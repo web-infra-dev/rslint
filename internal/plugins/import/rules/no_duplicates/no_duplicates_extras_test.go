@@ -673,3 +673,188 @@ func noDuplicatesConfiguredRules(*ast.SourceFile) []rule.ConfiguredRule {
 		},
 	}}
 }
+
+func TestNoDuplicatesTypeOnlyMerge(t *testing.T) {
+	preferInline := map[string]interface{}{"prefer-inline": true}
+	lines := func(lines ...int) []rule_tester.InvalidTestCaseError {
+		errors := make([]rule_tester.InvalidTestCaseError, len(lines))
+		for i, line := range lines {
+			errors[i] = rule_tester.InvalidTestCaseError{MessageId: "noDuplicates", Line: line}
+		}
+		return errors
+	}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&no_duplicates.NoDuplicatesRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			// `import type` absorbing inline type and value specifiers.
+			{
+				Code:   "import type {A} from './foo';\nimport {type B, C} from './foo';\n",
+				Output: []string{"import {type A,type B, C} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import type {A} from './foo';\nimport {type B} from './foo';\n",
+				Output: []string{"import {type A,type B} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import type {A} from './foo';\nimport D, {type B, C} from './foo';\n",
+				Output: []string{"import D, {type A,type B, C} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import type {A} from './foo';\nimport type {B} from './foo';\nimport {type C} from './foo';\n",
+				Output: []string{"import {type A,type B,type C} from './foo';\n"},
+				Errors: lines(1, 2, 3),
+			},
+			{
+				Code:   "import type {\n  A,\n  B as Bee,\n} from './foo';\nimport {type C, D} from './foo';\n",
+				Output: []string{"import {\n  type A,\n  type B as Bee,\ntype C, D} from './foo';\n"},
+				Errors: lines(4, 5),
+			},
+			{
+				Code:    "import type {A} from './foo?raw';\nimport {type B, C} from './foo?raw';\n",
+				Options: map[string]interface{}{"considerQueryString": true},
+				Output:  []string{"import {type A,type B, C} from './foo?raw';\n"},
+				Errors:  lines(1, 2),
+			},
+			// prefer-inline keeps aliased and default type-only specifiers type-only.
+			{
+				Code:    "import type {A as X} from './foo';\nimport {C} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {type A as X,C} from './foo';\n"},
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import type { default as D } from './foo';\nimport {C} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import { type default as D ,C} from './foo';\n"},
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import type {A} from './foo';\nimport D from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import D, {type A} from './foo';\n"},
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import type {A} from './foo';\nimport {} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {type A} from './foo';\n"},
+				Errors:  lines(1, 2),
+			},
+			// A type-only default cannot be merged with other bindings.
+			{
+				Code:    "import type D from './foo';\nimport {C} from './foo';\n",
+				Options: preferInline,
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import {C} from './foo';\nimport type D from './foo';\n",
+				Options: preferInline,
+				Errors:  lines(1, 2),
+			},
+			// Bare imports are kept when the merged import has no value binding.
+			{
+				Code:    "import type {A} from './foo';\nimport './foo';\n",
+				Options: preferInline,
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import './foo';\nimport type {A} from './foo';\n",
+				Options: preferInline,
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:    "import {type A} from './foo';\nimport './foo';\n",
+				Options: preferInline,
+				Errors:  lines(1, 2),
+			},
+			{
+				Code:   "import {} from './foo';\nimport './foo';\n",
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import {x} from './foo';\nimport './foo';\n",
+				Output: []string{"import {x} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			// Merged specifiers keep their source text, including comments and
+			// commas inside string-literal names or comments.
+			{
+				Code:   "import {type A} from './foo';\nimport type {\n B // comment\n} from './foo';\n",
+				Output: []string{"import {type A,\n type B // comment\n} from './foo';\n"},
+				Errors: lines(1, 4),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {\n  B, // c\n} from './foo';\n",
+				Output: []string{"import {type A,\n  type B // c\n} from './foo';\n"},
+				Errors: lines(1, 4),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {'x,y' as Q} from './foo';\n",
+				Output: []string{"import {type A,type 'x,y' as Q} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import {type A} from './foo';\nimport type {B /* x, y */} from './foo';\n",
+				Output: []string{"import {type A,type B /* x, y */} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import {type A, C} from './foo';\nimport type {\n  B, // b\n  E\n} from './foo';\n",
+				Output: []string{"import {type A, C,\n  type B, // b\n  type E\n} from './foo';\n"},
+				Errors: lines(1, 5),
+			},
+			{
+				Code:    "import {C} from './foo';\nimport type {\n 'x,y' as Q // q\n} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {C,\n type 'x,y' as Q // q\n} from './foo';\n"},
+				Errors:  lines(1, 4),
+			},
+			// A trailing comma followed by a comment does not produce `, ,`.
+			{
+				Code:   "import {C} from './foo';\nimport {\n  F, // f\n} from './foo';\nimport {D} from './foo';\n",
+				Output: []string{"import {C,\n  F // f\n,D} from './foo';\n"},
+				Errors: lines(1, 4, 5),
+			},
+			{
+				Code:   "import {\n  C, // c\n} from './foo';\nimport {F} from './foo';\n",
+				Output: []string{"import {\n  C, // c\nF} from './foo';\n"},
+				Errors: lines(3, 4),
+			},
+			// Specifiers are deduplicated by local name; conflicting bindings get no fix.
+			{
+				Code:   "import type {A} from './foo';\nimport {type A} from './foo';\n",
+				Output: []string{"import {type A} from './foo';\n"},
+				Errors: lines(1, 2),
+			},
+			{
+				Code:   "import type {C} from './foo';\nimport {type B, C} from './foo';\n",
+				Errors: lines(1, 2),
+			},
+			// A fully deduplicated import does not add a comma after a trailing one.
+			{
+				Code:   "import {type A,} from './foo';\nimport type {A} from './foo';\nimport {type B} from './foo';\n",
+				Output: []string{"import {type A,type B} from './foo';\n"},
+				Errors: lines(1, 2, 3),
+			},
+			{
+				Code:    "import {type A,} from './foo';\nimport type {A} from './foo';\nimport {type B} from './foo';\n",
+				Options: preferInline,
+				Output:  []string{"import {type A,type B} from './foo';\n"},
+				Errors:  lines(1, 2, 3),
+			},
+			{
+				Code:   "import {A,} from './foo';\nimport {A} from './foo';\nimport {B} from './foo';\n",
+				Output: []string{"import {A,B} from './foo';\n"},
+				Errors: lines(1, 2, 3),
+			},
+		},
+	)
+}

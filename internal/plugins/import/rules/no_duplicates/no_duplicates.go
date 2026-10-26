@@ -460,6 +460,34 @@ func hasInlineTypeSpecifiers(clause *ast.ImportClause) bool {
 	return false
 }
 
+// hasValueSpecifier checks if any named specifier lacks the inline `type` modifier.
+func hasValueSpecifier(clause *ast.ImportClause) bool {
+	if clause.NamedBindings == nil || clause.NamedBindings.Kind != ast.KindNamedImports {
+		return false
+	}
+	namedImports := clause.NamedBindings.AsNamedImports()
+	if namedImports.Elements == nil {
+		return false
+	}
+	for _, elem := range namedImports.Elements.Nodes {
+		if spec := elem.AsImportSpecifier(); spec != nil && !spec.IsTypeOnly {
+			return true
+		}
+	}
+	return false
+}
+
+// hasValueBinding returns true if an import that is not `import type` binds a
+// default or a named specifier without the inline `type` modifier.
+func hasValueBinding(node *ast.Node) bool {
+	importDecl := node.AsImportDeclaration()
+	if importDecl.ImportClause == nil {
+		return false
+	}
+	clause := importDecl.ImportClause.AsImportClause()
+	return clause.Name() != nil || hasValueSpecifier(clause)
+}
+
 // hasNamedSpecifiers returns true if the import has non-default, non-namespace specifiers
 // (i.e., `import { x, y }` or `import { type z }`).
 func hasNamedSpecifiers(node *ast.Node) bool {
@@ -538,9 +566,26 @@ func checkImports(resolver *importResolver, imports importMap) {
 }
 
 type specifierInfo struct {
-	importNode     *ast.Node
-	identifiersRaw string // raw identifier text between `{` and `}`
-	isEmpty        bool   // true when braces contain no actual specifiers (e.g., `import {} from ...`)
+	importNode    *ast.Node
+	elements      []*ast.Node // named specifiers; empty for `import {} from ...`
+	openBrace     int
+	closeBrace    int
+	trailingComma bool
+}
+
+// specifierKey describes what a named specifier binds. Two specifiers with the
+// same local name are merged only when their keys are equal.
+type specifierKey struct {
+	imported string
+	typeOnly bool
+}
+
+func newSpecifierKey(spec *ast.ImportSpecifier, importTypeOnly bool) specifierKey {
+	imported := spec.Name()
+	if spec.PropertyName != nil {
+		imported = spec.PropertyName
+	}
+	return specifierKey{imported: imported.Text(), typeOnly: importTypeOnly || spec.IsTypeOnly}
 }
 
 // getFix builds autofix operations to merge duplicate imports into the first one.
@@ -557,12 +602,16 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	// Bail: multiple different default import names (user must choose which to keep).
 	firstDefaultName := getDefaultImportName(first)
 	defaultImportName := firstDefaultName
+	addedDefaultIsValue := false
 	for _, node := range rest {
 		if name := getDefaultImportName(node); name != "" {
 			if defaultImportName != "" && name != defaultImportName {
 				return nil
 			}
 			defaultImportName = name
+			if !isTypeOnlyImport(node) {
+				addedDefaultIsValue = true
+			}
 		}
 	}
 
@@ -570,6 +619,9 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	// pass. Imports with comments or namespace bindings stay untouched.
 	var specifiers []specifierInfo
 	var unnecessaryImports []*ast.Node
+	var sideEffectImports []*ast.Node
+	mergesNonTypeOnly := false
+	mergesValueBinding := false
 	for _, node := range rest {
 		if hasNamespaceImport(node) || resolver.hasProblematicComments(node) {
 			continue
@@ -577,7 +629,7 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 
 		importDecl := node.AsImportDeclaration()
 		if importDecl.ImportClause == nil {
-			unnecessaryImports = append(unnecessaryImports, node)
+			sideEffectImports = append(sideEffectImports, node)
 			continue
 		}
 		clause := importDecl.ImportClause.AsImportClause()
@@ -596,14 +648,53 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 		}
 
 		namedImports := clause.NamedBindings.AsNamedImports()
-		specifiers = append(specifiers, specifierInfo{
-			importNode:     node,
-			identifiersRaw: text[openBrace+1 : closeBrace],
-			isEmpty:        namedImports.Elements == nil || len(namedImports.Elements.Nodes) == 0,
-		})
+		if !clause.IsTypeOnly() {
+			mergesNonTypeOnly = true
+			mergesValueBinding = mergesValueBinding || hasValueSpecifier(clause)
+		}
+		info := specifierInfo{importNode: node, openBrace: openBrace, closeBrace: closeBrace}
+		if namedImports.Elements != nil {
+			info.elements = namedImports.Elements.Nodes
+			info.trailingComma = namedImports.Elements.HasTrailingComma()
+		}
+		specifiers = append(specifiers, info)
 	}
 
 	shouldAddDefault := firstDefaultName == "" && defaultImportName != ""
+	if shouldAddDefault {
+		// A type-only default cannot share a statement with other bindings
+		// without rewriting it to `type default as X`.
+		if !addedDefaultIsValue {
+			return nil
+		}
+		mergesNonTypeOnly = true
+		mergesValueBinding = true
+	}
+
+	firstTypeOnly := isTypeOnlyImport(first)
+	if firstTypeOnly && firstDefaultName != "" && (len(specifiers) > 0 || mergesNonTypeOnly) {
+		return nil
+	}
+
+	// `import type` erases every binding, so merged imports that are not
+	// type-only need the inline form, with `type` on each type-only specifier.
+	convertFirst := firstTypeOnly && (opts.preferInline && len(specifiers) > 0 || mergesNonTypeOnly)
+	targetInline := !firstTypeOnly || convertFirst
+
+	// A bare import is the only form TypeScript always keeps for its side
+	// effects. Without a value binding the merged import can be elided, so
+	// a bare import is neither removed nor turned into a named import.
+	firstIsBare := first.AsImportDeclaration().ImportClause == nil
+	targetHasValue := mergesValueBinding || !firstTypeOnly && hasValueBinding(first)
+	if !targetHasValue {
+		if firstIsBare {
+			specifiers = nil
+		} else {
+			sideEffectImports = nil
+		}
+	}
+	unnecessaryImports = append(unnecessaryImports, sideEffectImports...)
+
 	shouldAddSpecifiers := len(specifiers) > 0
 	shouldRemoveUnnecessary := len(unnecessaryImports) > 0
 
@@ -611,29 +702,19 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 		return nil
 	}
 
-	// --- Build merged specifier text, deduplicating identifiers ---
+	// --- Build merged specifier text, deduplicating by local name ---
 
 	firstOpenBrace, firstCloseBrace := findBraces(first, text)
 	firstHasTrailingComma := false
 	firstIsEmpty := !hasNamedSpecifiers(first)
 
-	existingIdentifiers := make(map[string]bool)
-	if firstOpenBrace >= 0 && firstCloseBrace >= 0 && !firstIsEmpty {
-		for id := range strings.SplitSeq(text[firstOpenBrace+1:firstCloseBrace], ",") {
-			if trimmed := ecmascript.StringTrim(id); trimmed != "" {
-				existingIdentifiers[trimmed] = true
-			}
-		}
-		trimmedInside := strings.TrimRight(text[firstOpenBrace+1:firstCloseBrace], " \t\n\r")
-		firstHasTrailingComma = strings.HasSuffix(trimmedInside, ",")
-	}
-
-	// Snapshot of first import's specifiers before merge (for prefer-inline conversion).
-	var firstSpecifierNames map[string]bool
-	if opts.preferInline && isTypeOnlyImport(first) {
-		firstSpecifierNames = make(map[string]bool, len(existingIdentifiers))
-		for k := range existingIdentifiers {
-			firstSpecifierNames[k] = true
+	seen := make(map[string]specifierKey)
+	if !firstIsEmpty {
+		elements := first.AsImportDeclaration().ImportClause.AsImportClause().NamedBindings.AsNamedImports().Elements
+		firstHasTrailingComma = elements.HasTrailingComma()
+		for _, elem := range elements.Nodes {
+			spec := elem.AsImportSpecifier()
+			seen[spec.Name().Text()] = newSpecifierKey(spec, firstTypeOnly)
 		}
 	}
 
@@ -642,35 +723,53 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	var specBuf strings.Builder
 	needsComma := !firstHasTrailingComma && !firstIsEmpty
 
-	for _, spec := range specifiers {
-		isTypeSpec := isTypeOnlyImport(spec.importNode)
-		wroteSpecifier := false
+	for _, info := range specifiers {
+		typeOnly := isTypeOnlyImport(info.importNode)
 
-		// Append this import's identifiers directly, deduplicating as we go.
-		for id := range strings.SplitSeq(spec.identifiersRaw, ",") {
-			trimmed := ecmascript.StringTrim(id)
-			if trimmed == "" || existingIdentifiers[trimmed] {
+		// Copy each specifier's source text up to the comma that follows it, so
+		// comments, string-literal names and layout survive the merge.
+		for i, elem := range info.elements {
+			spec := elem.AsImportSpecifier()
+			key := newSpecifierKey(spec, typeOnly)
+			localName := spec.Name().Text()
+			if existing, ok := seen[localName]; ok {
+				if existing != key {
+					// One local name bound to different imports does not compile.
+					return nil
+				}
 				continue
 			}
-			existingIdentifiers[trimmed] = true
+			seen[localName] = key
 
-			if wroteSpecifier {
-				specBuf.WriteByte(',')
-			} else if needsComma && !spec.isEmpty {
-				specBuf.WriteByte(',')
+			start := elem.Pos()
+			end := info.closeBrace
+			tail := ""
+			if i+1 < len(info.elements) {
+				end = info.elements[i+1].Pos() - 1
+			} else if info.trailingComma {
+				// Drop the trailing comma but keep the comments after it.
+				end = scanner.SkipTrivia(text, elem.End())
+				tail = text[end+1 : info.closeBrace]
 			}
 
-			if opts.preferInline && isTypeSpec {
+			if needsComma {
+				specBuf.WriteByte(',')
+			}
+			specStart := scanner.SkipTrivia(text, start)
+			specBuf.WriteString(text[start:specStart])
+			if targetInline && typeOnly {
 				specBuf.WriteString("type ")
-				specBuf.WriteString(trimmed)
-			} else {
-				specBuf.WriteString(id)
 			}
-			wroteSpecifier = true
+			specBuf.WriteString(text[specStart:end])
+			specBuf.WriteString(tail)
+			needsComma = true
 		}
 
-		if !spec.isEmpty {
-			needsComma = true
+		if len(info.elements) == 0 {
+			if inner := text[info.openBrace+1 : info.closeBrace]; ecmascript.StringTrim(inner) != "" {
+				// Keep comments from empty braces, as upstream does for `import {/*c*/}`.
+				specBuf.WriteString(inner)
+			}
 		}
 	}
 
@@ -680,7 +779,7 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 
 	firstDecl := first.AsImportDeclaration()
 	fixCapacity := len(specifiers) + len(unnecessaryImports) + 2
-	if shouldAddSpecifiers && opts.preferInline && isTypeOnlyImport(first) && firstDecl.ImportClause != nil {
+	if convertFirst && firstDecl.ImportClause != nil {
 		bindings := firstDecl.ImportClause.AsImportClause().NamedBindings
 		if bindings != nil && bindings.Kind == ast.KindNamedImports && bindings.AsNamedImports().Elements != nil {
 			fixCapacity += len(bindings.AsNamedImports().Elements.Nodes)
@@ -690,30 +789,24 @@ func getFix(resolver *importResolver, first *ast.Node, rest []*ast.Node) []rule.
 	firstTrimmedPos := scanner.SkipTrivia(text, first.Pos())
 	importKeywordEnd := firstTrimmedPos + len("import")
 
-	// prefer-inline: convert `import type {a}` → `import {type a}`.
-	if shouldAddSpecifiers && opts.preferInline && isTypeOnlyImport(first) {
+	// Convert `import type {a}` → `import {type a}`.
+	if convertFirst {
 		// Remove the `type` keyword after `import`.
 		if typeRange := findTypeKeyword(first, text); typeRange.Pos() >= 0 {
 			fixes = append(fixes, rule.RuleFix{Range: typeRange, Text: ""})
 		}
-		// Prefix each existing specifier in the first import with `type`.
+		// Prefix each existing specifier in the first import with `type`,
+		// before its property name when it is aliased (`type a as b`).
 		if firstOpenBrace >= 0 && firstCloseBrace >= 0 {
 			clause := firstDecl.ImportClause.AsImportClause()
 			if clause.NamedBindings != nil && clause.NamedBindings.Kind == ast.KindNamedImports {
 				for _, elem := range clause.NamedBindings.AsNamedImports().Elements.Nodes {
-					spec := elem.AsImportSpecifier()
-					if spec != nil && !spec.IsTypeOnly {
-						nameNode := spec.Name()
-						if nameNode != nil {
-							nameText := nameNode.AsIdentifier().Text
-							if firstSpecifierNames[nameText] {
-								trimmedNamePos := scanner.SkipTrivia(text, nameNode.Pos())
-								fixes = append(fixes, rule.RuleFix{
-									Range: core.NewTextRange(trimmedNamePos, nameNode.End()),
-									Text:  "type " + nameText,
-								})
-							}
-						}
+					if spec := elem.AsImportSpecifier(); spec != nil && !spec.IsTypeOnly {
+						specPos := scanner.SkipTrivia(text, elem.Pos())
+						fixes = append(fixes, rule.RuleFix{
+							Range: core.NewTextRange(specPos, specPos),
+							Text:  "type ",
+						})
 					}
 				}
 			}
