@@ -1,11 +1,13 @@
 package target
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
@@ -26,6 +28,34 @@ func dirAccessed(dirs []string, seg string) bool {
 		}
 	}
 	return false
+}
+
+type globWalkRecorder struct {
+	vfs.FS
+	filesVisited int
+}
+
+func (f *globWalkRecorder) WalkDir(root string, fn vfs.WalkDirFunc) error {
+	return f.FS.WalkDir(root, func(path string, entry vfs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() {
+			f.filesVisited++
+		}
+		return fn(path, entry, err)
+	})
+}
+
+func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
+	layout := []string{"src/a.ts"}
+	for i := range 100 {
+		layout = append(layout, "src/unrelated/deep/file"+strconvI(i)+".ts")
+	}
+	root, paths := setupDiscoveryFixture(t, layout)
+	fsys := &globWalkRecorder{FS: osvfs.FS()}
+	scanRoot, files, err := ExpandGlob(context.Background(), fsys, root, "src/*.ts")
+	assert.NilError(t, err)
+	assert.Equal(t, scanRoot, tspath.ResolvePath(root, "src"))
+	assert.DeepEqual(t, files, []string{paths["src/a.ts"]})
+	assert.Equal(t, fsys.filesVisited, 1)
 }
 
 func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {
