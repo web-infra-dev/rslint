@@ -22,15 +22,6 @@ func (s *Server) currentEditorOverlayFSForTarget(
 	return newFrozenLintTargetOverlayFS(s.fs, files, target)
 }
 
-func (s *Server) currentEditorOverlayFSForTargetWithConflicts(
-	uri lsproto.DocumentUri,
-	target target.File,
-) (vfs.FS, bool) {
-	content, open := s.documents[uri]
-	files, aliasesConflict := s.currentEditorOverlayFilesForFrozenTarget(uri, target, content, open)
-	return newFrozenLintTargetOverlayFS(s.fs, files, target), aliasesConflict
-}
-
 // currentEditorOverlayFilesForFrozenTarget resolves every other open document
 // normally, but inserts the selected document only under the identity frozen
 // by documentLintSnapshot. Re-resolving the selected URI here could mix two

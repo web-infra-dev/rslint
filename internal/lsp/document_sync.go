@@ -44,12 +44,8 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 		s.lintPrograms.DidOpen(uri, content, existedOnDisk)
 	}
 
-	// Notify session about the opened file so it creates the overlay.
-	if s.session != nil {
-		s.session.DidOpenFile(ctx, uri, params.TextDocument.Version, content, params.TextDocument.LanguageId)
-	}
 	s.refreshUncoveredDocument(ctx, uri)
-	if s.session != nil {
+	if s.initialized {
 		s.pushDiagnostics(uri)
 	}
 	return nil
@@ -63,7 +59,7 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 	content, err := applyDocumentChanges(s.documents[uri], params.ContentChanges)
 	if err != nil {
 		// didChange is a notification, so the server cannot return an error to
-		// request a retry. Keep both document mirrors on their previous content
+		// request a retry. Keep the document on its previous content
 		// instead of partially applying malformed input or sending an invalid
 		// JSON-RPC response with a null request ID.
 		log.Printf("Ignoring invalid didChange for %s: %v", uri, err)
@@ -81,11 +77,7 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 	s.cancelInflightPluginDispatch(uri)
 	delete(s.diagnostics, uri)
 
-	// Notify session immediately so tsgo's overlay stays up-to-date for
-	// other LSP features (completions, hover, etc.).  Lint is deferred
-	// via scheduleLint to avoid running the linter on every keystroke.
-	if s.session != nil {
-		s.session.DidChangeFile(ctx, uri, params.TextDocument.Version, params.ContentChanges)
+	if s.initialized {
 		s.scheduleLint(uri)
 	}
 	s.refreshUncoveredDocument(ctx, uri)
@@ -106,8 +98,8 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		log.Printf("Ignoring stale didSave for open document %s", uri)
 	}
 
-	// Clear pending debounce lint for this URI — pushDiagnostics below
-	// will lint it immediately, so the debounce would be redundant.
+	// The save refresh below includes this URI, so its pending debounce
+	// would schedule redundant diagnostics.
 	delete(s.pendingLintURIs, uri)
 
 	if s.lintPrograms != nil && forwardSave {
@@ -116,12 +108,15 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 
 	s.refreshUncoveredDocument(ctx, uri)
 
-	// Notify session about the save event.
-	if s.session != nil {
+	if s.initialized {
 		if forwardSave {
-			s.session.DidSaveFile(ctx, uri)
+			// Saving a dependency can change other open documents' diagnostics
+			// without invalidating their resident Programs.
+			s.invalidateOpenDocumentDiagnostics()
+			_ = s.RefreshDiagnostics(ctx)
+		} else {
+			s.pushDiagnostics(uri)
 		}
-		s.pushDiagnostics(uri)
 	}
 	return nil
 }
@@ -153,8 +148,7 @@ func (s *Server) refreshUncoveredDocument(ctx context.Context, uri lsproto.Docum
 
 // shouldForwardDidSave suppresses only saves that are known to describe an
 // older version of an open document. Saves without text and saves for documents
-// not tracked as open are forwarded for LSP client compatibility and so tsgo
-// can observe out-of-band disk changes.
+// not tracked as open still invalidate resident Programs to observe disk changes.
 func shouldForwardDidSave(currentContent string, open bool, savedText *string) bool {
 	return savedText == nil || !open || currentContent == *savedText
 }
@@ -177,7 +171,7 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 		s.lintPrograms.DidClose(uri)
 	}
 
-	if s.session != nil {
+	if s.initialized {
 		// Push empty diagnostics to clear the client's display before closing
 		if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
 			Uri:         uri,
@@ -185,7 +179,6 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 		}); err != nil {
 			log.Printf("Error clearing diagnostics on close: %v", err)
 		}
-		s.session.DidCloseFile(ctx, uri)
 	}
 	return nil
 }

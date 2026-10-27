@@ -125,7 +125,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	// so any scheduled debounce lint for the same content is redundant.
 	delete(s.pendingLintURIs, uri)
 
-	if s.session == nil {
+	if !s.initialized {
 		return empty, nil
 	}
 	if !isLintableScriptFile(uri) {

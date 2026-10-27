@@ -2,14 +2,11 @@ package lsp
 
 import (
 	"context"
-	"io"
 	"log"
 	"os"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/shim/project"
-	"github.com/microsoft/TypeScript/tsc/shim/project/logging"
 )
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
@@ -59,8 +56,8 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 }
 func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
 	// Enable file watching if the client supports dynamic registration of
-	// didChangeWatchedFiles. This allows Session to register tsconfig watchers
-	// and call RefreshDiagnostics when project state changes.
+	// didChangeWatchedFiles. Resident Programs use these notifications to
+	// invalidate source and project metadata.
 	if s.initializeParams.Capabilities != nil &&
 		s.initializeParams.Capabilities.Workspace != nil &&
 		s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles != nil &&
@@ -84,20 +81,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		}()
 	}
 
-	s.session = project.NewSession(&project.SessionInit{
-		BackgroundCtx: s.backgroundCtx,
-		Options: &project.SessionOptions{
-			CurrentDirectory:   s.cwd,
-			DefaultLibraryPath: s.defaultLibraryPath,
-			TypingsLocation:    s.typingsLocation,
-			PositionEncoding:   s.positionEncoding,
-			WatchEnabled:       s.watchEnabled,
-		},
-		FS:         s.fs,
-		Client:     s,
-		Logger:     logging.NewLogger(io.Discard),
-		ParseCache: s.parseCache,
-	})
+	s.initialized = true
 	if s.watchEnabled && s.outgoingQueue != nil {
 		s.lintPrograms = newLintProgramStore(s)
 	}

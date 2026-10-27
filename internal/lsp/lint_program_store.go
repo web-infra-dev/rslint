@@ -10,27 +10,26 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// lintProgramStore owns standalone Programs selected for editor linting.
-// Both explicit and discovered projects prefer Session-owned Programs.
-// Standalone fallbacks retain their compiler construction mode in the cache key.
+// lintProgramStore owns the configured Programs selected by open documents.
+// Explicit and discovered projects share the same editor construction semantics.
 type lintProgramStore struct {
 	server              *Server
+	documentPrograms    map[lsproto.DocumentUri]lintProgramKey
+	parseCache          *utils.ParseCache
 	coverage            *lintProgramCoverage
 	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
 }
 
-type lintProgramKey struct {
-	configPath       string
-	sourceReferences bool
-}
+type lintProgramKey = tspath.Path
 
 type lintProgramState struct {
 	program    *compiler.Program
@@ -48,11 +47,12 @@ type lintProgramRequest struct {
 	store             *lintProgramStore
 	ctx               context.Context
 	uri               lsproto.DocumentUri
+	overlayFiles      map[string]string
 	overlayFS         vfs.FS
+	discoveryFS       *lintTrackingFS
 	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
-	sourceReferences  bool
 	usedKey           lintProgramKey
 	usedState         *lintProgramState
 	projectMetadata   map[string]*lintProjectMetadata
@@ -62,6 +62,8 @@ type lintProgramRequest struct {
 func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
 		server:              server,
+		documentPrograms:    make(map[lsproto.DocumentUri]lintProgramKey),
+		parseCache:          utils.NewParseCache(),
 		coverage:            newLintProgramCoverage(server),
 		programs:            make(map[lintProgramKey]*lintProgramState),
 		projectMetadata:     make(map[string]*lintProjectMetadata),
@@ -78,7 +80,7 @@ func (s *lintProgramStore) Request(
 	uri lsproto.DocumentUri,
 	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
-	request := s.request(ctx, uri, target, false)
+	request := s.request(ctx, uri, target)
 	return request.load, request.loadMetadata, request.finalize
 }
 
@@ -86,7 +88,6 @@ func (s *lintProgramStore) request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	target target.File,
-	sourceReferences bool,
 ) *lintProgramRequest {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
@@ -100,30 +101,25 @@ func (s *lintProgramStore) request(
 		ctx:               ctx,
 		uri:               uri,
 		target:            target,
-		sourceReferences:  sourceReferences,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
 }
 
 func (r *lintProgramRequest) key(configPath string) lintProgramKey {
-	if r.sourceReferences {
-		configPath = string(lintProgramLexicalPathID(configPath, r.store.server.fs))
-	}
-	return lintProgramKey{tspath.NormalizePath(configPath), r.sourceReferences}
+	return lintProgramLexicalPathID(configPath, r.store.server.fs)
 }
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
-	if r.sourceReferences {
-		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
-			true, metadata.commandLine,
-			newLintProjectReferenceHost(
-				utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys),
-				r.projectMetadata,
-			),
-		)
-	}
-	return createStandaloneLintProgram(metadata, fsys)
+	// Project loading is parallel; serialized LSP file requests share one checker.
+	commandLine := metadata.commandLine.WithFileNames(metadata.commandLine.FileNames())
+	options := *commandLine.CompilerOptions()
+	checkerCount := 1
+	options.Checkers = &checkerCount
+	commandLine.SetCompilerOptions(&options)
+	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
+	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
+		newLintProjectReferenceHost(host, r.projectMetadata))
 }
 
 func (r *lintProgramRequest) loadMetadata(
@@ -138,13 +134,24 @@ func (r *lintProgramRequest) prepareOverlay() {
 		return
 	}
 	r.overlayPrepared = true
-	var aliasesConflict bool
-	r.overlayFS, aliasesConflict =
-		r.store.server.currentEditorOverlayFSForTargetWithConflicts(r.uri, r.target)
+	server := r.store.server
+	content, open := server.documents[r.uri]
+	files, aliasesConflict := server.currentEditorOverlayFilesForFrozenTarget(r.uri, r.target, content, open)
+	r.overlayFiles = files
+	r.overlayFS = newFrozenLintTargetOverlayFS(server.fs, files, r.target)
+	r.discoveryFS = newLintTrackingFS(r.overlayFS)
 	if aliasesConflict {
 		r.store.Invalidate()
 		r.freshOnly = true
 	}
+}
+
+// freshFS shares repeated disk and projected-overlay queries within one
+// observation. A new view after watcher registration or an editor event keeps
+// cached misses and symlink identities out of the next observation.
+func (r *lintProgramRequest) freshFS() vfs.FS {
+	disk := cachedvfs.From(r.store.server.fs)
+	return cachedvfs.From(newFrozenLintTargetOverlayFS(disk, r.overlayFiles, r.target))
 }
 
 func (r *lintProgramRequest) metadata(
@@ -193,7 +200,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 	}
 
 	for attempt := range 2 {
-		tracker := newLintTrackingFS(r.overlayFS)
+		tracker := newLintTrackingFS(r.freshFS())
 		metadata, err := parseStandaloneLintProject(
 			configFileName,
 			tracker,
@@ -248,14 +255,16 @@ func (r *lintProgramRequest) load(
 	if content, open := r.store.server.documents[r.uri]; open {
 		r.store.markStateSourceContent(state, targetSource, content)
 	}
+	// Cache filesystem queries only within this editor observation. The stable
+	// host must see a fresh view on every request, including incremental updates.
+	state.tracker.Inner = r.freshFS()
 	if len(state.dirtyFiles) == 0 {
-		state.tracker.Inner = r.overlayFS
 		return r.result(configFileName, state)
 	}
 
-	state.tracker.Inner = r.overlayFS
 	state.tracker.reset()
 	program := state.program
+	allGraphsReused := true
 	for _, dirtyPath := range sortedLintProgramPaths(state.dirtyFiles) {
 		oldSourceFile := program.GetSourceFileByPath(dirtyPath)
 		if oldSourceFile == nil {
@@ -273,6 +282,7 @@ func (r *lintProgramRequest) load(
 		}
 		program = updated
 		if !graphReused {
+			allGraphsReused = false
 			clear(state.failedLookups)
 			clear(state.selectedSourceIdentities)
 			break
@@ -280,7 +290,11 @@ func (r *lintProgramRequest) load(
 	}
 
 	state.program = program
-	state.sources = utils.NewProgramSourceLookup(program, r.overlayFS)
+	if allGraphsReused {
+		state.sources.UpdateProgramForReusedGraph(program, r.overlayFS)
+	} else {
+		state.sources = utils.NewProgramSourceLookup(program, r.overlayFS)
+	}
 	clear(state.dirtyFiles)
 	added, safe := r.cover(state)
 	if !safe {
@@ -319,7 +333,7 @@ func (r *lintProgramRequest) matchesMetadata(state *lintProgramState, root *lint
 func (r *lintProgramRequest) loadFresh(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	program, err := r.createProgram(metadata, r.overlayFS)
+	program, err := r.createProgram(metadata, r.freshFS())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -342,7 +356,7 @@ func (r *lintProgramRequest) rebuild(
 	// can retain any successful metadata from this request, so none of those
 	// snapshots may cross the request boundary while coverage is unsettled.
 	if r.freshOnly || !r.store.Usable() || len(r.transientMetadata) != 0 {
-		program, err := r.createProgram(metadata, r.overlayFS)
+		program, err := r.createProgram(metadata, r.freshFS())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -352,7 +366,9 @@ func (r *lintProgramRequest) rebuild(
 	// Register every dependency discovered by the first build, then rebuild
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
-		tracker := newLintTrackingFS(r.overlayFS)
+		// Each retry starts after watcher registration with a fresh filesystem
+		// view, so cached misses cannot hide a change in the registration gap.
+		tracker := newLintTrackingFS(r.freshFS())
 		program, err := r.createProgram(metadata, tracker)
 		if err != nil {
 			return nil, nil, err
@@ -428,14 +444,66 @@ func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bo
 }
 
 func (r *lintProgramRequest) finalize() {
-	if !r.store.Usable() || r.usedState == nil {
+	defer r.store.prune()
+	delete(r.store.documentPrograms, r.uri)
+	if !r.store.Usable() {
+		return
+	}
+	if r.discoveryFS != nil {
+		lookups := r.discoveryFS.drain()
+		added, safe, err := r.store.coverage.ensure(r.ctx, lookups.seenFiles, r.store.server.cwd)
+		if err != nil || !safe {
+			r.store.coverage.disabled = true
+			r.store.Invalidate()
+			return
+		}
+		if added {
+			// Re-select after registering missing-config probes, closing the interval
+			// in which a new config could appear before its watcher became active.
+			r.store.Invalidate()
+			_ = r.store.server.RefreshDiagnostics(r.ctx)
+			return
+		}
+	}
+	if r.usedState == nil {
 		return
 	}
 	added, safe := r.cover(r.usedState)
 	if !safe || added {
-		// Rules and the checker can perform lazy reads. New watcher coverage is
-		// active now, but this Program predates it.
 		delete(r.store.programs, r.usedKey)
+		return
+	}
+	if _, open := r.store.server.documents[r.uri]; open && r.store.programs[r.usedKey] == r.usedState {
+		r.store.documentPrograms[r.uri] = r.usedKey
+	}
+}
+
+func (s *Server) releaseDocumentProgram(uri lsproto.DocumentUri) {
+	if s.lintPrograms != nil {
+		delete(s.lintPrograms.documentPrograms, uri)
+		s.lintPrograms.prune()
+	}
+}
+
+// prune bounds both Program and parsed-source residency to document ownership.
+// Requests already holding a generation keep their own Go references.
+func (s *lintProgramStore) prune() {
+	live := make(map[lintProgramKey]bool, len(s.documentPrograms))
+	for _, key := range s.documentPrograms {
+		live[key] = true
+	}
+	programs := make([]*compiler.Program, 0, len(s.programs))
+	for key, state := range s.programs {
+		if !live[key] {
+			delete(s.programs, key)
+		} else {
+			programs = append(programs, state.program)
+		}
+	}
+	s.parseCache.RetainOnly(programs)
+	if len(s.documentPrograms) == 0 {
+		clear(s.projectMetadata)
+		clear(s.observedRootConfigs)
 	}
 }
 
@@ -464,6 +532,8 @@ func (s *lintProgramStore) DidSave(uri lsproto.DocumentUri, open bool) {
 }
 
 func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
+	delete(s.documentPrograms, uri)
+	defer s.prune()
 	content, ok := s.server.fs.ReadFile(uriToPath(uri))
 	if !ok {
 		s.Invalidate()
@@ -478,21 +548,24 @@ func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
 func (s *lintProgramStore) DidChangeWatchedFiles(
 	changes []*lsproto.FileEvent,
 ) bool {
-	discarded := false
+	needsRefresh := false
 	for _, change := range changes {
 		if s.isOpenSourceOverlayWatchChange(change) {
 			uri := change.Uri
-			discarded = s.markContent(
+			s.markContent(
 				uriToPath(uri),
 				s.server.documents[uri],
 				false,
-			) || discarded
+			)
+			// A dependent document can still display older diagnostics even
+			// when its Program has already incorporated the saved buffer.
+			needsRefresh = true
 			continue
 		}
 		invalidated := s.Invalidate()
-		return invalidated || discarded || len(s.server.documents) > 0
+		return invalidated || needsRefresh || len(s.server.documents) > 0
 	}
-	return discarded
+	return needsRefresh
 }
 
 func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
@@ -511,6 +584,8 @@ func (s *lintProgramStore) Invalidate() bool {
 		len(s.projectMetadata) != 0 ||
 		len(s.observedRootConfigs) != 0
 	clear(s.programs)
+	clear(s.documentPrograms)
+	s.parseCache.RetainOnly(nil)
 	clear(s.projectMetadata)
 	clear(s.observedRootConfigs)
 	return hadState
@@ -520,16 +595,16 @@ func (s *lintProgramStore) markContent(
 	fileName string,
 	content string,
 	invalidatePossibleNewSource bool,
-) (discarded bool) {
+) {
 	if tspath.HasJSONFileExtension(fileName) {
-		return s.Invalidate()
+		s.Invalidate()
+		return
 	}
 	if invalidatePossibleNewSource {
 		for configFileName, metadata := range s.projectMetadata {
 			if metadata != nil && metadata.commandLine != nil &&
 				metadata.commandLine.PossiblyMatchesFileName(fileName) {
 				delete(s.projectMetadata, configFileName)
-				discarded = true
 			}
 		}
 	}
@@ -549,7 +624,6 @@ func (s *lintProgramStore) markContent(
 			state.selectedSourceIdentities[lexicalID]
 		if identityKnown && previousIdentity != physicalPathID() {
 			delete(s.programs, configFileName)
-			discarded = true
 			continue
 		}
 		var sourceFile *ast.SourceFile
@@ -561,7 +635,6 @@ func (s *lintProgramStore) markContent(
 		if sourceFile != nil {
 			if !identityKnown && lexicalID != physicalPathID() {
 				delete(s.programs, configFileName)
-				discarded = true
 				continue
 			}
 			s.markStateSourceContent(state, sourceFile, content)
@@ -571,10 +644,8 @@ func (s *lintProgramStore) markContent(
 			(state.program.CommandLine().PossiblyMatchesFileName(fileName) ||
 				state.failedLookupMatches(fileName, s.server.fs)) {
 			delete(s.programs, configFileName)
-			discarded = true
 		}
 	}
-	return discarded
 }
 
 // sourceFileForOpen avoids a canonical source scan for every unrelated

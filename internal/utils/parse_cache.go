@@ -57,7 +57,8 @@ import (
 //	I8: AST eviction is deletion-only (RetainOnly). A deleted entry is simply
 //	    re-parsed on next request; selective rewriting of entries is
 //	    forbidden — deletion can cost a parse, never a stale result.
-//	I9: cache ownership is explicit and bounded to one CLI run or API request;
+//	I9: cache ownership is explicit: one CLI run/API request or the LSP
+//	    resident Program set (pruned with RetainOnly);
 //	    no package-level singleton may extend source/AST lifetime implicitly.
 type ParseCache struct {
 	m        sync.Map // project.ParseCacheKey -> *ast.SourceFile
@@ -301,6 +302,16 @@ func WithParseCache(host compiler.CompilerHost, cache *ParseCache) compiler.Comp
 		useSourceSnapshots: cache.bindSourceSnapshotFS(host.FS()),
 		cacheAST:           true,
 	}
+}
+
+// WithASTCache shares parsed sources while reading every version from the
+// host's current filesystem. Editor hosts update their overlays between
+// requests; their owner prunes this cache to the resident Programs with RetainOnly.
+func WithASTCache(host compiler.CompilerHost, cache *ParseCache) compiler.CompilerHost {
+	if cache == nil {
+		return host
+	}
+	return &cachingCompilerHost{CompilerHost: host, cache: cache, cacheAST: true}
 }
 
 // WithSourceSnapshots reuses the invocation's immutable source bytes without

@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/collections"
@@ -223,7 +224,18 @@ func (c *lintProgramCoverage) ensure(
 		return false, false, nil
 	}
 
-	candidates := append(exactWatchers, watchers.WorkspaceWatchers...)
+	candidates := exactWatchers
+	for _, watcher := range watchers.WorkspaceWatchers {
+		// A physical compiler path may lie outside the client's workspace URI
+		// (for example /private/tmp versus /tmp). Absolute glob subscriptions
+		// only filter existing workspace events; URI roots also watch aliases.
+		directory := strings.TrimSuffix(*watcher.GlobPattern.Pattern, "/**/*")
+		if c.relativePatternSupport && tspath.IsRootedDiskPath(directory) {
+			watcher = fileSystemWatcher(directory, "**/*", true)
+			watcher.Kind = &watchKind
+		}
+		candidates = append(candidates, watcher)
+	}
 	candidates = append(candidates, watchers.OutsideWorkspaceWatchers...)
 	newWatchers := make([]*lsproto.FileSystemWatcher, 0, len(candidates))
 	newKeys := make([]string, 0, len(candidates))

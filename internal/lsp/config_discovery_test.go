@@ -741,15 +741,10 @@ func TestHandleConfigRefreshPublishesEffectiveProjectErrors(t *testing.T) {
 			if err := s.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer s.session.Close()
+
 			for _, name := range files {
 				uri := documentURIFromPath(tspath.ResolvePath(root, name))
 				s.documents[uri] = source
-				language := lsproto.LanguageKindTypeScript
-				if strings.HasSuffix(name, ".js") {
-					language = lsproto.LanguageKindJavaScript
-				}
-				s.session.DidOpenFile(context.Background(), uri, 1, source, language)
 			}
 			refresh := func(reason string, options *config.ParserOptions) {
 				t.Helper()

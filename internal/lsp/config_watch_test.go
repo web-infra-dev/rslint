@@ -77,16 +77,16 @@ func TestHandleDidChangeWatchedFilesInvalidatesTypeInfoForTSConfigVariants(t *te
 			s := newTestServer()
 			s.fs = &mockFS{files: map[string]bool{}}
 			s.cwd = "/project"
-			s.lintSessionRoots = newLintSessionProjectRootCache()
-			s.lintSessionRoots.entries["/project/old-tsconfig.json"] = lintSessionProjectRootEntry{}
+			s.lintPrograms = newLintProgramStore(s)
+			s.lintPrograms.projectMetadata["/project/old-tsconfig.json"] = &lintProjectMetadata{}
 
 			if err := s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
 				Changes: []*lsproto.FileEvent{{Uri: uri, Type: lsproto.FileChangeTypeChanged}},
 			}); err != nil {
 				t.Fatalf("tsconfig event: %v", err)
 			}
-			if len(s.lintSessionRoots.entries) != 0 {
-				t.Fatalf("stale project metadata survived invalidation: %+v", s.lintSessionRoots.entries)
+			if len(s.lintPrograms.projectMetadata) != 0 {
+				t.Fatalf("stale project metadata survived invalidation: %+v", s.lintPrograms.projectMetadata)
 			}
 			select {
 			case <-s.refreshCh:
@@ -138,9 +138,9 @@ func TestHandleDidChangeWatchedFilesReevaluatesCustomProject(t *testing.T) {
 			if err := s.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
 				t.Fatal(err)
 			}
-			defer s.session.Close()
+
 			s.lintPrograms = fixture.store
-			s.session.DidOpenFile(context.Background(), fixture.sourceURI, 1, s.documents[fixture.sourceURI], "typescript")
+
 			installJSConfigsForTest(s, map[string]config.RslintConfig{s.cwd: {{
 				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{pattern}}},
 			}}})

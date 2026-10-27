@@ -66,7 +66,6 @@ func acquireSpeculativeGeneration(
 	overlayFS := newFrozenLintTargetOverlayFS(environment.baseFS, files, target)
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
-	request.sourceReferences = snapshot.projectPolicy.ServiceRootDirectory != ""
 	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
 		snapshot.projectPolicy,
@@ -110,7 +109,7 @@ type speculativeGenerationAcquire func(
 
 // speculativeGenerationProvider maps the pipeline-owned memory snapshot onto an
 // isolated editor overlay. It never advances fix rounds and never mutates the
-// TypeScript Session, open-document store, or diagnostics cache.
+// resident Programs, open-document store, or diagnostics cache.
 type speculativeGenerationProvider struct {
 	uri             lsproto.DocumentUri
 	targetPath      string

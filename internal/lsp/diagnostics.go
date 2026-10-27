@@ -79,9 +79,9 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnosti
 
 // pushDiagnostics runs the linter for the given URI and pushes results to the client.
 // Must be called synchronously from the LSP message loop (not from a goroutine)
-// because session is not goroutine-safe.
+// because document and Program state belongs to that loop.
 func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
-	if s.session == nil {
+	if !s.initialized {
 		return
 	}
 
@@ -99,6 +99,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	s.cancelInflightPluginDispatch(uri)
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.unavailable {
+		s.releaseDocumentProgram(uri)
 		delete(s.diagnostics, uri)
 		if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
 			Uri:         uri,
