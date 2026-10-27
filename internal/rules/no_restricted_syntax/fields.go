@@ -288,6 +288,8 @@ func listChildrenOf(parent *ast.Node) [][]*ast.Node {
 		add(statements(parent.AsSourceFile().Statements))
 	case ast.KindBlock:
 		add(statements(parent.AsBlock().Statements))
+	case ast.KindModuleBlock:
+		add(statements(parent.AsModuleBlock().Statements))
 	case ast.KindClassStaticBlockDeclaration:
 		add(statements(parent.AsClassStaticBlockDeclaration().Body.AsBlock().Statements))
 	case ast.KindArrayLiteralExpression:

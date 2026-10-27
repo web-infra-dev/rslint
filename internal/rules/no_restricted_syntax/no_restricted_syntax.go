@@ -3,6 +3,7 @@ package no_restricted_syntax
 import (
 	_ "embed"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -83,8 +84,11 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// folded ESTree child: type, parent and fields can all differ.
 			target := virtualTarget(node)
 			visitExportWrapper := func() {
+				if !bucket.hasVirtual {
+					return
+				}
 				wrapper := exportWrapperTarget(node)
-				if !bucket.hasVirtual || wrapper == "" {
+				if wrapper == "" {
 					return
 				}
 				for index := range bucket.entries {
@@ -154,6 +158,9 @@ type ruleEntry struct {
 	compiled selector
 	message  string
 	exit     bool
+	// Some export hosts have no supported physical ESTree identity. Broad
+	// selectors still need their wrappers without exposing extra tsgo nodes.
+	virtualOnly bool
 }
 
 const maxCachedRulePlans = 64
@@ -242,6 +249,15 @@ func buildRulePlan(options []any) *rulePlan {
 			for _, kind := range allInterestingKinds {
 				key := listenerKind(kind)
 				perKind[key] = append(perKind[key], entry)
+			}
+			if !isBareWildcardSelector(entry.compiled) {
+				entry.virtualOnly = true
+				for _, kind := range exportedDeclarationKinds {
+					if !slices.Contains(allInterestingKinds, kind) {
+						key := listenerKind(kind)
+						perKind[key] = append(perKind[key], entry)
+					}
+				}
 			}
 			continue
 		}
@@ -389,6 +405,15 @@ func collectDispatchAttrs(sel selector, attrs []dispatchAttr) []dispatchAttr {
 	case classSelector:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
 	case combinatorSelector:
+		// The right-hand attribute cannot filter a reverse subject match on
+		// the left-hand node, whose attributes may be completely different.
+		if hasReverseSiblingSubject(value) {
+			kinds := newKindSet()
+			collectKinds(value.Right, kinds, false)
+			if kinds.universe {
+				return attrs
+			}
+		}
 		attrs = collectDispatchAttrs(value.Right, attrs)
 	case combinedPseudo:
 		attrs = collectDispatchAttrs(value.Inner, attrs)
@@ -467,6 +492,9 @@ func (bucket *ruleBucket) candidates(node *ast.Node, mc *matchContext) (first, s
 
 func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchContext, ctx *rule.RuleContext, indexed bool) {
 	entry := &bucket.entries[index]
+	if entry.virtualOnly {
+		return
+	}
 	compiled := entry.compiled
 	if indexed && bucket.dispatch != nil && bucket.dispatch.matched[index] != nil {
 		compiled = bucket.dispatch.matched[index]

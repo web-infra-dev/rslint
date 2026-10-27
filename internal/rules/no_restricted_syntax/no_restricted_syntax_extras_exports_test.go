@@ -7,6 +7,196 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+// Checked against ESLint 10.13.0 and @typescript-eslint/parser 8.65.0.
+func TestNoRestrictedSyntaxExportSelectorForms(t *testing.T) {
+	for _, declaration := range []struct {
+		code     string
+		nodeType string
+	}{
+		{"export default interface I {}", "ExportDefaultDeclaration"},
+		{"export default function f() {}", "ExportDefaultDeclaration"},
+		{"export default class C {}", "ExportDefaultDeclaration"},
+		{"export default 1;", "ExportDefaultDeclaration"},
+		{"export default value;", "ExportDefaultDeclaration"},
+		{"export default () => {};", "ExportDefaultDeclaration"},
+		{"export default (class {});", "ExportDefaultDeclaration"},
+		{"export interface I {}", "ExportNamedDeclaration"},
+		{"export type T = string;", "ExportNamedDeclaration"},
+		{"export namespace N {}", "ExportNamedDeclaration"},
+		{"export namespace A.B {}", "ExportNamedDeclaration"},
+		{"export import A = B.C;", "ExportNamedDeclaration"},
+		{`export import A = require("x");`, "ExportNamedDeclaration"},
+		{`export import type A = require("x");`, "ExportNamedDeclaration"},
+		{"export const value = 1;", "ExportNamedDeclaration"},
+		{"export function f() {}", "ExportNamedDeclaration"},
+		{"export class C {}", "ExportNamedDeclaration"},
+		{"export enum E { A }", "ExportNamedDeclaration"},
+		{"export { value };", "ExportNamedDeclaration"},
+		{"export { value } from 'x';", "ExportNamedDeclaration"},
+		{"export type { Value } from 'x';", "ExportNamedDeclaration"},
+		{"export * from 'x';", "ExportAllDeclaration"},
+		{"export * as ns from 'x';", "ExportAllDeclaration"},
+	} {
+		t.Run(declaration.code, func(t *testing.T) {
+			var invalid []rule_tester.InvalidTestCase
+			for _, selector := range []string{
+				declaration.nodeType,
+				"[type='" + declaration.nodeType + "']",
+				"[type=" + declaration.nodeType + "]",
+				"*[type='" + declaration.nodeType + "']",
+				"[type='" + declaration.nodeType + "']:exit",
+				":matches([type='" + declaration.nodeType + "'], Identifier[name='blocked'])",
+				"[type=/^Export.*Declaration$/]",
+				"[type=/^Export.*Declaration$/]:exit",
+				":not([type!=/^Export.*Declaration$/])",
+				"Program > [type=/^Export.*Declaration$/]",
+				":statement[type=/^Export.*Declaration$/]",
+				":declaration[type=/^Export.*Declaration$/]",
+				"[type=/^Export.*Declaration$/]:first-child",
+			} {
+				invalid = append(invalid, rule_tester.InvalidTestCase{
+					Code: declaration.code, Options: []any{selector},
+					Errors: []rule_tester.InvalidTestCaseError{{
+						MessageId: "restrictedSyntax", Line: 1, Column: 1,
+						EndLine: 1, EndColumn: len(declaration.code) + 1,
+					}},
+				})
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule, nil, invalid)
+		})
+	}
+}
+
+func TestNoRestrictedSyntaxExportSelectorBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "interface I {} type T = string; namespace A.B {} import C = D.E;", Options: []any{"[type=/^Export/]"}},
+			{Code: "namespace A.B.C {}", Options: []any{"[type='ExportNamedDeclaration']"}},
+			{Code: "export default interface I {}", Options: []any{"[type='exportDefaultDeclaration']"}},
+			{Code: "export default interface I {}", Options: []any{"[type='UnknownDeclaration']"}},
+			{Code: "export default interface I {}", Options: []any{"[type='ExportNamedDeclaration']"}},
+			{Code: "export interface I {}", Options: []any{"[type='ExportDefaultDeclaration']"}},
+			{Code: `export import type A = require("x");`, Options: []any{"[exportKind='type']"}},
+			{Code: "export = value;", Options: []any{"[type='ExportDefaultDeclaration']", "[type=/^Export/]", "[declaration]", "[exportKind]"}},
+			{Code: "export default (value as number);", Options: []any{"[type='ExportDefaultDeclaration'][declaration.type='Identifier']"}},
+			{Code: "// eslint-disable-next-line test\nexport default interface I {}", Options: []any{"[type='ExportDefaultDeclaration']"}},
+			{Code: "export type T = string; // eslint-disable-line test", Options: []any{"[type=/^Export/]:exit"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: "namespace N { export interface I {} }", Options: []any{"[type=/^Export/]:first-child", "[type=/^Export/]:last-child"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 36},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 36},
+				},
+			},
+			{
+				Code: "namespace N { export interface A {} export type B = A; }", Options: []any{"[type=/^Export/] + [type=/^Export/]", "[type=/^Export/]:nth-child(2)"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 37, EndLine: 1, EndColumn: 55},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 37, EndLine: 1, EndColumn: 55},
+				},
+			},
+			{
+				Code: "export { type T };", Options: []any{"[type='ExportSpecifier'][exportKind='type']"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code: "export type { T };", Options: []any{"[type='ExportSpecifier'][exportKind='value']"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 15, EndLine: 1, EndColumn: 16}},
+			},
+			{
+				Code: "export { type T };", Options: []any{"[type=/^Export/]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: "export default (value as number);", Options: []any{"[type='ExportDefaultDeclaration'][declaration.type='TSAsExpression']"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 34}},
+			},
+			{
+				Code: "export default interface I {}", Options: []any{":not(Program, Identifier)"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code: "export default 1;", Options: []any{"[type='ExportDefaultDeclaration'][declaration.type='Literal'][exportKind='value']"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}},
+			},
+			{
+				Code: "export default (value);", Options: []any{"ExportDefaultDeclaration > Identifier.declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 17, EndLine: 1, EndColumn: 22}},
+			},
+			{
+				Code: "export { value };", Options: []any{"[type='ExportNamedDeclaration'][declaration=null]"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 18}},
+			},
+			{
+				Code: "export interface A {}\nexport type B = A;", Options: []any{"[type=/^Export/] + [type=/^Export/]"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 19}},
+			},
+			{
+				Code: "export default interface I {}", Options: []any{"[type=/^Export/]:has(Identifier[name='I'])"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code: "export default interface I {}", Options: []any{"[type='Program']:has([type='ExportDefaultDeclaration'])"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
+			},
+			{
+				Code: "export default interface I {}", Options: []any{"[type='ExportDefaultDeclaration'] Identifier"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 27}},
+			},
+			{
+				// Adding export hosts must neither expose unsupported physical
+				// declarations nor add virtual diagnostics to the bare wildcard.
+				Code: "export default interface I {}", Options: []any{"*", "[type=/^Export/]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 26, EndLine: 1, EndColumn: 27},
+				},
+			},
+		})
+}
+
+func TestNoRestrictedSyntaxExportAttributeSubjects(t *testing.T) {
+	// Unlike a named selector, an attribute selector can also receive the
+	// left-hand node for esquery's reverse sibling-subject matching.
+	for _, selector := range []string{
+		"!ExpressionStatement ~ [type='ExportDefaultDeclaration']",
+		"ExpressionStatement + ![type='ExportDefaultDeclaration']",
+		":matches(!ExpressionStatement ~ [type='ExportDefaultDeclaration'], Identifier[name='missing'])",
+	} {
+		t.Run(selector, func(t *testing.T) {
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule, nil,
+				[]rule_tester.InvalidTestCase{{
+					Code: "value(); export default function f() {}", Options: []any{selector},
+					Errors: []rule_tester.InvalidTestCaseError{
+						{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 9},
+						{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 40},
+					},
+				}})
+		})
+	}
+	t.Run("preserve typed dispatch", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule, nil,
+			[]rule_tester.InvalidTestCase{
+				{
+					Code: "[a && b, c + d];", Options: []any{"!LogicalExpression ~ BinaryExpression[operator='+']"},
+					Errors: []rule_tester.InvalidTestCaseError{{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15}},
+				},
+				{
+					Code: "[a && b, c + d];", Options: []any{"!LogicalExpression ~ [type='BinaryExpression'][operator='+']"},
+					Errors: []rule_tester.InvalidTestCaseError{
+						{MessageId: "restrictedSyntax", Line: 1, Column: 2, EndLine: 1, EndColumn: 8},
+						{MessageId: "restrictedSyntax", Line: 1, Column: 10, EndLine: 1, EndColumn: 15},
+					},
+				},
+			})
+	})
+}
+
 // Regression expectations were checked against ESLint 10.10.0, esquery 1.7.0,
 // and @typescript-eslint/parser 8.69.0. tsgo folds `export` into the exported
 // declaration's modifiers; ESTree wraps it in ExportNamedDeclaration.
