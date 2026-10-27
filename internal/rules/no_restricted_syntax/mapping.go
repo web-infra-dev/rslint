@@ -48,9 +48,12 @@ var estreeKindMap = map[string][]ast.Kind{
 	// ESTree's VariableDeclaration is the statement-level node (`var a = 1;`).
 	// tsgo represents that with VariableStatement; the inner declarators
 	// become VariableDeclaration nodes (mapped as VariableDeclarator below).
+	// A FunctionDeclaration without a body (overload signature, `declare
+	// function`) is TSDeclareFunction in ESTree; the matcher checks the body.
 	"VariableDeclaration":           {ast.KindVariableStatement, ast.KindVariableDeclarationList},
 	"VariableDeclarator":            {ast.KindVariableDeclaration},
 	"FunctionDeclaration":           {ast.KindFunctionDeclaration},
+	"TSDeclareFunction":             {ast.KindFunctionDeclaration},
 	"FunctionExpression":            {ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
 	"TSEmptyBodyFunctionExpression": {ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor},
 	"TSAbstractMethodDefinition":    {ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor},

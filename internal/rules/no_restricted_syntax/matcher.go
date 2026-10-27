@@ -233,6 +233,10 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindJsxOpeningElement
 	case "Literal":
 		return node.Kind != ast.KindConstructor
+	case "FunctionDeclaration":
+		return !isDeclareFunction(node)
+	case "TSDeclareFunction":
+		return isDeclareFunction(node)
 	case "FunctionExpression":
 		// Methods expose a synthetic FunctionExpression through ESTree's
 		// MethodDefinition.value / Property.value fields.
@@ -351,6 +355,12 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindSpreadElement || node.Kind == ast.KindSpreadAssignment
 	}
 	return true
+}
+
+// isDeclareFunction reports a FunctionDeclaration without a body: an overload
+// signature or `declare function`, which ESTree types as TSDeclareFunction.
+func isDeclareFunction(node *ast.Node) bool {
+	return node.Kind == ast.KindFunctionDeclaration && node.AsFunctionDeclaration().Body == nil
 }
 
 func isJSXMemberExpression(node *ast.Node) bool {
@@ -2037,6 +2047,9 @@ func estreeNameForKind(node *ast.Node) string {
 	case ast.KindFunctionExpression:
 		return "FunctionExpression"
 	case ast.KindFunctionDeclaration:
+		if isDeclareFunction(node) {
+			return "TSDeclareFunction"
+		}
 		return "FunctionDeclaration"
 	case ast.KindBlock:
 		return "BlockStatement"

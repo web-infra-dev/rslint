@@ -741,3 +741,172 @@ func TestNoRestrictedSyntaxExportRegressions(t *testing.T) {
 			},
 		})
 }
+
+// A FunctionDeclaration without a body is TSDeclareFunction in ESTree, including
+// overload signatures under ExportDefaultDeclaration / ExportNamedDeclaration.
+func TestNoRestrictedSyntaxDeclareFunctionRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "declare function g(): void;", Options: []any{"FunctionDeclaration"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "export default function f(x: string): string;\nexport default function f(x: any) { return x; }",
+				Options: []any{"ExportDefaultDeclaration[declaration.type='FunctionDeclaration']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 48},
+				},
+			},
+			{
+				Code:    "export default function f(x: string): string;\nexport default function f(x: any) { return x; }",
+				Options: []any{"ExportDefaultDeclaration[declaration.type='TSDeclareFunction']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 46},
+				},
+			},
+			{
+				Code:    "export default function f(x: string): string;\nexport default function f(x: any) { return x; }",
+				Options: []any{"ExportDefaultDeclaration > FunctionDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 16, EndLine: 2, EndColumn: 48},
+				},
+			},
+			{
+				Code:    "export default function f(x: string): string;\nexport default function f(x: any) { return x; }",
+				Options: []any{"ExportDefaultDeclaration > TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 46},
+				},
+			},
+			{
+				Code:    "export default function f(x: string): string;\nexport default function f(x: any) { return x; }",
+				Options: []any{"ExportDefaultDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 46},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 48},
+				},
+			},
+			{
+				Code:    "export function f(x: string): string;\nexport function f(x: any) { return x; }",
+				Options: []any{"ExportNamedDeclaration[declaration.type='TSDeclareFunction']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
+				},
+			},
+			{
+				Code:    "export function f(x: string): string;\nexport function f(x: any) { return x; }",
+				Options: []any{"ExportNamedDeclaration > FunctionDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 8, EndLine: 2, EndColumn: 40},
+				},
+			},
+			{
+				Code:    "export function f(x: string): string;\nexport function f(x: any) { return x; }",
+				Options: []any{"ExportNamedDeclaration[exportKind='value']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 40},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{"FunctionDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 33},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{"TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{"Program > TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{"TSDeclareFunction[id.name='f']"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{":function"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 33},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{":statement"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 33},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 20, EndLine: 2, EndColumn: 33},
+					{MessageId: "restrictedSyntax", Line: 2, Column: 22, EndLine: 2, EndColumn: 31},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{":declaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 33},
+				},
+			},
+			{
+				Code:    "function f(x: string): string;\nfunction f(x: any) { return x; }",
+				Options: []any{"TSDeclareFunction + FunctionDeclaration"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 33},
+				},
+			},
+			{
+				Code:    "declare function g(): void;",
+				Options: []any{"TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 28},
+				},
+			},
+			{
+				Code:    "export declare function g(): void;",
+				Options: []any{"ExportNamedDeclaration[exportKind='type'] > TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    "declare module 'm' { function h(): void; }",
+				Options: []any{"TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 22, EndLine: 1, EndColumn: 41},
+				},
+			},
+			{
+				Code:    "async function f(): Promise<void>;\nasync function f() {}",
+				Options: []any{"TSDeclareFunction[async=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
+				},
+			},
+			{
+				Code:    "export default function (): void;\nexport default function () {}",
+				Options: []any{"ExportDefaultDeclaration > TSDeclareFunction"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 16, EndLine: 1, EndColumn: 34},
+				},
+			},
+			{
+				Code:    "function f(): void;\nfunction f() {}",
+				Options: []any{"FunctionDeclaration[body]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
+				},
+			},
+		})
+}
