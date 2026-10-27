@@ -219,7 +219,14 @@ async function classifyLintPatterns(
 
   for (const pattern of patterns) {
     if (globPatternRole(pattern) !== 'match') continue;
-    let scanRoot = staticGlobRoot(pattern, cwd);
+    let absolute = path.resolve(cwd, pattern);
+    let info;
+    try {
+      info = await stat(absolute);
+    } catch {
+      // Missing literal paths can still be glob patterns or escaped paths.
+    }
+    let scanRoot = info ? undefined : staticGlobRoot(pattern, cwd);
     if (scanRoot !== undefined) {
       try {
         const info = await stat(scanRoot);
@@ -236,12 +243,8 @@ async function classifyLintPatterns(
       continue;
     }
 
-    let absolute = path.resolve(cwd, pattern);
     try {
-      let info;
-      try {
-        info = await stat(absolute);
-      } catch {
+      if (!info) {
         absolute = path.resolve(
           cwd,
           picomatch.scan(pattern, { unescape: true }).base || pattern,
@@ -370,6 +373,7 @@ export class Rslint {
   /**
    * Lint files matched by glob pattern(s), resolved against `cwd`. Results are
    * ordered by the linted file's path (deterministic), not by glob-walk order.
+   * Inclusion patterns give existing files and directories literal precedence.
    */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
     const globs = Array.isArray(patterns) ? patterns : [patterns];

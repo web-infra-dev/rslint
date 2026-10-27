@@ -364,6 +364,7 @@ describe('Rslint class', () => {
         '!dir',
         '!!src',
         'skip.ts',
+        'literals',
       ];
       for (const directory of directories) {
         await mkdir(path.join(tmp, directory, '.git'), { recursive: true });
@@ -381,6 +382,9 @@ describe('Rslint class', () => {
       );
       await writeFile(path.join(tmp, 'src', 'control.ts'), 'debugger;\n');
       await writeFile(path.join(tmp, 'control.ts'), 'debugger;\n');
+      for (const file of ['[ab].ts', 'a.ts', 'b.ts']) {
+        await writeFile(path.join(tmp, 'literals', file), 'debugger;\n');
+      }
       await writeFile(
         path.join(tmp, 'rslint.config.mjs'),
         `export default ${JSON.stringify(config)};\n`,
@@ -394,6 +398,7 @@ describe('Rslint class', () => {
         try {
           for (const [pattern, expected] of [
             ['brace{dir}/**/*.ts', ['brace{dir}/one.ts']],
+            ['nested/[dir]', ['nested/[dir]/one.ts']],
             [String.raw`nested/\[dir\]`, ['nested/[dir]/one.ts']],
             [String.raw`brace\{dir\}/**/*.ts`, ['brace{dir}/one.ts']],
             ['brace{dir}/one.ts', ['brace{dir}/one.ts']],
@@ -402,6 +407,12 @@ describe('Rslint class', () => {
             ['close)dir/**/*.ts', ['close)dir/one.ts']],
             ['comma,dir/**/*.ts', ['comma,dir/one.ts']],
             ['comma,dir/one.ts', ['comma,dir/one.ts']],
+            ['literals/[ab].ts', ['literals/[ab].ts']],
+            [path.join(tmp, 'literals', '[ab].ts'), ['literals/[ab].ts']],
+            [
+              ['literals/[ab].ts', 'literals/[ab].ts', 'src/*.ts'],
+              ['literals/[ab].ts', 'src/control.ts'],
+            ],
             ['src/**/*.ts', ['src/control.ts']],
             [['src/control.ts', `!${absolutePattern}/src/*.ts`], []],
             [['src/control.ts', ancestorExclusion], []],
@@ -416,11 +427,11 @@ describe('Rslint class', () => {
             ['', []],
             [['', 'src/*.ts'], ['src/control.ts']],
             ['./!src', ['control.ts']],
-            ['./!!src', ['src/control.ts']],
+            ['./!!src', ['!!src/one.ts']],
             [String.raw`\!dir`, ['!dir/one.ts']],
             ['scratch/*/../../!src', ['control.ts']],
             [`${absolutePattern}/scratch/*/../../!src`, ['control.ts']],
-            ['scratch/*/../../!!src', ['src/control.ts']],
+            ['scratch/*/../../!!src', ['!!src/one.ts']],
             [`${absolutePattern}/scratch/*/../../!!src`, ['src/control.ts']],
             ['scratch/*/../../src/*.ts', ['src/control.ts']],
             ['scratch/**/../../src/*.ts', ['src/control.ts']],
