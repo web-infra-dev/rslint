@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/binder"
@@ -299,6 +301,9 @@ func TestCachingHost_SourceSnapshotSharedAcrossParseOptions(t *testing.T) {
 	fs := newMemoryReadFS(map[string]string{fileName: "const value = 1;\n"})
 	cache := &ParseCache{}
 	host := WithParseCache(CreateCompilerHost("/virtual", fs), cache)
+	if text, ok := cache.ReadSourceText(fs, fileName); !ok || text != "const value = 1;\n" {
+		t.Fatalf("construction preflight returned %q, %v", text, ok)
+	}
 
 	regular := host.GetSourceFile(testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{}))
 	forced := host.GetSourceFile(testParseOpts(fileName, ast.ExternalModuleIndicatorOptions{Force: true}))
@@ -1117,5 +1122,39 @@ func TestWithParseCache_NilPassthrough(t *testing.T) {
 	host := CreateCompilerHost(t.TempDir(), fs)
 	if WithParseCache(host, nil) != host {
 		t.Fatal("nil cache must return the host unchanged")
+	}
+}
+
+func TestWeakParseCacheReleasesASTAndKeepsSourceSnapshot(t *testing.T) {
+	t.Setenv("RSLINT_DISABLE_PARSE_CACHE", "")
+	cache := NewWeakParseCache()
+	fs := newReadCountingFS(newMemoryReadFS(map[string]string{"/file.ts": "export const value = 1;"}))
+	host := WithParseCache(CreateCompilerHost("/", fs), cache)
+	opts := testParseOpts("/file.ts", ast.ExternalModuleIndicatorOptions{})
+	ref := func() weak.Pointer[ast.SourceFile] {
+		first := host.GetSourceFile(opts)
+		runtime.GC()
+		if second := host.GetSourceFile(opts); first != second {
+			t.Fatal("a live AST was not shared")
+		}
+		return weak.Make(first)
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for ref.Value() != nil {
+		if time.Now().After(deadline) {
+			t.Fatal("weak parse cache retained an unowned AST")
+		}
+		runtime.GC()
+		runtime.Gosched()
+	}
+	reparsed := host.GetSourceFile(opts)
+	if reparsed.Text() != "export const value = 1;" {
+		t.Fatal("reparse changed the frozen source")
+	}
+	fs.mu.Lock()
+	reads := fs.reads["/file.ts"]
+	fs.mu.Unlock()
+	if reads != 1 {
+		t.Fatalf("AST reclamation discarded the source snapshot: %d reads", reads)
 	}
 }

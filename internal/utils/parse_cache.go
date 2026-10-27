@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
+	"weak"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
@@ -54,14 +55,16 @@ import (
 //	I7: source invalidation atomically swaps in a fresh generation. It never
 //	    clears a live map, so a pre-invalidation miss can only publish into its
 //	    captured old generation. Invalidation is not a reader barrier.
-//	I8: AST eviction is deletion-only (RetainOnly). A deleted entry is simply
+//	I8: AST eviction deletes entries (RetainOnly), or weak references expire
+//	    when their last Program owner disappears. An expired entry is simply
 //	    re-parsed on next request; selective rewriting of entries is
 //	    forbidden — deletion can cost a parse, never a stale result.
 //	I9: cache ownership is explicit: one CLI run/API request or the LSP
 //	    resident Program set (pruned with RetainOnly);
 //	    no package-level singleton may extend source/AST lifetime implicitly.
 type ParseCache struct {
-	m        sync.Map // project.ParseCacheKey -> *ast.SourceFile
+	m        sync.Map // project.ParseCacheKey -> *ast.SourceFile or weak.Pointer[ast.SourceFile]
+	weakASTs bool
 	inflight sync.Map // project.ParseCacheKey -> *parseCacheFlight
 
 	sourceGeneration atomic.Pointer[sourceSnapshotGeneration]
@@ -97,10 +100,21 @@ type parseCacheFlight struct {
 // The escape hatch is undocumented — it exists for bisecting user issues and
 // A/B verification, not as a user-facing knob.
 func NewParseCache() *ParseCache {
+	return newParseCache(false)
+}
+
+// NewWeakParseCache shares ASTs while Programs still own them, without keeping
+// completed Programs' sources alive during an overlapping load/execute pass.
+// Source text snapshots remain strong and immutable for the entire request.
+func NewWeakParseCache() *ParseCache {
+	return newParseCache(true)
+}
+
+func newParseCache(weakASTs bool) *ParseCache {
 	if os.Getenv("RSLINT_DISABLE_PARSE_CACHE") != "" {
 		return nil
 	}
-	cache := &ParseCache{}
+	cache := &ParseCache{weakASTs: weakASTs}
 	cache.sourceGeneration.Store(&sourceSnapshotGeneration{})
 	return cache
 }
@@ -123,7 +137,7 @@ func (c *ParseCache) acquireSnapshot(opts ast.SourceFileParseOptions, snapshot s
 	scriptKind := core.GetScriptKindFromFileName(opts.FileName)
 	key := project.NewParseCacheKey(opts, snapshot.hash, scriptKind)
 	if value, ok := c.m.Load(key); ok {
-		if sourceFile, ok := value.(*ast.SourceFile); ok {
+		if sourceFile := cachedSourceFile(value); sourceFile != nil {
 			return sourceFile
 		}
 	}
@@ -151,7 +165,7 @@ func (c *ParseCache) acquireParseMiss(
 		// A previous owner can publish the final entry and remove its flight
 		// between acquireSnapshot's fast-path miss and our LoadOrStore above.
 		if value, ok := c.m.Load(key); ok {
-			if sourceFile, ok := value.(*ast.SourceFile); ok {
+			if sourceFile := cachedSourceFile(value); sourceFile != nil {
 				candidate.sourceFile = sourceFile
 				candidate.completed = true
 				c.completeParseFlight(key, candidate)
@@ -176,7 +190,11 @@ func (c *ParseCache) parseAndPublish(
 	}()
 
 	sourceFile := parse()
-	if sourceFile != nil {
+	if sourceFile != nil && c.weakASTs {
+		// The single-flight owner is the only publisher for this key. A dead
+		// weak entry can be replaced; its parse inputs and snapshot are equal.
+		c.m.Store(key, weak.Make(sourceFile))
+	} else if sourceFile != nil {
 		actual, _ := c.m.LoadOrStore(key, sourceFile)
 		if winner, ok := actual.(*ast.SourceFile); ok {
 			sourceFile = winner
@@ -187,6 +205,17 @@ func (c *ParseCache) parseAndPublish(
 	completed = true
 	c.completeParseFlight(key, flight)
 	return sourceFile
+}
+
+func cachedSourceFile(value any) *ast.SourceFile {
+	switch value := value.(type) {
+	case *ast.SourceFile:
+		return value
+	case weak.Pointer[ast.SourceFile]:
+		return value.Value()
+	default:
+		return nil
+	}
 }
 
 func (c *ParseCache) completeParseFlight(key project.ParseCacheKey, flight *parseCacheFlight) {
@@ -223,10 +252,7 @@ func (c *ParseCache) RetainOnly(programs []*compiler.Program) {
 		}
 	}
 	c.m.Range(func(k, v any) bool {
-		sourceFile, ok := v.(*ast.SourceFile)
-		if !ok {
-			return true
-		}
+		sourceFile := cachedSourceFile(v)
 		if _, ok := live[sourceFile]; !ok {
 			c.m.CompareAndDelete(k, v)
 		}
@@ -327,10 +353,20 @@ func WithSourceSnapshots(host compiler.CompilerHost, cache *ParseCache) compiler
 	}
 }
 
+// ReadSourceText lets construction preflight share the same immutable bytes
+// later consumed by compiler hosts. It does not parse or retain an AST.
+func (c *ParseCache) ReadSourceText(fsys vfs.FS, fileName string) (string, bool) {
+	if c == nil || !c.bindSourceSnapshotFS(fsys) {
+		return fsys.ReadFile(fileName)
+	}
+	snapshot, ok := c.acquireSourceSnapshot(fsys, c.currentSourceGeneration(), fileName)
+	return snapshot.text, ok
+}
+
 func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.SourceFile {
 	if h.useSourceSnapshots {
 		generation := h.cache.currentSourceGeneration() // I7: capture exactly one generation
-		snapshot, ok := h.acquireSourceSnapshot(generation, opts.FileName)
+		snapshot, ok := h.cache.acquireSourceSnapshot(h.FS(), generation, opts.FileName)
 		if !ok {
 			return nil // I1: failed reads are never published
 		}
@@ -350,7 +386,8 @@ func (h *cachingCompilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *as
 	return parser.ParseSourceFile(opts, text, core.GetScriptKindFromFileName(opts.FileName))
 }
 
-func (h *cachingCompilerHost) acquireSourceSnapshot(
+func (c *ParseCache) acquireSourceSnapshot(
+	fsys vfs.FS,
 	generation *sourceSnapshotGeneration,
 	fileName string,
 ) (sourceSnapshot, bool) {
@@ -380,15 +417,16 @@ func (h *cachingCompilerHost) acquireSourceSnapshot(
 				candidate.snapshot = snapshot
 				candidate.ok = true
 				candidate.completed = true
-				h.completeSourceSnapshotFlight(generation, fileName, candidate)
+				completeSourceSnapshotFlight(generation, fileName, candidate)
 				return snapshot, true
 			}
 		}
-		return h.readAndPublishSourceSnapshot(generation, fileName, candidate)
+		return c.readAndPublishSourceSnapshot(fsys, generation, fileName, candidate)
 	}
 }
 
-func (h *cachingCompilerHost) readAndPublishSourceSnapshot(
+func (c *ParseCache) readAndPublishSourceSnapshot(
+	fsys vfs.FS,
 	generation *sourceSnapshotGeneration,
 	fileName string,
 	flight *sourceSnapshotFlight,
@@ -397,15 +435,15 @@ func (h *cachingCompilerHost) readAndPublishSourceSnapshot(
 	defer func() {
 		if !completed {
 			// A panicking VFS must not strand Programs waiting on the same file.
-			h.completeSourceSnapshotFlight(generation, fileName, flight)
+			completeSourceSnapshotFlight(generation, fileName, flight)
 		}
 	}()
 
-	text, ok := h.FS().ReadFile(fileName)
+	text, ok := fsys.ReadFile(fileName)
 	if !ok {
 		flight.completed = true
 		completed = true
-		h.completeSourceSnapshotFlight(generation, fileName, flight)
+		completeSourceSnapshotFlight(generation, fileName, flight)
 		return sourceSnapshot{}, false
 	}
 
@@ -418,11 +456,11 @@ func (h *cachingCompilerHost) readAndPublishSourceSnapshot(
 	flight.ok = true
 	flight.completed = true
 	completed = true
-	h.completeSourceSnapshotFlight(generation, fileName, flight)
+	completeSourceSnapshotFlight(generation, fileName, flight)
 	return flight.snapshot, true
 }
 
-func (h *cachingCompilerHost) completeSourceSnapshotFlight(
+func completeSourceSnapshotFlight(
 	generation *sourceSnapshotGeneration,
 	fileName string,
 	flight *sourceSnapshotFlight,

@@ -318,6 +318,31 @@ func dispatchEslintPluginRules(
 	timing *TimingCollector,
 	onDiagnostic DiagnosticHandler,
 ) ([]EslintPluginProtocolNotice, error) {
+	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil)
+}
+
+// One observation owns one bounded set of projection and transport windows.
+// Program units share both admission and reusable buffers; splitting loading
+// must never multiply ESTree capacity or Node requests.
+type pluginDispatchResources struct {
+	slots    chan struct{}
+	builders chan *pluginProjectionBuffers
+}
+
+func newPluginDispatchResources() *pluginDispatchResources {
+	limit := dispatchConcurrency()
+	return &pluginDispatchResources{slots: make(chan struct{}, limit), builders: make(chan *pluginProjectionBuffers, limit)}
+}
+
+func (resources *pluginDispatchResources) dispatch(
+	ctx context.Context, dispatch EslintPluginDispatcher, files []EslintPluginFileInput,
+	collectFixes bool, suggestionsMode string, timing *TimingCollector, onDiagnostic DiagnosticHandler,
+	onBatch func(pluginBatchRange),
+) ([]EslintPluginProtocolNotice, error) {
+	if resources == nil {
+		resources = newPluginDispatchResources()
+	}
+
 	// Internal pipeline tasks transfer ownership of these private input slots.
 	// Exported dispatch helpers clone the caller's slice before entering here.
 	defer clear(files)
@@ -329,9 +354,12 @@ func dispatchEslintPluginRules(
 	// concurrency limit. A large homogeneous group must share that capacity,
 	// rather than serially alternating projection and worker execution.
 	var batches [][]EslintPluginFileInput
+	var keys []string
 	for _, group := range groupEslintPluginFiles(files) {
+		key := eslintPluginBatchKey(group[0])
 		for start := 0; start < len(group); start += pluginWindowFiles {
 			batches = append(batches, group[start:min(start+pluginWindowFiles, len(group))])
+			keys = append(keys, key)
 		}
 	}
 	clear(files)
@@ -340,13 +368,16 @@ func dispatchEslintPluginRules(
 	batchErrs := make([]error, len(batches))
 
 	var g errgroup.Group
-	limit := dispatchConcurrency()
-	// This invocation owns a finite cache of projection and output buffers.
-	// A window keeps exclusive ownership until its dispatcher has returned.
-	builders := make(chan *pluginProjectionBuffers, limit)
-	g.SetLimit(limit)
 	for i, batch := range batches {
+		select {
+		case resources.slots <- struct{}{}:
+		case <-ctx.Done():
+			batchErrs[i] = ctx.Err()
+			clear(batch)
+			continue
+		}
 		g.Go(func() error {
+			defer func() { <-resources.slots }()
 			// Each batch writes only its own slot, so concurrent batches share
 			// no state; diagnostics are emitted serially after Wait. The timing
 			// collector is the one mutex-guarded exception, merged per file.
@@ -354,7 +385,7 @@ func dispatchEslintPluginRules(
 				ctx,
 				dispatch,
 				batch,
-				builders,
+				resources.builders,
 				collectFixes,
 				suggestionsMode,
 				timing,
@@ -368,14 +399,18 @@ func dispatchEslintPluginRules(
 	}
 	_ = g.Wait()
 
-	for _, diags := range batchDiags {
+	var notices []EslintPluginProtocolNotice
+	diagnosticCount := 0
+	for i, diags := range batchDiags {
+		part := pluginBatchRange{key: keys[i], diagnosticStart: diagnosticCount, diagnosticEnd: diagnosticCount + len(diags), noticeStart: len(notices), noticeEnd: len(notices) + len(batchNotices[i]), err: batchErrs[i]}
 		for _, d := range diags {
 			onDiagnostic(d)
 		}
-	}
-	var notices []EslintPluginProtocolNotice
-	for _, batch := range batchNotices {
-		notices = append(notices, batch...)
+		diagnosticCount += len(diags)
+		notices = append(notices, batchNotices[i]...)
+		if onBatch != nil {
+			onBatch(part)
+		}
 	}
 	// A real (non-cancellation) error outranks a cooperative cancel: with batches
 	// running concurrently, a later batch's genuine transport failure must not be
@@ -420,6 +455,8 @@ type EslintPluginProtocolNotice struct {
 // also contributes a synthetic error diagnostic so it cannot produce a false
 // successful lint result.
 type EslintPluginDispatchOutcome struct {
+	batches       []pluginBatchRange
+	failurePath   string
 	Diagnostics   []rule.RuleDiagnostic
 	Notices       []EslintPluginProtocolNotice
 	DispatchError error

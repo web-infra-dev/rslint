@@ -326,17 +326,11 @@ func (s *Session) executeProjectPlan(plan projectPlan, singleThreaded bool) (Pro
 // then applies the caller's existing construction scope. LoadCLI/LoadAPI bind
 // targets to that plan once; discovery never creates a separate Program set.
 func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error) {
-	if err := s.validate(); err != nil {
+	plan, err := s.prepareProjectPlan(request)
+	if err != nil {
 		return ProjectSet{}, err
 	}
-	plan := buildProjectPlan(request, s.FS())
-	if plan.terminalErr == nil {
-		if err := s.discoverServiceProjects(&plan, request.Targets, request.Policies); err != nil {
-			return ProjectSet{}, err
-		}
-	}
 	var set ProjectSet
-	var err error
 	if request.Scope == AllDeclared {
 		set, err = s.executeProjectPlan(plan, request.SingleThreaded)
 	} else {
@@ -364,4 +358,19 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 		}
 	}
 	return set, nil
+}
+
+// prepareProjectPlan resolves declarations and service metadata without loading
+// source Programs. Both materialized and admitted CLI loads use this authority.
+func (s *Session) prepareProjectPlan(request ProjectBuildRequest) (projectPlan, error) {
+	if err := s.validate(); err != nil {
+		return projectPlan{}, err
+	}
+	plan := buildProjectPlan(request, s.FS())
+	if plan.terminalErr == nil {
+		if err := s.discoverServiceProjects(&plan, request.Targets, request.Policies); err != nil {
+			return projectPlan{}, err
+		}
+	}
+	return plan, nil
 }

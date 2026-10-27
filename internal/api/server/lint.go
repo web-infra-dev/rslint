@@ -445,11 +445,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		if buildErr != nil {
 			return loader.LoadResult{}, buildErr
 		}
-		return session.LoadAPI(projects, targetPlan, configDirectory, false)
-	}
-	binding, err := buildBinding(programSession)
-	if err != nil {
-		return nil, err
+		binding, err := session.LoadAPI(projects, targetPlan, configDirectory, false)
+		session.ReleaseBuildCache()
+		return binding, err
 	}
 
 	if len(pluginEntries) > 0 {
@@ -505,9 +503,14 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			Plugin: plugin,
 		}
 	}
-	initialGeneration := generationForBinding(binding, programSession.FS())
 	provider := &apiGenerationProvider{
-		initial: &initialGeneration,
+		initial: func(context.Context) (linter.Generation, error) {
+			binding, err := buildBinding(programSession)
+			if err != nil {
+				return linter.Generation{}, err
+			}
+			return generationForBinding(binding, programSession.FS()), nil
+		},
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (linter.Generation, error) {
 			if err := ctx.Err(); err != nil {
 				return linter.Generation{}, err
@@ -529,10 +532,41 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			return generationForBinding(roundBinding, roundSession.FS()), nil
 		},
 	}
+	if !req.Fix {
+		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
+			loads, err := programSession.PlanLoads(projectRequest, configDirectory, true)
+			if err != nil {
+				return nil, err
+			}
+			result := make([]linter.GenerationLoad, len(loads))
+			for i, load := range loads {
+				checkers := 0
+				if load.Options != nil && load.Options.Checkers != nil {
+					checkers = max(1, *load.Options.Checkers)
+				}
+				result[i] = linter.GenerationLoad{
+					TargetCount: load.TargetCount, CheckerCount: checkers,
+					Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
+						if err := ctx.Err(); err != nil {
+							return linter.Generation{}, nil, err
+						}
+						binding, err := load.Load()
+						if err != nil {
+							return linter.Generation{}, nil, err
+						}
+						return generationForBinding(binding, programSession.FS()), nil, nil
+					},
+				}
+			}
+			return result, nil
+		}
+	}
+
 	demand := linter.ArtifactDemand{
 		Native:      rule.EditDemandAll,
 		Plugin:      rule.EditDemandAll,
 		LintedFiles: true,
+		SourceFiles: req.IncludeEncodedSourceFiles,
 	}
 	policy := linter.ObservationPolicy{
 		Demand:        demand,
@@ -561,6 +595,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		})
 	}
 	if err != nil {
+		var loadError *linter.GenerationLoadError
+		if _, fixing := pipelineResult.AppliedFixes(); !fixing && errors.As(err, &loadError) {
+			return nil, loadError.Err
+		}
 		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 	diagnostics, complete := pipelineResult.Observation.CompleteDiagnostics()
@@ -579,9 +617,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// from the prepared plan rather than diagnostic/GetRules side effects.
 	sourceFiles := make(map[string]*ast.SourceFile, len(pipelineResult.Observation.Native.Files))
 	for _, lintedFile := range pipelineResult.Observation.Native.Files {
-		if lintedFile.SourceFile == nil {
-			continue
-		}
 		responsePath := tspath.ConvertToRelativePath(lintedFile.Path, comparePathOptions)
 		sourceFiles[responsePath] = lintedFile.SourceFile
 	}

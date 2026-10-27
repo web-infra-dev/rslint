@@ -57,16 +57,15 @@ func (s SourceSnapshot) Text(path string) (string, bool) {
 
 func (s SourceSnapshot) Empty() bool { return len(s.files) == 0 }
 
-// GenerationProvider materializes one immutable lint generation from the
+// GenerationProvider plans one immutable lint generation from the
 // pipeline-owned in-memory snapshot. The provider may combine it with a
 // read-only disk base, an overlay VFS, or editor state, but it never owns or
 // advances fix rounds and must not persist the snapshot.
 //
-// AcquireGeneration and the returned ReleaseFunc are called on RunPipeline's
-// goroutine. On an acquisition error, the provider retains responsibility for
-// cleaning up resources that it did not successfully publish.
+// Planning does not construct Programs. The pipeline acquires and releases
+// each planned unit; a provider only decides how to construct or borrow it.
 type GenerationProvider interface {
-	AcquireGeneration(ctx context.Context, snapshot SourceSnapshot) (Generation, ReleaseFunc, error)
+	PlanGeneration(ctx context.Context, snapshot SourceSnapshot) (GenerationPlan, error)
 }
 
 // GenerationProviderFunc adapts a function to GenerationProvider.
@@ -78,6 +77,40 @@ func (f GenerationProviderFunc) AcquireGeneration(ctx context.Context, snapshot 
 	}
 	return f(ctx, snapshot)
 }
+
+func (f GenerationProviderFunc) PlanGeneration(_ context.Context, snapshot SourceSnapshot) (GenerationPlan, error) {
+	return GenerationPlan{Loads: []GenerationLoad{{Acquire: func(ctx context.Context) (Generation, ReleaseFunc, error) {
+		return f.AcquireGeneration(ctx, snapshot)
+	}}}}, nil
+}
+
+// GenerationPlan describes ordered, disjoint bindings of the same immutable
+// source snapshot. Each load constructs complete Programs or borrows an owner's
+// coherent generation. Ownership and any compatibility binding are resolved by
+// the provider, before publishing work; the executor never retries rules.
+// A single load uses the same execution and result boundary as multiple loads.
+// Loads transfers its private slice to the executor. Each acquisition runs at
+// most once. Fix providers publish one coherent source-identity binding.
+type GenerationPlan struct {
+	Loads          []GenerationLoad
+	SingleThreaded bool
+}
+
+// GenerationLoad acquires one complete binding under the core's shard budget.
+// Counts are hints only; they never change roots, dependencies or checker pools.
+// Release ends this observation's ownership or borrow, not an owner's cache.
+type GenerationLoad struct {
+	TargetCount  int
+	CheckerCount int
+	Acquire      func(context.Context) (Generation, ReleaseFunc, error)
+}
+
+// GenerationLoadError identifies acquisition failures for presentation;
+// entrypoints may preserve their existing error wording.
+type GenerationLoadError struct{ Err error }
+
+func (e *GenerationLoadError) Error() string { return e.Err.Error() }
+func (e *GenerationLoadError) Unwrap() error { return e.Err }
 
 // FinalChangeCommitter projects a non-empty final in-memory delta onto an
 // external medium at most once. It never participates in fix rounds. A medium
@@ -140,9 +173,11 @@ type PluginGeneration struct {
 type ArtifactDemand struct {
 	Native rule.EditDemand
 	Plugin rule.EditDemand
-	// LintedFiles retains the complete target/source projection for consumers
-	// such as the API that return selected files or encode their ASTs.
+	// LintedFiles returns selected target paths without retaining compiler ASTs.
 	LintedFiles bool
+	// SourceFiles additionally retains the selected ASTs, including their paths,
+	// for consumers such as the API's optional encoded-source response.
+	SourceFiles bool
 }
 
 func (d ArtifactDemand) valid() bool {

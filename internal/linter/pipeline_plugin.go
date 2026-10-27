@@ -16,6 +16,7 @@ import (
 var ErrDeferredPluginRunAlreadyInvoked = errors.New("linter pipeline: deferred plugin run already invoked")
 
 type pluginTask struct {
+	resources        *pluginDispatchResources
 	inputs           []EslintPluginFileInput
 	targetPathByWire map[string]string
 	fixCandidates    []fixSourceCandidate
@@ -68,43 +69,42 @@ func newDeferredPluginRun(task pluginTask) (DeferredPluginRun, error) {
 }
 
 func (t pluginTask) run(ctx context.Context, dispatcher EslintPluginDispatcher) EslintPluginDispatchOutcome {
+	return applyPluginFailure(t.runRaw(ctx, dispatcher), t.failure)
+}
+
+// runRaw consumes one binding's inputs. Failure policy belongs to the complete
+// observation, so a failed unit cannot discard only its own partial results or
+// manufacture one synthetic error per Program.
+func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatcher) EslintPluginDispatchOutcome {
 	failurePath := eslintPluginDispatchFailurePath(t.inputs)
-	var diagnostics []rule.RuleDiagnostic
-	notices, err := dispatchEslintPluginRules(
-		ctx,
-		dispatcher,
-		t.inputs,
-		t.collectFixes,
-		t.suggestionsMode,
-		t.timing,
-		func(diagnostic rule.RuleDiagnostic) {
-			diagnostics = append(diagnostics, diagnostic)
-		},
-	)
-	if err != nil {
-		switch t.failure {
-		case PluginDiscardOnFailure:
-			diagnostics = nil
-		case PluginKeepPartialWithSynthetic:
-			if !errors.Is(err, context.Canceled) {
-				diagnostics = append(diagnostics, NewEslintPluginErrorDiagnostic(
-					failurePath,
-					"rslint/plugin-lint-error",
-					"ESLint plugin lint dispatch failed: "+err.Error(),
-				))
-			}
-		}
+	if path, ok := t.targetPathByWire[failurePath]; ok {
+		failurePath = path
 	}
+	var diagnostics []rule.RuleDiagnostic
+	var batches []pluginBatchRange
+	notices, err := t.resources.dispatch(ctx, dispatcher, t.inputs, t.collectFixes, t.suggestionsMode, t.timing,
+		func(diagnostic rule.RuleDiagnostic) { diagnostics = append(diagnostics, diagnostic) },
+		func(batch pluginBatchRange) { batches = append(batches, batch) })
 	for index := range diagnostics {
 		if targetPath, ok := t.targetPathByWire[diagnostics[index].FilePath]; ok {
 			diagnostics[index].FilePath = targetPath
 		}
 	}
-	return EslintPluginDispatchOutcome{
-		Diagnostics:   diagnostics,
-		Notices:       notices,
-		DispatchError: err,
+	return EslintPluginDispatchOutcome{Diagnostics: diagnostics, Notices: notices, DispatchError: err, failurePath: failurePath, batches: batches}
+}
+
+func applyPluginFailure(outcome EslintPluginDispatchOutcome, failure PluginFailurePolicy) EslintPluginDispatchOutcome {
+	outcome.batches = nil
+	if outcome.DispatchError == nil {
+		return outcome
 	}
+	if failure == PluginDiscardOnFailure {
+		outcome.Diagnostics = nil
+	} else if !errors.Is(outcome.DispatchError, context.Canceled) {
+		outcome.Diagnostics = append(outcome.Diagnostics, NewEslintPluginErrorDiagnostic(outcome.failurePath,
+			"rslint/plugin-lint-error", "ESLint plugin lint dispatch failed: "+outcome.DispatchError.Error()))
+	}
+	return outcome
 }
 
 func materializePluginTask(
@@ -266,4 +266,49 @@ func clonePluginJSON[T any](value T) (T, error) {
 		return result, err
 	}
 	return result, nil
+}
+
+// Batch ranges retain ordering metadata, never a second copy of diagnostics or
+// AST owners. Units may finish in any order; publication keeps the established
+// config-group, file and error precedence across the entire observation.
+type pluginBatchRange struct {
+	key                            string
+	diagnosticStart, diagnosticEnd int
+	noticeStart, noticeEnd         int
+	err                            error
+}
+
+func mergePluginOutcomes(parts []EslintPluginDispatchOutcome) EslintPluginDispatchOutcome {
+	var order []string
+	groups := make(map[string]EslintPluginDispatchOutcome)
+	var result EslintPluginDispatchOutcome
+	for _, part := range parts {
+		if result.failurePath == "" {
+			result.failurePath = part.failurePath
+		}
+		for _, batch := range part.batches {
+			group, exists := groups[batch.key]
+			if !exists {
+				order = append(order, batch.key)
+			}
+			group.Diagnostics = append(group.Diagnostics, part.Diagnostics[batch.diagnosticStart:batch.diagnosticEnd]...)
+			group.Notices = append(group.Notices, part.Notices[batch.noticeStart:batch.noticeEnd]...)
+			group.DispatchError = preferPluginError(group.DispatchError, batch.err)
+			groups[batch.key] = group
+		}
+	}
+	for _, key := range order {
+		group := groups[key]
+		result.Diagnostics = append(result.Diagnostics, group.Diagnostics...)
+		result.Notices = append(result.Notices, group.Notices...)
+		result.DispatchError = preferPluginError(result.DispatchError, group.DispatchError)
+	}
+	return result
+}
+
+func preferPluginError(first, next error) error {
+	if next != nil && (first == nil || (errors.Is(first, context.Canceled) && !errors.Is(next, context.Canceled))) {
+		return next
+	}
+	return first
 }

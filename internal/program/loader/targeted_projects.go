@@ -400,18 +400,8 @@ func (s *Session) executeTargetProjectPlan(
 	singleThreaded := request.SingleThreaded
 	execution := newTargetedProjectExecution(s, plan, singleThreaded)
 	if request.Scope == ActiveOwners {
-		// Broad lint still validates every active declaration, in plan order,
-		// before reporting a later path-resolution failure. Parsing metadata
-		// does not require loading any project's sources or imports.
-		indexes := make([]int, len(plan.specs))
-		for index := range indexes {
-			indexes[index] = index
-		}
-		execution.parseConcurrent(indexes)
-		for index := range indexes {
-			if err := execution.slots[index].parseErr; err != nil {
-				return ProjectSet{}, fmt.Errorf("create TypeScript Program from %q: %w", plan.specs[index].tsconfigPath, err)
-			}
+		if err := execution.validateActiveConfigs(); err != nil {
+			return ProjectSet{}, err
 		}
 	}
 	if plan.terminalErr != nil {
@@ -422,139 +412,10 @@ func (s *Session) executeTargetProjectPlan(
 	}
 
 	directBuilds := newTargetedProjectBuildQueue(execution)
-	directProjectByTarget := make([]int, len(targetPlan.Files))
-	for index := range directProjectByTarget {
-		directProjectByTarget[index] = -1
-	}
 	groups := groupTargetsByProjects(targetPlan.Files, plan.targetProjects, func(owner string) []int {
 		return orderedProjectIndexesForConfig(plan, owner)
 	})
-	if request.Scope == ActiveOwners {
-		roots := make([][]string, len(plan.specs))
-		for index := range roots {
-			roots[index] = execution.slots[index].config.FileNames()
-		}
-		// The eager binder's exact identity ranking is also valid before
-		// construction. Copy the groups because ranking filters its input slice.
-		directProjectByTarget = directRootOwners(roots, targetPlan.Files, plan.targetProjects,
-			append([]projectTargetGroup(nil), groups...), s.FS(), singleThreaded)
-	}
-
-	err := runTargetProjectTasks(groups, singleThreaded, func(group projectTargetGroup) error {
-		// Service discovery already selected one owner from parsed roots.
-		// Reuse that result in every construction scope instead of making a
-		// second ownership decision with the ordinary batch identity policy.
-		if len(group.projectIndexes) == 1 && plan.specs[group.projectIndexes[0]].sourceReferences {
-			projectIndex := group.projectIndexes[0]
-			for _, targetIndex := range group.targetIndexes {
-				directProjectByTarget[targetIndex] = projectIndex
-			}
-			return directBuilds.enqueue(projectIndex)
-		}
-		if request.Scope == ActiveOwners {
-			for _, targetIndex := range group.targetIndexes {
-				if index := directProjectByTarget[targetIndex]; index >= 0 {
-					if err := directBuilds.enqueue(index); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
-		}
-		targetIndexes := group.targetIndexes
-		unresolved := len(targetIndexes)
-		orderedProjectIndexes := group.projectIndexes
-		scanProject := func(projectIndex int) error {
-			rootFiles, err := execution.rootFileIndex(projectIndex)
-			if err != nil {
-				return err
-			}
-			selected := false
-			for _, targetIndex := range targetIndexes {
-				if directProjectByTarget[targetIndex] >= 0 {
-					continue
-				}
-				target := targetPlan.Files[targetIndex]
-				if rootFiles.Contains(target.Path, target.CanonicalPath) {
-					directProjectByTarget[targetIndex] = projectIndex
-					unresolved--
-					selected = true
-				}
-			}
-			if selected {
-				if err := directBuilds.enqueue(projectIndex); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-
-		nextPosition := 0
-		if !singleThreaded {
-			predictedTargetsByProject := make(map[int][]int)
-			maxPredictedPosition := -1
-			for _, targetIndex := range targetIndexes {
-				position := execution.predictedProjectPosition(
-					orderedProjectIndexes,
-					targetPlan.Files[targetIndex],
-				)
-				if position < 0 {
-					continue
-				}
-				projectIndex := orderedProjectIndexes[position]
-				predictedTargetsByProject[projectIndex] = append(
-					predictedTargetsByProject[projectIndex],
-					targetIndex,
-				)
-				maxPredictedPosition = max(maxPredictedPosition, position)
-			}
-
-			if maxPredictedPosition >= 0 {
-				predictedProjects := make([]int, 0, len(predictedTargetsByProject))
-				for _, projectIndex := range orderedProjectIndexes[:maxPredictedPosition+1] {
-					if _, predicted := predictedTargetsByProject[projectIndex]; predicted {
-						predictedProjects = append(predictedProjects, projectIndex)
-					}
-				}
-				execution.parseConcurrent(predictedProjects)
-				for _, projectIndex := range predictedProjects {
-					rootFiles, parseErr := execution.rootFileIndex(projectIndex)
-					if parseErr != nil {
-						continue
-					}
-					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
-						target := targetPlan.Files[targetIndex]
-						if rootFiles.Contains(target.Path, target.CanonicalPath) {
-							if err := directBuilds.enqueue(projectIndex); err != nil {
-								return err
-							}
-							break
-						}
-					}
-				}
-
-				// The nearest containing tsconfig is only a latency hint. Parsing
-				// its declaration-order prefix concurrently proves whether an
-				// earlier config owns the target; results are still committed in
-				// order and no speculative Program can win by finishing first.
-				execution.parseConcurrent(orderedProjectIndexes[:maxPredictedPosition+1])
-				for nextPosition <= maxPredictedPosition && unresolved > 0 {
-					if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-						return err
-					}
-					nextPosition++
-				}
-			}
-		}
-
-		for nextPosition < len(orderedProjectIndexes) && unresolved > 0 {
-			if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
-				return err
-			}
-			nextPosition++
-		}
-		return nil
-	})
+	directProjectByTarget, err := execution.selectRootOwners(targetPlan.Files, request.Scope, groups, directBuilds.enqueue)
 	directBuilds.wait()
 	if err != nil {
 		return ProjectSet{}, err
@@ -627,4 +488,176 @@ func (s *Session) executeTargetProjectPlan(
 	}
 
 	return execution.projectSet(keep, directProjectByTarget, targetPlan.Files), nil
+}
+
+// validateActiveConfigs preserves broad lint's declaration-order errors without
+// constructing sources. Focused requests deliberately keep their lazy prefix.
+func (execution *targetedProjectExecution) validateActiveConfigs() error {
+	indexes := make([]int, len(execution.plan.specs))
+	for index := range indexes {
+		indexes[index] = index
+	}
+	execution.parseConcurrent(indexes)
+	for index := range indexes {
+		if err := execution.slots[index].parseErr; err != nil {
+			return fmt.Errorf("create TypeScript Program from %q: %w", execution.plan.specs[index].tsconfigPath, err)
+		}
+	}
+	return nil
+}
+
+func (execution *targetedProjectExecution) activeRootOwners(files []target.File, groups []projectTargetGroup) []int {
+	roots := make([][]string, len(execution.slots))
+	for index := range roots {
+		roots[index] = execution.slots[index].config.FileNames()
+	}
+	// Ranking filters its groups, so retain the caller's complete projection.
+	owners := directRootOwners(roots, files, execution.plan.targetProjects,
+		append([]projectTargetGroup(nil), groups...), execution.session.FS(), execution.singleThreaded)
+	for _, group := range groups {
+		if len(group.projectIndexes) == 1 && execution.plan.specs[group.projectIndexes[0]].sourceReferences {
+			for _, index := range group.targetIndexes {
+				owners[index] = group.projectIndexes[0]
+			}
+		}
+	}
+	return owners
+}
+
+// selectRootOwners is the shared metadata authority for materialized and
+// deferred loading. An optional callback overlaps confirmed/speculative builds
+// with metadata discovery; it never changes ownership or error ordering.
+func (execution *targetedProjectExecution) selectRootOwners(
+	files []target.File, scope ProjectScope, groups []projectTargetGroup, onOwner func(int) error,
+) ([]int, error) {
+	enqueue := func(index int) error {
+		if onOwner != nil {
+			return onOwner(index)
+		}
+		return nil
+	}
+	directProjectByTarget := make([]int, len(files))
+	for index := range directProjectByTarget {
+		directProjectByTarget[index] = -1
+	}
+	if scope == ActiveOwners {
+		directProjectByTarget = execution.activeRootOwners(files, groups)
+	}
+
+	err := runTargetProjectTasks(groups, execution.singleThreaded, func(group projectTargetGroup) error {
+		// Service discovery already selected one owner from parsed roots.
+		// Reuse that result in every construction scope instead of making a
+		// second ownership decision with the ordinary batch identity policy.
+		if len(group.projectIndexes) == 1 && execution.plan.specs[group.projectIndexes[0]].sourceReferences {
+			projectIndex := group.projectIndexes[0]
+			for _, targetIndex := range group.targetIndexes {
+				directProjectByTarget[targetIndex] = projectIndex
+			}
+			return enqueue(projectIndex)
+		}
+		if scope == ActiveOwners {
+			for _, targetIndex := range group.targetIndexes {
+				if index := directProjectByTarget[targetIndex]; index >= 0 {
+					if err := enqueue(index); err != nil {
+						return err
+					}
+				}
+			}
+			return nil
+		}
+		targetIndexes := group.targetIndexes
+		unresolved := len(targetIndexes)
+		orderedProjectIndexes := group.projectIndexes
+		scanProject := func(projectIndex int) error {
+			rootFiles, err := execution.rootFileIndex(projectIndex)
+			if err != nil {
+				return err
+			}
+			selected := false
+			for _, targetIndex := range targetIndexes {
+				if directProjectByTarget[targetIndex] >= 0 {
+					continue
+				}
+				target := files[targetIndex]
+				if rootFiles.Contains(target.Path, target.CanonicalPath) {
+					directProjectByTarget[targetIndex] = projectIndex
+					unresolved--
+					selected = true
+				}
+			}
+			if selected {
+				if err := enqueue(projectIndex); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		nextPosition := 0
+		if !execution.singleThreaded {
+			predictedTargetsByProject := make(map[int][]int)
+			maxPredictedPosition := -1
+			for _, targetIndex := range targetIndexes {
+				position := execution.predictedProjectPosition(
+					orderedProjectIndexes,
+					files[targetIndex],
+				)
+				if position < 0 {
+					continue
+				}
+				projectIndex := orderedProjectIndexes[position]
+				predictedTargetsByProject[projectIndex] = append(
+					predictedTargetsByProject[projectIndex],
+					targetIndex,
+				)
+				maxPredictedPosition = max(maxPredictedPosition, position)
+			}
+
+			if maxPredictedPosition >= 0 {
+				predictedProjects := make([]int, 0, len(predictedTargetsByProject))
+				for _, projectIndex := range orderedProjectIndexes[:maxPredictedPosition+1] {
+					if _, predicted := predictedTargetsByProject[projectIndex]; predicted {
+						predictedProjects = append(predictedProjects, projectIndex)
+					}
+				}
+				execution.parseConcurrent(predictedProjects)
+				for _, projectIndex := range predictedProjects {
+					rootFiles, parseErr := execution.rootFileIndex(projectIndex)
+					if parseErr != nil {
+						continue
+					}
+					for _, targetIndex := range predictedTargetsByProject[projectIndex] {
+						target := files[targetIndex]
+						if rootFiles.Contains(target.Path, target.CanonicalPath) {
+							if err := enqueue(projectIndex); err != nil {
+								return err
+							}
+							break
+						}
+					}
+				}
+
+				// The nearest containing tsconfig is only a latency hint. Parsing
+				// its declaration-order prefix concurrently proves whether an
+				// earlier config owns the target; results are still committed in
+				// order and no speculative Program can win by finishing first.
+				execution.parseConcurrent(orderedProjectIndexes[:maxPredictedPosition+1])
+				for nextPosition <= maxPredictedPosition && unresolved > 0 {
+					if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
+						return err
+					}
+					nextPosition++
+				}
+			}
+		}
+
+		for nextPosition < len(orderedProjectIndexes) && unresolved > 0 {
+			if err := scanProject(orderedProjectIndexes[nextPosition]); err != nil {
+				return err
+			}
+			nextPosition++
+		}
+		return nil
+	})
+	return directProjectByTarget, err
 }

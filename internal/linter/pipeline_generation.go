@@ -38,7 +38,7 @@ func projectGenerationTargets(
 	generation Generation,
 	plan *LintPlan,
 	snapshot SourceSnapshot,
-	collectLintedFiles bool,
+	demand ArtifactDemand,
 ) ([]LintedFile, error) {
 	if plan == nil {
 		if snapshot.Empty() {
@@ -48,6 +48,7 @@ func projectGenerationTargets(
 	}
 	fileCount := plan.fileCount()
 	sources := make(map[string]ast.SourceFileLike, fileCount)
+	collectLintedFiles := demand.LintedFiles || demand.SourceFiles
 	var lintedFiles []LintedFile
 	if collectLintedFiles {
 		lintedFiles = make([]LintedFile, 0, fileCount)
@@ -70,7 +71,11 @@ func projectGenerationTargets(
 			}
 			sources[path] = source
 			if collectLintedFiles {
-				lintedFiles = append(lintedFiles, LintedFile{Path: path, SourceFile: source})
+				file := LintedFile{Path: path}
+				if demand.SourceFiles {
+					file.SourceFile = source
+				}
+				lintedFiles = append(lintedFiles, file)
 			}
 		}
 	}

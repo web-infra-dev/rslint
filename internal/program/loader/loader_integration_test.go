@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strconv"
@@ -2649,6 +2650,36 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 					}
 				}
 			}
+			// Two independent owners exercise deferred construction as well.
+			other := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "other.ts"))
+			files[other.Path] = "export const other = 1;"
+			files[tspath.ResolvePath(dir, "other.json")] = `{"files":["other.ts"],"compilerOptions":{"noLib":true}}`
+			declaration := &rslintconfig.ProjectDeclaration{
+				Patterns: append(append(rslintconfig.ProjectPaths(nil), test.projects...), "other.json"), BaseDirectory: dir,
+			}
+			request := ProjectBuildRequest{
+				Scope: ActiveOwners, Targets: target.Plan{Files: []target.File{file, other}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					file: {ExplicitProject: declaration}, other: {ExplicitProject: declaration},
+				},
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.target == "target.js" {
+				if len(loads) != 0 {
+					t.Fatal("compatibility binding must be resolved before publishing work")
+				}
+			} else {
+				if len(loads) != 2 {
+					t.Fatalf("deferred root plan: loads=%d", len(loads))
+				}
+				if _, err := loads[0].Load(); err != nil {
+					t.Fatal(err)
+				}
+			}
+
 		})
 	}
 }
@@ -4098,5 +4129,98 @@ func BenchmarkFrozenIOPaths(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		scope         ProjectScope
+		compilerRoots bool
+	}{{"broad native roots", ActiveOwners, false}, {"focused compiler roots", Targeted, true}} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			config := rslintconfig.RslintConfig{{
+				Files: []string{"**/*.ts"},
+				LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+					Project: rslintconfig.ProjectPaths{"a/tsconfig.json", "b/tsconfig.json"},
+				}},
+			}}
+			configs := map[string]rslintconfig.RslintConfig{dir: config}
+			plan, err := target.Resolve(withGitPolicyForTest(target.Request{
+				Config: config, ConfigDirectory: dir, FS: fsys,
+				Files: rslintconfig.ResolveFileIdentities([]string{
+					tspath.ResolvePath(dir, "a/src/file.ts"), tspath.ResolvePath(dir, "b/src/file.ts"),
+					tspath.ResolvePath(dir, "outside/file.ts"), tspath.ResolvePath(dir, "unrelated.ts"),
+				}, fsys),
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			resolver := configLint.NewResolver(configLint.ResolverOptions{
+				ConfigsByOwner: configs, DefaultRootDirectory: dir, FS: fsys,
+				PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+			})
+			policies, err := resolver.ProjectPolicies(plan.Files, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: test.scope}
+			materialized := NewSession(fsys)
+			set, err := materialized.BuildProjects(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			loadBinding := materialized.LoadCLI
+			if test.compilerRoots {
+				loadBinding = materialized.LoadAPI
+			}
+			want, err := loadBinding(set, plan, dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, dir, test.compilerRoots)
+			if err != nil || len(loads) != 3 {
+				t.Fatalf("loads=%d, err=%v", len(loads), err)
+			}
+			type projection struct {
+				targets []string
+				sources []string
+				typed   bool
+			}
+			project := func(binding LoadResult) map[string]projection {
+				result := make(map[string]projection)
+				for index, program := range binding.Programs {
+					sources := make([]string, 0)
+					for _, source := range program.SourceFiles() {
+						sources = append(sources, source.FileName())
+					}
+					slices.Sort(sources)
+					targets := append([]string(nil), binding.TargetsByProgram[index]...)
+					slices.Sort(targets)
+					result[strings.Join(targets, "\n")] = projection{targets, sources, program.CanProvideProgramDiagnostics()}
+				}
+				return result
+			}
+			wantPrograms := project(want)
+			gotPrograms := make(map[string]projection)
+			gotMapping := make(map[string]target.File)
+			for _, load := range loads {
+				binding, err := load.Load()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for key, value := range project(binding) {
+					gotPrograms[key] = value
+				}
+				for key, value := range binding.LintTargetBySourcePath {
+					gotMapping[key] = value
+				}
+			}
+			if !reflect.DeepEqual(gotPrograms, wantPrograms) || !reflect.DeepEqual(gotMapping, want.LintTargetBySourcePath) {
+				t.Fatal("admitted loads changed complete source graphs, target grouping, capabilities, or source identity")
+			}
+		})
 	}
 }

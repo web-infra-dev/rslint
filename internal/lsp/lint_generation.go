@@ -267,3 +267,7 @@ func emptyLintGeneration(processCwd string) linter.Generation {
 		SingleThreaded: true,
 	}}
 }
+
+func (p *documentGenerationProvider) PlanGeneration(ctx context.Context, snapshot linter.SourceSnapshot) (linter.GenerationPlan, error) {
+	return linter.GenerationProviderFunc(p.AcquireGeneration).PlanGeneration(ctx, snapshot)
+}
