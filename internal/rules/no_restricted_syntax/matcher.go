@@ -51,17 +51,17 @@ func (s *kindSet) markUniverse() {
 // candidateKinds returns the set of tsgo ast.Kind values that a selector
 // might match. For selectors that constrain by attribute / pseudo only
 // (no leading kind), the universe flag is set and the listener should be
-// registered on every kind in allInterestingKinds.
+// registered on the physical wildcard kinds and supported virtual hosts.
 func candidateKinds(sel selector) *kindSet {
 	s := newKindSet()
-	collectKinds(sel, s)
+	collectKinds(sel, s, true)
 	return s
 }
 
-func collectKinds(sel selector, s *kindSet) {
+func collectKinds(sel selector, s *kindSet, narrowExportTypes bool) {
 	switch v := sel.(type) {
 	case subjectSelector:
-		collectKinds(v.Inner, s)
+		collectKinds(v.Inner, s, narrowExportTypes)
 	case identifierSelector:
 		if v.Name == "*" {
 			s.markUniverse()
@@ -82,20 +82,31 @@ func collectKinds(sel selector, s *kindSet) {
 			s.addAll(defaultExportedDeclarationKinds)
 		}
 	case classSelector:
-		collectKinds(v.Inner, s)
+		collectKinds(v.Inner, s, narrowExportTypes)
 	case attrSelector:
-		collectKinds(v.Inner, s)
+		// Exact export type attributes can use the same complete host list as
+		// named selectors. Keep the full selector for matching its other filters.
+		if narrowExportTypes && len(v.Path) == 1 && v.Path[0] == "type" && v.Op == attrEqual {
+			if name, ok := exactStringValue(v.Value); ok && isExportWrapperTarget(name) {
+				collectKinds(identifierSelector{Name: name, Kinds: kindsForEstreeName(name)}, s, narrowExportTypes)
+				return
+			}
+		}
+		collectKinds(v.Inner, s, narrowExportTypes)
 	case combinatorSelector:
-		// The right-hand side is the node being matched; the left side
-		// is an ancestor / sibling constraint we evaluate at match time.
-		collectKinds(v.Right, s)
+		// Sibling subjects can also match the left-hand node. Preserve the
+		// broad registration of attribute selectors for those reverse paths.
+		if hasReverseSiblingSubject(v) {
+			narrowExportTypes = false
+		}
+		collectKinds(v.Right, s, narrowExportTypes)
 	case relativeSelector:
-		collectKinds(v.Inner, s)
+		collectKinds(v.Inner, s, narrowExportTypes)
 	case pseudoSelector:
 		switch v.Name {
 		case "is", "matches":
 			for _, a := range v.Args {
-				collectKinds(a, s)
+				collectKinds(a, s, narrowExportTypes)
 			}
 		case "not":
 			// `:not(...)` says nothing about the kind that matches — every
@@ -109,10 +120,10 @@ func collectKinds(sel selector, s *kindSet) {
 			s.markUniverse()
 		}
 	case combinedPseudo:
-		collectKinds(v.Inner, s)
+		collectKinds(v.Inner, s, narrowExportTypes)
 	case unionSelector:
 		for _, a := range v.Selectors {
-			collectKinds(a, s)
+			collectKinds(a, s, narrowExportTypes)
 		}
 	}
 }
@@ -652,6 +663,11 @@ func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchCont
 func isSubjectSelector(sel selector) bool {
 	_, ok := sel.(subjectSelector)
 	return ok
+}
+
+func hasReverseSiblingSubject(sel combinatorSelector) bool {
+	return sel.Kind == combSibling && isSubjectSelector(sel.Left) ||
+		sel.Kind == combAdjacent && isSubjectSelector(sel.Right)
 }
 
 func isClassLikeNode(node *ast.Node) bool {
@@ -1838,9 +1854,23 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 		return readLocalAttr(node)
 	case "exported":
 		return readExportedAttr(node)
+	case "declaration":
+		switch node.Kind {
+		case ast.KindExportAssignment:
+			if !node.AsExportAssignment().IsExportEquals {
+				return node.AsExportAssignment().Expression, true
+			}
+		case ast.KindExportDeclaration:
+			if isNamedExportDeclaration(node) {
+				return nil, true
+			}
+		}
 	case "exportKind":
-		if node.Kind == ast.KindExportDeclaration {
-			if node.AsExportDeclaration().IsTypeOnly {
+		if node.Kind == ast.KindExportAssignment && !node.AsExportAssignment().IsExportEquals {
+			return "value", true
+		}
+		if node.Kind == ast.KindExportDeclaration || node.Kind == ast.KindExportSpecifier {
+			if node.IsTypeOnly() {
 				return "type", true
 			}
 			return "value", true
@@ -2122,6 +2152,17 @@ func estreeNameForKind(node *ast.Node) string {
 		return "TSMethodSignature"
 	case ast.KindImportDeclaration:
 		return "ImportDeclaration"
+	case ast.KindExportAssignment:
+		if !node.AsExportAssignment().IsExportEquals {
+			return "ExportDefaultDeclaration"
+		}
+	case ast.KindExportDeclaration:
+		if isNamedExportDeclaration(node) {
+			return "ExportNamedDeclaration"
+		}
+		return "ExportAllDeclaration"
+	case ast.KindExportSpecifier:
+		return "ExportSpecifier"
 	case ast.KindClassDeclaration:
 		return "ClassDeclaration"
 	case ast.KindClassExpression:
