@@ -2164,34 +2164,60 @@ func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.
 		}
 	})
 	for _, mode := range []string{"automatic", "explicit", "inline"} {
-		t.Run(mode, func(t *testing.T) {
-			configDiscovery := &api.ConfigDiscoveryRequest{}
-			if mode == "explicit" {
-				configDiscovery.ExplicitConfigPath = tspath.ResolvePath(root, "rslint.config.js")
+		for _, test := range []struct {
+			name     string
+			scans    [][]string
+			explicit []bool
+		}{
+			{name: "raw patterns"},
+			{name: "outer then inner", scans: [][]string{{"."}, {"."}, {"nested/selected", "./nested/selected"}, {}}},
+			{name: "inner then outer", scans: [][]string{{"."}, {"nested/selected"}, {"."}, {"."}}},
+			{name: "scan then literal", scans: [][]string{{"."}, {"."}, nil, {"."}}},
+			{name: "literal then scan", scans: [][]string{{"."}, nil, {"."}, {"."}}},
+			{name: "scan then literal flags", explicit: []bool{false, false, true, false}},
+			{name: "literal then scan flags", explicit: []bool{false, true, false, false}},
+		} {
+			if mode == "inline" && test.explicit != nil {
+				continue // This metadata belongs to ConfigDiscovery requests.
 			}
-			request := api.LintRequest{
-				Patterns:         []string{"**/{control,keep,other}.js", "nested/selected/keep.*"},
-				WorkingDirectory: root,
-				ConfigDiscovery:  configDiscovery,
-			}
-			if mode == "inline" {
-				request.ConfigDiscovery = nil
-				request.Config = json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
-				request.ConfigDirectory = root
-			}
-			response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var files []string
-			for _, diagnostic := range response.Diagnostics {
-				files = append(files, diagnostic.FilePath)
-			}
-			slices.Sort(files)
-			if response.FileCount != 2 || !reflect.DeepEqual(files, []string{"control.js", "nested/selected/keep.js"}) {
-				t.Fatalf("expanded files borrowed another input's scan entry: %+v", response)
-			}
-		})
+			t.Run(mode+"/"+test.name, func(t *testing.T) {
+				configDiscovery := &api.ConfigDiscoveryRequest{}
+				if mode == "explicit" {
+					configDiscovery.ExplicitConfigPath = tspath.ResolvePath(root, "rslint.config.js")
+				}
+				request := api.LintRequest{
+					WorkingDirectory: root,
+					ConfigDiscovery:  configDiscovery,
+				}
+				if test.scans == nil && test.explicit == nil {
+					request.Patterns = []string{"**/{control,keep,other}.js", "nested/selected/keep.*"}
+				} else {
+					request.Files = []string{"control.js", "nested/selected/keep.js", tspath.ResolvePath(root, "nested/selected/keep.js"), "nested/selected/other.js"}
+					request.FileScanDirectories = test.scans
+					if test.explicit != nil {
+						configDiscovery.Directories = []string{root}
+						configDiscovery.ExplicitFiles = test.explicit
+					}
+				}
+				if mode == "inline" {
+					request.ConfigDiscovery = nil
+					request.Config = json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
+					request.ConfigDirectory = root
+				}
+				response, err := (&Handler{}).HandleLintWithContext(context.Background(), request, requester)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var files []string
+				for _, diagnostic := range response.Diagnostics {
+					files = append(files, diagnostic.FilePath)
+				}
+				slices.Sort(files)
+				if response.FileCount != 2 || !reflect.DeepEqual(files, []string{"control.js", "nested/selected/keep.js"}) {
+					t.Fatalf("expanded files borrowed another input's scan entry: %+v", response)
+				}
+			})
+		}
 	}
 }
 

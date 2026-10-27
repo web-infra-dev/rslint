@@ -13,11 +13,12 @@ import (
 
 var inputPatternOptions = minimatch3.Options{Dot: true, NoComment: true, PreserveWhitespace: true}
 
-// globDirectory uses the matcher's literal recognition, including brace and
-// extglob syntax. Keep authored dot segments until the static root is known:
+// globDirectory returns the authored prefix and its decoded filesystem directory
+// using the matcher's literal recognition, including brace and extglob syntax.
+// Keep authored dot segments until the static root is known:
 // normalizing across a wildcard first can invent an independent scan entry.
 // tspath.GetDirectoryPath also normalizes backslashes, spending glob escapes.
-func globDirectory(pattern string) string {
+func globDirectory(pattern string) (string, string) {
 	directory := pattern
 	for {
 		index := strings.LastIndexByte(directory, '/')
@@ -30,7 +31,7 @@ func globDirectory(pattern string) string {
 			directory = directory[:index]
 		}
 		if literal, ok := minimatch3.New(directory, inputPatternOptions).Literal(); ok {
-			return literal
+			return directory, literal
 		}
 	}
 }
@@ -63,7 +64,8 @@ func ExpandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 	partialOptions.Partial = true
 	for index, pattern := range patterns {
 		pattern = filepath.ToSlash(pattern)
-		root := tspath.ResolvePath(cwd, globDirectory(pattern))
+		directory, literalDirectory := globDirectory(pattern)
+		root := tspath.ResolvePath(cwd, literalDirectory)
 		expansions[index].Root = root
 		if !fsys.DirectoryExists(root) {
 			continue
@@ -71,8 +73,10 @@ func ExpandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		absolute := pattern
 		if !filepath.IsAbs(absolute) {
 			absolute = filepath.Join(cwd, absolute)
+			directory = filepath.Join(cwd, directory)
 		}
-		relative, err := filepath.Rel(filepath.FromSlash(root), filepath.FromSlash(absolute))
+		// Relativize within pattern syntax; root has already decoded escapes.
+		relative, err := filepath.Rel(filepath.FromSlash(directory), filepath.FromSlash(absolute))
 		if err != nil {
 			return nil, err
 		}

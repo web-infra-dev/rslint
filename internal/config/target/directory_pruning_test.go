@@ -2,6 +2,7 @@ package target
 
 import (
 	"context"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -114,8 +115,17 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 			roots:    []string{"src", "src/nested"},
 			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/nested/b.ts"}},
 		},
+		{
+			name:     "escaped and literal roots share a walk",
+			patterns: []string{`src/\nested/*.ts`, "src/nested/*.ts"},
+			roots:    []string{"src/nested"},
+			files:    [][]string{{"src/nested/b.ts"}, {"src/nested/b.ts"}},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(test.patterns[0], `\`) {
+				t.Skip("backslash glob escapes are POSIX-only")
+			}
 			fsys := &globWalkRecorder{FS: osvfs.FS()}
 			expansions, err := ExpandGlobs(context.Background(), fsys, root, test.patterns)
 			assert.NilError(t, err)

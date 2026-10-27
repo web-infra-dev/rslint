@@ -86,6 +86,7 @@ func TestRunCLIQuotedGlobs(t *testing.T) {
 		{"recursive", []string{"src/**/*.ts"}, recursive},
 		{"question mark", []string{"src/?.ts"}, []string{"src/a.ts"}},
 		{"extglob", []string{"src/@(a|missing).ts"}, []string{"src/a.ts"}},
+		{"escaped directory", []string{`src/\nested/*.ts`}, []string{"src/nested/b.ts"}},
 		{"dot segment", []string{"src/*/./*.ts"}, []string{"src/nested/b.ts"}},
 		{"absolute", []string{tspath.ResolvePath(root, "src/**/*.ts")}, recursive},
 		{"literal priority", []string{"src/[ab].ts"}, []string{"src/[ab].ts"}},
@@ -96,6 +97,9 @@ func TestRunCLIQuotedGlobs(t *testing.T) {
 		{"directory does not borrow glob scope", []string{".", "src/git-ignored/*.js"}, []string{"other/c.js", "other/deep/d.js", "src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js", "src/git-ignored/entry.js", "src/nested/b.ts"}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(test.argv[0], `\`) {
+				t.Skip("backslash glob escapes are POSIX-only")
+			}
 			code, stdout := runCLIArgsForTest(t, map[string]any{
 				"workingDirectory": root,
 				"format":           "jsonline",

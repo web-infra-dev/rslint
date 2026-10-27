@@ -1424,6 +1424,22 @@ module.exports = config;`
           [[escapedDirectory], ['nested/literal[dir]/keep[0].ts']],
           [[escapedFile], ['nested/literal[dir]/keep[0].ts']],
         ];
+        if (process.platform !== 'win32') {
+          cases.push(
+            [
+              [String.raw`nested/literal\[dir\]/*.ts`],
+              ['nested/literal[dir]/keep[0].ts'],
+            ],
+            [
+              [String.raw`nested/literal\[dir\]/keep\[*\].ts`],
+              ['nested/literal[dir]/keep[0].ts'],
+            ],
+            [
+              [path.join(tmp, String.raw`nested/literal\[dir\]/*.ts`)],
+              ['nested/literal[dir]/keep[0].ts'],
+            ],
+          );
+        }
         for (const options of [
           {},
           { overrideConfigFile: 'rslint.config.mjs' },

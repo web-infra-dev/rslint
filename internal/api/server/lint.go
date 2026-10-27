@@ -160,16 +160,28 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	explicitFiles := make(map[string]bool)
 	seenGlobRoots := make(map[string]bool)
+	// Duplicate exact paths contribute a union of scan entries. A literal
+	// occurrence still overrides every scanned occurrence below.
+	type scanEntry struct{ file, root string }
+	seenScanEntries := make(map[scanEntry]bool)
 	for index, path := range req.Files {
 		path = resolveRequestPath(path)
 		if req.FileScanDirectories != nil {
 			if req.FileScanDirectories[index] == nil {
 				explicitFiles[path] = true
 			} else {
-				roots := make([]string, 0, len(req.FileScanDirectories[index]))
+				roots := scanDirectories[path]
+				if roots == nil {
+					// Empty means no scan origins; nil would borrow every containing root.
+					roots = make([]string, 0, len(req.FileScanDirectories[index]))
+				}
 				for _, root := range req.FileScanDirectories[index] {
 					root = resolveRequestPath(root)
-					roots = append(roots, root)
+					entry := scanEntry{path, root}
+					if !seenScanEntries[entry] {
+						seenScanEntries[entry] = true
+						roots = append(roots, root)
+					}
 					if !seenGlobRoots[root] {
 						seenGlobRoots[root] = true
 						globRoots = append(globRoots, root)
@@ -178,9 +190,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				scanDirectories[path] = roots
 			}
 		}
-	}
-	for path := range explicitFiles {
-		delete(scanDirectories, path)
 	}
 	identityFS := fs
 	if len(canonicalPaths) > 0 {
@@ -225,12 +234,18 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 			if req.FileScanDirectories == nil {
 				for index, path := range req.Files {
-					if !req.ConfigDiscovery.ExplicitFiles[index] {
-						scanDirectories[resolveRequestPath(path)] = nil
+					path = resolveRequestPath(path)
+					if req.ConfigDiscovery.ExplicitFiles[index] {
+						explicitFiles[path] = true
+					} else {
+						scanDirectories[path] = nil
 					}
 				}
 			}
 		}
+	}
+	for path := range explicitFiles {
+		delete(scanDirectories, path)
 	}
 	var discoveryFiles []discovery.DiscoveryFile
 	if targetFiles != nil {
