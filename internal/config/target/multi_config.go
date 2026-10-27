@@ -91,9 +91,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		// automatically assigned files when adding the catalog-owned literal scope.
 		// Scoped paths were reserved above, and targetsForPaths deduplicates this
 		// list, so these additions cannot repeat a path already in the bucket.
-		for _, explicitFile := range explicitSet.targetsForPaths(scope.ExplicitFiles) {
-			filesByConfig[configDir] = append(filesByConfig[configDir], explicitFile)
-		}
+		filesByConfig[configDir] = append(filesByConfig[configDir], explicitSet.targetsForPaths(scope.ExplicitFiles)...)
 		filesSpecifiedByConfig[configDir] = true
 	}
 
