@@ -490,8 +490,8 @@ ruleTester.run('no-restricted-syntax', {
       errors: [{ messageId: 'restrictedSyntax' }],
     },
 
-    // Real-world: ban export default of function/class — uses tsgo's
-    // modifier-based representation (no ExportDefaultDeclaration wrapper).
+    // Real-world: ban export default of function/class. tsgo keeps
+    // `export default` as modifiers; the matcher models the ESTree wrapper.
     {
       code: `export default function f() {}`,
       options: ['ExportDefaultDeclaration > FunctionDeclaration'] as any,

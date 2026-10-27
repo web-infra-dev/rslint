@@ -75,8 +75,11 @@ func collectKinds(sel selector, s *kindSet) {
 			return
 		}
 		s.addAll(ks)
-		if v.Name == "ExportNamedDeclaration" {
+		switch v.Name {
+		case "ExportNamedDeclaration":
 			s.addAll(exportedDeclarationKinds)
+		case "ExportDefaultDeclaration":
+			s.addAll(defaultExportedDeclarationKinds)
 		}
 	case classSelector:
 		collectKinds(v.Inner, s)
@@ -230,6 +233,10 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindJsxOpeningElement
 	case "Literal":
 		return node.Kind != ast.KindConstructor
+	case "FunctionDeclaration":
+		return !isDeclareFunction(node)
+	case "TSDeclareFunction":
+		return isDeclareFunction(node)
 	case "FunctionExpression":
 		// Methods expose a synthetic FunctionExpression through ESTree's
 		// MethodDefinition.value / Property.value fields.
@@ -263,6 +270,9 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindExportDeclaration && isNamedExportDeclaration(node)
 	case "ExportAllDeclaration":
 		return node.Kind == ast.KindExportDeclaration && !isNamedExportDeclaration(node)
+	case "ExportDefaultDeclaration":
+		// `export = x` is TSExportAssignment in ESTree.
+		return node.Kind == ast.KindExportAssignment && !node.AsExportAssignment().IsExportEquals
 	case "UnaryExpression":
 		// ESTree's UnaryExpression wraps `+`, `-`, `!`, `~`, `typeof`, `void`,
 		// `delete`. ESTree's UpdateExpression wraps `++`/`--`. tsgo splits
@@ -345,6 +355,12 @@ func refineEstreeMatch(name string, node *ast.Node) bool {
 		return node.Kind == ast.KindSpreadElement || node.Kind == ast.KindSpreadAssignment
 	}
 	return true
+}
+
+// isDeclareFunction reports a FunctionDeclaration without a body: an overload
+// signature or `declare function`, which ESTree types as TSDeclareFunction.
+func isDeclareFunction(node *ast.Node) bool {
+	return node.Kind == ast.KindFunctionDeclaration && node.AsFunctionDeclaration().Body == nil
 }
 
 func isJSXMemberExpression(node *ast.Node) bool {
@@ -591,9 +607,6 @@ func matchesCombinatorTarget(c combinatorSelector, node *ast.Node, mc *matchCont
 		if !ok {
 			return false
 		}
-		if target == "physical" && isDefaultExportedDeclaration(node) && selectorMatchesVirtualExportDefault(c.Left) {
-			return true
-		}
 		for ok {
 			if matchesInScopeTarget(c.Left, parent, mc, scopeRoot, parentTarget) {
 				return true
@@ -672,8 +685,8 @@ func childTarget(node *ast.Node) string {
 	if isChainRoot(node) {
 		return "ChainExpression"
 	}
-	if isExportNamedWrapped(node) {
-		return "ExportNamedDeclaration"
+	if wrapper := exportWrapperTarget(node); wrapper != "" {
+		return wrapper
 	}
 	return "physical"
 }
@@ -682,15 +695,16 @@ func estreeChildValue(node *ast.Node) interface{} {
 	if isChainRoot(node) {
 		return virtualNodeFacade{node, "ChainExpression"}
 	}
-	if isExportNamedWrapped(node) {
-		return virtualNodeFacade{node, "ExportNamedDeclaration"}
+	if wrapper := exportWrapperTarget(node); wrapper != "" {
+		return virtualNodeFacade{node, wrapper}
 	}
 	return node
 }
 
 // exportedDeclarationKinds lists the declarations that can carry tsgo's
 // `export` modifier. ESTree moves that modifier to an ExportNamedDeclaration
-// wrapper whose `declaration` is the declaration itself.
+// (or, with `default`, ExportDefaultDeclaration) wrapper whose `declaration`
+// is the declaration itself.
 var exportedDeclarationKinds = []ast.Kind{
 	ast.KindVariableStatement,
 	ast.KindFunctionDeclaration,
@@ -702,19 +716,36 @@ var exportedDeclarationKinds = []ast.Kind{
 	ast.KindImportEqualsDeclaration,
 }
 
-// isExportNamedWrapped reports whether ESTree wraps node in a virtual
-// ExportNamedDeclaration. `export default` declarations use a different
-// wrapper and are excluded. In `namespace A.B {}` tsgo nests B directly in A
-// with a synthesized `export` modifier; ESTree has a single declaration there.
-func isExportNamedWrapped(node *ast.Node) bool {
+// defaultExportedDeclarationKinds are the declarations `export default` can
+// prefix. Other default exports are ExportAssignment nodes.
+var defaultExportedDeclarationKinds = []ast.Kind{
+	ast.KindFunctionDeclaration,
+	ast.KindClassDeclaration,
+	ast.KindInterfaceDeclaration,
+}
+
+// exportWrapperTarget names the virtual ESTree export wrapper around node:
+// ExportNamedDeclaration, ExportDefaultDeclaration, or "" when ESTree has
+// none. In `namespace A.B {}` tsgo nests B directly in A with a synthesized
+// `export` modifier; ESTree has a single declaration there.
+func exportWrapperTarget(node *ast.Node) string {
 	if node == nil || !slices.Contains(exportedDeclarationKinds, node.Kind) {
-		return false
+		return ""
 	}
 	if node.Kind == ast.KindModuleDeclaration && node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
-		return false
+		return ""
 	}
-	return ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) &&
-		!ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault)
+	if !ast.HasSyntacticModifier(node, ast.ModifierFlagsExport) {
+		return ""
+	}
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsDefault) {
+		return "ExportDefaultDeclaration"
+	}
+	return "ExportNamedDeclaration"
+}
+
+func isExportWrapperTarget(target string) bool {
+	return target == "ExportNamedDeclaration" || target == "ExportDefaultDeclaration"
 }
 
 // isNamedExportDeclaration separates `export { a }` / `export { a } from`
@@ -775,8 +806,8 @@ func virtualParent(node *ast.Node, target string) (*ast.Node, string, bool) {
 	switch target {
 	case "ChainExpression":
 		return structuralParent(node)
-	case "ExportNamedDeclaration":
-		if isExportNamedWrapped(node) {
+	case "ExportNamedDeclaration", "ExportDefaultDeclaration":
+		if exportWrapperTarget(node) == target {
 			return structuralParent(node)
 		}
 	case "Identifier", "Literal":
@@ -820,8 +851,8 @@ func logicalParentTarget(node *ast.Node, target string, scopeRoot *virtualNodeFa
 	if isChainRoot(node) {
 		return node, "ChainExpression", true
 	}
-	if isExportNamedWrapped(node) {
-		return node, "ExportNamedDeclaration", true
+	if wrapper := exportWrapperTarget(node); wrapper != "" {
+		return node, wrapper, true
 	}
 	return structuralParent(node)
 }
@@ -1158,7 +1189,7 @@ func forEachLogicalChild(node *ast.Node, target string, mc *matchContext, visit 
 			visitPhysicalChildren(nil)
 		}
 		return
-	case "ChainExpression", "ExportNamedDeclaration":
+	case "ChainExpression", "ExportNamedDeclaration", "ExportDefaultDeclaration":
 		visit(node, "physical")
 		return
 	case "JSXEmptyExpression", "Identifier", "Literal":
@@ -1571,8 +1602,8 @@ func nodeIndexInListFieldTarget(node *ast.Node, scopeRoot *virtualNodeFacade, ta
 
 func siblingsOf(node *ast.Node, target string, scopeRoot *virtualNodeFacade) ([]*ast.Node, int) {
 	// All folded children occupy scalar fields, never a sibling array.
-	if target != "physical" && target != "ChainExpression" && target != "ExportNamedDeclaration" ||
-		target == "physical" && (isChainRoot(node) || isExportNamedWrapped(node)) {
+	if target != "physical" && target != "ChainExpression" && !isExportWrapperTarget(target) ||
+		target == "physical" && (isChainRoot(node) || exportWrapperTarget(node) != "") {
 		return nil, -1
 	}
 	parent, parentTarget, ok := logicalParentTarget(node, target, scopeRoot)
@@ -1607,58 +1638,6 @@ func indexInNodeList(node *ast.Node, list []*ast.Node) (int, int) {
 		}
 	}
 	return -1, 0
-}
-
-// isDefaultExportedDeclaration reports whether `node` carries the
-// `export default` modifier combo that tsgo attaches directly to a
-// declaration (instead of wrapping the declaration in an
-// ExportDefaultDeclaration as ESTree does).
-func isDefaultExportedDeclaration(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
-	default:
-		return false
-	}
-	return ast.HasSyntacticModifier(node, ast.ModifierFlagsExportDefault)
-}
-
-// selectorMatchesVirtualExportDefault reports whether the given selector
-// would match a synthetic ExportDefaultDeclaration node — used to honour
-// `ExportDefaultDeclaration > X` selectors when the tsgo node sits
-// directly under SourceFile but ESTree would place it under an
-// ExportDefaultDeclaration wrapper.
-func selectorMatchesVirtualExportDefault(sel selector) bool {
-	switch v := sel.(type) {
-	case subjectSelector:
-		return selectorMatchesVirtualExportDefault(v.Inner)
-	case identifierSelector:
-		return v.Name == "*" || v.Name == "ExportDefaultDeclaration"
-	case unionSelector:
-		for _, a := range v.Selectors {
-			if selectorMatchesVirtualExportDefault(a) {
-				return true
-			}
-		}
-	case combinedPseudo:
-		if selectorMatchesVirtualExportDefault(v.Inner) {
-			// `:not` cannot be evaluated reliably against a virtual
-			// node — ESLint's behaviour is well-defined only on real
-			// nodes, so treat the pseudo as conservatively passing.
-			return true
-		}
-	case pseudoSelector:
-		if v.Name == "is" || v.Name == "matches" {
-			for _, a := range v.Args {
-				if selectorMatchesVirtualExportDefault(a) {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 // unwrapExpression strips the tsgo-only "transparent" expression wrappers
@@ -2068,6 +2047,9 @@ func estreeNameForKind(node *ast.Node) string {
 	case ast.KindFunctionExpression:
 		return "FunctionExpression"
 	case ast.KindFunctionDeclaration:
+		if isDeclareFunction(node) {
+			return "TSDeclareFunction"
+		}
 		return "FunctionDeclaration"
 	case ast.KindBlock:
 		return "BlockStatement"
@@ -2922,6 +2904,13 @@ func readVirtualNodeAttr(facade virtualNodeFacade, name string, mc *matchContext
 	case "ChainExpression":
 		if name == "expression" {
 			return node, true
+		}
+	case "ExportDefaultDeclaration":
+		switch name {
+		case "declaration":
+			return node, true
+		case "exportKind":
+			return "value", true
 		}
 	case "ExportNamedDeclaration":
 		switch name {

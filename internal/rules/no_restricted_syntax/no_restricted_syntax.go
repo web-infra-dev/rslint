@@ -83,11 +83,12 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// folded ESTree child: type, parent and fields can all differ.
 			target := virtualTarget(node)
 			visitExportWrapper := func() {
-				if !bucket.hasVirtual || !isExportNamedWrapped(node) {
+				wrapper := exportWrapperTarget(node)
+				if !bucket.hasVirtual || wrapper == "" {
 					return
 				}
 				for index := range bucket.entries {
-					bucket.matchVirtual(index, node, "ExportNamedDeclaration", mc, &ctx)
+					bucket.matchVirtual(index, node, wrapper, mc, &ctx)
 				}
 			}
 			visitVirtual := func() {
@@ -109,7 +110,7 @@ var NoRestrictedSyntaxRule = rule.Rule{
 			// ChainExpression surrounds the physical node; the other facades
 			// are its children. Exit events reverse that order.
 			virtualBeforePhysical := bucket.entries[0].exit != (target == "ChainExpression")
-			// ExportNamedDeclaration also surrounds the exported declaration,
+			// Export wrappers also surround the exported declaration,
 			// which may own a child facade such as ClassBody.
 			exit := bucket.entries[0].exit
 			if !exit {
@@ -478,8 +479,8 @@ func (bucket *ruleBucket) matchPhysical(index int, node *ast.Node, mc *matchCont
 	}
 	if matchesInScopeTarget(compiled, node, mc, nil, "physical") {
 		textRange := utils.GetESTreeBindingIdentifierRange(mc.sf, node)
-		if isExportNamedWrapped(node) {
-			// The ExportNamedDeclaration wrapper owns the `export` keyword.
+		if exportWrapperTarget(node) != "" {
+			// The export wrapper owns the `export` and `default` keywords.
 			textRange = core.NewTextRange(utils.FindFunctionKeywordPos(mc.sf, node), textRange.End())
 		}
 		ctx.ReportRange(textRange, rule.RuleMessage{
@@ -504,8 +505,8 @@ func (bucket *ruleBucket) matchVirtual(index int, node *ast.Node, target string,
 		}
 	case "ClassBody":
 		ctx.ReportRange(classBodyTextRange(mc.sf, node), message)
-	case "ExportNamedDeclaration":
-		ctx.ReportRange(exportNamedTextRange(mc.sf, node), message)
+	case "ExportNamedDeclaration", "ExportDefaultDeclaration":
+		ctx.ReportRange(exportWrapperTextRange(mc.sf, node), message)
 	case "TSEnumBody":
 		ctx.ReportRange(enumBodyTextRange(mc.sf, node), message)
 	case "JSXEmptyExpression":
@@ -534,9 +535,9 @@ func functionValueTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 	return utils.TrimNodeTextRange(sf, node)
 }
 
-// exportNamedTextRange starts the virtual ExportNamedDeclaration at the authored
+// exportWrapperTextRange starts a virtual export wrapper at the authored
 // `export` keyword: decorators written before it belong to the declaration.
-func exportNamedTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
+func exportWrapperTextRange(sf *ast.SourceFile, node *ast.Node) core.TextRange {
 	textRange := utils.TrimNodeTextRange(sf, node)
 	if modifiers := node.Modifiers(); modifiers != nil {
 		for _, modifier := range modifiers.Nodes {
