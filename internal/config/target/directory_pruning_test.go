@@ -33,9 +33,11 @@ func dirAccessed(dirs []string, seg string) bool {
 type globWalkRecorder struct {
 	vfs.FS
 	filesVisited int
+	roots        []string
 }
 
 func (f *globWalkRecorder) WalkDir(root string, fn vfs.WalkDirFunc) error {
+	f.roots = append(f.roots, root)
 	return f.FS.WalkDir(root, func(path string, entry vfs.DirEntry, err error) error {
 		if err == nil && !entry.IsDir() {
 			f.filesVisited++
@@ -51,11 +53,59 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, layout)
 	fsys := &globWalkRecorder{FS: osvfs.FS()}
-	scanRoot, files, err := ExpandGlob(context.Background(), fsys, root, "src/*.ts")
+	expansions, err := ExpandGlobs(context.Background(), fsys, root, []string{"src/*.ts"})
 	assert.NilError(t, err)
-	assert.Equal(t, scanRoot, tspath.ResolvePath(root, "src"))
-	assert.DeepEqual(t, files, []string{paths["src/a.ts"]})
+	assert.Equal(t, expansions[0].Root, tspath.ResolvePath(root, "src"))
+	assert.DeepEqual(t, expansions[0].Files, []string{paths["src/a.ts"]})
 	assert.Equal(t, fsys.filesVisited, 1)
+}
+
+func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
+	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts"})
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		roots    []string
+		files    [][]string
+	}{
+		{
+			name:     "overlap and normalized duplicate",
+			patterns: []string{"src/**/*.ts", "src/*.ts", "src/./*.ts"},
+			roots:    []string{"src"},
+			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/a.ts"}, {"src/a.ts"}},
+		},
+		{
+			name:     "unmatched input remains empty",
+			patterns: []string{"src/*.ts", "src/missing*.ts"},
+			roots:    []string{"src"},
+			files:    [][]string{{"src/a.ts"}, nil},
+		},
+		{
+			name:     "ancestor roots stay independent",
+			patterns: []string{"src/**/*.ts", "src/nested/*.ts"},
+			roots:    []string{"src", "src/nested"},
+			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/nested/b.ts"}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fsys := &globWalkRecorder{FS: osvfs.FS()}
+			expansions, err := ExpandGlobs(context.Background(), fsys, root, test.patterns)
+			assert.NilError(t, err)
+			assert.Equal(t, len(expansions), len(test.patterns))
+			var wantRoots []string
+			for _, name := range test.roots {
+				wantRoots = append(wantRoots, tspath.ResolvePath(root, name))
+			}
+			assert.DeepEqual(t, fsys.roots, wantRoots)
+			for index, names := range test.files {
+				var want []string
+				for _, name := range names {
+					want = append(want, paths[name])
+				}
+				assert.DeepEqual(t, expansions[index].Files, want)
+			}
+		})
+	}
 }
 
 func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {

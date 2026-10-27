@@ -89,6 +89,8 @@ func TestRunCLIQuotedGlobs(t *testing.T) {
 		{"absolute", []string{tspath.ResolvePath(root, "src/**/*.ts")}, recursive},
 		{"literal priority", []string{"src/[ab].ts"}, []string{"src/[ab].ts"}},
 		{"brace and shallow", []string{"src/*.{js,ts}"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js"}},
+		{"same root globs and literal", []string{"src/**/*.ts", "src/*.{js,ts}", "src/*.ts", "src/a.ts"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js", "src/nested/b.ts"}},
+		{"unmatched glob and directory", []string{"src/*.ts", "src/missing*.ts", "other"}, []string{"other/c.js", "other/deep/d.js", "src/.hidden.ts", "src/[ab].ts", "src/a.ts"}},
 		{"mixed overlap", []string{"src/**/*.ts", "src/a.ts", "other"}, append([]string{"other/c.js", "other/deep/d.js"}, recursive...)},
 		{"directory does not borrow glob scope", []string{".", "src/git-ignored/*.js"}, []string{"other/c.js", "other/deep/d.js", "src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js", "src/git-ignored/entry.js", "src/nested/b.ts"}},
 	} {

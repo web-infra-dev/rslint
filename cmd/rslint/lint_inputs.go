@@ -22,39 +22,60 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs) error {
 		return err
 	}
 	args.AllowFiles, args.AllowDirs = nil, nil
-	literals := make(map[string]bool)
-	for _, input := range args.Positional {
+	type cliInput struct {
+		path      string
+		directory bool
+		glob      bool
+	}
+	inputs := make([]cliInput, len(args.Positional))
+	var patterns []string
+	for index, input := range args.Positional {
 		absolute, err := filepath.Abs(input)
 		if err != nil {
 			return err
 		}
 		absolute = tspath.NormalizePath(absolute)
+		inputs[index].path = absolute
 		info, statErr := os.Stat(absolute)
 		if statErr == nil && info.IsDir() {
-			args.AllowDirs = append(args.AllowDirs, absolute)
+			inputs[index].directory = true
 			continue
 		}
-		if statErr == nil || !strings.ContainsAny(input, "*?[{") {
-			args.AllowFiles = append(args.AllowFiles, absolute)
-			literals[absolute] = true
+		if statErr != nil && strings.ContainsAny(input, "*?[{") {
+			inputs[index].glob = true
+			patterns = append(patterns, input)
+		}
+	}
+	expansions, err := target.ExpandGlobs(ctx, args.FS, cwd, patterns)
+	if err != nil {
+		return err
+	}
+	literals := make(map[string]bool)
+	globIndex := 0
+	for _, input := range inputs {
+		if input.directory {
+			args.AllowDirs = append(args.AllowDirs, input.path)
 			continue
 		}
-		root, matches, err := target.ExpandGlob(ctx, args.FS, cwd, input)
-		if err != nil {
-			return err
-		}
-		if len(matches) == 0 {
-			args.AllowFiles = append(args.AllowFiles, absolute)
-			literals[absolute] = true
+		if !input.glob {
+			args.AllowFiles = append(args.AllowFiles, input.path)
+			literals[input.path] = true
 			continue
 		}
-		args.GlobRoots = append(args.GlobRoots, rslintconfig.ResolveDirectoryIdentities([]string{root}, args.FS)...)
+		expansion := expansions[globIndex]
+		globIndex++
+		if len(expansion.Files) == 0 {
+			args.AllowFiles = append(args.AllowFiles, input.path)
+			literals[input.path] = true
+			continue
+		}
+		args.GlobRoots = append(args.GlobRoots, rslintconfig.ResolveDirectoryIdentities([]string{expansion.Root}, args.FS)...)
 		if args.ScanDirectories == nil {
 			args.ScanDirectories = make(map[string][]string)
 		}
-		for _, file := range matches {
+		for _, file := range expansion.Files {
 			args.AllowFiles = append(args.AllowFiles, file)
-			args.ScanDirectories[file] = append(args.ScanDirectories[file], root)
+			args.ScanDirectories[file] = append(args.ScanDirectories[file], expansion.Root)
 		}
 	}
 	for file := range literals {

@@ -263,7 +263,7 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 			Files: []string{"**/*.js"},
 			Rules: rslintconfig.Rules{"no-var": "error"},
 		}}),
-		Positional:     []string{"selected*.js"},
+		Positional:     []string{"selected*.js", "select*.js", "selected.js"},
 		Fix:            true,
 		Format:         "jsonline",
 		NoColor:        true,
