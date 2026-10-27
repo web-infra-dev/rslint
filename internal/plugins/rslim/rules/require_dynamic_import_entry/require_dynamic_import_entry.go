@@ -24,8 +24,7 @@ var RequireDynamicImportEntryRule = rule.Rule{
 						Description: "TypeScript does not collect this import() dependency because its path is not a string literal or a template literal without substitutions. Review every module Rspack may load, including module side effects. Add source files whose runtime code may be removed to Rslim entries. Once all targets are safe, suppress this call with rslint-disable-next-line rslim/require-dynamic-import-entry and a reason.",
 					})
 				} else if expression.Kind == ast.KindIdentifier && expression.Text() == "require" {
-					// TypeScript collects literal require calls only in JavaScript files.
-					if ast.IsInJSFile(node) && ast.IsRequireCall(node, true) {
+					if ast.IsRequireCall(node, true) {
 						return
 					}
 					ctx.ReportNode(node, rule.RuleMessage{

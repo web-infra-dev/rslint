@@ -2,16 +2,18 @@
 
 Report runtime `import(...)` calls whose first argument is not a string literal or a template literal without substitutions, so dependencies that TypeScript cannot analyze are reviewed before Rslim optimizes the project. Variable paths, concatenation, and template literals with substitutions are reported, even when a local variable is declared with `const`.
 
-Bare `require(...)` calls are also reported, except in JavaScript files when the call has exactly one string literal or template literal without substitutions as its argument. TypeScript collects these JavaScript dependencies, but does not collect ordinary `require(...)` calls in TypeScript files, even with a literal argument. TypeScript `import x = require(...)` declarations are ignored because TypeScript analyzes their module references.
+Bare `require(...)` calls are also reported, except when the call has exactly one string literal or template literal without substitutions as its argument. These literal calls are ignored in both TypeScript and JavaScript files. Variable paths, concatenation, and template literals with substitutions are still reported, even when a local variable is declared with `const`. TypeScript `import x = require(...)` declarations are ignored because TypeScript analyzes their module references.
 
 This rule only detects the syntax. It does not resolve modules, read Rslim configuration, or require type information. Static ES imports, `require.resolve(...)`, and TypeScript `import(...)` types are not reported.
 
-These analyzable imports do not need a manual review through this rule:
+These literal imports and require calls do not produce a diagnostic:
 
 ```ts
 const module = await import('./module');
 const data = await import(`./data.json`, { with: { type: 'json' } });
 import plugin = require('./plugin');
+const dependency = require('./dependency');
+const config = require(`./config.json`);
 ```
 
 For each diagnostic:
@@ -25,11 +27,11 @@ For each diagnostic:
 const route = await import(`./routes/${name}.js`);
 ```
 
-The same review applies to reported `require(...)` calls, including literal calls in TypeScript files:
+The same review applies to reported `require(...)` calls with dynamic paths:
 
 ```ts
 // rslint-disable-next-line rslim/require-dynamic-import-entry -- Verified the loaded module is preserved.
-const plugin = require('./plugin');
+const plugin = require(pluginPath);
 ```
 
 The diagnostic covers the entire `import(...)` call. For a multiline call, place the suppression immediately before the line containing `import`:
