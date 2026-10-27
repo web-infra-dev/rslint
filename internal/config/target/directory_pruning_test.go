@@ -5,9 +5,11 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
@@ -58,6 +60,32 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	assert.Equal(t, expansions[0].Root, tspath.ResolvePath(root, "src"))
 	assert.DeepEqual(t, expansions[0].Files, []string{paths["src/a.ts"]})
 	assert.Equal(t, fsys.filesVisited, 1)
+}
+
+func TestSelectInputsPreservesLiteralAndScanRoles(t *testing.T) {
+	// The selector needs an enumerable VFS, not a host filesystem or content map.
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/a.ts":      &fstest.MapFile{},
+		"project/src/b.ts":      &fstest.MapFile{},
+		"project/src/[ab].ts":   &fstest.MapFile{},
+		"project/other/deep.ts": &fstest.MapFile{},
+	}, true)
+	for _, inputs := range [][]string{
+		{"src/@(a|b).ts", "src/*.ts", "src/./*.ts", "src/[ab].ts", "other", "missing*.ts"},
+		{"src/[ab].ts", "src/*.ts", "other", "src/@(a|b).ts", "missing*.ts"},
+	} {
+		selection, err := SelectInputs(context.Background(), fsys, "/project", inputs)
+		assert.NilError(t, err)
+		sort.Strings(selection.Files)
+		assert.DeepEqual(t, selection.Files, []string{"/project/src/[ab].ts", "/project/src/a.ts", "/project/src/b.ts"})
+		assert.DeepEqual(t, selection.Unmatched, []string{"/project/missing*.ts"})
+		assert.DeepEqual(t, selection.Directories, []string{"/project/other"})
+		assert.DeepEqual(t, selection.GlobRoots, []string{"/project/src"})
+		assert.DeepEqual(t, selection.ScanDirectories, map[string][]string{
+			"/project/src/a.ts": {"/project/src"},
+			"/project/src/b.ts": {"/project/src"},
+		})
+	}
 }
 
 func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {

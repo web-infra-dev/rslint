@@ -730,23 +730,30 @@ func TestHandleLint_FileContentsDependenciesDoNotWidenExplicitTargets(t *testing
 		"rules": { "no-debugger": "error" }
 	}]`)
 
-	response, err := (&Handler{}).HandleLint(api.LintRequest{
-		Config:           config,
-		ConfigDirectory:  dir,
-		WorkingDirectory: dir,
-		Files:            []string{target},
-		FileContents: map[string]string{
-			dependency: "debugger;\n",
-		},
-	})
-	if err != nil {
-		t.Fatalf("HandleLint returned error: %v", err)
-	}
-	if response.FileCount != 1 || len(response.LintedFiles) != 1 || response.LintedFiles[0] != "target.ts" {
-		t.Fatalf("overlay dependency must not widen explicit targets: count=%d files=%v", response.FileCount, response.LintedFiles)
-	}
-	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "target.ts" || response.Diagnostics[0].RuleName != "no-debugger" {
-		t.Fatalf("expected only target.ts no-debugger diagnostic, got %+v", response.Diagnostics)
+	for _, patterns := range [][]string{nil, {"target.*"}} {
+		files := []string{target}
+		if patterns != nil {
+			files = nil
+		}
+		response, err := (&Handler{}).HandleLint(api.LintRequest{
+			Config:           config,
+			ConfigDirectory:  dir,
+			WorkingDirectory: dir,
+			Files:            files,
+			Patterns:         patterns,
+			FileContents: map[string]string{
+				dependency: "debugger;\n",
+			},
+		})
+		if err != nil {
+			t.Fatalf("HandleLint returned error: %v", err)
+		}
+		if response.FileCount != 1 || len(response.LintedFiles) != 1 || response.LintedFiles[0] != "target.ts" {
+			t.Fatalf("overlay dependency must not widen explicit targets: count=%d files=%v", response.FileCount, response.LintedFiles)
+		}
+		if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "target.ts" || response.Diagnostics[0].RuleName != "no-debugger" {
+			t.Fatalf("expected only target.ts no-debugger diagnostic, got %+v", response.Diagnostics)
+		}
 	}
 }
 
@@ -758,14 +765,15 @@ func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testin
 	tests := []struct {
 		name            string
 		files           []string
+		patterns        []string
 		wantFileCount   int
 		wantDiagnostics int
 	}{
 		{
 			name:            "files omitted",
 			files:           nil,
-			wantFileCount:   1,
-			wantDiagnostics: 1,
+			wantFileCount:   2,
+			wantDiagnostics: 2,
 		},
 		{
 			name:            "files explicitly empty",
@@ -773,17 +781,33 @@ func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testin
 			wantFileCount:   0,
 			wantDiagnostics: 0,
 		},
+		{name: "patterns explicitly empty", patterns: []string{}},
+		{name: "pattern does not select virtual dependencies", patterns: []string{"*.ts"}},
+		{name: "unmatched pattern is not a virtual literal fallback", patterns: []string{"[virtual].ts"}},
+		{name: "exact virtual glob characters", files: []string{filepath.Join(dir, "[virtual].ts")}, wantFileCount: 1, wantDiagnostics: 1},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response, err := (&Handler{}).HandleLint(api.LintRequest{
+			request := api.LintRequest{
 				Config:           config,
 				ConfigDirectory:  dir,
 				WorkingDirectory: dir,
 				Files:            tt.files,
-				FileContents:     map[string]string{virtualFile: "debugger;\n"},
-			})
+				Patterns:         tt.patterns,
+				FileContents:     map[string]string{virtualFile: "debugger;\n", filepath.Join(dir, "[virtual].ts"): "debugger;\n"},
+			}
+			// Exercise the wire representation: empty target arrays must survive
+			// serialization rather than falling back to FileContents targets.
+			payload, err := json.Marshal(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded api.LintRequest
+			if err := json.Unmarshal(payload, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			response, err := (&Handler{}).HandleLint(decoded)
 			if err != nil {
 				t.Fatalf("HandleLint returned error: %v", err)
 			}
@@ -2111,7 +2135,6 @@ func TestHandleLint_ConfigDiscoveryDirectoriesOnlyLoadTargetAncestorBranches(t *
 
 func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
-	inner := tspath.ResolvePath(root, "nested/selected")
 	writeProgramTestFiles(t, root, map[string]string{
 		".git/HEAD":                "ref: refs/heads/main\n",
 		".gitignore":               "nested/\n",
@@ -2142,22 +2165,14 @@ func TestHandleLint_ConfigDiscoveryExpandedFilesKeepTheirScanEntries(t *testing.
 	})
 	for _, mode := range []string{"automatic", "explicit", "inline"} {
 		t.Run(mode, func(t *testing.T) {
-			configDiscovery := &api.ConfigDiscoveryRequest{
-				Directories:   []string{root, inner},
-				ExplicitFiles: []bool{false, false, false},
-			}
+			configDiscovery := &api.ConfigDiscoveryRequest{}
 			if mode == "explicit" {
 				configDiscovery.ExplicitConfigPath = tspath.ResolvePath(root, "rslint.config.js")
 			}
 			request := api.LintRequest{
-				Files: []string{
-					tspath.ResolvePath(root, "control.js"),
-					tspath.ResolvePath(inner, "keep.js"),
-					tspath.ResolvePath(inner, "other.js"),
-				},
-				WorkingDirectory:    root,
-				ConfigDiscovery:     configDiscovery,
-				FileScanDirectories: [][]string{{root}, {root, inner}, {root}},
+				Patterns:         []string{"**/{control,keep,other}.js", "nested/selected/keep.*"},
+				WorkingDirectory: root,
+				ConfigDiscovery:  configDiscovery,
 			}
 			if mode == "inline" {
 				request.ConfigDiscovery = nil

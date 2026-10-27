@@ -85,6 +85,7 @@ func TestRunCLIQuotedGlobs(t *testing.T) {
 	}{
 		{"recursive", []string{"src/**/*.ts"}, recursive},
 		{"question mark", []string{"src/?.ts"}, []string{"src/a.ts"}},
+		{"extglob", []string{"src/@(a|missing).ts"}, []string{"src/a.ts"}},
 		{"dot segment", []string{"src/*/./*.ts"}, []string{"src/nested/b.ts"}},
 		{"absolute", []string{tspath.ResolvePath(root, "src/**/*.ts")}, recursive},
 		{"literal priority", []string{"src/[ab].ts"}, []string{"src/[ab].ts"}},

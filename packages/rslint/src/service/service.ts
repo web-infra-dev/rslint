@@ -79,6 +79,7 @@ export class RSLintService {
     requiredReverse: { pluginLint: boolean; configLoad: boolean },
   ): Promise<LintResponse> {
     const {
+      patterns,
       files,
       canonicalFiles,
       fileScanDirectories,
@@ -97,6 +98,7 @@ export class RSLintService {
 
     // Send lint request
     return this.service.sendMessage('lint', {
+      patterns,
       files,
       canonicalFiles,
       fileScanDirectories,

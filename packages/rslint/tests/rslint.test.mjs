@@ -4,7 +4,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { convertPathToPattern } from 'tinyglobby';
-import { compileGlobExclusions } from '../src/api/glob-exclusions.js';
 import {
   writeFile,
   rm,
@@ -345,108 +344,70 @@ describe('Rslint class', () => {
     }
   });
 
-  test('lintFiles uses the same glob syntax for expansion and scan entries', async () => {
-    const tmp = await mkdtemp(path.join(os.tmpdir(), '[rslint-api-braces]-'));
-    const absolutePattern = convertPathToPattern(tmp.split(path.sep).join('/'));
-    const ancestorExclusion = `!${convertPathToPattern(path.dirname(tmp))}/**/*.ts`;
+  test('lintFiles shares Go input matching across config modes', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), '[rslint-api-inputs]-'));
     const config = [
       { ignores: ['rslint.config.mjs'] },
       { rules: { 'no-debugger': 'error' } },
     ];
     try {
-      await mkdir(path.join(tmp, '.git'));
-      const directories = [
-        'brace{dir}',
-        'nested/[dir]',
-        'plus+dir',
-        'close)dir',
-        'comma,dir',
-        '!dir',
-        '!!src',
-        'skip.ts',
-        'literals',
-      ];
-      for (const directory of directories) {
-        await mkdir(path.join(tmp, directory, '.git'), { recursive: true });
-        await writeFile(path.join(tmp, directory, 'one.ts'), 'debugger;\n');
-      }
-      await mkdir(path.join(tmp, 'src'));
-      await mkdir(path.join(tmp, 'scratch', 'sub'), { recursive: true });
-      await writeFile(
-        path.join(tmp, '.gitignore'),
-        directories
-          .map(
-            (directory) => `${directory.split('/')[0].replace(/^!/, '\\!')}/\n`,
-          )
-          .join(''),
-      );
-      await writeFile(path.join(tmp, 'src', 'control.ts'), 'debugger;\n');
-      await writeFile(path.join(tmp, 'control.ts'), 'debugger;\n');
-      for (const file of ['[ab].ts', 'a.ts', 'b.ts']) {
-        await writeFile(path.join(tmp, 'literals', file), 'debugger;\n');
+      for (const file of [
+        'src/a.ts',
+        'src/b.ts',
+        'src/[ab].ts',
+        'src/deep/c.ts',
+        'other/d.ts',
+      ]) {
+        await mkdir(path.dirname(path.join(tmp, file)), { recursive: true });
+        await writeFile(path.join(tmp, file), 'debugger;\n');
       }
       await writeFile(
         path.join(tmp, 'rslint.config.mjs'),
         `export default ${JSON.stringify(config)};\n`,
       );
+      const all = [
+        'other/d.ts',
+        'src/[ab].ts',
+        'src/a.ts',
+        'src/b.ts',
+        'src/deep/c.ts',
+      ];
       for (const options of [
         {},
         { overrideConfigFile: 'rslint.config.mjs' },
         { overrideConfigFile: true, overrideConfig: config },
       ]) {
-        const rslint = new Rslint({ cwd: tmp, ...options });
+        const rslint = new Rslint({
+          cwd: tmp,
+          ...options,
+          // Pattern selection reads disk; unselected virtual dependencies do
+          // not become extra targets. Selected content still uses the overlay.
+          virtualFiles: {
+            'src/a.ts': 'debugger;\n',
+            'src/virtual.ts': 'debugger;\n',
+          },
+        });
         try {
-          for (const [pattern, expected] of [
-            ['brace{dir}/**/*.ts', ['brace{dir}/one.ts']],
-            ['nested/[dir]', ['nested/[dir]/one.ts']],
-            [String.raw`nested/\[dir\]`, ['nested/[dir]/one.ts']],
-            [String.raw`brace\{dir\}/**/*.ts`, ['brace{dir}/one.ts']],
-            ['brace{dir}/one.ts', ['brace{dir}/one.ts']],
-            ['plus+dir/**/*.ts', ['plus+dir/one.ts']],
-            ['plus+dir/one.ts', ['plus+dir/one.ts']],
-            ['close)dir/**/*.ts', ['close)dir/one.ts']],
-            ['comma,dir/**/*.ts', ['comma,dir/one.ts']],
-            ['comma,dir/one.ts', ['comma,dir/one.ts']],
-            ['literals/[ab].ts', ['literals/[ab].ts']],
-            [path.join(tmp, 'literals', '[ab].ts'), ['literals/[ab].ts']],
-            [
-              ['literals/[ab].ts', 'literals/[ab].ts', 'src/*.ts'],
-              ['literals/[ab].ts', 'src/control.ts'],
-            ],
-            ['src/**/*.ts', ['src/control.ts']],
-            [['src/control.ts', `!${absolutePattern}/src/*.ts`], []],
-            [['src/control.ts', ancestorExclusion], []],
-            [['src/*.ts', ancestorExclusion], []],
-            [['src/control.ts', 'src/*.ts', ancestorExclusion], []],
-            [['src/control.ts', 'src/*.ts', '!src'], []],
-            [['skip.ts/one.ts', 'skip.ts/*.ts', '!*.ts'], []],
-            [
-              [String.raw`\!dir/*.ts`, 'src/*.ts', '!./!dir'],
-              ['src/control.ts'],
-            ],
-            ['', []],
-            [['', 'src/*.ts'], ['src/control.ts']],
-            ['./!src', ['control.ts']],
-            ['./!!src', ['!!src/one.ts']],
-            [String.raw`\!dir`, ['!dir/one.ts']],
-            ['scratch/*/../../!src', ['control.ts']],
-            [`${absolutePattern}/scratch/*/../../!src`, ['control.ts']],
-            ['scratch/*/../../!!src', ['!!src/one.ts']],
-            [`${absolutePattern}/scratch/*/../../!!src`, ['src/control.ts']],
-            ['scratch/*/../../src/*.ts', ['src/control.ts']],
-            ['scratch/**/../../src/*.ts', ['src/control.ts']],
-            [`${absolutePattern}/scratch/*/../../src/*.ts`, ['src/control.ts']],
-            ['scratch/*/../../src/control.ts', ['src/control.ts']],
-            ['scratch/*/../../brace{dir}', ['brace{dir}/one.ts']],
-            ['**/*.ts', ['control.ts', 'src/control.ts']],
+          for (const [inputs, expected] of [
+            ['src/*.ts', ['src/[ab].ts', 'src/a.ts', 'src/b.ts']],
+            ['src/@(a|b).ts', ['src/a.ts', 'src/b.ts']],
+            ['src/?.ts', ['src/a.ts', 'src/b.ts']],
+            ['src/{a,b}.ts', ['src/a.ts', 'src/b.ts']],
+            ['src/[ab].ts', ['src/[ab].ts']],
+            [path.join(tmp, 'src', '[ab].ts'), ['src/[ab].ts']],
+            [['src/**/*.ts', 'src/./*.ts', 'src/a.ts'], all.slice(1)],
+            [['src/*.ts', 'other'], all.slice(0, 4)],
+            [['other', 'src/*.ts'], all.slice(0, 4)],
+            // ESLint unions the matchers; a leading bang is not set subtraction.
+            [['src/*.ts', '!src/b.ts'], all.slice(0, 4)],
+            [[], []],
+            [['missing/*.ts'], []],
           ]) {
-            const results = await rslint.lintFiles(pattern);
+            const results = await rslint.lintFiles(inputs);
             expect(
-              results
-                .map((result) =>
-                  path.relative(tmp, result.filePath).split(path.sep).join('/'),
-                )
-                .sort(),
+              results.map((result) =>
+                path.relative(tmp, result.filePath).split(path.sep).join('/'),
+              ),
             ).toEqual(expected);
             expect(
               results.every((result) =>
@@ -463,44 +424,6 @@ describe('Rslint class', () => {
     } finally {
       await cleanupTempDir(tmp);
     }
-  });
-
-  test('lintFiles exclusions preserve platform path and glob semantics', () => {
-    for (const [cwd, pattern, file, excluded] of [
-      ['C:/Project', 'a.ts', 'C:/PROJECT/a.ts', true],
-      ['//server/share/Project', 'a.ts', '//SERVER/SHARE/PROJECT/a.ts', true],
-      ['C:/Project', 'src/*.ts', 'C:/PROJECT/SRC/a.ts', false],
-      ['C:/Project', 'a.ts', 'C:/PROJECT/A.ts', false],
-      ['C:/project', 'C:/../project/*.ts', 'C:/project/a.ts', true],
-      [
-        '//server/share/project',
-        '//SERVER/SHARE/../project/*.ts',
-        '//server/share/project/a.ts',
-        true,
-      ],
-      ['C:/project', 'D:/../project/*.ts', 'C:/project/a.ts', false],
-      [
-        '//server/share/project',
-        '//server/other/../project/*.ts',
-        '//server/share/project/a.ts',
-        false,
-      ],
-      ['C:/project', 'c:/Project/*.ts', 'C:/project/a.ts', false],
-      [
-        'C:/[project]',
-        String.raw`c:/\[project\]/*.ts`,
-        'C:/[project]/a.ts',
-        true,
-      ],
-    ]) {
-      const exclusions = compileGlobExclusions([pattern], cwd, path.win32);
-      expect(exclusions.matches(file)).toBe(excluded);
-    }
-    expect(
-      compileGlobExclusions(['a.ts'], '/Project', path.posix).matches(
-        '/PROJECT/a.ts',
-      ),
-    ).toBe(false);
   });
 
   test('outputFixes writes output to absolute paths, skips no-output/relative', async () => {
@@ -824,7 +747,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles discovers config for a positive extglob', async () => {
+  test('lintFiles discovers config for an extglob directory', async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-extglob-'));
     try {
       await writeFile(
@@ -838,7 +761,7 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        const results = await rslint.lintFiles('!(vendor)/**/*.ts');
+        const results = await rslint.lintFiles('@(included)/**/*.ts');
         expect(results).toHaveLength(1);
         expect(path.relative(tmp, results[0].filePath)).toBe(
           path.join('included', 'index.ts'),
@@ -1374,12 +1297,14 @@ module.exports = config;`
 
       const rslint = new Rslint({ cwd: tmp });
       try {
-        for (const pattern of [
-          '**/*.ts',
+        expect(await rslint.lintFiles('**/*.ts')).toEqual([]);
+        // Like ESLint, an existing normalized path takes literal precedence
+        // before glob classification, including canceled wildcard segments.
+        const literal = await rslint.lintFiles(
           'scratch/*/../../packages/app/index.ts',
-        ]) {
-          expect(await rslint.lintFiles(pattern)).toEqual([]);
-        }
+        );
+        expect(literal).toHaveLength(1);
+        expect(literal[0].messages[0].ruleId).toBe('no-debugger');
       } finally {
         await rslint.close();
       }
@@ -1489,21 +1414,15 @@ module.exports = config;`
             ['control.ts', keep],
           ],
           [
-            ['**/*.ts', 'nested/selected/**/*.ts', '!**/other.ts'],
-            ['control.ts', keep],
+            ['**/*.ts', 'nested/selected/**/*.ts'],
+            ['control.ts', keep, other],
           ],
           [
             ['nested/selected/keep.*', 'nested/extra.*'],
             ['nested/extra.ts', keep],
           ],
-          [
-            [`${convertPathToPattern(escapedDirectory)}/**/*.ts`],
-            ['nested/literal[dir]/keep[0].ts'],
-          ],
-          [
-            [convertPathToPattern(escapedFile)],
-            ['nested/literal[dir]/keep[0].ts'],
-          ],
+          [[escapedDirectory], ['nested/literal[dir]/keep[0].ts']],
+          [[escapedFile], ['nested/literal[dir]/keep[0].ts']],
         ];
         for (const options of [
           {},
@@ -2002,7 +1921,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles applies negative patterns case-sensitively to a literal file symlink', async () => {
+  test('lintFiles applies config ignores case-sensitively to a literal file symlink', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-literal-negative-case-'),
     );
@@ -2027,10 +1946,13 @@ module.exports = config;`
       const rslint = new Rslint({
         cwd: tmp,
         overrideConfigFile: true,
-        overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+        overrideConfig: [
+          { ignores: ['foo/link.ts'] },
+          { rules: { 'no-debugger': 'error' } },
+        ],
       });
       try {
-        const results = await rslint.lintFiles(['Foo/link.ts', '!foo/link.ts']);
+        const results = await rslint.lintFiles('Foo/link.ts');
         expect(results).toHaveLength(1);
         expect(results[0].filePath).toBe(path.normalize(link));
       } finally {
@@ -2041,7 +1963,7 @@ module.exports = config;`
     }
   });
 
-  test('lintFiles excludes a literal file symlink with relative and absolute negative patterns', async () => {
+  test('lintFiles excludes a literal file symlink through config ignores', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-literal-negative-[cwd]-'),
     );
@@ -2058,28 +1980,13 @@ module.exports = config;`
       const rslint = new Rslint({
         cwd: tmp,
         overrideConfigFile: true,
-        overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+        overrideConfig: [
+          { ignores: ['link.ts'] },
+          { rules: { 'no-debugger': 'error' } },
+        ],
       });
       try {
-        expect(await rslint.lintFiles('link.ts')).toHaveLength(1);
-        for (const negative of [
-          '!link.ts',
-          `!${convertPathToPattern(tmp)}/*.ts`,
-        ]) {
-          expect(await rslint.lintFiles(['link.ts', negative])).toHaveLength(0);
-        }
-        if (process.platform === 'win32') {
-          const alternateDrive = convertPathToPattern(link).replace(
-            /^[a-z]:/i,
-            (drive) =>
-              drive === drive.toLowerCase()
-                ? drive.toUpperCase()
-                : drive.toLowerCase(),
-          );
-          expect(
-            await rslint.lintFiles(['link.ts', `!${alternateDrive}`]),
-          ).toHaveLength(0);
-        }
+        expect(await rslint.lintFiles('link.ts')).toHaveLength(0);
       } finally {
         await rslint.close();
       }

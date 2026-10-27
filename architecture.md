@@ -1086,18 +1086,17 @@ The transport and target phase differ by surface:
   directory sweep. Automatic literal scopes and explicit file-only invocations
   contribute only their exact owner-to-target source chains to the same
   source-keyed projection.
-- `Rslint.lintFiles()` still expands target globs with `tinyglobby`, preserves
-  literal provenance and canonical identities, and sends the resulting files
-  plus the static roots that actually matched each file in one API lint request.
-  Static roots follow glob dot-segment normalization while retaining the
-  authored literal/scan role and native volume boundaries. A glob that reduces
-  to a static file still enters through its directory.
-  Go bounds catalog discovery to each root's candidate ancestor trie and removes
-  candidates that no matching input can reach before file-to-config
-  assignment, then applies selectors and ignores once to that exact target set;
-  configs in unrelated descendants are not evaluated. Explicit-module and
-  inline-only arrays use the same bounded input walk, independently of config
-  location. The bidirectional API
+- `Rslint.lintFiles()` sends raw file/directory/glob patterns in one API
+  request. Go shares `target.SelectInputs` with the CLI, including literal
+  priority, lexical scan entries, equal-root walk batching, and compiled-pattern
+  pruning. File contents are an independent read overlay. Exact-file requests
+  retain their own identities and are never parsed as patterns.
+  Go bounds catalog discovery to each glob root's candidate ancestor trie while
+  retaining recursive literal directories, then applies selectors, ignores,
+  ownership, and canonical deduplication through the existing target planner.
+  Configs in unrelated descendants are not evaluated. Explicit-module and
+  inline-only arrays use the same input scope, independently of config location.
+  The bidirectional API
   advertises `reverseConfigLoadV1`; low-level pre-resolved `config` requests and
   WASM do not use staged module discovery. If the resulting catalog contains
   object-form community plugins, Go additionally requires the peer's
@@ -1519,7 +1518,10 @@ and the inspector cache remain in `internal/api/server`; planning, execution,
 and mutation sequencing do not.
 
 1. **Node.js Wrapper**: parses args, starts the Go engine, and hosts JS/TS module evaluation plus live third-party plugin objects
-   Go expands raw CLI glob inputs into lexical scan candidates before config discovery, using target-owned filesystem enumeration and the existing glob dependency. Candidates retain their scan roots and do not acquire literal-file config-discovery exceptions. Config discovery bounds glob roots to candidate ancestry while preserving recursive literal directory inputs; target planning applies ordinary file selection and canonical deduplication. IPC-supplied exact files are never reinterpreted as patterns.
+   CLI positional inputs and native API `Rslint.lintFiles()` patterns use `target.SelectInputs` before config discovery. The selector accepts a `vfs.FS`, gives existing files/directories literal precedence, and reuses the compiled `minimatch3` grammar for static roots, full matching, and directory pruning. Equal lexical roots share a walk; parent/child roots and physical aliases remain independent. Candidates retain only the scan roots that actually matched them, while literal inputs take precedence over overlapping scans. Config discovery bounds glob roots to candidate ancestry and preserves recursive literal directories; target planning owns config admission and canonical deduplication. The exact-file IPC and LSP document paths never reinterpret filenames as patterns.
+
+   API `patterns` and exact `files` are separate request contracts. `fileContents` is a read overlay: it can supply virtual exact targets and dependencies but does not add entries to the raw pattern search. Omitting both target fields retains the low-level overlay-target contract; an explicitly empty target array stays empty. The selector's enumerable VFS is independent from the Program's overlay view, so other filesystem implementations can reuse selection without importing native OS or Node glob logic. Protocol version 5 prevents older binaries from silently ignoring raw patterns.
+
 2. **Config Catalog**: for automatic JS/TS discovery or an explicitly selected JS/TS config, Go builds the staged catalog and batches exact module-evaluation requests to Node. If automatic discovery finds no candidate, or a non-JS config was explicitly selected, the existing Go JSON loader path remains in control
 3. **Mode Selection**:
    - `--lsp`: starts the LSP server
@@ -1581,11 +1583,11 @@ collection, and plugin dispatch may still use infrastructure goroutines.
    - A bounded Go worker pool scans one reachable sibling frontier at a time.
      Config-boundary nodes are suspended, batched after that frontier is
      processed, and resumed only after the Node result is merged.
-   - Native API roots carry an exact target-ancestor trie from the tinyglobby
-     result, so only sibling branches leading to supplied files enter those
-     frontiers. CLI/LSP directory roots, including CLI mixed file+directory
-     invocations, remain recursively unbounded during automatic config
-     discovery. Explicit-config discovery uses the same Git reader without
+   - CLI and native API glob roots carry an exact target-ancestor trie from
+     Go input selection, so only branches leading to matched files enter those
+     frontiers. Literal directory roots remain recursively unbounded, including
+     mixed file/directory/glob invocations. LSP retains its document-driven
+     orchestration. Explicit-config discovery uses the same Git reader without
      searching for config candidates: exact-file inputs observe their containing
      directory chains, and requested directories recurse from their frozen roots.
    - Directory-root ancestry is loaded outer-to-inner before the root frontier.
@@ -1842,7 +1844,7 @@ inline as base64 through its existing JSON-RPC route. The host resolves bytes
 and forwards configuration keys; workers own configuration lookup. Neither the
 plugin adapter nor Node IPC performs a separate canonical base64 validation
 pass. Native mapping bounds, publication generations and exact release
-acknowledgements remain transport invariants. API protocol 4.0.0 requires
+acknowledgements remain transport invariants. API protocol 5.0.0 requires
 matching peers, with no old text-input negotiation or parser fallback. Detached
 LSP continuations contain owned frames, diagnostic text and cloned JSON
 metadata, with no SourceFile, checker, mutable observer or native rule graph.
@@ -2069,14 +2071,14 @@ Other invariants:
   an existing lexical owner; physical ancestry is only a fallback for paths
   with no lexical config. Frozen physical parent ancestry takes precedence over
   the leaf file's destination, matching staged discovery without filesystem reads.
-- `Rslint.lintFiles()` applies the same rule before creating a third-party
-  plugin host or sending API requests. Its realpath memo is bounded to one API
-  call and is not a persistent cache. Canonical target paths resolved during
-  that plan are sent with the request so Go does not repeat the same realpath
-  work. Literal files and glob results share one compiled exclusion matcher,
-  preserving glob escapes and Windows volume roots. Absolute patterns match
-  absolute candidates; equivalent cwd-relative patterns also prune the glob
-  walk. This filtering does not select config owners.
+- `Rslint.lintFiles()` sends raw inputs to Go; it does not enumerate, exclude,
+  canonicalize, or assign config owners to targets in JavaScript. Go freezes
+  identities and rejects conflicting physical ownership before lint execution.
+  The exact-file API still accepts independent canonical hints, including for
+  `lintText()` virtual buffers. JavaScript resolves source aliases only when
+  required to assemble multi-edit fixes or suggestions; that memo stays local
+  to the call. Pattern inputs are combined as a union rather than interpreted as ordered
+  exclusions; config `ignores` remains the exclusion mechanism.
 - LSP uses a different orchestration model and keeps document and Program access on its main
   dispatch loop. Its Program-source lookup follows the same exact lexical and
   canonical filesystem identity rules as CLI/API binding, including
@@ -2193,7 +2195,7 @@ lint and fix execution still await full config activation.
   diagnostics keep their observable identity.
 - **Incremental LSP Document Sync**: editor changes reach the server immediately and are applied in order to rslint's document store; compiler hosts read frozen views of all open texts. rslint selects the mandatory LSP UTF-16 encoding so incoming changes, native diagnostics, plugin diagnostics, and edits share VS Code's coordinate model. Whole-document changes remain a supported protocol fallback.
 - **Server-Owned Debounced Re-linting**: `refreshCh` and `debounceCh` collapse bursts of file changes and project refreshes onto the main dispatch loop. The server remains the single owner of the 200 ms typing debounce; open and save diagnostics stay immediate, while save, fix-all, and close discard redundant pending work for their target document.
-- **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API path canonicalization is also scoped to one `lintFiles()` call.
+- **CLI/API Are Mostly Fresh Runs**: CLI and one-shot API requests generally rebuild `Program` state per run; there is no repository-local rule-result cache or persistent incremental lint cache in the main CLI path today. JavaScript API source-alias lookup is also scoped to one call.
 - **Report Root Identities Are Demand-Scoped**: only the default CLI format asks the loader to freeze roots from the actual type-capable Programs selected for the run, during initial acquisition and before native execution. The loader reuses target hints and resolves only the remaining root paths through one bounded per-file identity pass; the command immediately reduces the frozen result to a file count. Machine formats, autofix generations, `Program` caches, and report rendering retain none of this identity state. As with the rest of a loader Session generation, this assumes the filesystem namespace is stable for the run; the shared request-local VFS may be warmed by the projection, and concurrent external namespace mutation is not a supported consistency boundary.
 - **Worker-Local JavaScript Selector Compilation**: each third-party-plugin worker keeps a 2,048-entry FIFO cache keyed by the exact non-bare selector string. Entries contain only the immutable canonical esquery parse result, specificity, conservative anchor types, or an invalid-selector message; per-file contexts, listeners, options, ASTs, source code, and match results remain outside the cache. Bare node-type selectors retain their direct dispatch path, and replacing the worker naturally discards the cache.
 - **Parallel Program Realpath Queries**: when a CLI or lint API request builds multiple Programs concurrently, the loader session derives a Program-only VFS view that coalesces same-path `Realpath` cold queries across those compiler hosts. Completed realpath and empty-result values remain request-local. Exact path strings are used as keys without cleaning, separator rewriting, case folding, or realpath-key merging. Existence checks and all other operations continue through the existing VFS stack. Serial Program builds, config discovery, target binding, LSP, and `cmd/tsgo` retain their existing filesystem paths and cache lifecycles.

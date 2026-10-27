@@ -3,13 +3,37 @@ package target
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
+
+var inputPatternOptions = minimatch3.Options{Dot: true, NoComment: true, PreserveWhitespace: true}
+
+// globDirectory uses the matcher's literal recognition, including brace and
+// extglob syntax. Keep authored dot segments until the static root is known:
+// normalizing across a wildcard first can invent an independent scan entry.
+// tspath.GetDirectoryPath also normalizes backslashes, spending glob escapes.
+func globDirectory(pattern string) string {
+	directory := pattern
+	for {
+		index := strings.LastIndexByte(directory, '/')
+		switch {
+		case index < 0:
+			directory = "."
+		case index == 0 || index == len(filepath.VolumeName(directory)):
+			directory = directory[:index+1]
+		default:
+			directory = directory[:index]
+		}
+		if literal, ok := minimatch3.New(directory, inputPatternOptions).Literal(); ok {
+			return literal
+		}
+	}
+}
 
 type GlobExpansion struct {
 	Root  string
@@ -34,16 +58,25 @@ func ExpandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 	groupsByRoot := make(map[string]*globGroup)
 	var groups []*globGroup
 	// Full and partial matching share a grammar so pruning preserves selected files.
-	options := minimatch3.Options{Dot: true, NoNegate: true, NoComment: true, NoExt: true, PreserveWhitespace: true}
+	options := minimatch3.Options{Dot: true, PreserveWhitespace: true}
 	partialOptions := options
 	partialOptions.Partial = true
 	for index, pattern := range patterns {
-		base, pattern := doublestar.SplitPattern(filepath.ToSlash(filepath.Clean(pattern)))
-		root := tspath.ResolvePath(cwd, base)
+		pattern = filepath.ToSlash(pattern)
+		root := tspath.ResolvePath(cwd, globDirectory(pattern))
 		expansions[index].Root = root
-		if !doublestar.ValidatePattern(pattern) || !fsys.DirectoryExists(root) {
+		if !fsys.DirectoryExists(root) {
 			continue
 		}
+		absolute := pattern
+		if !filepath.IsAbs(absolute) {
+			absolute = filepath.Join(cwd, absolute)
+		}
+		relative, err := filepath.Rel(filepath.FromSlash(root), filepath.FromSlash(absolute))
+		if err != nil {
+			return nil, err
+		}
+		pattern = filepath.ToSlash(relative)
 		group := groupsByRoot[root]
 		if group == nil {
 			group = &globGroup{root: root, patterns: make(map[string]*compiledGlob)}

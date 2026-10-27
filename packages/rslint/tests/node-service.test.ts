@@ -126,7 +126,7 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
 
   test('owns late pipe errors until the terminated child has closed', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
-    await svc.sendMessage('handshake', { version: '4.0.0' });
+    await svc.sendMessage('handshake', { version: '5.0.0' });
     const child = childOf(svc);
     const closed = once(child, 'close');
     svc.terminate();
@@ -146,9 +146,9 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
   test('does not harm a normal request/response round-trip', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     await expect(
-      svc.sendMessage('handshake', { version: '4.0.0' }),
+      svc.sendMessage('handshake', { version: '5.0.0' }),
     ).resolves.toEqual({
-      version: '4.0.0',
+      version: '5.0.0',
       ok: true,
       capabilities: ['reversePluginLint'],
     });
@@ -180,7 +180,7 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
     process.env.RSLINT_FAKE_EXIT_SILENT = '1';
     try {
       const svc = new NodeRslintService({ rslintPath: FAKE });
-      await svc.sendMessage('handshake', { version: '4.0.0' });
+      await svc.sendMessage('handshake', { version: '5.0.0' });
       const [lint, exit] = await Promise.allSettled([
         svc.sendMessage('lint', {}),
         svc.sendMessage('exit', {}),
@@ -239,7 +239,7 @@ suite('NodeRslintService reject-all-pending on crash/terminate', () => {
       import { NodeRslintService } from ${JSON.stringify(entry)};
       const keepAlive = setInterval(() => {}, 1000);
       const service = new NodeRslintService({ rslintPath: ${JSON.stringify(FAKE)} });
-      await service.sendMessage('handshake', { version: '4.0.0' });
+      await service.sendMessage('handshake', { version: '5.0.0' });
       service.setInboundHandler(() => {
         clearInterval(keepAlive);
         process.stdout.write('INBOUND_PENDING\\n');

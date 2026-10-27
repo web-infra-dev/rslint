@@ -3,8 +3,8 @@
 /**
  * The `Rslint` class — the ESLint-style programmatic API (issue #1106).
  *
- * It is a thin JS facade over the low-level `lint()` IPC. JavaScript expands
- * API globs; Go owns config discovery, ownership, ignore semantics, and final
+ * It is a thin JS facade over the low-level `lint()` IPC. Go owns raw input
+ * selection, config discovery, ownership, ignore semantics, and final
  * lint-target admission. Reverse IPC asks this process to evaluate and
  * normalize only the JavaScript config candidates Go selected. The facade also
  * reshapes wire-level responses into ESLint v10's `LintResult[]` (per-file
@@ -14,10 +14,7 @@
  * service; `close()` tears it down (mirrors RSLintService.close()).
  */
 import path from 'node:path';
-import { readFile, stat, writeFile } from 'node:fs/promises';
-import { convertPathToPattern, glob } from 'tinyglobby';
-import picomatch from 'picomatch';
-import { compileGlobExclusions } from './glob-exclusions.js';
+import { readFile, writeFile } from 'node:fs/promises';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
@@ -138,139 +135,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-interface ClassifiedLintPatterns {
-  literalFilePatterns: string[];
-  scanPatterns: Map<string, string[]>;
-}
-
-type GlobPatternRole = 'match' | 'ignore' | 'skip';
-
-// Keep this classification aligned with tinyglobby's processPatterns(): a
-// leading `!(` starts a positive extglob, while `!pattern` is an exclusion.
-function globPatternRole(pattern: string): GlobPatternRole {
-  if (!pattern) return 'skip';
-  if (pattern[0] !== '!' || pattern[1] === '(') return 'match';
-  if (pattern[1] !== '!' || pattern[2] === '(') return 'ignore';
-  return 'skip';
-}
-
-interface PlannedLintFile extends ResolvedFilesystemPath {
-  explicit: boolean;
-  scanDirectories: string[];
-}
-
-const DEFAULT_LINT_GLOB_IGNORES = ['**/node_modules/**', '**/.git/**'];
-
-function staticGlobRoot(pattern: string, cwd: string): string | undefined {
-  // scan() can stop at literal/escaped braces before seeing a later wildcard.
-  // Keep the authored literal/scan role, then derive the effective static path
-  // after dot-segment normalization. Preserve Windows volume boundaries.
-  const volume =
-    path.sep === '\\'
-      ? /^(?:[a-z]:|\/\/[^/]+\/[^/]+)(?=\/|$)/i.exec(pattern)?.[0] || ''
-      : '';
-  let normalized =
-    volume + path.posix.normalize(pattern.slice(volume.length) || '/');
-  if (path.isAbsolute(normalized)) {
-    const relative = path.posix.relative(
-      convertPathToPattern(cwd.split(path.sep).join('/')),
-      normalized,
-    );
-    // tinyglobby makes absolute patterns relative before parsing negations.
-    if (relative.startsWith('!')) normalized = relative;
-  }
-  let prefix = '';
-  for (const input of normalized === pattern
-    ? [pattern]
-    : [pattern, normalized]) {
-    prefix = '';
-    const parsed = picomatch.parse(input, {});
-    let dynamic = Boolean(parsed.negated);
-    for (const token of parsed.negated ? [] : parsed.tokens) {
-      if (
-        ['bos', 'text', 'dot', 'slash', 'comma'].includes(token.type) ||
-        token.value.startsWith('\\') ||
-        token.output === `\\${token.value}`
-      ) {
-        prefix += token.value;
-        continue;
-      }
-      dynamic = true;
-      break;
-    }
-    // scan() records leading negation syntax even when two bangs cancel out.
-    if (input === pattern && !dynamic && !picomatch.scan(input).negated) {
-      return undefined;
-    }
-    if (dynamic) prefix = prefix.slice(0, prefix.lastIndexOf('/') + 1);
-  }
-  return path.resolve(
-    cwd,
-    picomatch.scan(prefix, { unescape: true }).base || '.',
-  );
-}
-
-async function classifyLintPatterns(
-  patterns: string[],
-  cwd: string,
-): Promise<ClassifiedLintPatterns> {
-  const literalFilePatterns: string[] = [];
-  const scanPatterns = new Map<string, string[]>();
-
-  for (const pattern of patterns) {
-    if (globPatternRole(pattern) !== 'match') continue;
-    let absolute = path.resolve(cwd, pattern);
-    let info;
-    try {
-      info = await stat(absolute);
-    } catch {
-      // Missing literal paths can still be glob patterns or escaped paths.
-    }
-    let scanRoot = info ? undefined : staticGlobRoot(pattern, cwd);
-    if (scanRoot !== undefined) {
-      try {
-        const info = await stat(scanRoot);
-        // A glob reduced to a static file still enters through its directory.
-        if (info.isFile()) scanRoot = path.dirname(scanRoot);
-        if (info.isDirectory() || info.isFile()) {
-          const matches = scanPatterns.get(scanRoot) ?? [];
-          matches.push(pattern);
-          scanPatterns.set(scanRoot, matches);
-        }
-      } catch {
-        // A missing static root cannot contribute a matched target.
-      }
-      continue;
-    }
-
-    try {
-      if (!info) {
-        absolute = path.resolve(
-          cwd,
-          picomatch.scan(pattern, { unescape: true }).base || pattern,
-        );
-        info = await stat(absolute);
-      }
-      if (info.isDirectory()) {
-        const matches = scanPatterns.get(absolute) ?? [];
-        const relative =
-          path.relative(cwd, absolute).split(path.sep).join('/') || '.';
-        matches.push(`${convertPathToPattern(relative)}/**/*`);
-        scanPatterns.set(absolute, matches);
-      } else if (info.isFile()) {
-        literalFilePatterns.push(absolute);
-      }
-    } catch {
-      // tinyglobby will omit a missing literal from the match set.
-    }
-  }
-
-  return {
-    literalFilePatterns,
-    scanPatterns,
-  };
-}
-
 export class Rslint {
   readonly #service: RSLintService;
   readonly #cwd: string;
@@ -376,96 +240,14 @@ export class Rslint {
    * Inclusion patterns give existing files and directories literal precedence.
    */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
-    const globs = Array.isArray(patterns) ? patterns : [patterns];
-    const { literalFilePatterns, scanPatterns } = await classifyLintPatterns(
-      globs,
-      this.#cwd,
-    );
-    const exclusions = compileGlobExclusions(
-      [
-        ...DEFAULT_LINT_GLOB_IGNORES,
-        ...globs
-          .filter((pattern) => globPatternRole(pattern) === 'ignore')
-          .map((pattern) => pattern.slice(1)),
-      ],
-      this.#cwd,
-    );
-    const globOptions = {
-      cwd: this.#cwd,
-      absolute: true,
-      onlyFiles: true,
-      dot: true,
-      ignore: exclusions.ignore,
-    } as const;
-    // stat() already established each literal as a file. Keep its caller
-    // spelling directly, including file symlinks, without a second glob crawl.
-    const literalMatches = literalFilePatterns;
-
-    const filesByIdentity = new Map<
-      string,
-      { filePath: string; explicit: boolean; scanDirectories: string[] }
-    >();
-    // Keep each static root's actual matches. A file matched by an outer glob
-    // cannot borrow an unrelated inner glob's independent scan entry.
-    for (const [directory, patterns] of scanPatterns) {
-      const matched = await glob(patterns, {
-        ...globOptions,
-        followSymbolicLinks: false,
-      });
-      for (const file of matched) {
-        if (exclusions.matches(file)) continue;
-        const normalized = path.normalize(file);
-        const key = nativePathIdentity.key(normalized);
-        const entry = filesByIdentity.get(key) ?? {
-          filePath: normalized,
-          explicit: false,
-          scanDirectories: [],
-        };
-        entry.scanDirectories.push(directory);
-        filesByIdentity.set(key, entry);
-      }
-    }
-    for (const file of literalMatches) {
-      if (exclusions.matches(file)) continue;
-      const normalized = path.normalize(file);
-      const key = nativePathIdentity.key(normalized);
-      // Preserve the spelling of a literal target over an overlapping glob.
-      filesByIdentity.set(key, {
-        filePath: normalized,
-        explicit: true,
-        scanDirectories: [],
-      });
-    }
-
-    const lexicalFiles = [...filesByIdentity.values()];
-    if (lexicalFiles.length === 0) return [];
-
+    const inputs = Array.isArray(patterns) ? patterns : [patterns];
     const pathResolver = new RunPathResolver();
-    const resolvedPaths = await pathResolver.resolveAll(
-      lexicalFiles.map(({ filePath }) => filePath),
-    );
-    const plannedFiles: PlannedLintFile[] = resolvedPaths.map(
-      (resolved, index) => ({
-        ...resolved,
-        explicit: lexicalFiles[index].explicit,
-        scanDirectories: lexicalFiles[index].scanDirectories,
-      }),
-    );
-
-    // Preserve lexical aliases through discovery. Go owns the final canonical
-    // target plan: aliases under one config are coalesced there, while aliases
-    // governed by different configs must remain visible so it can reject the
-    // ambiguous ownership instead of silently dropping one before discovery.
-    const selectedFiles = [...plannedFiles].sort((left, right) =>
-      nativePathIdentity.compare(left.lexicalPath, right.lexicalPath),
-    );
     const overrideConfig = this.#getNormalizedOverrideConfig() ?? [];
     const usesNativeDiscovery = this.#overrideConfigFile !== true;
     const discoverySession = usesNativeDiscovery
       ? this.#createNativeConfigDiscoverySession()
       : null;
     try {
-      const files = selectedFiles.map((file) => file.lexicalPath);
       const overlay = this.#resolveOverlay();
       const response = await this.#service.lint(
         {
@@ -476,39 +258,29 @@ export class Rslint {
                   typeof this.#overrideConfigFile === 'string'
                     ? path.resolve(this.#cwd, this.#overrideConfigFile)
                     : undefined,
-                directories: [...scanPatterns.keys()],
                 overrideConfig,
               }
             : undefined,
           configDirectory: usesNativeDiscovery ? undefined : this.#cwd,
           workingDirectory: this.#cwd,
-          files,
-          fileScanDirectories: selectedFiles.map((file) =>
-            file.explicit ? null : file.scanDirectories,
-          ),
-          canonicalFiles: selectedFiles.map((file) => file.canonicalPath),
+          patterns: inputs,
           // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
           fileContents: overlay,
           fix: this.#fix,
         },
         discoverySession?.handlers ?? {},
       );
+      const linted = (response.lintedFiles ?? []).map((file) =>
+        path.isAbsolute(file)
+          ? path.normalize(file)
+          : path.resolve(this.#cwd, file),
+      );
       const multiEditSources = await this.#resolveMultiEditSources(
         response,
         this.#cwd,
         pathResolver,
         overlay,
-        selectedFiles,
       );
-      // The multi-config native path returns absolute identities. Relative
-      // values remain accepted for low-level/older implementations.
-      const linted = response.lintedFiles
-        ? response.lintedFiles.map((file) =>
-            path.isAbsolute(file)
-              ? path.normalize(file)
-              : path.resolve(this.#cwd, file),
-          )
-        : files;
       return this.#toLintResults(
         response,
         this.#cwd,
@@ -709,6 +481,11 @@ export class Rslint {
       if (!overlayByPath.has(canonicalKey)) {
         overlayByPath.set(canonicalKey, source);
       }
+    }
+    if (resolvedFiles.length === 0) {
+      resolvedFiles = await pathResolver.resolveAll(
+        diagnostics.map((diagnostic) => toAbs(diagnostic.filePath)),
+      );
     }
     // Go materializes each selected lexical path through its canonical identity.
     // Mirror that request-known equivalence here so a diagnostic projected back

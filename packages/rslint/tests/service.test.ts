@@ -27,7 +27,7 @@ class ReverseLintBackend implements RslintServiceInterface {
     if (kind === 'handshake') {
       this.handshakes.push([...(data.capabilities ?? [])]);
       return {
-        version: '4.0.0',
+        version: '5.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       };
@@ -41,7 +41,7 @@ class ReverseLintBackend implements RslintServiceInterface {
     return this.inbound({
       id: 100,
       kind: 'pluginLint',
-      data: { token: data.files[0] },
+      data: { token: data.files?.[0] ?? data.patterns?.[0] },
       ...(this.attachments === undefined
         ? {}
         : { attachments: this.attachments }),
@@ -208,7 +208,7 @@ class ReverseConfigBackend extends ReverseLintBackend {
     if (kind === 'handshake') {
       this.handshakeCapabilities = [...(data.capabilities ?? [])];
       return {
-        version: '4.0.0',
+        version: '5.0.0',
         ok: true,
         capabilities: [API_REVERSE_CONFIG_LOAD_CAPABILITY],
       };
@@ -314,6 +314,23 @@ describe('RSLintService reverse lint request scoping', () => {
     await service.close();
   });
 
+  test('forwards raw patterns without expanding them in JavaScript', async () => {
+    const backend = new ReverseLintBackend();
+    const service = new RSLintService(backend);
+    try {
+      await service.lint(
+        { patterns: ['src/@(a|b).ts', 'src/[ab].ts'] },
+        { pluginLint: () => ({ diagnostics: [] }) },
+      );
+      expect(backend.lintPayloads[0]).toMatchObject({
+        patterns: ['src/@(a|b).ts', 'src/[ab].ts'],
+      });
+      expect(backend.lintPayloads[0].files).toBeUndefined();
+    } finally {
+      await service.close();
+    }
+  });
+
   test('serializes concurrent lint frames so handlers cannot overwrite each other', async () => {
     const backend = new GatedReverseLintBackend();
     const service = new RSLintService(backend);
@@ -348,7 +365,7 @@ describe('RSLintService reverse lint request scoping', () => {
     };
     const service = new RSLintService(backend);
     await expect(service.lint({ files: ['a.ts'] })).rejects.toThrow(
-      /protocol mismatch.*4\.0\.0.*1\.0\.0/,
+      /protocol mismatch.*5\.0\.0.*1\.0\.0/,
     );
     await service.close();
   });
@@ -357,7 +374,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const backend = new ReverseLintBackend();
     backend.sendMessage = async (kind: string, data: any): Promise<any> => {
       if (kind === 'handshake') {
-        return { version: '4.0.0', ok: true, capabilities: [] };
+        return { version: '5.0.0', ok: true, capabilities: [] };
       }
       return ReverseLintBackend.prototype.sendMessage.call(backend, kind, data);
     };
