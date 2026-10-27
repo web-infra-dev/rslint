@@ -98,8 +98,8 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		log.Printf("Ignoring stale didSave for open document %s", uri)
 	}
 
-	// Clear pending debounce lint for this URI — pushDiagnostics below
-	// will lint it immediately, so the debounce would be redundant.
+	// The save refresh below includes this URI, so its pending debounce
+	// would schedule redundant diagnostics.
 	delete(s.pendingLintURIs, uri)
 
 	if s.lintPrograms != nil && forwardSave {
@@ -109,7 +109,14 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 	s.refreshUncoveredDocument(ctx, uri)
 
 	if s.initialized {
-		s.pushDiagnostics(uri)
+		if forwardSave {
+			// Saving a dependency can change other open documents' diagnostics
+			// without invalidating their resident Programs.
+			s.invalidateOpenDocumentDiagnostics()
+			_ = s.RefreshDiagnostics(ctx)
+		} else {
+			s.pushDiagnostics(uri)
+		}
 	}
 	return nil
 }

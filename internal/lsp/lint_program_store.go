@@ -18,8 +18,7 @@ import (
 )
 
 // lintProgramStore owns the configured Programs selected by open documents.
-// Explicit and discovered projects share this owner; their construction mode
-// remains part of the cache key.
+// Explicit and discovered projects share the same editor construction semantics.
 type lintProgramStore struct {
 	server              *Server
 	documentPrograms    map[lsproto.DocumentUri]lintProgramKey
@@ -30,10 +29,7 @@ type lintProgramStore struct {
 	observedRootConfigs map[string]struct{}
 }
 
-type lintProgramKey struct {
-	configPath       string
-	sourceReferences bool
-}
+type lintProgramKey = tspath.Path
 
 type lintProgramState struct {
 	program    *compiler.Program
@@ -57,7 +53,6 @@ type lintProgramRequest struct {
 	target            target.File
 	freshOnly         bool
 	overlayPrepared   bool
-	sourceReferences  bool
 	usedKey           lintProgramKey
 	usedState         *lintProgramState
 	projectMetadata   map[string]*lintProjectMetadata
@@ -85,7 +80,7 @@ func (s *lintProgramStore) Request(
 	uri lsproto.DocumentUri,
 	target target.File,
 ) (lintProgramLoader, lintProjectMetadataLoader, func()) {
-	request := s.request(ctx, uri, target, false)
+	request := s.request(ctx, uri, target)
 	return request.load, request.loadMetadata, request.finalize
 }
 
@@ -93,7 +88,6 @@ func (s *lintProgramStore) request(
 	ctx context.Context,
 	uri lsproto.DocumentUri,
 	target target.File,
-	sourceReferences bool,
 ) *lintProgramRequest {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
@@ -107,17 +101,13 @@ func (s *lintProgramStore) request(
 		ctx:               ctx,
 		uri:               uri,
 		target:            target,
-		sourceReferences:  sourceReferences,
 		projectMetadata:   make(map[string]*lintProjectMetadata),
 		transientMetadata: make(map[string]struct{}),
 	}
 }
 
 func (r *lintProgramRequest) key(configPath string) lintProgramKey {
-	if r.sourceReferences {
-		configPath = string(lintProgramLexicalPathID(configPath, r.store.server.fs))
-	}
-	return lintProgramKey{tspath.NormalizePath(configPath), r.sourceReferences}
+	return lintProgramLexicalPathID(configPath, r.store.server.fs)
 }
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
@@ -128,11 +118,8 @@ func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys v
 	options.Checkers = &checkerCount
 	commandLine.SetCompilerOptions(&options)
 	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
-	if r.sourceReferences {
-		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
-			newLintProjectReferenceHost(host, r.projectMetadata))
-	}
-	return utils.CreateProgramFromParsedConfigLenient(false, commandLine, host)
+	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
+		newLintProjectReferenceHost(host, r.projectMetadata))
 }
 
 func (r *lintProgramRequest) loadMetadata(
@@ -561,21 +548,24 @@ func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
 func (s *lintProgramStore) DidChangeWatchedFiles(
 	changes []*lsproto.FileEvent,
 ) bool {
-	discarded := false
+	needsRefresh := false
 	for _, change := range changes {
 		if s.isOpenSourceOverlayWatchChange(change) {
 			uri := change.Uri
-			discarded = s.markContent(
+			s.markContent(
 				uriToPath(uri),
 				s.server.documents[uri],
 				false,
-			) || discarded
+			)
+			// A dependent document can still display older diagnostics even
+			// when its Program has already incorporated the saved buffer.
+			needsRefresh = true
 			continue
 		}
 		invalidated := s.Invalidate()
-		return invalidated || discarded || len(s.server.documents) > 0
+		return invalidated || needsRefresh || len(s.server.documents) > 0
 	}
-	return discarded
+	return needsRefresh
 }
 
 func (s *lintProgramStore) isOpenSourceOverlayWatchChange(
@@ -605,16 +595,16 @@ func (s *lintProgramStore) markContent(
 	fileName string,
 	content string,
 	invalidatePossibleNewSource bool,
-) (discarded bool) {
+) {
 	if tspath.HasJSONFileExtension(fileName) {
-		return s.Invalidate()
+		s.Invalidate()
+		return
 	}
 	if invalidatePossibleNewSource {
 		for configFileName, metadata := range s.projectMetadata {
 			if metadata != nil && metadata.commandLine != nil &&
 				metadata.commandLine.PossiblyMatchesFileName(fileName) {
 				delete(s.projectMetadata, configFileName)
-				discarded = true
 			}
 		}
 	}
@@ -634,7 +624,6 @@ func (s *lintProgramStore) markContent(
 			state.selectedSourceIdentities[lexicalID]
 		if identityKnown && previousIdentity != physicalPathID() {
 			delete(s.programs, configFileName)
-			discarded = true
 			continue
 		}
 		var sourceFile *ast.SourceFile
@@ -646,7 +635,6 @@ func (s *lintProgramStore) markContent(
 		if sourceFile != nil {
 			if !identityKnown && lexicalID != physicalPathID() {
 				delete(s.programs, configFileName)
-				discarded = true
 				continue
 			}
 			s.markStateSourceContent(state, sourceFile, content)
@@ -656,10 +644,8 @@ func (s *lintProgramStore) markContent(
 			(state.program.CommandLine().PossiblyMatchesFileName(fileName) ||
 				state.failedLookupMatches(fileName, s.server.fs)) {
 			delete(s.programs, configFileName)
-			discarded = true
 		}
 	}
-	return discarded
 }
 
 // sourceFileForOpen avoids a canonical source scan for every unrelated

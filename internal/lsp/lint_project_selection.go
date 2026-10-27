@@ -1,7 +1,6 @@
 package lsp
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -98,22 +97,6 @@ func parseStandaloneLintProject(
 		identityFS = parseFS
 	}
 	return newLintProjectMetadata(tsConfigPath, parsed, identityFS), nil
-}
-
-func createStandaloneLintProgram(
-	metadata *lintProjectMetadata,
-	fs vfs.FS,
-) (*compiler.Program, error) {
-	if metadata == nil || metadata.commandLine == nil {
-		return nil, errors.New("cannot create a Program without parsed project metadata")
-	}
-	configDir := tspath.GetDirectoryPath(metadata.configPath)
-	host := utils.CreateCompilerHost(configDir, fs)
-	return utils.CreateProgramFromParsedConfigLenient(
-		true,
-		metadata.commandLine,
-		host,
-	)
 }
 
 // selectedLintProject is the configured-project result of the shared LSP
@@ -225,11 +208,10 @@ func loadDirectLintProject(
 // project snapshot. Root probing and Program construction share it, so a
 // config cannot be parsed twice or change meaning halfway through selection.
 type standaloneLintProjectRequest struct {
-	target           target.File
-	fs               vfs.FS
-	loadFS           func() vfs.FS
-	projects         map[string]*lintProjectMetadata
-	sourceReferences bool
+	target   target.File
+	fs       vfs.FS
+	loadFS   func() vfs.FS
+	projects map[string]*lintProjectMetadata
 }
 
 func newStandaloneLintProjectRequest(
@@ -283,19 +265,13 @@ func (request *standaloneLintProjectRequest) metadata(
 func (request *standaloneLintProjectRequest) program(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	var program *compiler.Program
-	var err error
-	if request.sourceReferences {
-		program, err = utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
-			true, metadata.commandLine,
-			newLintProjectReferenceHost(
-				utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), request.filesystem()),
-				request.projects,
-			),
-		)
-	} else {
-		program, err = createStandaloneLintProgram(metadata, request.filesystem())
-	}
+	program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
+		true, metadata.commandLine,
+		newLintProjectReferenceHost(
+			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), request.filesystem()),
+			request.projects,
+		),
+	)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -291,7 +292,7 @@ func TestStandaloneLintProjectRequestKeepsReferenceSnapshot(t *testing.T) {
 	fsys := bundled.WrapFS(osvfs.FS())
 	target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), directory, fsys)
 	request := newStandaloneLintProjectRequestWithFS(target, fsys)
-	request.sourceReferences = true
+
 	metadata, err := request.metadata(rootPath)
 	if err != nil {
 		t.Fatal(err)
@@ -351,11 +352,16 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 	if !lintProjectSnapshotsEqual(upper.commandLine, lower.commandLine, fsys) {
 		t.Fatal("Drive normalization made unchanged roots or path options incompatible")
 	}
-	program, err := createStandaloneLintProgram(lower, fsys)
+	request := newStandaloneLintProjectRequestWithFS(lspConfigTarget("c:/Repo/target.ts", "c:/Repo", fsys), fsys)
+	program, _, err := request.program(lower)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !lintProjectSnapshotsEqual(upper.commandLine, program.CommandLine(), fsys) {
+	upperProgram, _, err := request.program(upper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !lintProjectSnapshotsEqual(upperProgram.CommandLine(), program.CommandLine(), fsys) {
 		t.Fatal("equivalent Windows configuration could not reuse its Program")
 	}
 }
@@ -733,7 +739,7 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 			fsys := bundled.WrapFS(osvfs.FS())
 			target := lspConfigTarget(tspath.ResolvePath(directory, test.file), directory, fsys)
 			request := newStandaloneLintProjectRequestWithFS(target, fsys)
-			request.sourceReferences = true
+
 			loaders := request.loaders()
 			var built []string
 			loaders.program = func(metadata *lintProjectMetadata) (*compiler.Program, *ast.SourceFile, error) {
@@ -1397,7 +1403,7 @@ func TestLSPRootMembershipTypedGapTyped(t *testing.T) {
 	}
 }
 
-func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
+func TestLSPUsesReferencedEditorSources(t *testing.T) {
 	archive := txtarfs.MustParseFile(t, "testdata/project_service.txtar")
 	for _, test := range []struct {
 		fixture, target, reference, targetContent, referenceContent string
@@ -1414,65 +1420,75 @@ func TestProjectServiceLSPUsesReferencedEditorSources(t *testing.T) {
 			referenceContent: "var globalValue = 'editor';\n", wantMismatch: true,
 		},
 	} {
-		t.Run(test.fixture, func(t *testing.T) {
-			directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
-			targetPath := tspath.ResolvePath(directory, test.target)
-			referencePath := tspath.ResolvePath(directory, test.reference)
-			server := newTestServer()
-			server.cwd = directory
-			server.fs = bundled.WrapFS(osvfs.FS())
-			server.backgroundCtx = context.Background()
-			server.defaultLibraryPath = bundled.LibPath()
-			server.initializeParams = &lsproto.InitializeParams{}
-			if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
-				t.Fatal(err)
-			}
+		for _, service := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/service=%t", test.fixture, service), func(t *testing.T) {
+				directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
+				targetPath := tspath.ResolvePath(directory, test.target)
+				referencePath := tspath.ResolvePath(directory, test.reference)
+				server := newTestServer()
+				server.cwd = directory
+				server.fs = bundled.WrapFS(osvfs.FS())
+				server.backgroundCtx = context.Background()
+				server.defaultLibraryPath = bundled.LibPath()
+				server.initializeParams = &lsproto.InitializeParams{}
+				if err := server.handleInitialized(context.Background(), &lsproto.InitializedParams{}); err != nil {
+					t.Fatal(err)
+				}
 
-			uri := documentURIFromPath(targetPath)
-			referenceURI := documentURIFromPath(referencePath)
-			server.documents[uri] = test.targetContent
-			server.documents[referenceURI] = test.referenceContent
-			entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{
-				ParserOptions: &config.ParserOptions{ProjectService: config.BoolPtr(true)},
-			}}}
-			snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
-			for _, speculative := range []bool{false, true} {
-				var generation linter.Generation
-				var release linter.ReleaseFunc
-				var err error
-				if speculative {
-					generation, release, err = acquireSpeculativeGeneration(context.Background(), test.targetContent, snapshot,
-						server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
-				} else {
-					provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
-					generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+				uri := documentURIFromPath(targetPath)
+				referenceURI := documentURIFromPath(referencePath)
+				server.documents[uri] = test.targetContent
+				server.documents[referenceURI] = test.referenceContent
+				server.lintPrograms = newLintProgramStore(server)
+				server.lintPrograms.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+				parserOptions := &config.ParserOptions{ProjectService: config.BoolPtr(true)}
+				if !service {
+					projectPath := "./tsconfig.json"
+					if test.fixture == "reference-sources" {
+						projectPath = "./app/tsconfig.json"
+					}
+					parserOptions = &config.ParserOptions{Project: config.ProjectPaths{projectPath}}
 				}
-				if release != nil {
-					defer release()
-				}
-				if err != nil || len(generation.Native.Programs) != 1 {
-					t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
-				}
-				program := generation.Native.Programs[0]
-				if source := program.GetSourceFile(referencePath); source == nil || source.Text() != test.referenceContent {
-					t.Fatalf("speculative=%v: did not load unsaved referenced source", speculative)
-				}
-				if test.wantMismatch {
-					foundMismatch := false
-					for _, diagnostic := range program.NoEmitDiagnostics(context.Background()) {
-						foundMismatch = foundMismatch || diagnostic.Code() == 2322
-						if diagnostic.Code() == 2304 {
-							t.Fatalf("speculative=%v: JS global was missing from the type context", speculative)
+				entries := config.RslintConfig{{LanguageOptions: &config.LanguageOptions{ParserOptions: parserOptions}}}
+				snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
+				for _, speculative := range []bool{false, true} {
+					var generation linter.Generation
+					var release linter.ReleaseFunc
+					var err error
+					if speculative {
+						generation, release, err = acquireSpeculativeGeneration(context.Background(), test.targetContent, snapshot,
+							server.freezeSpeculativeLintEnvironment(uri, snapshot.target))
+					} else {
+						provider := &documentGenerationProvider{server: server, uri: uri, snapshot: snapshot}
+						generation, release, err = provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
+					}
+					if release != nil {
+						defer release()
+					}
+					if err != nil || len(generation.Native.Programs) != 1 {
+						t.Fatalf("speculative=%v: Programs=%d error=%v", speculative, len(generation.Native.Programs), err)
+					}
+					program := generation.Native.Programs[0]
+					if source := program.GetSourceFile(referencePath); source == nil || source.Text() != test.referenceContent {
+						t.Fatalf("speculative=%v: did not load unsaved referenced source", speculative)
+					}
+					if test.wantMismatch {
+						foundMismatch := false
+						for _, diagnostic := range program.NoEmitDiagnostics(context.Background()) {
+							foundMismatch = foundMismatch || diagnostic.Code() == 2322
+							if diagnostic.Code() == 2304 {
+								t.Fatalf("speculative=%v: JS global was missing from the type context", speculative)
+							}
 						}
+						if !foundMismatch {
+							t.Fatalf("speculative=%v: lost the JS global's string-to-number type mismatch", speculative)
+						}
+					} else if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
+						t.Fatalf("speculative=%v: used stale declaration output", speculative)
 					}
-					if !foundMismatch {
-						t.Fatalf("speculative=%v: lost the JS global's string-to-number type mismatch", speculative)
-					}
-				} else if program.GetSourceFile(tspath.ResolvePath(directory, "lib/dist/value.d.ts")) != nil {
-					t.Fatalf("speculative=%v: used stale declaration output", speculative)
 				}
-			}
-		})
+			})
+		}
 	}
 }
 

@@ -66,7 +66,6 @@ func acquireSpeculativeGeneration(
 	overlayFS := newFrozenLintTargetOverlayFS(environment.baseFS, files, target)
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
-	request.sourceReferences = snapshot.projectPolicy.ServiceRootDirectory != ""
 	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
 		snapshot.projectPolicy,

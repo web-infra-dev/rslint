@@ -498,6 +498,82 @@ func TestHandleDidChange_UnopenedDocument(t *testing.T) {
 
 // ======== handleDidSave tests ========
 
+func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
+	for _, event := range []string{"save", "watch"} {
+		t.Run(event, func(t *testing.T) {
+			const consumer = "import { value } from './dependency';\nexport const result = value.member;\n"
+			const typed = "export const value = { member: 1 };\n"
+			fixture := newLintProgramStoreFixture(t, consumer)
+			s := fixture.server
+			s.initialized = true
+			s.backgroundCtx = context.Background()
+			s.outgoingQueue = make(chan *lsproto.Message, 32)
+			s.lintPrograms = fixture.store
+			defer func() {
+				if s.lintTimer != nil {
+					s.lintTimer.Stop()
+				}
+			}()
+			dependencyPath := tspath.ResolvePath(s.cwd, "src/dependency.ts")
+			dependencyURI := documentURIFromPath(dependencyPath)
+			if err := os.WriteFile(dependencyPath, []byte(typed), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			s.documents[dependencyURI] = typed
+			installJSConfigsForTest(s, map[string]config.RslintConfig{s.cwd: {{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			}}})
+			s.pushDiagnostics(fixture.sourceURI)
+			if got := len(s.diagnostics[fixture.sourceURI]); got != 0 {
+				t.Fatalf("initial consumer diagnostics=%d", got)
+			}
+			for step, content := range []string{"export const value: any = {};\n", typed} {
+				if err := s.handleDidChange(context.Background(), makeDidChangeParams(dependencyURI, int32(step+2), content)); err != nil {
+					t.Fatal(err)
+				}
+				// The dependency's own diagnostics already update the shared Program.
+				// Consumers still need publication even if no cache is invalidated.
+				s.pushDiagnostics(dependencyURI)
+				program := fixture.load(t)
+				if err := os.WriteFile(dependencyPath, []byte(content), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				select {
+				case <-s.refreshCh:
+				default:
+				}
+				var err error
+				if event == "save" {
+					err = s.handleDidSave(context.Background(), &lsproto.DidSaveTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: dependencyURI}, Text: &content,
+					})
+				} else {
+					err = s.handleDidChangeWatchedFiles(context.Background(), &lsproto.DidChangeWatchedFilesParams{
+						Changes: []*lsproto.FileEvent{{Uri: dependencyURI, Type: lsproto.FileChangeTypeChanged}},
+					})
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				select {
+				case <-s.refreshCh:
+				default:
+					t.Fatal("saved dependency did not schedule consumer diagnostics")
+				}
+				s.pushDiagnostics(fixture.sourceURI)
+				if got, want := len(s.diagnostics[fixture.sourceURI]), 1-step; got != want {
+					t.Fatalf("refreshed consumer diagnostics=%d, want %d", got, want)
+				}
+				if fixture.load(t) != program {
+					t.Fatal("diagnostic refresh rebuilt an already current Program")
+				}
+			}
+		})
+	}
+}
+
 func TestHandleDidSave_DoesNotOverwriteNewerDidChange(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()

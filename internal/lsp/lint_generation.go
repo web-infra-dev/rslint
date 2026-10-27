@@ -131,7 +131,6 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		func() vfs.FS { return server.currentEditorOverlayFSForTarget(p.uri, snapshot.target) },
 	)
 	serviceEnabled := snapshot.projectPolicy.ServiceRootDirectory != ""
-	request.sourceReferences = serviceEnabled
 	loaders := request.loaders()
 	var selectionFS vfs.FS
 	release := linter.ReleaseFunc(nil)
@@ -144,7 +143,7 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	if p.requestPrograms != nil {
 		loaders, release = p.requestPrograms(ctx, p.uri, snapshot.target)
 	} else if server.lintPrograms.Usable() {
-		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target, serviceEnabled)
+		resident := server.lintPrograms.request(ctx, p.uri, snapshot.target)
 		loaders = lintProjectLoaders{program: resident.load, metadata: resident.loadMetadata}
 		release = resident.finalize
 		resident.prepareOverlay()
