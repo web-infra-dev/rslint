@@ -267,7 +267,17 @@ func (m *Matcher) Literal() (string, bool) {
 		}
 		parts = append(parts, part.literal)
 	}
-	return strings.Join(parts, "/"), true
+	expansions := m.braceExpand()
+	if len(expansions) != 1 {
+		return "", false
+	}
+	literal := strings.Join(parts, "/")
+	// Matching collapses repeated slashes, but path roots such as UNC need them.
+	leadingSlashes := len(expansions[0]) - len(strings.TrimLeft(expansions[0], "/"))
+	if leadingSlashes > 1 {
+		literal = expansions[0][:leadingSlashes-1] + literal
+	}
+	return literal, true
 }
 
 func (m *Matcher) braceExpand() []string {

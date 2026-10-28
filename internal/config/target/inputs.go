@@ -50,7 +50,7 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 			patterns = append(patterns, raw)
 		}
 	}
-	expansions, err := ExpandGlobs(ctx, fsys, cwd, patterns)
+	expansions, err := expandGlobs(ctx, fsys, cwd, patterns)
 	if err != nil {
 		return nil, err
 	}

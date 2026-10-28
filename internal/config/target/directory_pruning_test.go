@@ -56,7 +56,7 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, layout)
 	fsys := &globWalkRecorder{FS: osvfs.FS()}
-	expansions, err := ExpandGlobs(context.Background(), fsys, root, []string{"src/*.ts"})
+	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts"})
 	assert.NilError(t, err)
 	assert.Equal(t, expansions[0].Root, tspath.ResolvePath(root, "src"))
 	assert.DeepEqual(t, expansions[0].Files, []string{paths["src/a.ts"]})
@@ -90,7 +90,7 @@ func TestSelectInputsPreservesLiteralAndScanRoles(t *testing.T) {
 }
 
 func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
-	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts"})
+	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts", "hash/#group/a.ts"})
 	for _, test := range []struct {
 		name     string
 		patterns []string
@@ -110,6 +110,12 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 			files:    [][]string{{"src/a.ts"}, nil},
 		},
 		{
+			name:     "hash prefix is a filename",
+			patterns: []string{"hash/#*/*.ts"},
+			roots:    []string{"hash"},
+			files:    [][]string{{"hash/#group/a.ts"}},
+		},
+		{
 			name:     "ancestor roots stay independent",
 			patterns: []string{"src/**/*.ts", "src/nested/*.ts"},
 			roots:    []string{"src", "src/nested"},
@@ -127,7 +133,7 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 				t.Skip("backslash glob escapes are POSIX-only")
 			}
 			fsys := &globWalkRecorder{FS: osvfs.FS()}
-			expansions, err := ExpandGlobs(context.Background(), fsys, root, test.patterns)
+			expansions, err := expandGlobs(context.Background(), fsys, root, test.patterns)
 			assert.NilError(t, err)
 			assert.Equal(t, len(expansions), len(test.patterns))
 			var wantRoots []string

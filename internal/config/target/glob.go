@@ -36,15 +36,15 @@ func globDirectory(pattern string) (string, string) {
 	}
 }
 
-type GlobExpansion struct {
+type globExpansion struct {
 	Root  string
 	Files []string
 }
 
-// ExpandGlobs returns one expansion per input, in the same order. Patterns with
+// expandGlobs returns one expansion per input, in the same order. Patterns with
 // the same lexical root share a walk; other roots retain independent entry points.
 // Config ownership and ignores are evaluated later using each result's root.
-func ExpandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string) ([]GlobExpansion, error) {
+func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string) ([]globExpansion, error) {
 	type compiledGlob struct {
 		inputs    []int
 		files     *minimatch3.Matcher
@@ -55,11 +55,11 @@ func ExpandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		patterns map[string]*compiledGlob
 		matchers []*compiledGlob
 	}
-	expansions := make([]GlobExpansion, len(patterns))
+	expansions := make([]globExpansion, len(patterns))
 	groupsByRoot := make(map[string]*globGroup)
 	var groups []*globGroup
 	// Full and partial matching share a grammar so pruning preserves selected files.
-	options := minimatch3.Options{Dot: true, PreserveWhitespace: true}
+	options := inputPatternOptions
 	partialOptions := options
 	partialOptions.Partial = true
 	for index, pattern := range patterns {

@@ -18,6 +18,8 @@ func TestLiteral(t *testing.T) {
 		literal       bool
 	}{
 		{`src/\[dir\]`, "src/[dir]", true},
+		{"//server/share/src", "//server/share/src", true},
+		{"//server/share/{1..1}", "//server/share/1", true},
 		{"src/brace{dir}", "src/brace{dir}", true},
 		{"src/{a,b}", "", false},
 		{"src/@(a|b)", "", false},

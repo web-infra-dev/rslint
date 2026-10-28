@@ -493,10 +493,8 @@ func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
-// mirroring parseLintFlags's positional handling (filepath.Abs +
-// tspath.NormalizePath) so the IPC and flag entry paths produce identical
-// target-planning inputs. An Abs failure is skipped with a stderr warning
+// classifyPaths splits exact IPC targets into files and directories using
+// lexical absolute paths. An Abs failure is skipped with a stderr warning
 // rather than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
 	for _, p := range paths {

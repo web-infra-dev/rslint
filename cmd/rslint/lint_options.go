@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -40,7 +38,8 @@ type lintArgs struct {
 	MaxWarnings int
 	StartTimeMs int64
 	RuleFlags   []string
-	// Positional args resolved into existing-dir vs file paths.
+	// AllowFiles and AllowDirs are prepared target paths. Positional retains raw
+	// arguments until the run-scoped filesystem is available.
 	AllowFiles      []string
 	AllowDirs       []string
 	Positional      []string
@@ -180,34 +179,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		args.TypeCheck = true
 	}
 
-	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
-	if positional := fs.Args(); len(positional) > 0 {
-		args.Positional = positional
-		for _, arg := range positional {
-			absPath, err := filepath.Abs(arg)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
-				return lintArgs{}, help, 1
-			}
-			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
-			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
-			// Windows 8.3 short names to long names, but the rest
-			// of the pipeline (os.Getwd, TypeScript file names, configDir)
-			// uses unresolved CWD-based paths. Resolving only file args would
-			// create a format mismatch causing failures in lint-target detection,
-			// config matching, dir scoping, and gitignore checks.
-			// Lexical and canonical aliases are frozen during target discovery;
-			// the Program loader then resolves those aliases while binding the
-			// exact target projection.
-			normalized := tspath.NormalizePath(absPath)
-			info, statErr := os.Stat(absPath)
-			if statErr == nil && info.IsDir() {
-				args.AllowDirs = append(args.AllowDirs, normalized)
-			} else {
-				args.AllowFiles = append(args.AllowFiles, normalized)
-			}
-		}
-	}
+	args.Positional = fs.Args()
 
 	return args, help, 0
 }
