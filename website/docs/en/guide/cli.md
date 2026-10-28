@@ -42,8 +42,8 @@ rslint src/
 # Lint files matched by a glob, including nested directories
 rslint "src/**/*.{js,ts}"
 
-# Mix files and directories
-rslint src/ lib/utils.ts
+# Mix glob patterns, files, and directories
+rslint "src/*.ts" lib/utils.ts tests/
 
 # Use with --fix
 rslint --fix src/index.ts
@@ -51,7 +51,15 @@ rslint --fix src/index.ts
 
 When no arguments are given, rslint scopes linting to the current working directory.
 
-Quoted globs are expanded by rslint relative to the working directory; absolute patterns also work. Patterns support `*`, `**`, `?`, character classes such as `[ab]`, brace alternatives such as `{js,ts}`, and extended glob patterns such as `@(a|b)`. Existing file or directory paths are treated literally, even when their names contain glob characters. `#` is treated as a filename character in input patterns. Glob results follow the existing config, ignore, and `.gitignore` policies, and overlapping targets are checked only once. The same matching rules apply to the JavaScript API's `lintFiles()`. Input patterns contribute matching files to a union; use config `ignores` to exclude files rather than adding a `!pattern` input. Rslint recognizes a standalone `?` wildcard, such as `src/?.ts`; ESLint 10.13.0's input detector does not recognize every such pattern.
+Wrap glob patterns in quotes so rslint expands them. Relative paths and patterns start from the directory where you run the command. Absolute paths and patterns also work.
+
+`"src/*.ts"` checks files directly in `src`, while `"src/**/*.ts"` also checks subdirectories. Patterns also support `?` for a single character, `[ab]` for either character, `{js,ts}` for alternatives, and `@(client|server)` to match either name.
+
+If a file or directory with the given name exists, rslint uses that exact path, even if its name contains glob characters. `#` is an ordinary filename character.
+
+When you pass several inputs, each file is checked once, even when several inputs match it. Your config's `files` and `ignores` settings and `.gitignore` still apply. To exclude files, use `ignores` in your config. A `!pattern` input does not remove files selected by other inputs.
+
+The JavaScript API's `lintFiles()` follows the same matching rules.
 
 ### Config Discovery
 
