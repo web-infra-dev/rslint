@@ -35,6 +35,7 @@ type lintProgramState struct {
 	program    *compiler.Program
 	tracker    *lintTrackingFS
 	sources    *utils.ProgramSourceLookup
+	overlayFS  *frozenLintTargetOverlayFS
 	dirtyFiles map[tspath.Path]struct{}
 	// Failed lookups close the gap between a file appearing and the client's
 	// corresponding watcher notification.
@@ -48,7 +49,7 @@ type lintProgramRequest struct {
 	ctx               context.Context
 	uri               lsproto.DocumentUri
 	overlayFiles      map[string]string
-	overlayFS         vfs.FS
+	overlayFS         *frozenLintTargetOverlayFS
 	discoveryFS       *lintTrackingFS
 	target            target.File
 	freshOnly         bool
@@ -111,12 +112,7 @@ func (r *lintProgramRequest) key(configPath string) lintProgramKey {
 }
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
-	// Project loading is parallel; serialized LSP file requests share one checker.
-	commandLine := metadata.commandLine.WithFileNames(metadata.commandLine.FileNames())
-	options := *commandLine.CompilerOptions()
-	checkerCount := 1
-	options.Checkers = &checkerCount
-	commandLine.SetCompilerOptions(&options)
+	commandLine := singleCheckerLintCommandLine(metadata.commandLine)
 	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
 	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
 		newLintProjectReferenceHost(host, r.projectMetadata))
@@ -150,8 +146,7 @@ func (r *lintProgramRequest) prepareOverlay() {
 // observation. A new view after watcher registration or an editor event keeps
 // cached misses and symlink identities out of the next observation.
 func (r *lintProgramRequest) freshFS() vfs.FS {
-	disk := cachedvfs.From(r.store.server.fs)
-	return cachedvfs.From(newFrozenLintTargetOverlayFS(disk, r.overlayFiles, r.target))
+	return newCachedLintTargetOverlayFS(r.store.server.fs, r.overlayFiles, r.target)
 }
 
 func (r *lintProgramRequest) metadata(
@@ -290,6 +285,7 @@ func (r *lintProgramRequest) load(
 	}
 
 	state.program = program
+	state.overlayFS = r.overlayFS
 	if allGraphsReused {
 		state.sources.UpdateProgramForReusedGraph(program, r.overlayFS)
 	} else {
@@ -377,6 +373,7 @@ func (r *lintProgramRequest) rebuild(
 			program:                  program,
 			tracker:                  tracker,
 			sources:                  utils.NewProgramSourceLookup(program, r.overlayFS),
+			overlayFS:                r.overlayFS,
 			dirtyFiles:               make(map[tspath.Path]struct{}),
 			failedLookups:            make(map[tspath.Path]struct{}),
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
@@ -619,6 +616,9 @@ func (s *lintProgramStore) markContent(
 		}
 		return physicalID
 	}
+	// Share disk queries only within this document event. Each Program keeps
+	// its own frozen overlay; no filesystem cache survives into the next event.
+	disk := cachedvfs.From(s.server.fs)
 	for configFileName, state := range s.programs {
 		previousIdentity, identityKnown :=
 			state.selectedSourceIdentities[lexicalID]
@@ -630,7 +630,7 @@ func (s *lintProgramStore) markContent(
 		if invalidatePossibleNewSource {
 			sourceFile = s.sourceFileForOpen(state, fileName)
 		} else {
-			sourceFile = state.sources.SourceFileForPath(fileName)
+			sourceFile = state.sources.SourceFileForPath(fileName, state.overlayFS.withBaseFS(disk))
 		}
 		if sourceFile != nil {
 			if !identityKnown && lexicalID != physicalPathID() {

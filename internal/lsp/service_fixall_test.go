@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // fixGroup represents an atomic set of text edits from a single diagnostic.
@@ -165,6 +166,70 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	}
 	if resp.CommandOrCodeActionArray == nil || len(*resp.CommandOrCodeActionArray) != 0 {
 		t.Fatalf("gitignored file produced fix-all actions: %+v", resp)
+	}
+}
+
+func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
+	const content = "#!/usr/bin/env node\nexport {};\n"
+	for _, test := range []struct {
+		name, disk, editor string
+		wantDiagnostics    int
+	}{
+		{name: "editor adds BOM", disk: content, editor: utils.BOM + content, wantDiagnostics: 1},
+		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, test.disk)
+			server := fixture.server
+			server.lintPrograms = fixture.store
+			server.initialized = true
+			server.documents[fixture.sourceURI] = test.editor
+			if err := os.WriteFile(tspath.ResolvePath(server.cwd, "package.json"), []byte(`{"bin":"src/index.ts"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			entries := config.RslintConfig{{
+				Plugins:         []string{"node"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+				Rules:           config.Rules{"node/hashbang": "error"},
+			}}
+			installJSConfigsForTest(server, map[string]config.RslintConfig{tspath.NormalizePath(server.cwd): entries})
+			result, err := configuredDocumentPipelineResultForTest(server, context.Background(), fixture.sourceURI, entries, server.cwd, true, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(fixture.store.programs) != 1 {
+				t.Fatal("diagnostics did not use the resident Program")
+			}
+			diagnostics := result.Observation.Native.Diagnostics
+			if len(diagnostics) != test.wantDiagnostics {
+				t.Fatalf("resident diagnostics = %+v, want %d", diagnostics, test.wantDiagnostics)
+			}
+			if len(diagnostics) > 0 && diagnostics[0].Message.Id != "unexpectedBOM" {
+				t.Fatalf("resident diagnostic = %+v, want unexpectedBOM", diagnostics[0])
+			}
+
+			response, err := server.handleFixAllCodeAction(context.Background(), fixture.sourceURI)
+			if err != nil {
+				t.Fatal(err)
+			}
+			actions := response.CommandOrCodeActionArray
+			if actions == nil || len(*actions) != test.wantDiagnostics {
+				t.Fatalf("fix-all actions = %+v, want %d", actions, test.wantDiagnostics)
+			}
+			if len(*actions) > 0 {
+				action := (*actions)[0].CodeAction
+				if action == nil || action.Edit == nil || action.Edit.Changes == nil {
+					t.Fatal("fix-all action has no edit")
+				}
+				edits := (*action.Edit.Changes)[fixture.sourceURI]
+				if len(edits) != 1 || edits[0].NewText != content {
+					t.Fatalf("fix-all edits = %+v, want editor content without BOM", edits)
+				}
+			}
+			if server.documents[fixture.sourceURI] != test.editor {
+				t.Fatal("fix-all changed the open document")
+			}
+		})
 	}
 }
 

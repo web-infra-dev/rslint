@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -79,7 +80,26 @@ type frozenLintTargetOverlayFS struct {
 	canonicalPath   string
 }
 
-func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
+// Query caching must preserve the BOM supplied by the current source layer.
+type cachedLintQueryFS struct {
+	*cachedvfs.FS
+	sourceFS vfs.FS
+}
+
+func newCachedLintQueryFS(sourceFS vfs.FS) *cachedLintQueryFS {
+	return &cachedLintQueryFS{FS: cachedvfs.From(sourceFS), sourceFS: sourceFS}
+}
+
+func (fs *cachedLintQueryFS) SourceHasBOM(filePath string) bool {
+	return utils.SourceHasBOM(fs.sourceFS, filePath)
+}
+
+func newCachedLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
+	diskFS := newCachedLintQueryFS(baseFS)
+	return newCachedLintQueryFS(newFrozenLintTargetOverlayFS(diskFS, files, target))
+}
+
+func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) *frozenLintTargetOverlayFS {
 	caseSensitive := true
 	if baseFS != nil {
 		caseSensitive = baseFS.UseCaseSensitiveFileNames()
@@ -96,6 +116,14 @@ func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target
 		canonicalPathID: lspLexicalPathID(canonicalPath, caseSensitive),
 		canonicalPath:   canonicalPath,
 	}
+}
+
+// withBaseFS shares disk observations without changing this Program's frozen
+// target identity or editor overlay.
+func (fs *frozenLintTargetOverlayFS) withBaseFS(baseFS vfs.FS) *frozenLintTargetOverlayFS {
+	view := *fs
+	view.FS = utils.NewOverlayVFS(baseFS, fs.overlayFiles)
+	return &view
 }
 
 func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {
