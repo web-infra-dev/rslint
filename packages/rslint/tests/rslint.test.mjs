@@ -3,7 +3,6 @@ import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import os from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { convertPathToPattern } from 'tinyglobby';
 import {
   writeFile,
   rm,
@@ -643,8 +642,8 @@ describe('Rslint class', () => {
       });
       try {
         const results = await rslint.lintFiles([
-          `${convertPathToPattern(firstDir)}/**/*.ts`,
-          `${convertPathToPattern(secondDir)}/**/*.ts`,
+          '../first/**/*.ts',
+          '../second/**/*.ts',
         ]);
         expect(results.map((result) => result.filePath)).toEqual([
           path.join(firstDir, 'visible.ts'),

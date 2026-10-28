@@ -20,15 +20,13 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
  *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
  *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes
- *    `dependencies` (`picomatch`) + `peerDependencies` (`jiti`); `tinyglobby` is
- *    a devDep, so its code bundles in. The public `globals` catalog is also a
- *    devDep, but a Rspack plugin emits one package-internal JSON asset per
- *    environment so the root can load only selected maps. Consumers install
- *    neither devDependency.
- *    `tinyglobby`'s `fdir` loads `picomatch` via `createRequire`,
- *    which rspack can't statically follow — so `picomatch` can't be bundled away
- *    and stays a runtime dep. One `lib` block with all entries: the surface
- *    modules share a graph, so shared chunks between entries are fine here.
+ *    `dependencies` (`picomatch`) + `peerDependencies` (`jiti`). The public
+ *    config-loader's parent-ignore helper uses `picomatch` at runtime. The
+ *    `globals` catalog is a devDep; a Rspack plugin emits one package-internal
+ *    JSON asset per environment so the root can load only selected maps.
+ *    Consumers do not install `globals`. One `lib` block with all entries:
+ *    the surface modules share a graph, so shared chunks between entries are
+ *    fine here.
  *
  * 2. Plugin host and worker → `dist/eslint-plugin/` (`tsconfig.worker.json`,
  *    which includes `src/eslint-plugin/**` and `src/languages/js/**`). Each

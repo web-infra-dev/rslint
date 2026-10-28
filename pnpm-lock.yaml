@@ -207,9 +207,6 @@ catalogs:
     tinybench:
       specifier: ^6.1.1
       version: 6.1.1
-    tinyglobby:
-      specifier: ^0.2.17
-      version: 0.2.17
     tw-animate-css:
       specifier: ^1.4.0
       version: 1.4.0
@@ -337,9 +334,6 @@ importers:
       json-schema-to-typescript:
         specifier: 'catalog:'
         version: 15.0.4
-      tinyglobby:
-        specifier: 'catalog:'
-        version: 0.2.17
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

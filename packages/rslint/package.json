@@ -72,7 +72,6 @@
     "esquery": "catalog:",
     "globals": "catalog:",
     "json-schema-to-typescript": "catalog:",
-    "tinyglobby": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
