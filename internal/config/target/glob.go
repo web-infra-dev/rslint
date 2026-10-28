@@ -63,20 +63,24 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		files     *minimatch3.Matcher
 		directory *minimatch3.Matcher
 	}
+	type patternKey struct {
+		pattern  string
+		noNegate bool
+	}
 	type globGroup struct {
 		root     string
-		patterns map[string]*compiledGlob
+		patterns map[patternKey]*compiledGlob
 		matchers []*compiledGlob
 	}
 	expansions := make([]globExpansion, len(patterns))
 	groupsByRoot := make(map[string]*globGroup)
 	var groups []*globGroup
-	// Full and partial matching share a grammar so pruning preserves selected files.
-	options := inputPatternOptions
-	partialOptions := options
-	partialOptions.Partial = true
 	for index, pattern := range patterns {
 		pattern = filepath.ToSlash(pattern)
+		// Only an authored leading bang can negate the whole input. Removing a
+		// static prefix must not reinterpret a later bang or negative extglob.
+		options := inputPatternOptions
+		options.NoNegate = !strings.HasPrefix(pattern, "!")
 		directory, relative := globDirectory(pattern)
 		root, err := resolveInputPath(cwd, directory)
 		if err != nil {
@@ -92,17 +96,21 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		pattern = strings.Join(parts, "/")
 		group := groupsByRoot[root]
 		if group == nil {
-			group = &globGroup{root: root, patterns: make(map[string]*compiledGlob)}
+			group = &globGroup{root: root, patterns: make(map[patternKey]*compiledGlob)}
 			groupsByRoot[root] = group
 			groups = append(groups, group)
 		}
-		matcher := group.patterns[pattern]
+		key := patternKey{pattern: pattern, noNegate: options.NoNegate}
+		matcher := group.patterns[key]
 		if matcher == nil {
+			// Full and partial matching share the original input's grammar.
+			partialOptions := options
+			partialOptions.Partial = true
 			matcher = &compiledGlob{
 				files:     minimatch3.New(pattern, options),
 				directory: minimatch3.New(pattern, partialOptions),
 			}
-			group.patterns[pattern] = matcher
+			group.patterns[key] = matcher
 			group.matchers = append(group.matchers, matcher)
 		}
 		matcher.inputs = append(matcher.inputs, index)

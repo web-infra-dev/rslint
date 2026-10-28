@@ -220,6 +220,68 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 	}
 }
 
+func TestExpandGlobsPreservesNegationContext(t *testing.T) {
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/!important.ts": &fstest.MapFile{},
+		"project/src/a.ts":          &fstest.MapFile{},
+		"project/src/b.ts":          &fstest.MapFile{},
+		"project/src/unrelated.js":  &fstest.MapFile{},
+		"project/src/(b)/a.ts":      &fstest.MapFile{},
+		"project/src/b/a.ts":        &fstest.MapFile{},
+		"project/src/selected/a.ts": &fstest.MapFile{},
+	}, true)
+	bang := []string{"/project/src/!important.ts"}
+	negated := []string{"/project/src/(b)/a.ts", "/project/src/b/a.ts", "/project/src/selected/a.ts", "/project/src/unrelated.js"}
+	for _, test := range []struct {
+		name     string
+		cwd      string
+		patterns []string
+		files    [][]string
+	}{
+		{
+			name:     "bang after static prefix",
+			cwd:      "/project",
+			patterns: []string{"src/!*.ts", "/project/src/!*.ts"},
+			files:    [][]string{bang, bang},
+		},
+		{
+			name:     "negative file extglob",
+			cwd:      "/project",
+			patterns: []string{"src/!(b).ts"},
+			files:    [][]string{{"/project/src/!important.ts", "/project/src/a.ts"}},
+		},
+		{
+			name:     "negative directory extglob",
+			cwd:      "/project",
+			patterns: []string{"src/!(b)/*.ts"},
+			files:    [][]string{{"/project/src/(b)/a.ts", "/project/src/selected/a.ts"}},
+		},
+		{
+			name:     "same root with different negation contexts",
+			cwd:      "/project/src",
+			patterns: []string{"!*.ts", "./!*.ts"},
+			files:    [][]string{negated, bang},
+		},
+		{
+			name:     "reversed negation contexts",
+			cwd:      "/project/src",
+			patterns: []string{"./!*.ts", "!*.ts"},
+			files:    [][]string{bang, negated},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := &globWalkRecorder{FS: fsys}
+			expansions, err := expandGlobs(context.Background(), recorder, test.cwd, test.patterns)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, recorder.roots, []string{"/project/src"})
+			for index := range test.patterns {
+				sort.Strings(expansions[index].Files)
+				assert.DeepEqual(t, expansions[index].Files, test.files[index])
+			}
+		})
+	}
+}
+
 func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {
 	layout := []string{
 		"packages/core/src/index.ts",
