@@ -4,7 +4,7 @@ description: 'Use the Rslint class to lint files and in-memory code, write fixes
 
 # Rslint
 
-The `Rslint` class lets you lint files and in-memory code from JavaScript.
+The `Rslint` class is the ESLint-style programmatic API for linting files and in-memory source from a JavaScript host.
 
 ```ts
 class Rslint {
@@ -42,7 +42,7 @@ try {
 }
 ```
 
-Both `lintFiles` and `lintText` return a `LintResult[]` containing each file's messages and error and warning counts.
+Both `lintFiles` and `lintText` return ESLint-shaped `LintResult[]` values.
 
 ## Constructor
 
@@ -58,7 +58,7 @@ const rslint = new Rslint(options);
 | `fix`                | `boolean`                                   | `false`         | Applies auto-fixes and includes changed source in `result.output`                                                                                                                |
 | `virtualFiles`       | `Record<string, string>`                    | —               | In-memory path-to-content overlay for project inputs; unresolved reads may still fall back to disk                                                                               |
 
-With automatic discovery, each file uses its nearest rslint config.
+With automatic discovery, Go selects each file's nearest config and owns ignore and target-admission semantics. The JavaScript host evaluates and normalizes the JS or TS config modules selected for that run.
 
 See the [`basePath` configuration reference](/config/base-path) for automatic, explicit-file, and inline-override behavior.
 
@@ -90,7 +90,7 @@ Your config's `files` and `ignores` settings and `.gitignore` still apply. To ex
 
 `lintFiles` selects files on disk. If a selected file appears in `virtualFiles`, rslint reads its content from memory. Use `lintText` for code that only exists in memory.
 
-If no file matches, `lintFiles` returns an empty array.
+If no file matches, `lintFiles` returns an empty array. This differs from ESLint v10's default `errorOnUnmatchedPattern` behavior, which throws for an unmatched glob.
 
 ## lintText
 
@@ -111,7 +111,7 @@ const [result] = await rslint.lintText('const answer: number = 42;', {
 
 The method returns the result for the supplied buffer. When `filePath` is omitted, Rslint uses a synthetic TypeScript path for matching and reports the result path as the `"<text>"` sentinel. A supplied path is resolved against `cwd` and returned as an absolute path.
 
-A leading byte order mark is excluded from column and fix offsets. Fixed output preserves it unless a fix removes it.
+Line, column, and fix offsets match ESLint's byte-order-mark behavior: a leading byte order mark is not included in indexed source text, while fixed whole-file output preserves it unless a fix removes it.
 
 ## In-memory projects
 
@@ -147,7 +147,7 @@ const [result] = await rslint.lintText(
 );
 ```
 
-Rslint reads `virtualFiles` first. It can still read from disk for `.gitignore`, module resolution, and files absent from the map.
+`virtualFiles` is an overlay, not a filesystem sandbox. Rslint can still read from disk for `.gitignore`, module resolution, and files absent from the map.
 
 Use relative paths for portability. `virtualFiles` keys always resolve against `cwd`; `parserOptions.project` resolves from the config entry's effective base; paths inside a tsconfig resolve from that tsconfig's directory. In the override-only example above all three directories are `cwd`. Prefer an explicit tsconfig `files` list because a broad `include` glob is expanded against the real filesystem from the tsconfig's directory.
 
