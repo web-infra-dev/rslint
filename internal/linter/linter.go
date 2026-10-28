@@ -325,7 +325,9 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 
 			return false
 		}
+		runListeners(ast.KindSourceFile, file.AsNode())
 		file.Node.ForEachChild(childVisitor)
+		runListeners(rule.ListenerOnExit(ast.KindSourceFile), file.AsNode())
 		if opts.Timing != nil {
 			opts.Timing.addFile(file.FileName(), rules, ruleDurations)
 		}
