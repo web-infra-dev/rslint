@@ -161,3 +161,7 @@ func (p *speculativeGenerationProvider) AcquireGeneration(
 	}
 	return p.acquire(ctx, content, p.snapshot, p.environment)
 }
+
+func (p *speculativeGenerationProvider) PlanGeneration(ctx context.Context, snapshot linter.SourceSnapshot) (linter.GenerationPlan, error) {
+	return linter.GenerationProviderFunc(p.AcquireGeneration).PlanGeneration(ctx, snapshot)
+}

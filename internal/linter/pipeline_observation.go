@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // observationExecution is the pipeline-private result of one immutable source
@@ -28,16 +30,20 @@ type preparedObservation struct {
 
 func prepareObservation(
 	ctx context.Context,
-	provider GenerationProvider,
+	acquire func(context.Context) (Generation, ReleaseFunc, error),
 	snapshot SourceSnapshot,
 	policy ObservationPolicy,
 	dispatcher EslintPluginDispatcher,
 	planChanges bool,
 	stopOnTargetSyntaxErrors bool,
+	reservation *programReservation,
 ) (preparedObservation, error) {
-	generation, release, err := provider.AcquireGeneration(ctx, snapshot)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return preparedObservation{}, err
+	}
+	generation, release, err := acquire(ctx)
+	if err != nil {
+		return preparedObservation{}, &GenerationLoadError{Err: err}
 	}
 	lease := &releaseLease{release: release}
 	transferred := false
@@ -67,7 +73,7 @@ func prepareObservation(
 		generation,
 		plan,
 		snapshot,
-		policy.Demand.LintedFiles,
+		policy.Demand,
 	)
 	if err != nil {
 		return preparedObservation{}, err
@@ -88,6 +94,7 @@ func prepareObservation(
 	if err != nil {
 		return preparedObservation{}, err
 	}
+	nativeWork.execution.options.reservation = reservation
 	for index := range pluginWork.inputs {
 		input := &pluginWork.inputs[index]
 		if input.SourceFile != nil {
@@ -110,9 +117,9 @@ func prepareObservation(
 	return prepared, nil
 }
 
-func executeObservation(
+func executePreparedObservation(
 	ctx context.Context,
-	provider GenerationProvider,
+	prepared preparedObservation,
 	snapshot SourceSnapshot,
 	policy ObservationPolicy,
 	dispatcher EslintPluginDispatcher,
@@ -120,14 +127,11 @@ func executeObservation(
 	planChanges bool,
 	stopOnTargetSyntaxErrors bool,
 ) (observationExecution, error) {
-	prepared, err := prepareObservation(ctx, provider, snapshot, policy, dispatcher, planChanges, stopOnTargetSyntaxErrors)
-	if err != nil {
-		return observationExecution{}, err
-	}
+	var err error
 	lease := prepared.lease
 	defer lease.close()
 	nativeWork := prepared.native
-	defer nativeWork.execution.close()
+	defer nativeWork.close()
 	pluginWork := prepared.plugin
 	prepared.plugin = pluginTask{}
 	targetSyntaxBlocked := prepared.targetSyntaxBlocked
@@ -144,7 +148,7 @@ func executeObservation(
 			execution,
 		)
 		if runErr == nil && planChanges && !targetSyntaxBlocked {
-			diagnostics, _ := execution.observation.CompleteDiagnostics()
+			diagnostics := execution.fixDiagnostics(policy.PluginFailure)
 			execution.fixTexts, runErr = freezeFixTextsForDiagnostics(
 				ctx,
 				prepared.readFixText,
@@ -205,7 +209,7 @@ func executeObservation(
 			execution.observation.pluginKind = pluginObservationNone
 			return execution, nil
 		}
-		outcome := pluginWork.run(ctx, dispatcher)
+		outcome := pluginWork.runRaw(ctx, dispatcher)
 		execution.observation.pluginKind = pluginObservationJoined
 		execution.observation.pluginOutcome = outcome
 		execution.pluginOutcome = &execution.observation.pluginOutcome
@@ -213,7 +217,7 @@ func executeObservation(
 			return execution, err
 		}
 		if planChanges {
-			diagnostics, _ := execution.observation.CompleteDiagnostics()
+			diagnostics := execution.fixDiagnostics(policy.PluginFailure)
 			execution.fixTexts, err = retainFixTextsForDiagnostics(
 				execution.fixTexts,
 				diagnostics,
@@ -271,7 +275,7 @@ func executeConcurrentObservation(
 		go func() {
 			var outcome EslintPluginDispatchOutcome
 			defer func() { ch <- outcome }()
-			pluginPanic.run(func() { outcome = pluginTask.run(pluginCtx, dispatcher) })
+			pluginPanic.run(func() { outcome = pluginTask.runRaw(pluginCtx, dispatcher) })
 		}()
 	}
 	// This defer runs before executeObservation's lease defer, so panic,
@@ -312,4 +316,13 @@ func joinContextError(err error, ctx context.Context) error {
 		return err
 	}
 	return errors.Join(err, contextErr)
+}
+
+// Fix validation uses the observation's failure policy without publishing it.
+// Providers keep fix generations coherent because validation spans all targets.
+func (execution observationExecution) fixDiagnostics(failure PluginFailurePolicy) []rule.RuleDiagnostic {
+	observation := execution.observation
+	observation.pluginOutcome = applyPluginFailure(observation.pluginOutcome, failure)
+	diagnostics, _ := observation.CompleteDiagnostics()
+	return diagnostics
 }

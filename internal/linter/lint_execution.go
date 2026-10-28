@@ -129,7 +129,11 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 			}
 			needsAdmission = needsAdmission || (typeCheckWork > 0 && total > budget)
 		}
-		if !e.options.SingleThreaded && needsAdmission {
+		if len(e.programs) == 1 && e.options.reservation != nil {
+			// Loading already acquired this reservation. Transfer its progress
+			// notifications to the native shards instead of admitting twice.
+			runProgram(0, e.options.reservation)
+		} else if !e.options.SingleThreaded && needsAdmission {
 			runWithProgramAdmission(estimates, budget, runProgram)
 		} else {
 			work := newLintWorkGroup(e.options.SingleThreaded)

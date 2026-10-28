@@ -475,7 +475,7 @@ func TestPipelinePublishesTextDiagnosticSources(t *testing.T) {
 				pluginDiagnostics = outcome.Diagnostics
 			} else {
 				result, err = RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{
-					Plugin: mode, Demand: ArtifactDemand{LintedFiles: true},
+					Plugin: mode, Demand: ArtifactDemand{SourceFiles: true},
 				}, dispatch))
 				if err != nil {
 					t.Fatal(err)
@@ -850,5 +850,124 @@ func TestConcurrentPipelineCancelsAndJoinsPluginBeforeReleaseOnNativePanic(t *te
 	}()
 	if recovered == nil || releases.Load() != 1 {
 		t.Fatalf("panic/releases = %v/%d, want panic/1", recovered, releases.Load())
+	}
+}
+
+func TestPipelineAdmitsLoadingAndReclaimsBeforeNextLoad(t *testing.T) {
+	for _, mixed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("mixed-%t", mixed), func(t *testing.T) {
+			previous := runtime.GOMAXPROCS(1)
+			defer runtime.GOMAXPROCS(previous)
+			var completed weak.Pointer[compiler.Program]
+			var source weak.Pointer[ast.SourceFile]
+			var running atomic.Bool
+			var releases atomic.Int32
+			loads := make([]GenerationLoad, 2)
+			for index := range loads {
+				loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+					if running.Load() {
+						t.Error("next Program constructed before the previous native work released capacity")
+					}
+					if index == 1 {
+						if releases.Load() != 1 {
+							t.Error("previous lease was not released before the next load")
+						}
+						deadline := time.Now().Add(5 * time.Second)
+						for completed.Value() != nil || source.Value() != nil {
+							if time.Now().After(deadline) {
+								t.Error("completed Program or diagnostic AST retained into the next load")
+								break
+							}
+							runtime.GC()
+							runtime.Gosched()
+						}
+					}
+					cp, paths := createTestProgramWithFilesAndCompilerOptions(t, map[string]string{"file.ts": "const value = 1;"}, `{"noLib":true}`)
+					if index == 0 {
+						completed = weak.Make(cp)
+						source = weak.Make(cp.GetSourceFile(paths["file.ts"]))
+					}
+					generation := Generation{Native: NativeGeneration{
+						Programs: []*program.Program{program.NewFromCompiler(cp)}, TargetsByProgram: [][]string{{paths["file.ts"]}},
+						RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+							rules := []rule.ConfiguredRule{{Name: "native/check", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								running.Store(true)
+								defer running.Store(false)
+								runtime.Gosched()
+								ctx.ReportRange(core.NewTextRange(6, 11), rule.RuleMessage{Description: "native"})
+								return nil
+							}}}
+							if mixed {
+								rules = append(rules, rule.ConfiguredRule{Name: "plugin/check", IsEslintPluginRule: true, Severity: rule.SeverityError})
+							}
+							return rules
+						},
+					}, Target: TargetProjection{
+						Path:     func(string) string { return fmt.Sprintf("target-%d.ts", index) },
+						ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil },
+					}}
+					if mixed {
+						generation.Plugin = &PluginGeneration{}
+					}
+					return generation, func() { releases.Add(1) }, nil
+				}}
+			}
+			provider := pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}
+			result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{ProgramExecution: ProgramComplete, Demand: ArtifactDemand{LintedFiles: true}}, EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: request.Files[0].Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "plugin"}}}}}, nil
+			})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if releases.Load() != 2 {
+				t.Fatalf("release count: %d", releases.Load())
+			}
+			observation := result.Observation.Native
+			if len(observation.Files) != 2 {
+				t.Fatalf("selected paths = %+v", observation.Files)
+			}
+			for index, file := range observation.Files {
+				if file.Path != fmt.Sprintf("target-%d.ts", index) || file.SourceFile != nil {
+					t.Fatalf("path-only result changed selection or retained an AST: %+v", file)
+				}
+			}
+			wantRules := 1
+			if mixed {
+				wantRules++
+			}
+			if observation.Lint.LintedFileCount != 2 || len(observation.Diagnostics) != 2 || len(observation.Lint.ExecutedRules) != wantRules {
+				t.Fatalf("incomplete admitted result: %+v", observation)
+			}
+			for index, diagnostic := range observation.Diagnostics {
+				if diagnostic.FilePath != fmt.Sprintf("target-%d.ts", index) || diagnostic.SourceFile.Text() != "const value = 1;" {
+					t.Fatalf("lost target identity or text: %+v", diagnostic)
+				}
+			}
+			if mixed {
+				outcome, ok := result.Observation.JoinedPluginOutcome()
+				if !ok || len(outcome.Diagnostics) != 2 {
+					t.Fatalf("lost mixed results: %+v", outcome)
+				}
+			}
+		})
+	}
+}
+
+func TestPipelineJoinsAcquiredUnitsAfterLoadFailure(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path := tspath.ResolvePath(root, "file.ts")
+	var released atomic.Int32
+	wantErr := errors.New("compiler rejected a planned root")
+	provider := pipelinePlanProvider{plan: GenerationPlan{Loads: []GenerationLoad{
+		{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			return pipelineTestGeneration(t, root, path, "const value = 1;", nil, nil), func() { released.Add(1) }, nil
+		}},
+		{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			return Generation{}, nil, wantErr
+		}},
+	}}}
+	result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{}, nil))
+	if !errors.Is(err, wantErr) || len(result.Observation.Native.Diagnostics) != 0 || released.Load() != 1 {
+		t.Fatalf("failed partial observation escaped: error=%v result=%+v released=%d", err, result, released.Load())
 	}
 }

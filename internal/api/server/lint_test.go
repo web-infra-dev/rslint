@@ -538,6 +538,51 @@ func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {
 	}
 }
 
+func TestHandleLint_IndependentProjectsPreserveRequestedArtifacts(t *testing.T) {
+	dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+	config := json.RawMessage(`[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json","./root-default/tsconfig.json"]}},"rules":{"no-debugger":"error"}}]`)
+	wantPaths := []string{"pkg/file.ts", "root-default/pkg/file.ts"}
+	for _, includeSources := range []bool{false, true} {
+		t.Run(fmt.Sprintf("encoded-sources-%t", includeSources), func(t *testing.T) {
+			response, err := (&Handler{}).HandleLint(api.LintRequest{
+				Config: config, ConfigDirectory: dir, WorkingDirectory: dir,
+				Files: []string{
+					tspath.ResolvePath(dir, wantPaths[1]), tspath.ResolvePath(dir, wantPaths[0]),
+				},
+				IncludeEncodedSourceFiles: includeSources,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if response.FileCount != len(wantPaths) || !slices.Equal(response.LintedFiles, wantPaths) {
+				t.Fatalf("independent projects changed selected files: count=%d paths=%v", response.FileCount, response.LintedFiles)
+			}
+			if len(response.Diagnostics) != len(wantPaths) {
+				t.Fatalf("independent projects lost diagnostics: %+v", response.Diagnostics)
+			}
+			for i, diagnostic := range response.Diagnostics {
+				if diagnostic.FilePath != wantPaths[i] || diagnostic.RuleName != "no-debugger" {
+					t.Fatalf("diagnostic lost its selected path or rule: %+v", diagnostic)
+				}
+			}
+			if !includeSources {
+				if len(response.EncodedSourceFiles) != 0 {
+					t.Fatal("source artifacts were returned without a request")
+				}
+				return
+			}
+			if len(response.EncodedSourceFiles) != len(wantPaths) {
+				t.Fatalf("independent projects lost encoded sources: %v", response.EncodedSourceFiles)
+			}
+			for _, path := range wantPaths {
+				if len(response.EncodedSourceFiles[path]) == 0 {
+					t.Fatalf("missing encoded source for selected path %q", path)
+				}
+			}
+		})
+	}
+}
+
 func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {

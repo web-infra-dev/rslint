@@ -207,3 +207,13 @@ func (r *pipelineFinalChangeRecorder) CommitFinalChanges(
 	}
 	return CommitResult{ConfirmedPaths: paths}, nil
 }
+
+func (p *pipelineAutofixProvider) PlanGeneration(ctx context.Context, snapshot SourceSnapshot) (GenerationPlan, error) {
+	return GenerationProviderFunc(p.AcquireGeneration).PlanGeneration(ctx, snapshot)
+}
+
+type pipelinePlanProvider struct{ plan GenerationPlan }
+
+func (p pipelinePlanProvider) PlanGeneration(context.Context, SourceSnapshot) (GenerationPlan, error) {
+	return p.plan, nil
+}

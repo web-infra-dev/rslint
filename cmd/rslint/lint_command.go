@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -20,6 +21,7 @@ import (
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
@@ -385,76 +387,39 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	programSession := loader.NewSession(sourceFS)
-	projectSet, err := programSession.BuildProjects(projectRequest)
-	if err != nil {
-		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-	}
-	programs := projectSet.Programs()
-	var loadedPrograms loader.LoadResult
-	if !typeCheckOnly {
-		loadedPrograms, err = programSession.LoadCLI(projectSet, targetPlan, currentDirectory, singleThreaded)
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
+	var summaryFileCount int
+	activate := func() error {
+		if completeActivation == nil {
+			return nil
 		}
-		programs = loadedPrograms.Programs
-	}
-
-	// Metadata was sufficient for planning, but execution requires the exact
-	// host validated by Node's post-prepare fingerprint check. Join even when
-	// there are no targets, no enabled plugin rules, or only type checking.
-	if completeActivation != nil {
 		complete := completeActivation
 		completeActivation = nil
-		if err := complete(); err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-		}
+		return complete()
 	}
-
-	// Only the default formatter consumes the completed-run summary. Freeze
-	// type-capable Program root identities before execution, while the loader
-	// generation is authoritative, then immediately reduce them with the
-	// already-frozen lint targets so identity storage does not outlive this
-	// projection.
-	var summaryFileCount int
-	if format == output.FormatDefault && mode != output.ModeLint {
-		summaryFileCount, err = freezeLintReportFileCount(
-			ctx,
-			mode,
-			programSession,
-			programs,
-			targetPlan.Files,
-			singleThreaded,
-		)
-		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
-		}
-	}
-
-	// Construction and binding are complete. Execution needs the published
-	// Programs, not the cross-project AST reuse index. Session reuse remains an
-	// explicit loader concern; CLI fix rounds construct fresh Sessions below.
-	programSession.ReleaseBuildCache()
 
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
 	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
+		defer session.ReleaseBuildCache()
 		rebuilt, err := session.BuildProjects(projectRequest)
 		if err != nil {
 			return loader.LoadResult{}, err
+		}
+		if typeCheckOnly {
+			return loader.LoadResult{Programs: rebuilt.Programs()}, nil
 		}
 		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
-		session.ReleaseBuildCache()
 		return binding, nil
 	}
 
 	// The command owns config/target/Program construction and physical writes.
 	// It supplies the current immutable source generation to the linter-owned
 	// pipeline, which alone schedules native/plugin work and fix rounds.
-	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
 	generationForBinding := func(
 		binding loader.LoadResult,
 		generationFS vfs.FS,
@@ -502,13 +467,24 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	initialBinding := loadedPrograms
-	if typeCheckOnly {
-		initialBinding = loader.LoadResult{Programs: programs}
-	}
 	provider := &cliGenerationProvider{
-		initial:   &initialBinding,
-		initialFS: programSession.FS(),
+		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
+			binding, err := createPrograms(programSession)
+			if err != nil {
+				return loader.LoadResult{}, nil, err
+			}
+			if err := activate(); err != nil {
+				return loader.LoadResult{}, nil, err
+			}
+			if format == output.FormatDefault && mode != output.ModeLint {
+				summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
+					binding.Programs, targetPlan.Files, singleThreaded)
+				if err != nil {
+					return loader.LoadResult{}, nil, err
+				}
+			}
+			return binding, programSession.FS(), nil
+		},
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error) {
 			if err := ctx.Err(); err != nil {
 				return loader.LoadResult{}, nil, err
@@ -534,6 +510,22 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		},
 		generation: generationForBinding,
 	}
+	provider.singleThreaded = singleThreaded
+	// Fix validation needs one coherent source-identity boundary. Ordinary
+	// lint admits disjoint bindings independently, regardless of rule backend.
+	if !fix {
+		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
+			loads, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
+			if err != nil || len(loads) == 0 {
+				return nil, err
+			}
+			if err := activate(); err != nil {
+				return nil, err
+			}
+			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+		}
+	}
+
 	demand := linter.ArtifactDemand{}
 	if fix {
 		demand.Native = rule.EditDemandAutofix
@@ -564,6 +556,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		pipelineRequest = linter.NewLintRequest(provider, observationPolicy, dispatch)
 	}
 	pipelineResult, err := linter.RunPipeline(ctx, pipelineRequest)
+	var loadError *linter.GenerationLoadError
+	if _, fixing := pipelineResult.AppliedFixes(); !fixing && errors.As(err, &loadError) {
+		return abortRun(loadError.Error(), fmt.Sprintf("error: %v", loadError))
+	}
+
 	for _, pluginRecord := range pipelineResult.PluginOutcomes() {
 		reportEslintPluginDispatchOutcome(linter.EslintPluginDispatchOutcome{
 			Notices:       pluginRecord.Notices,

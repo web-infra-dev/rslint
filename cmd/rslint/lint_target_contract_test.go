@@ -28,7 +28,7 @@ func TestCLIGenerationProviderTransfersInitialOwnership(t *testing.T) {
 	}}
 	fsys := osvfs.FS()
 	provider := &cliGenerationProvider{
-		initial: &loaded, initialFS: fsys,
+		initial: func(context.Context) (loader.LoadResult, vfs.FS, error) { return loaded, fsys, nil },
 		generation: func(binding loader.LoadResult, generationFS vfs.FS) linter.Generation {
 			if generationFS != fsys {
 				t.Fatal("generation lost its filesystem")
@@ -42,7 +42,7 @@ func TestCLIGenerationProviderTransfersInitialOwnership(t *testing.T) {
 		t.Fatalf("canceled acquisition changed initial ownership: %v", err)
 	}
 	generation, release, err := provider.AcquireGeneration(context.Background(), linter.SourceSnapshot{})
-	if err != nil || release != nil || provider.initial != nil || provider.initialFS != nil {
+	if err != nil || release != nil || provider.initial != nil {
 		t.Fatalf("initial acquisition = release:%v error:%v", release != nil, err)
 	}
 	if generation.Native.Programs[0] != loaded.Programs[0] || len(generation.Native.Programs[0].SourceFiles()) == 0 {

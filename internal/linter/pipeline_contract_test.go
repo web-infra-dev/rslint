@@ -195,7 +195,19 @@ func TestPipelineCollectsLintedFilesOnlyWhenDemanded(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := withFiles.Observation.Native.Files
-	if len(files) != 1 || files[0].Path != fileName || files[0].SourceFile == nil {
+	if len(files) != 1 || files[0].Path != fileName || files[0].SourceFile != nil {
 		t.Fatalf("requested linted files = %+v", files)
+	}
+	withSources, err := RunPipeline(context.Background(), NewLintRequest(
+		pipelineTestProvider(generation, nil),
+		ObservationPolicy{Demand: ArtifactDemand{SourceFiles: true}},
+		nil,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	files = withSources.Observation.Native.Files
+	if len(files) != 1 || files[0].Path != fileName || files[0].SourceFile == nil {
+		t.Fatalf("requested ASTs = %+v", files)
 	}
 }

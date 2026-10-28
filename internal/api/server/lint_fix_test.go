@@ -26,7 +26,7 @@ import (
 func TestAPIGenerationProviderTransfersInitialOwnership(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	initial := linter.Generation{Native: linter.NativeGeneration{Cwd: root}}
-	provider := &apiGenerationProvider{initial: &initial}
+	provider := &apiGenerationProvider{initial: func(context.Context) (linter.Generation, error) { return initial, nil }}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, _, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{}); !errors.Is(err, context.Canceled) || provider.initial == nil {

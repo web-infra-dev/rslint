@@ -270,7 +270,11 @@ func TestLSPProjectConfigErrorClassification(t *testing.T) {
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			_, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})
+			plan, err := provider.PlanGeneration(ctx, linter.SourceSnapshot{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, release, err := plan.Loads[0].Acquire(ctx)
 			if !errors.Is(err, context.Canceled) || errors.As(err, &projectErr) || release != nil {
 				t.Fatalf("canceled acquisition = %v, release = %v, want unclassified cancellation", err, release != nil)
 			}

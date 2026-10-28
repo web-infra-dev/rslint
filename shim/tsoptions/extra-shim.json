@@ -1,6 +1,5 @@
 {
   "IgnoreFunctions": [
-    "GetSupportedExtensions",
     "ParseJsonConfigFileContent",
     "ParseJsonSourceFileConfigFileContent"
   ]

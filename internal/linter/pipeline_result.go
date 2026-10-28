@@ -9,17 +9,18 @@ import (
 // syntax-error and zero-rule files so API callers do not have to rediscover
 // selection through diagnostic side effects.
 type LintedFile struct {
-	Path       string
+	Path string
+	// SourceFile is populated only when ArtifactDemand.SourceFiles is requested.
 	SourceFile *ast.SourceFile
 }
 
 // NativeObservation is the complete native result for one generation and its
 // requested ArtifactDemand. Diagnostic source frames retain text rather than
-// compiler ASTs; explicitly requested Files keep their original source objects.
+// compiler ASTs; explicitly requested SourceFiles keep their original objects.
 type NativeObservation struct {
 	Diagnostics []rule.RuleDiagnostic
 	Lint        *LintResult
-	// Files is populated only when ArtifactDemand.LintedFiles is requested.
+	// Files is populated when target paths or source ASTs are requested.
 	Files                 []LintedFile
 	HasTargetSyntaxErrors bool
 }

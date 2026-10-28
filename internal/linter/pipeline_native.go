@@ -19,6 +19,12 @@ type nativeObservationWork struct {
 	hasTargetSyntaxErrors  bool
 }
 
+func (work *nativeObservationWork) close() {
+	if work.execution != nil {
+		work.execution.close()
+	}
+}
+
 func prepareNativeObservation(
 	generation Generation,
 	plan *LintPlan,
