@@ -21,6 +21,7 @@ import (
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -538,27 +539,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			if err != nil {
 				return nil, err
 			}
-			result := make([]linter.GenerationLoad, len(loads))
-			for i, load := range loads {
-				checkers := 0
-				if load.Options != nil && load.Options.Checkers != nil {
-					checkers = max(1, *load.Options.Checkers)
-				}
-				result[i] = linter.GenerationLoad{
-					TargetCount: load.TargetCount, CheckerCount: checkers,
-					Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
-						if err := ctx.Err(); err != nil {
-							return linter.Generation{}, nil, err
-						}
-						binding, err := load.Load()
-						if err != nil {
-							return linter.Generation{}, nil, err
-						}
-						return generationForBinding(binding, programSession.FS()), nil, nil
-					},
-				}
-			}
-			return result, nil
+			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 

@@ -122,6 +122,7 @@ func prohibitedPipelineDependency(importPath string) bool {
 func isProductLintIntegration(packagePath string) bool {
 	return packagePath == "cmd/rslint" ||
 		packagePath == "internal/api/server" ||
+		packagePath == "internal/linter/loader" ||
 		packagePath == "internal/lsp"
 }
 

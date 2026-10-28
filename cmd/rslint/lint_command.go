@@ -21,6 +21,7 @@ import (
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
@@ -521,7 +522,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			if err := activate(); err != nil {
 				return nil, err
 			}
-			return cliGenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 

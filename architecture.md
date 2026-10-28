@@ -782,6 +782,14 @@ These are semantic ports rather than generic pre/post hooks:
 - `ProgressiveDiagnostics` owns LSP-specific baseline presentation and detached
   enrichment admission without becoming a second lint orchestrator.
 
+`internal/linter/loader` is the shared CLI/API adapter from request-scoped
+`program/loader.ProgramLoad` values to `linter.GenerationLoad` values. It maps
+admission metadata and deferred acquisition once, while each entry point supplies
+its own binding-to-generation projection. This adapter depends on both packages;
+neither core package depends on the adapter or on the other core package. Config
+activation, overlay rebuilding, and result demands stay with their entry points.
+LSP supplies resident Program leases directly through the same pipeline contract.
+
 The linter files mirror those responsibilities: `pipeline_contract.go` and
 `pipeline_result.go` define the public boundary; `pipeline.go` is the sealed
 entry; `pipeline_load.go` owns acquisition admission, leases, and result merging;

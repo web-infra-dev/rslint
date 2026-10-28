@@ -21,35 +21,6 @@ type cliGenerationProvider struct {
 	generation     func(loader.LoadResult, vfs.FS) linter.Generation
 }
 
-func cliGenerationLoads(
-	loads []loader.ProgramLoad,
-	fsys vfs.FS,
-	generation func(loader.LoadResult, vfs.FS) linter.Generation,
-) []linter.GenerationLoad {
-	result := make([]linter.GenerationLoad, len(loads))
-	for index, load := range loads {
-		checkers := 0
-		if load.Options != nil && load.Options.Checkers != nil {
-			checkers = max(1, *load.Options.Checkers)
-		}
-		result[index] = linter.GenerationLoad{
-			TargetCount:  load.TargetCount,
-			CheckerCount: checkers,
-			Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
-				if err := ctx.Err(); err != nil {
-					return linter.Generation{}, nil, err
-				}
-				binding, err := load.Load()
-				if err != nil {
-					return linter.Generation{}, nil, err
-				}
-				return generation(binding, fsys), nil, nil
-			},
-		}
-	}
-	return result
-}
-
 func (p *cliGenerationProvider) AcquireGeneration(
 	ctx context.Context,
 	snapshot linter.SourceSnapshot,
