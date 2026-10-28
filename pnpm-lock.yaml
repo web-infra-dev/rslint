@@ -54,9 +54,6 @@ catalogs:
     '@types/node':
       specifier: ^26.6.5
       version: 26.6.5
-    '@types/picomatch':
-      specifier: ^4.0.3
-      version: 4.0.3
     '@types/react':
       specifier: ^19.2.17
       version: 19.2.17
@@ -174,9 +171,6 @@ catalogs:
     ovsx:
       specifier: ^0.10.12
       version: 0.10.12
-    picomatch:
-      specifier: ^4.0.5
-      version: 4.0.5
     react:
       specifier: ^19.2.8
       version: 19.2.8
@@ -294,9 +288,6 @@ importers:
       jiti:
         specifier: 'catalog:'
         version: 2.7.0
-      picomatch:
-        specifier: 'catalog:'
-        version: 4.0.5
     devDependencies:
       '@eslint/plugin-kit':
         specifier: 'catalog:'
@@ -307,9 +298,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
-      '@types/picomatch':
-        specifier: 'catalog:'
-        version: 4.0.3
       '@typescript-eslint/scope-manager':
         specifier: 'catalog:'
         version: 8.65.0
@@ -3003,9 +2991,6 @@ packages:
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
-
-  '@types/picomatch@4.0.3':
-    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -8537,8 +8522,6 @@ snapshots:
       undici-types: 8.9.0
 
   '@types/normalize-package-data@2.4.4': {}
-
-  '@types/picomatch@4.0.3': {}
 
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:

@@ -2,6 +2,7 @@ package target
 
 import (
 	"context"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -86,6 +87,73 @@ func TestSelectInputsPreservesLiteralAndScanRoles(t *testing.T) {
 			"/project/src/a.ts": {"/project/src"},
 			"/project/src/b.ts": {"/project/src"},
 		})
+	}
+}
+
+func TestSelectInputsDecodedPatterns(t *testing.T) {
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/1.ts":            &fstest.MapFile{},
+		"project/src/[ab].ts":         &fstest.MapFile{},
+		"project/src/[dir]/a.ts":      &fstest.MapFile{},
+		"project/src/[dir]/deep/b.ts": &fstest.MapFile{},
+	}, true)
+	for _, test := range []struct {
+		pattern string
+		root    string
+		files   []string
+	}{
+		{"src/{1..1}.ts", "/project/src", []string{"/project/src/1.ts"}},
+		{`src/\[ab\].ts`, "/project/src", []string{"/project/src/[ab].ts"}},
+		{`src/\[dir\]`, "/project/src/[dir]", []string{"/project/src/[dir]/a.ts", "/project/src/[dir]/deep/b.ts"}},
+	} {
+		t.Run(test.pattern, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(test.pattern, `\`) {
+				t.Skip("backslash glob escapes are POSIX-only")
+			}
+			selection, err := SelectInputs(context.Background(), fsys, "/project", []string{test.pattern})
+			assert.NilError(t, err)
+			sort.Strings(selection.Files)
+			assert.DeepEqual(t, selection.Files, test.files)
+			assert.Equal(t, len(selection.Unmatched), 0)
+			assert.Equal(t, len(selection.Directories), 0)
+			assert.DeepEqual(t, selection.GlobRoots, []string{test.root})
+			for _, file := range test.files {
+				assert.DeepEqual(t, selection.ScanDirectories[file], []string{test.root})
+			}
+		})
+	}
+}
+
+func TestSelectInputsWindowsPaths(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("native Windows volume rules")
+	}
+	root, paths := setupDiscoveryFixture(t, []string{"a.ts", "src/a.ts", "src/b.ts"})
+	volume := filepath.VolumeName(root)
+	selection, err := SelectInputs(context.Background(), osvfs.FS(), root, []string{volume + "a.ts", volume + "src/a.ts", volume + "src/*.ts"})
+	assert.NilError(t, err)
+	sort.Strings(selection.Files)
+	assert.DeepEqual(t, selection.Files, []string{paths["a.ts"], paths["src/a.ts"], paths["src/b.ts"]})
+	assert.Equal(t, len(selection.Unmatched), 0)
+	assert.DeepEqual(t, selection.ScanDirectories, map[string][]string{paths["src/b.ts"]: {tspath.ResolvePath(root, "src")}})
+	for _, test := range []struct{ cwd, input, want string }{
+		{"C:/project", "C:a.ts", "C:/project/a.ts"},
+		{"C:/project", "c:src/a.ts", "C:/project/src/a.ts"},
+		{"C:/project", "/src/a.ts", "C:/src/a.ts"},
+		{"//server/share/repo", "../../a.ts", "//server/share/a.ts"},
+		{"C:/project", "//server/share/../../a.ts", "//server/share/a.ts"},
+	} {
+		got, err := resolveInputPath(test.cwd, test.input)
+		assert.NilError(t, err)
+		assert.Equal(t, got, test.want)
+	}
+	for _, test := range []struct{ pattern, directory, relative string }{
+		{"//server/[share]/src/*.ts", "//server/[share]/src", "*.ts"},
+		{"//server/[share]/*.ts", "//server/[share]/", "*.ts"},
+	} {
+		directory, relative := globDirectory(test.pattern)
+		assert.Equal(t, directory, test.directory)
+		assert.Equal(t, relative, test.relative)
 	}
 }
 

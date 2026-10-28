@@ -2,11 +2,13 @@ package target
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 // InputSelection preserves literal directories and each glob's independent scan
@@ -35,7 +37,10 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 	classified := make([]input, len(inputs))
 	var patterns []string
 	for index, raw := range inputs {
-		absolute := tspath.ResolvePath(cwd, raw)
+		absolute, err := resolveInputPath(cwd, raw)
+		if err != nil {
+			return nil, err
+		}
 		classified[index].path = absolute
 		if fsys.FileExists(absolute) {
 			classified[index].file = true
@@ -45,9 +50,20 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 			classified[index].directory = true
 			continue
 		}
-		if _, literal := minimatch3.New(filepath.ToSlash(raw), inputPatternOptions).Literal(); !literal && raw != "" {
+		pattern := filepath.ToSlash(raw)
+		decoded, literal := literalPatternPath(pattern)
+		if raw != "" && (!literal || decoded != pattern) {
+			if literal {
+				directory, err := resolveInputPath(cwd, decoded)
+				if err != nil {
+					return nil, err
+				}
+				if fsys.DirectoryExists(directory) {
+					pattern = strings.TrimRight(pattern, "/") + "/**/*"
+				}
+			}
 			classified[index].glob = true
-			patterns = append(patterns, raw)
+			patterns = append(patterns, pattern)
 		}
 	}
 	expansions, err := expandGlobs(ctx, fsys, cwd, patterns)
@@ -115,4 +131,34 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 		delete(selection.ScanDirectories, file)
 	}
 	return selection, nil
+}
+
+// resolveInputPath resolves filesystem paths, not glob syntax. Windows drive-
+// relative inputs use the request's cwd on that drive; other drives retain the
+// operating system's per-drive working directory. Native cleaning protects UNC
+// share roots from parent segments without changing the process cwd.
+func resolveInputPath(cwd, name string) (string, error) {
+	if runtime.GOOS != "windows" {
+		return tspath.ResolvePath(cwd, name), nil
+	}
+	if !filepath.IsAbs(name) {
+		volume := filepath.VolumeName(name)
+		switch {
+		case volume != "":
+			if strings.EqualFold(volume, filepath.VolumeName(cwd)) {
+				name = filepath.Join(cwd, name[len(volume):])
+			} else {
+				absolute, err := filepath.Abs(name)
+				if err != nil {
+					return "", err
+				}
+				name = absolute
+			}
+		case len(name) > 0 && os.IsPathSeparator(name[0]):
+			name = filepath.VolumeName(cwd) + name
+		default:
+			name = filepath.Join(cwd, name)
+		}
+	}
+	return filepath.ToSlash(filepath.Clean(name)), nil
 }

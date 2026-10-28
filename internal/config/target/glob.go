@@ -3,6 +3,7 @@ package target
 import (
 	"context"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -13,25 +14,37 @@ import (
 
 var inputPatternOptions = minimatch3.Options{Dot: true, NoComment: true, PreserveWhitespace: true}
 
-// globDirectory returns the authored prefix and its decoded filesystem directory
-// using the matcher's literal recognition, including brace and extglob syntax.
-// Keep authored dot segments until the static root is known:
-// normalizing across a wildcard first can invent an independent scan entry.
-// tspath.GetDirectoryPath also normalizes backslashes, spending glob escapes.
+// literalPatternPath decodes pattern syntax outside the native volume. Windows
+// drive and UNC namespaces are fixed filesystem roots, not matching components.
+func literalPatternPath(pattern string) (string, bool) {
+	volume := filepath.ToSlash(filepath.VolumeName(pattern))
+	if volume != "" && len(volume) == len(pattern) {
+		return volume, true
+	}
+	options := inputPatternOptions
+	options.NoNegate = volume != ""
+	literal, ok := minimatch3.New(pattern[len(volume):], options).Literal()
+	return volume + literal, ok
+}
+
+// globDirectory returns the decoded static directory and the untouched pattern
+// below it. Only filesystem paths are cleaned; matching keeps escapes and dot
+// segments. Native volume boundaries make the upward search finite.
 func globDirectory(pattern string) (string, string) {
-	directory := pattern
+	volumeLength := len(filepath.VolumeName(pattern))
+	end := len(pattern)
 	for {
-		index := strings.LastIndexByte(directory, '/')
-		switch {
-		case index < 0:
-			directory = "."
-		case index == 0 || index == len(filepath.VolumeName(directory)):
-			directory = directory[:index+1]
-		default:
-			directory = directory[:index]
+		index := strings.LastIndexByte(pattern[volumeLength:end], '/')
+		if index < 0 {
+			return filepath.ToSlash(filepath.Join(pattern[:volumeLength], ".")), pattern[volumeLength:]
 		}
-		if literal, ok := minimatch3.New(directory, inputPatternOptions).Literal(); ok {
-			return directory, literal
+		end = volumeLength + index
+		directoryEnd := end
+		if end == volumeLength {
+			directoryEnd++
+		}
+		if literal, ok := literalPatternPath(pattern[:directoryEnd]); ok {
+			return literal, pattern[end+1:]
 		}
 	}
 }
@@ -64,23 +77,19 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 	partialOptions.Partial = true
 	for index, pattern := range patterns {
 		pattern = filepath.ToSlash(pattern)
-		directory, literalDirectory := globDirectory(pattern)
-		root := tspath.ResolvePath(cwd, literalDirectory)
+		directory, relative := globDirectory(pattern)
+		root, err := resolveInputPath(cwd, directory)
+		if err != nil {
+			return nil, err
+		}
 		expansions[index].Root = root
 		if !fsys.DirectoryExists(root) {
 			continue
 		}
-		absolute := pattern
-		if !filepath.IsAbs(absolute) {
-			absolute = filepath.Join(cwd, absolute)
-			directory = filepath.Join(cwd, directory)
-		}
-		// Relativize within pattern syntax; root has already decoded escapes.
-		relative, err := filepath.Rel(filepath.FromSlash(directory), filepath.FromSlash(absolute))
-		if err != nil {
-			return nil, err
-		}
-		pattern = filepath.ToSlash(relative)
+		// A dot component is redundant even after a wildcard. Parent components
+		// must remain in pattern syntax rather than canceling matching components.
+		parts := slices.DeleteFunc(strings.Split(relative, "/"), func(part string) bool { return part == "." })
+		pattern = strings.Join(parts, "/")
 		group := groupsByRoot[root]
 		if group == nil {
 			group = &globGroup{root: root, patterns: make(map[string]*compiledGlob)}

@@ -19,11 +19,10 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    not share its `tsBuildInfoFile` with the tsgo `typecheck` over the same
  *    `src` — the two tools' incremental formats clash. Hence a tsconfig per
  *    consumer: `tsconfig.lib.json` (here), `tsconfig.worker.json` (below), and
- *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes
- *    `dependencies` (`picomatch`) + `peerDependencies` (`jiti`). The public
- *    config-loader's parent-ignore helper uses `picomatch` at runtime. The
- *    `globals` catalog is a devDep; a Rspack plugin emits one package-internal
- *    JSON asset per environment so the root can load only selected maps.
+ *    `tsconfig.build.json` (typecheck). `output.autoExternal` externalizes the
+ *    optional `jiti` peer. The `globals` catalog is a devDep; a Rspack plugin
+ *    emits one package-internal JSON asset per environment so the root can
+ *    load only selected maps.
  *    Consumers do not install `globals`. One `lib` block with all entries:
  *    the surface modules share a graph, so shared chunks between entries are
  *    fine here.
