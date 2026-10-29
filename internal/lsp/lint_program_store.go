@@ -508,16 +508,16 @@ func (s *lintProgramStore) DidOpen(
 	uri lsproto.DocumentUri,
 	content string,
 	existedOnDisk bool,
-) {
+) []lsproto.DocumentUri {
 	if !existedOnDisk {
 		s.Invalidate()
-		return
+		return nil
 	}
-	s.markContent(uriToPath(uri), content, true)
+	return s.markContent(uriToPath(uri), content, true)
 }
 
-func (s *lintProgramStore) DidChange(uri lsproto.DocumentUri, content string) {
-	s.markContent(uriToPath(uri), content, false)
+func (s *lintProgramStore) DidChange(uri lsproto.DocumentUri, content string) []lsproto.DocumentUri {
+	return s.markContent(uriToPath(uri), content, false)
 }
 
 func (s *lintProgramStore) DidSave(uri lsproto.DocumentUri, open bool) {
@@ -528,15 +528,15 @@ func (s *lintProgramStore) DidSave(uri lsproto.DocumentUri, open bool) {
 	s.markContent(uriToPath(uri), s.server.documents[uri], false)
 }
 
-func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) {
+func (s *lintProgramStore) DidClose(uri lsproto.DocumentUri) []lsproto.DocumentUri {
 	delete(s.documentPrograms, uri)
 	defer s.prune()
 	content, ok := s.server.fs.ReadFile(uriToPath(uri))
 	if !ok {
 		s.Invalidate()
-		return
+		return nil
 	}
-	s.markContent(uriToPath(uri), content, false)
+	return s.markContent(uriToPath(uri), content, false)
 }
 
 // DidChangeWatchedFiles returns whether diagnostics need to be refreshed. A
@@ -592,10 +592,10 @@ func (s *lintProgramStore) markContent(
 	fileName string,
 	content string,
 	invalidatePossibleNewSource bool,
-) {
+) []lsproto.DocumentUri {
 	if tspath.HasJSONFileExtension(fileName) {
 		s.Invalidate()
-		return
+		return nil
 	}
 	if invalidatePossibleNewSource {
 		for configFileName, metadata := range s.projectMetadata {
@@ -616,11 +616,13 @@ func (s *lintProgramStore) markContent(
 		}
 		return physicalID
 	}
+	changed := make(map[lintProgramKey]struct{})
 	for configFileName, state := range s.programs {
 		previousIdentity, identityKnown :=
 			state.selectedSourceIdentities[lexicalID]
 		if identityKnown && previousIdentity != physicalPathID() {
 			delete(s.programs, configFileName)
+			changed[configFileName] = struct{}{}
 			continue
 		}
 		var sourceFile *ast.SourceFile
@@ -632,17 +634,31 @@ func (s *lintProgramStore) markContent(
 		if sourceFile != nil {
 			if !identityKnown && lexicalID != physicalPathID() {
 				delete(s.programs, configFileName)
+				changed[configFileName] = struct{}{}
 				continue
 			}
-			s.markStateSourceContent(state, sourceFile, content)
+			if s.markStateSourceContent(state, sourceFile, content) {
+				changed[configFileName] = struct{}{}
+			}
 			continue
 		}
 		if invalidatePossibleNewSource &&
 			(state.program.CommandLine().PossiblyMatchesFileName(fileName) ||
 				state.failedLookupMatches(fileName, s.server.fs)) {
 			delete(s.programs, configFileName)
+			changed[configFileName] = struct{}{}
 		}
 	}
+	// Report ownership affected by this update without making the Program store
+	// responsible for diagnostic scheduling or publication. Unowned documents
+	// have no resident graph with which to establish dependency membership.
+	var documents []lsproto.DocumentUri
+	for uri, key := range s.documentPrograms {
+		if _, affected := changed[key]; affected {
+			documents = append(documents, uri)
+		}
+	}
+	return documents
 }
 
 // sourceFileForOpen avoids a canonical source scan for every unrelated
@@ -670,14 +686,17 @@ func (s *lintProgramStore) markStateSourceContent(
 	state *lintProgramState,
 	sourceFile *ast.SourceFile,
 	content string,
-) {
+) bool {
 	if sourceFile == nil {
-		return
+		return false
 	}
 	if sourceFile.Text() == content {
+		_, wasDirty := state.dirtyFiles[sourceFile.Path()]
 		delete(state.dirtyFiles, sourceFile.Path())
+		return wasDirty
 	} else {
 		state.dirtyFiles[sourceFile.Path()] = struct{}{}
+		return true
 	}
 }
 

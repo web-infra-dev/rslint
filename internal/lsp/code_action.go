@@ -38,6 +38,7 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	if isFixAllRequest(params.Context) {
 		return s.handleFixAllCodeAction(ctx, uri)
 	}
+	s.flushDocumentDiagnostics(uri)
 
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored {
@@ -121,9 +122,8 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {
 	empty := lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}
 
-	// Clear pending debounce for this URI — we are about to lint it fresh,
-	// so any scheduled debounce lint for the same content is redundant.
-	delete(s.pendingLintURIs, uri)
+	// Fix-all computes speculative edits and does not publish diagnostics. Keep
+	// pending diagnostics even when no edits are produced or applied by the client.
 
 	if !s.initialized {
 		return empty, nil

@@ -76,21 +76,15 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatchFunc {
 }
 
 func (p *documentProgressiveDiagnostics) Submit(
-	parentCtx context.Context,
+	_ context.Context,
 	run linter.DeferredPluginRun,
 ) {
-	p.server.startDiagnosticEnrichment(
-		parentCtx,
-		p.uri,
-		p.generation,
-		p.pluginGeneration,
-		run,
-	)
+	p.enrichment = run
 }
 
 // startDiagnosticEnrichment implements the progressive request's asynchronous
-// executor port. RunPipeline alone decides when to submit work; this adapter
-// supplies transport, deadline, cancellation, and stale-result admission.
+// executor port after the baseline commits. RunPipeline decides eligibility;
+// this adapter supplies transport, deadline, cancellation, and stale-result admission.
 func (s *Server) startDiagnosticEnrichment(
 	parentCtx context.Context,
 	uri lsproto.DocumentUri,

@@ -3,34 +3,11 @@ package lsp
 import (
 	"context"
 	"log"
-	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 )
-
-// lintDebounceDelay is how long to wait after the last keystroke before
-// running the linter. This avoids linting on every keystroke against
-// incomplete/broken syntax that can cause panics or waste CPU.
-const lintDebounceDelay = 200 * time.Millisecond
-
-// scheduleLint marks a URI for deferred linting and resets the debounce timer.
-// When the timer fires it signals debounceCh, which is consumed by the main
-// dispatch loop. Must be called from the main dispatch loop goroutine.
-func (s *Server) scheduleLint(uri lsproto.DocumentUri) {
-	s.pendingLintURIs[uri] = struct{}{}
-	if s.lintTimer != nil {
-		s.lintTimer.Stop()
-	}
-	s.lintTimer = time.AfterFunc(lintDebounceDelay, func() {
-		select {
-		case s.debounceCh <- struct{}{}:
-		default:
-			// Already pending — no need to queue another signal
-		}
-	})
-}
 
 func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextDocumentParams) error {
 	log.Printf("Handling didOpen: %s", params.TextDocument.Uri)
@@ -39,14 +16,16 @@ func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextD
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
+	var affected []lsproto.DocumentUri
 	if s.lintPrograms != nil {
 		existedOnDisk := s.fs != nil && s.fs.FileExists(uriToPath(uri))
-		s.lintPrograms.DidOpen(uri, content, existedOnDisk)
+		affected = s.lintPrograms.DidOpen(uri, content, existedOnDisk)
 	}
+	s.invalidateDocumentInputs(uri, affected)
 
 	s.refreshUncoveredDocument(ctx, uri)
 	if s.initialized {
-		s.pushDiagnostics(uri)
+		s.queueDiagnostics(uri)
 	}
 	return nil
 }
@@ -66,16 +45,15 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 		return nil
 	}
 	s.documents[uri] = content
+	var affected []lsproto.DocumentUri
 	if s.lintPrograms != nil {
-		s.lintPrograms.DidChange(uri, s.documents[uri])
+		affected = s.lintPrograms.DidChange(uri, s.documents[uri])
 	}
 
 	// A content version change supersedes plugin work immediately, not when the
 	// debounce timer eventually starts the next lint. Otherwise an older worker
 	// result can be published against the new buffer while the user is typing.
-	s.docGeneration[uri]++
-	s.cancelInflightPluginDispatch(uri)
-	delete(s.diagnostics, uri)
+	s.invalidateDocumentInputs(uri, affected)
 
 	if s.initialized {
 		s.scheduleLint(uri)
@@ -100,7 +78,7 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 
 	// The save refresh below includes this URI, so its pending debounce
 	// would schedule redundant diagnostics.
-	delete(s.pendingLintURIs, uri)
+	delete(s.lintSchedule.pending, uri)
 
 	if s.lintPrograms != nil && forwardSave {
 		s.lintPrograms.DidSave(uri, open)
@@ -115,7 +93,7 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 			s.invalidateOpenDocumentDiagnostics()
 			_ = s.RefreshDiagnostics(ctx)
 		} else {
-			s.pushDiagnostics(uri)
+			s.queueDiagnostics(uri)
 		}
 	}
 	return nil
@@ -157,19 +135,16 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 	log.Printf("Handling didClose: %s", params.TextDocument.Uri)
 	uri := params.TextDocument.Uri
 	delete(s.documents, uri)
-	delete(s.diagnostics, uri)
-	delete(s.pendingLintURIs, uri)
+	delete(s.lintSchedule.pending, uri)
 	// Bump (do NOT delete) the generation on close so any in-flight plugin
 	// result for this URI is stale. Keeping the counter monotonic — rather
 	// than resetting it to 0 on a later reopen — prevents a generation collision
 	// where a pre-close worker result could match a freshly reopened document.
-	s.docGeneration[uri]++
-	// Cancel an in-flight plugin dispatch for the closed doc so its Node worker
-	// stops instead of running to completion — no superseding keystroke will.
-	s.cancelInflightPluginDispatch(uri)
+	var affected []lsproto.DocumentUri
 	if s.lintPrograms != nil {
-		s.lintPrograms.DidClose(uri)
+		affected = s.lintPrograms.DidClose(uri)
 	}
+	s.invalidateDocumentInputs(uri, affected)
 
 	if s.initialized {
 		// Push empty diagnostics to clear the client's display before closing
