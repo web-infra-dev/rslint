@@ -111,12 +111,7 @@ func (r *lintProgramRequest) key(configPath string) lintProgramKey {
 }
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
-	// Project loading is parallel; serialized LSP file requests share one checker.
-	commandLine := metadata.commandLine.WithFileNames(metadata.commandLine.FileNames())
-	options := *commandLine.CompilerOptions()
-	checkerCount := 1
-	options.Checkers = &checkerCount
-	commandLine.SetCompilerOptions(&options)
+	commandLine := singleCheckerLintCommandLine(metadata.commandLine)
 	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
 	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
 		newLintProjectReferenceHost(host, r.projectMetadata))

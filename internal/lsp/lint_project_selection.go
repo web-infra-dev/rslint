@@ -266,7 +266,7 @@ func (request *standaloneLintProjectRequest) program(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
 	program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
-		true, metadata.commandLine,
+		false, singleCheckerLintCommandLine(metadata.commandLine),
 		newLintProjectReferenceHost(
 			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), request.filesystem()),
 			request.projects,
@@ -276,6 +276,16 @@ func (request *standaloneLintProjectRequest) program(
 		return nil, nil, err
 	}
 	return program, sourceFileForTarget(program, request.target, request.filesystem()), nil
+}
+
+// LSP file requests use one checker even when Program loading is parallel.
+func singleCheckerLintCommandLine(commandLine *tsoptions.ParsedCommandLine) *tsoptions.ParsedCommandLine {
+	commandLine = commandLine.WithFileNames(commandLine.FileNames())
+	options := *commandLine.CompilerOptions()
+	checkerCount := 1
+	options.Checkers = &checkerCount
+	commandLine.SetCompilerOptions(&options)
+	return commandLine
 }
 
 func (request *standaloneLintProjectRequest) loadMetadata(

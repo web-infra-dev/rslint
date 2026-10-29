@@ -255,12 +255,20 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 	if !metadata.Contains(firstSource, "") {
 		t.Fatal("initial parsed metadata does not contain its configured root")
 	}
+	authoredCheckerCount := 4
+	metadata.commandLine.CompilerOptions().Checkers = &authoredCheckerCount
 	if err := os.WriteFile(configPath, []byte(`{"files":["second.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	program, sourceFile, err := request.program(metadata)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if program.SingleThreaded() || program.Options().Checkers == nil || *program.Options().Checkers != 1 {
+		t.Fatal("standalone Program must load in parallel with one checker")
+	}
+	if got := metadata.commandLine.CompilerOptions().Checkers; got == nil || *got != 4 {
+		t.Fatal("Program construction changed the authored checker options")
 	}
 	if sourceFile == nil || lintProgramLexicalPathID(sourceFile.FileName(), fs) != lintProgramLexicalPathID(firstSource, fs) {
 		t.Fatalf("Program did not use the selected parsed snapshot: %v", sourceFile)

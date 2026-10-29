@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -77,6 +78,25 @@ type frozenLintTargetOverlayFS struct {
 	lexicalPathID   string
 	canonicalPathID string
 	canonicalPath   string
+}
+
+// Query caching must preserve the BOM supplied by the current source layer.
+type cachedLintQueryFS struct {
+	*cachedvfs.FS
+	sourceFS vfs.FS
+}
+
+func newCachedLintQueryFS(sourceFS vfs.FS) *cachedLintQueryFS {
+	return &cachedLintQueryFS{FS: cachedvfs.From(sourceFS), sourceFS: sourceFS}
+}
+
+func (fs *cachedLintQueryFS) SourceHasBOM(filePath string) bool {
+	return utils.SourceHasBOM(fs.sourceFS, filePath)
+}
+
+func newCachedLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
+	diskFS := newCachedLintQueryFS(baseFS)
+	return newCachedLintQueryFS(newFrozenLintTargetOverlayFS(diskFS, files, target))
 }
 
 func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {

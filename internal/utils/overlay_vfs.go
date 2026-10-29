@@ -2,6 +2,7 @@ package utils
 
 import (
 	"io/fs"
+	"slices"
 	"strings"
 	"time"
 
@@ -66,6 +67,10 @@ func (vfs *OverlayVFS) DirectoryExists(path string) bool {
 
 func (vfs *OverlayVFS) GetAccessibleEntries(path string) (result vfs.Entries) {
 	result = vfs.fs.GetAccessibleEntries(path)
+	// Cached filesystems can return shared slices. Append must allocate before
+	// adding overlay entries to either backing array.
+	result.Files = slices.Clip(result.Files)
+	result.Directories = slices.Clip(result.Directories)
 
 	normalizedPath := tspath.NormalizePath(path)
 	if !strings.HasSuffix(normalizedPath, "/") {

@@ -2,12 +2,45 @@ package utils
 
 import (
 	"math"
+	"slices"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
+
+type sharedDirectoryEntriesFS struct {
+	vfs.FS
+	entries vfs.Entries
+}
+
+func (fs *sharedDirectoryEntriesFS) GetAccessibleEntries(string) vfs.Entries {
+	return fs.entries
+}
+
+func TestOverlayVFSDirectoryEntriesDoNotMutateBase(t *testing.T) {
+	t.Parallel()
+	files := []string{"disk.ts", "file sentinel"}
+	directories := []string{"disk-dir", "directory sentinel"}
+	base := &sharedDirectoryEntriesFS{entries: vfs.Entries{
+		Files:       files[:1],
+		Directories: directories[:1],
+	}}
+	overlay := NewOverlayVFS(base, map[string]string{
+		"/repo/virtual.ts":            "export {};",
+		"/repo/virtual-dir/source.ts": "export {};",
+	})
+	entries := overlay.GetAccessibleEntries("/repo")
+	if !slices.Equal(entries.Files, []string{"disk.ts", "virtual.ts"}) ||
+		!slices.Equal(entries.Directories, []string{"disk-dir", "virtual-dir"}) {
+		t.Fatalf("overlay entries = %+v", entries)
+	}
+	if files[1] != "file sentinel" || directories[1] != "directory sentinel" {
+		t.Fatal("overlay entries overwrote the backing filesystem's shared slices")
+	}
+}
 
 func TestIsStrictCompilerOptionEnabled(t *testing.T) {
 	t.Parallel()
