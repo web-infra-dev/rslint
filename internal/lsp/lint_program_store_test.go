@@ -1596,7 +1596,7 @@ type lintProgramSourceCountingFS struct {
 }
 
 func (fs *lintProgramSourceCountingFS) ReadFile(path string) (string, bool) {
-	if path == fs.source {
+	if lintProgramLexicalPathID(path, fs.FS) == lintProgramLexicalPathID(fs.source, fs.FS) {
 		fs.reads.Add(1)
 	}
 	return fs.FS.ReadFile(path)
@@ -1606,6 +1606,12 @@ func TestLintProgramStorePreparesBeforeSourceReads(t *testing.T) {
 	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
 	dependency := tspath.ResolvePath(tspath.GetDirectoryPath(fixture.sourcePath), "dependency.ts")
 	if err := os.WriteFile(dependency, []byte("export const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Keep package-scope discovery inside the covered source directory so this
+	// case exercises one build instead of the ancestor package.json fallback.
+	packageJSON := tspath.ResolvePath(tspath.GetDirectoryPath(dependency), "package.json")
+	if err := os.WriteFile(packageJSON, []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	counted := &lintProgramSourceCountingFS{FS: fixture.server.fs, source: dependency}
@@ -1628,6 +1634,9 @@ func TestLintProgramStorePreparesBeforeSourceReads(t *testing.T) {
 		t.Fatal("did not prepare predictable coverage")
 	}
 	reads := counted.reads.Load()
+	if reads != 1 {
+		t.Fatalf("got %d source reads after first load; want 1", reads)
+	}
 	source := program.GetSourceFile(dependency)
 	if source == nil || source.Text() != "export const value = 2;\n" {
 		t.Fatal("first build missed a change during preparation")
