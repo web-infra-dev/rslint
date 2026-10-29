@@ -63,7 +63,9 @@ func acquireSpeculativeGeneration(
 		files[path] = text
 	}
 	addEditorOverlayTarget(files, target, content)
-	overlayFS := newFrozenLintTargetOverlayFS(environment.baseFS, files, target)
+	// Cache path queries only within this observation; the next fix round must
+	// see its new editor text and fresh filesystem results.
+	overlayFS := newCachedLintTargetOverlayFS(environment.baseFS, files, target)
 
 	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
 	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
