@@ -1243,9 +1243,14 @@ func TestLintProgramStoreWatchedChangeRefreshesCustomProjectDiagnostics(t *testi
 }
 
 func TestLintProgramStoreWatcherFailureFallsBackToFreshPrograms(t *testing.T) {
-	for _, phase := range []string{"metadata", "program preparation"} {
+	for _, phase := range []string{"metadata", "required dependency"} {
 		t.Run(phase, func(t *testing.T) {
 			fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+			if phase == "required dependency" {
+				if err := os.WriteFile(fixture.configPath, []byte(`{"files":["src/index.ts"]}`), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 			failed := false
 			fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
 				for _, watcher := range watchers {
@@ -1722,10 +1727,7 @@ func TestLintProgramCoveragePreparationPaths(t *testing.T) {
 					return nil
 				}
 				for range 2 {
-					safe, err := coverage.prepareProgram(context.Background(), server.cwd+"/app")
-					if err != nil || !safe {
-						t.Fatalf("coverage safe=%t error=%v", safe, err)
-					}
+					coverage.prepareProgram(context.Background(), server.cwd+"/app")
 				}
 				want := []string{root + "/repo/**/*", root + "/node_modules/**/*", bundled.LibPath() + "/**/*"}
 				switch root {
@@ -1749,5 +1751,27 @@ func TestLintProgramCoveragePreparationPaths(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestLintProgramStorePreparationFailureIsOptional(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	rejected := false
+	fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+		for _, watcher := range watchers {
+			// This noLib project never reads the predicted default-library location.
+			if project.FileSystemWatcherGlobString(watcher) == bundled.LibPath()+"/**/*" {
+				rejected = true
+				return errors.New("predicted location unavailable")
+			}
+		}
+		return nil
+	}
+	first := fixture.load(t)
+	if !rejected || !fixture.store.Usable() || len(fixture.store.programs) != 1 {
+		t.Fatal("failure of unused speculative coverage disabled actual dependency coverage")
+	}
+	if fixture.load(t) != first {
+		t.Fatal("failed prediction prevented safe Program reuse")
 	}
 }

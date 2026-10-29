@@ -358,11 +358,7 @@ func (r *lintProgramRequest) rebuild(
 		return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 	}
 
-	if safe, err := r.store.coverage.prepareProgram(r.ctx, tspath.GetDirectoryPath(configFileName)); err != nil || !safe {
-		r.store.coverage.disabled = true
-		r.store.Invalidate()
-		return r.loadFresh(metadata)
-	}
+	r.store.coverage.prepareProgram(r.ctx, tspath.GetDirectoryPath(configFileName))
 
 	// Register any dependencies outside the prepared coverage, then rebuild
 	// once so no filesystem change can fall into the registration gap.
