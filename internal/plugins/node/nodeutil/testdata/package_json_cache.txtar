@@ -1,0 +1,32 @@
+-- input.js --
+export {};
+
+-- package.json --
+{"name":"app","imports":{"#local":"./src/local.js?raw#fragment","#dep":"dep"},"exports":{"./self":"./src/local.js"}}
+
+-- src/local.js --
+export {};
+
+-- node_modules/dep/package.json --
+{"name":"dep","main":"./cjs.js","exports":{".":{"import":"./esm.js","require":"./cjs.js"},"./gone":"./gone.js","./directory":"./directory"}}
+
+-- node_modules/dep/esm.js --
+export {};
+
+-- node_modules/dep/cjs.js --
+module.exports = {};
+
+-- node_modules/dep/directory/index.js --
+module.exports = {};
+
+-- node_modules/legacy/package.json --
+{"main":"./main.js","module":"./module.js"}
+
+-- node_modules/legacy/main.js --
+export {};
+
+-- node_modules/legacy/module.js --
+export {};
+
+-- node_modules/legacy/index.js --
+export {};
