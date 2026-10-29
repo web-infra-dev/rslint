@@ -76,6 +76,12 @@ func (coordinator *discoveryCoordinator) normalizedDirectoryRoots() []rslintconf
 	return roots
 }
 
+func (coordinator *discoveryCoordinator) recursiveDirectory(path string) bool {
+	return slices.ContainsFunc(coordinator.request.RecursiveDirectories, func(directory rslintconfig.DirectoryIdentity) bool {
+		return discoveryPathsEqual(path, directory.LexicalPath, coordinator.fs.UseCaseSensitiveFileNames())
+	})
+}
+
 func (coordinator *discoveryCoordinator) normalizedFiles() []DiscoveryFile {
 	if coordinator.request.Files == nil {
 		return nil

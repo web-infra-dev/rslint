@@ -35,6 +35,9 @@ type Request struct {
 	OwnerScopes     map[string]OwnerScope
 	FS              vfs.FS
 	Files           []rslintconfig.PathIdentity
+	// ScanDirectories marks exact candidates produced by scans rather than
+	// literal paths. They must satisfy normal config file selection.
+	ScanDirectories map[string][]string
 	Directories     []rslintconfig.DirectoryIdentity
 	GitPolicy       *rslintconfig.GitPolicy
 	PathSpaces      *rslintconfig.PathSpaceSnapshot
@@ -55,6 +58,11 @@ func Resolve(request Request) (Plan, error) {
 	}
 	plan := Plan{gitPolicy: request.GitPolicy}
 	explicitFiles := newExplicitLintTargetSet(request.Files, request.FS)
+	if explicitFiles != nil {
+		for _, file := range explicitFiles.byPath {
+			_, file.scanned = request.ScanDirectories[file.target.Path]
+		}
+	}
 	var discoveredFiles []File
 	if request.ConfigMap != nil {
 		spaces := request.PathSpaces

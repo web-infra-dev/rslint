@@ -144,12 +144,13 @@ type patternPart struct {
 
 // Matcher is a compiled pattern, ready to match any number of paths.
 type Matcher struct {
-	options Options
-	pattern string
-	negate  bool
-	comment bool
-	empty   bool
-	invalid bool
+	options     Options
+	pattern     string
+	negate      bool
+	hasNegation bool
+	comment     bool
+	empty       bool
+	invalid     bool
 	// set holds one row per brace expansion, each row one part per path part.
 	set [][]patternPart
 }
@@ -248,6 +249,35 @@ func (m *Matcher) parseNegate() {
 		offset++
 	}
 	m.pattern = m.pattern[offset:]
+	m.hasNegation = offset > 0
+}
+
+// Literal returns the unescaped path when the pattern has exactly one literal
+// expansion. A negation is a pattern even when an even number of bangs cancels
+// out. Callers can reuse the compiled grammar to find a glob's static directory
+// without introducing a second glob parser.
+func (m *Matcher) Literal() (string, bool) {
+	if m.invalid || m.comment || m.hasNegation || len(m.set) != 1 {
+		return "", false
+	}
+	parts := make([]string, 0, len(m.set[0]))
+	for _, part := range m.set[0] {
+		if part.globstar || part.re != nil {
+			return "", false
+		}
+		parts = append(parts, part.literal)
+	}
+	expansions := m.braceExpand()
+	if len(expansions) != 1 {
+		return "", false
+	}
+	literal := strings.Join(parts, "/")
+	// Matching collapses repeated slashes, but path roots such as UNC need them.
+	leadingSlashes := len(expansions[0]) - len(strings.TrimLeft(expansions[0], "/"))
+	if leadingSlashes > 1 {
+		literal = expansions[0][:leadingSlashes-1] + literal
+	}
+	return literal, true
 }
 
 func (m *Matcher) braceExpand() []string {

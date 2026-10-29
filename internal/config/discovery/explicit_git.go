@@ -8,7 +8,7 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 	coordinator.collectExactGitFiles()
 	roots := make([]discoveryWalkNode, 0, len(coordinator.targetDirectories))
 	for _, directory := range coordinator.targetDirectories {
-		if targetsByRoot != nil && targetsByRoot[directory.LexicalPath] == nil {
+		if targetsByRoot != nil && targetsByRoot[directory.LexicalPath] == nil && !coordinator.recursiveDirectory(directory.LexicalPath) {
 			continue
 		}
 		if isDefaultDiscoveryExcluded(directory.LexicalPath, coordinator.request.CWD, coordinator.fs.UseCaseSensitiveFileNames()) {
@@ -24,6 +24,7 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 			configReachable:    true,
 			gitCursor:          coordinator.git.Ancestors(directory.CanonicalPath),
 			targets:            targetsByRoot[directory.LexicalPath],
+			recursive:          coordinator.recursiveDirectory(directory.LexicalPath),
 		})
 	}
 	return coordinator.walkDirectories(roots, false)

@@ -30,7 +30,7 @@ rslint [options] [files/directories...]
 
 ## File and Directory Arguments
 
-You can pass file paths, directory paths, or a mix of both. Rslint discovers the config file by walking upward from the target location.
+You can pass file paths, directory paths, quoted glob patterns, or a mix of them. Rslint discovers the config file by walking upward from the target location.
 
 ```bash
 # Lint specific files
@@ -39,14 +39,27 @@ rslint src/index.ts src/utils.ts
 # Lint a directory (only files under that directory are linted)
 rslint src/
 
-# Mix files and directories
-rslint src/ lib/utils.ts
+# Lint files matched by a glob, including nested directories
+rslint "src/**/*.{js,ts}"
+
+# Mix glob patterns, files, and directories
+rslint "src/*.ts" lib/utils.ts tests/
 
 # Use with --fix
 rslint --fix src/index.ts
 ```
 
 When no arguments are given, rslint scopes linting to the current working directory.
+
+Wrap glob patterns in quotes so rslint expands them. Relative paths and patterns start from the directory where you run the command. Absolute paths and patterns also work.
+
+`"src/*.ts"` checks files directly in `src`, while `"src/**/*.ts"` also checks subdirectories. Patterns also support `?` for a single character, `[ab]` for either character, `{js,ts}` for alternatives, and `@(client|server)` to match either name.
+
+If a file or directory with the given name exists, rslint uses that exact path, even if its name contains glob characters. `#` is an ordinary filename character.
+
+When you pass several inputs, each file is checked once, even when several inputs match it. Your config's `files` and `ignores` settings and `.gitignore` still apply. To exclude files, use `ignores` in your config. A `!pattern` input does not remove files selected by other inputs.
+
+The JavaScript API's `lintFiles()` follows the same matching rules.
 
 ### Config Discovery
 

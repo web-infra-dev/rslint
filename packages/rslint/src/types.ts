@@ -65,9 +65,11 @@ export interface LintResponse {
 }
 
 export interface LintOptions {
+  /** Raw file/directory/glob inputs. Mutually exclusive with exact `files`. */
+  patterns?: string[];
   files?: string[];
-  // Optional physical paths parallel to files. High-level Node APIs provide
-  // these after target planning so Go does not repeat realpath resolution.
+  // Optional physical paths parallel to exact files, including virtual buffers.
+  // Go selects and freezes raw pattern results itself.
   canonicalFiles?: string[];
   /** Parallel to `files`: matched scan roots, or null for a literal file. */
   fileScanDirectories?: (string[] | null)[];

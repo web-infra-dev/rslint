@@ -64,7 +64,7 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "4.0.0"
+const Version = "5.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"
@@ -84,7 +84,11 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files []string `json:"files,omitempty"`
+	// Patterns are raw file/directory/glob inputs, mutually exclusive with Files
+	// and its expansion metadata. FileContents remains a read overlay.
+	Patterns []string `json:"patterns"`
+	// Keep an explicitly empty target array distinct from omitted/null targets.
+	Files []string `json:"files"`
 	// CanonicalFiles is parallel to Files when the host already resolved physical
 	// identity. Go uses these paths for this request instead of repeating realpath
 	// calls; omitted by lower-level clients that have no pre-resolved identity.

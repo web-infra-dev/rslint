@@ -346,6 +346,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
+		targetDirectories := configCatalog.TargetDirectories
+		if len(args.GlobRoots) > 0 {
+			// Glob roots govern config discovery; only literal directory inputs
+			// authorize recursive lint-target walking.
+			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
+		}
 		targetPlan, err = target.Resolve(target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
@@ -354,7 +360,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			OwnerScopes:     configTargetScopes,
 			FS:              fs,
 			Files:           configCatalog.TargetFiles,
-			Directories:     configCatalog.TargetDirectories,
+			ScanDirectories: args.ScanDirectories,
+			Directories:     targetDirectories,
 			GitPolicy:       configCatalog.GitPolicy,
 			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,

@@ -1,0 +1,28 @@
+-- rslint.config.mjs --
+export default [];
+-- .gitignore --
+src/git-ignored/
+-- src/a.ts --
+debugger;
+-- src/[ab].ts --
+debugger;
+-- src/nested/b.ts --
+debugger;
+-- src/.hidden.ts --
+debugger;
+-- src/bundle.min.js --
+debugger;
+-- src/generated/skip.ts --
+debugger;
+-- src/generated/rslint.config.mjs --
+throw new Error('ignored config must not run');
+-- src/git-ignored/skip.ts --
+debugger;
+-- src/git-ignored/entry.js --
+debugger;
+-- src/git-ignored/rslint.config.mjs --
+export default [];
+-- other/c.js --
+debugger;
+-- other/deep/d.js --
+debugger;

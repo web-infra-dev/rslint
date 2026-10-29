@@ -1601,10 +1601,13 @@ func TestDiscoverLintTargetsMultiConfig_MergesAutomaticAndHostAssignedFilesForSa
 	targets := discoverLintTargetsMultiConfig(
 		configMap,
 		map[string]OwnerScope{
-			childDir: {ExplicitFiles: []string{paths["pkg/explicit.ts"]}},
+			childDir: {ExplicitFiles: []string{paths["pkg/explicit.ts"], paths["pkg/explicit.ts"]}},
 		},
 		fsys,
-		[]string{paths["pkg/automatic.ts"], paths["pkg/explicit.ts"]},
+		[]string{
+			paths["pkg/automatic.ts"], paths["pkg/explicit.ts"],
+			paths["pkg/automatic.ts"], paths["pkg/explicit.ts"],
+		},
 		nil,
 		true,
 	)

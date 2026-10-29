@@ -320,6 +320,7 @@ func runCLI(args []string) int {
 	}
 	if len(payload.Files) > 0 {
 		baseArgs.AllowFiles, baseArgs.AllowDirs = classifyPaths(payload.Files)
+		baseArgs.Positional = nil
 	}
 	if payload.Format != "" {
 		baseArgs.Format = payload.Format
@@ -353,7 +354,11 @@ func runCLI(args []string) int {
 			_ = ch.Close()
 			return 2
 		}
-		if err := discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch); err != nil {
+		prepareErr := prepareCLIInputs(lintCtx, &baseArgs)
+		if prepareErr == nil {
+			prepareErr = discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch)
+		}
+		if err := prepareErr; err != nil {
 			// Discovery now includes the potentially long Go walk and reverse
 			// Node loads. A signal can cancel either before the mirror goroutine
 			// publishes state.signalled, so consult the source context as well.
@@ -488,10 +493,8 @@ func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// classifyPaths splits a path slice into (files, dirs) by stat'ing each entry,
-// mirroring parseLintFlags's positional handling (filepath.Abs +
-// tspath.NormalizePath) so the IPC and flag entry paths produce identical
-// target-planning inputs. An Abs failure is skipped with a stderr warning
+// classifyPaths splits exact IPC targets into files and directories using
+// lexical absolute paths. An Abs failure is skipped with a stderr warning
 // rather than silently dropping the path.
 func classifyPaths(paths []string) (files []string, dirs []string) {
 	for _, p := range paths {
@@ -531,10 +534,17 @@ func discoverCLIConfigCatalog(
 		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
 		SingleThreaded: args.SingleThreaded,
 	}
+	if len(args.GlobRoots) > 0 {
+		request.RecursiveDirectories = request.Directories
+		request.Directories = append(request.Directories, args.GlobRoots...)
+		request.LimitDirectoryWalkToFiles = true
+	}
 	for _, filePath := range args.AllowFiles {
+		roots, scanned := args.ScanDirectories[filePath]
 		request.Files = append(request.Files, discovery.DiscoveryFile{
-			PathIdentity: rslintconfig.FreezeFileIdentity(filePath, args.FS),
-			Explicit:     true,
+			PathIdentity:    rslintconfig.FreezeFileIdentity(filePath, args.FS),
+			Explicit:        !scanned,
+			ScanDirectories: roots,
 		})
 	}
 	loader := &ipcConfigModuleLoader{channel: channel}
@@ -547,12 +557,14 @@ func discoverCLIConfigCatalog(
 			args.FS,
 			loader,
 			discovery.ExplicitConfigRequest{
-				CWD:               cwd,
-				ConfigPath:        payload.ConfigDiscovery.ExplicitConfigPath,
-				ProjectOnly:       args.TypeCheckOnly,
-				TargetFiles:       targetFiles,
-				TargetDirectories: targetDirectories,
-				SingleThreaded:    args.SingleThreaded,
+				CWD:                       cwd,
+				ConfigPath:                payload.ConfigDiscovery.ExplicitConfigPath,
+				ProjectOnly:               args.TypeCheckOnly,
+				TargetFiles:               targetFiles,
+				TargetDirectories:         targetDirectories,
+				RecursiveDirectories:      request.RecursiveDirectories,
+				LimitDirectoryWalkToFiles: request.LimitDirectoryWalkToFiles,
+				SingleThreaded:            args.SingleThreaded,
 			},
 		)
 	} else {

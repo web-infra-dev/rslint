@@ -1,11 +1,17 @@
 package target
 
 import (
+	"context"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
@@ -26,6 +32,275 @@ func dirAccessed(dirs []string, seg string) bool {
 		}
 	}
 	return false
+}
+
+type globWalkRecorder struct {
+	vfs.FS
+	filesVisited int
+	roots        []string
+}
+
+func (f *globWalkRecorder) WalkDir(root string, fn vfs.WalkDirFunc) error {
+	f.roots = append(f.roots, root)
+	return f.FS.WalkDir(root, func(path string, entry vfs.DirEntry, err error) error {
+		if err == nil && !entry.IsDir() {
+			f.filesVisited++
+		}
+		return fn(path, entry, err)
+	})
+}
+
+func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
+	layout := []string{"src/a.ts"}
+	for i := range 100 {
+		layout = append(layout, "src/unrelated/deep/file"+strconvI(i)+".ts")
+	}
+	root, paths := setupDiscoveryFixture(t, layout)
+	fsys := &globWalkRecorder{FS: osvfs.FS()}
+	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"})
+	assert.NilError(t, err)
+	for _, expansion := range expansions {
+		assert.Equal(t, expansion.Root, tspath.ResolvePath(root, "src"))
+		assert.DeepEqual(t, expansion.Files, []string{paths["src/a.ts"]})
+	}
+	assert.DeepEqual(t, fsys.roots, []string{tspath.ResolvePath(root, "src")})
+	assert.Equal(t, fsys.filesVisited, 1)
+}
+
+func TestSelectInputsPreservesLiteralAndScanRoles(t *testing.T) {
+	// The selector needs an enumerable VFS, not a host filesystem or content map.
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/a.ts":      &fstest.MapFile{},
+		"project/src/b.ts":      &fstest.MapFile{},
+		"project/src/[ab].ts":   &fstest.MapFile{},
+		"project/other/deep.ts": &fstest.MapFile{},
+	}, true)
+	for _, inputs := range [][]string{
+		{"src/@(a|b).ts", "src/*.ts", "src/./*.ts", "src/[ab].ts", "other", "missing*.ts"},
+		{"src/[ab].ts", "src/*.ts", "other", "src/@(a|b).ts", "missing*.ts"},
+	} {
+		selection, err := SelectInputs(context.Background(), fsys, "/project", inputs)
+		assert.NilError(t, err)
+		sort.Strings(selection.Files)
+		assert.DeepEqual(t, selection.Files, []string{"/project/src/[ab].ts", "/project/src/a.ts", "/project/src/b.ts"})
+		assert.DeepEqual(t, selection.Unmatched, []string{"/project/missing*.ts"})
+		assert.DeepEqual(t, selection.Directories, []string{"/project/other"})
+		assert.DeepEqual(t, selection.GlobRoots, []string{"/project/src"})
+		assert.DeepEqual(t, selection.ScanDirectories, map[string][]string{
+			"/project/src/a.ts": {"/project/src"},
+			"/project/src/b.ts": {"/project/src"},
+		})
+	}
+}
+
+func TestSelectInputsDecodedPatterns(t *testing.T) {
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/1.ts":            &fstest.MapFile{},
+		"project/src/[ab].ts":         &fstest.MapFile{},
+		"project/src/[dir]/a.ts":      &fstest.MapFile{},
+		"project/src/[dir]/deep/b.ts": &fstest.MapFile{},
+	}, true)
+	for _, test := range []struct {
+		pattern string
+		root    string
+		files   []string
+	}{
+		{"src/{1..1}.ts", "/project/src", []string{"/project/src/1.ts"}},
+		{`src/\[ab\].ts`, "/project/src", []string{"/project/src/[ab].ts"}},
+		{`src/\[dir\]`, "/project/src/[dir]", []string{"/project/src/[dir]/a.ts", "/project/src/[dir]/deep/b.ts"}},
+	} {
+		t.Run(test.pattern, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(test.pattern, `\`) {
+				t.Skip("backslash glob escapes are POSIX-only")
+			}
+			selection, err := SelectInputs(context.Background(), fsys, "/project", []string{test.pattern})
+			assert.NilError(t, err)
+			sort.Strings(selection.Files)
+			assert.DeepEqual(t, selection.Files, test.files)
+			assert.Equal(t, len(selection.Unmatched), 0)
+			assert.Equal(t, len(selection.Directories), 0)
+			assert.DeepEqual(t, selection.GlobRoots, []string{test.root})
+			for _, file := range test.files {
+				assert.DeepEqual(t, selection.ScanDirectories[file], []string{test.root})
+			}
+		})
+	}
+}
+
+func TestSelectInputsWindowsPaths(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("native Windows volume rules")
+	}
+	root, paths := setupDiscoveryFixture(t, []string{"a.ts", "src/a.ts", "src/b.ts"})
+	volume := filepath.VolumeName(root)
+	selection, err := SelectInputs(context.Background(), osvfs.FS(), root, []string{volume + "a.ts", volume + "src/a.ts", volume + "src/*.ts", volume + "src/*/../*.ts", volume + "src/*/../../src/*.ts"})
+	assert.NilError(t, err)
+	sort.Strings(selection.Files)
+	assert.DeepEqual(t, selection.Files, []string{paths["a.ts"], paths["src/a.ts"], paths["src/b.ts"]})
+	assert.Equal(t, len(selection.Unmatched), 0)
+	assert.DeepEqual(t, selection.ScanDirectories, map[string][]string{paths["src/b.ts"]: {tspath.ResolvePath(root, "src")}})
+	for _, test := range []struct{ cwd, input, want string }{
+		{"C:/project", "C:a.ts", "C:/project/a.ts"},
+		{"C:/project", "c:src/a.ts", "C:/project/src/a.ts"},
+		{"C:/project", "/src/a.ts", "C:/src/a.ts"},
+		{"//server/share/repo", "../../a.ts", "//server/share/a.ts"},
+		{"C:/project", "//server/share/../../a.ts", "//server/share/a.ts"},
+	} {
+		got, err := resolveInputPath(test.cwd, test.input)
+		assert.NilError(t, err)
+		assert.Equal(t, got, test.want)
+	}
+	for _, test := range []struct{ pattern, directory, relative string }{
+		{"//server/[share]/src/*.ts", "//server/[share]/src", "*.ts"},
+		{"//server/[share]/*.ts", "//server/[share]/", "*.ts"},
+	} {
+		directory, _, relative := globDirectory(test.pattern)
+		assert.Equal(t, directory, test.directory)
+		assert.Equal(t, relative, test.relative)
+	}
+}
+
+func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
+	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts", "hash/#group/a.ts", "escaped/[dir]/a.ts"})
+	for _, test := range []struct {
+		name     string
+		patterns []string
+		roots    []string
+		files    [][]string
+	}{
+		{
+			name:     "overlap and normalized duplicate",
+			patterns: []string{"src/**/*.ts", "src/*.ts", "src/./*.ts"},
+			roots:    []string{"src"},
+			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/a.ts"}, {"src/a.ts"}},
+		},
+		{
+			name:     "unmatched input remains empty",
+			patterns: []string{"src/*.ts", "src/missing*.ts"},
+			roots:    []string{"src"},
+			files:    [][]string{{"src/a.ts"}, nil},
+		},
+		{
+			name:     "hash prefix is a filename",
+			patterns: []string{"hash/#*/*.ts"},
+			roots:    []string{"hash"},
+			files:    [][]string{{"hash/#group/a.ts"}},
+		},
+		{
+			name:     "ancestor roots stay independent",
+			patterns: []string{"src/**/*.ts", "src/nested/*.ts"},
+			roots:    []string{"src", "src/nested"},
+			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/nested/b.ts"}},
+		},
+		{
+			name:     "parent segments do not widen scan entries",
+			patterns: []string{"src/nested/*/../../*.ts", "src/*/../../*.ts"},
+			roots:    []string{"src/nested", "src"},
+			files:    [][]string{nil, nil},
+		},
+		{
+			name:     "parent segments can return to the scan entry",
+			patterns: []string{"src/*/../../src/*.ts", "src/nested/*/../../nested/*.ts"},
+			roots:    []string{"src", "src/nested"},
+			files:    [][]string{{"src/a.ts"}, {"src/nested/b.ts"}},
+		},
+		{
+			name:     "escaped roots retain authored syntax when returning",
+			patterns: []string{`escaped/\[dir\]/*/../../\[dir\]/*.ts`, `escaped/\[dir\]/*/../../[dir]/*.ts`},
+			roots:    []string{"escaped/[dir]"},
+			files:    [][]string{{"escaped/[dir]/a.ts"}, nil},
+		},
+		{
+			name:     "escaped and literal roots share a walk",
+			patterns: []string{`src/\nested/*.ts`, "src/nested/*.ts", `src/\nested/*/../*.ts`},
+			roots:    []string{"src/nested"},
+			files:    [][]string{{"src/nested/b.ts"}, {"src/nested/b.ts"}, {"src/nested/b.ts"}},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if runtime.GOOS == "windows" && strings.Contains(test.patterns[0], `\`) {
+				t.Skip("backslash glob escapes are POSIX-only")
+			}
+			fsys := &globWalkRecorder{FS: osvfs.FS()}
+			expansions, err := expandGlobs(context.Background(), fsys, root, test.patterns)
+			assert.NilError(t, err)
+			assert.Equal(t, len(expansions), len(test.patterns))
+			var wantRoots []string
+			for _, name := range test.roots {
+				wantRoots = append(wantRoots, tspath.ResolvePath(root, name))
+			}
+			assert.DeepEqual(t, fsys.roots, wantRoots)
+			for index, names := range test.files {
+				var want []string
+				for _, name := range names {
+					want = append(want, paths[name])
+				}
+				assert.DeepEqual(t, expansions[index].Files, want)
+			}
+		})
+	}
+}
+
+func TestExpandGlobsPreservesNegationContext(t *testing.T) {
+	fsys := iovfs.From(fstest.MapFS{
+		"project/src/!important.ts": &fstest.MapFile{},
+		"project/src/a.ts":          &fstest.MapFile{},
+		"project/src/b.ts":          &fstest.MapFile{},
+		"project/src/unrelated.js":  &fstest.MapFile{},
+		"project/src/(b)/a.ts":      &fstest.MapFile{},
+		"project/src/b/a.ts":        &fstest.MapFile{},
+		"project/src/selected/a.ts": &fstest.MapFile{},
+	}, true)
+	bang := []string{"/project/src/!important.ts"}
+	negated := []string{"/project/src/(b)/a.ts", "/project/src/b/a.ts", "/project/src/selected/a.ts", "/project/src/unrelated.js"}
+	for _, test := range []struct {
+		name     string
+		cwd      string
+		patterns []string
+		files    [][]string
+	}{
+		{
+			name:     "bang after static prefix",
+			cwd:      "/project",
+			patterns: []string{"src/!*.ts", "/project/src/!*.ts", "src/*/../!*.ts"},
+			files:    [][]string{bang, bang, bang},
+		},
+		{
+			name:     "negative file extglob",
+			cwd:      "/project",
+			patterns: []string{"src/!(b).ts"},
+			files:    [][]string{{"/project/src/!important.ts", "/project/src/a.ts"}},
+		},
+		{
+			name:     "negative directory extglob",
+			cwd:      "/project",
+			patterns: []string{"src/!(b)/*.ts"},
+			files:    [][]string{{"/project/src/(b)/a.ts", "/project/src/selected/a.ts"}},
+		},
+		{
+			name:     "same root with different negation contexts",
+			cwd:      "/project/src",
+			patterns: []string{"!*.ts", "./!*.ts"},
+			files:    [][]string{negated, bang},
+		},
+		{
+			name:     "reversed negation contexts",
+			cwd:      "/project/src",
+			patterns: []string{"./!*.ts", "!*.ts"},
+			files:    [][]string{bang, negated},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			recorder := &globWalkRecorder{FS: fsys}
+			expansions, err := expandGlobs(context.Background(), recorder, test.cwd, test.patterns)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, recorder.roots, []string{"/project/src"})
+			for index := range test.patterns {
+				sort.Strings(expansions[index].Files)
+				assert.DeepEqual(t, expansions[index].Files, test.files[index])
+			}
+		})
+	}
 }
 
 func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {

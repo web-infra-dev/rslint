@@ -63,7 +63,10 @@ type ConfigDiscoveryRequest struct {
 	// can govern that request. CLI/LSP directory roots leave this false and retain
 	// the full recursive catalog walk, including mixed CLI file+directory input.
 	LimitDirectoryWalkToFiles bool
-	ImplicitCWD               bool
+	// RecursiveDirectories keep literal directory inputs unbounded when they
+	// are combined with already-expanded glob candidates.
+	RecursiveDirectories []rslintconfig.DirectoryIdentity
+	ImplicitCWD          bool
 	// AdditionalGitFiles add exact Git chains without participating in config discovery.
 	AdditionalGitFiles []rslintconfig.PathIdentity
 	Fresh              bool
@@ -91,6 +94,7 @@ type ExplicitConfigRequest struct {
 	TargetDirectories []rslintconfig.DirectoryIdentity
 	// LimitDirectoryWalkToFiles bounds these roots to the supplied candidates.
 	LimitDirectoryWalkToFiles bool
+	RecursiveDirectories      []rslintconfig.DirectoryIdentity
 	AdditionalGitFiles        []rslintconfig.PathIdentity
 	Fresh                     bool
 	SingleThreaded            bool
@@ -218,6 +222,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 		Files:                     request.TargetFiles,
 		Directories:               request.TargetDirectories,
 		LimitDirectoryWalkToFiles: request.LimitDirectoryWalkToFiles,
+		RecursiveDirectories:      request.RecursiveDirectories,
 		AdditionalGitFiles:        request.AdditionalGitFiles,
 		ImplicitCWD:               request.TargetFiles == nil && request.TargetDirectories == nil,
 		Fresh:                     request.Fresh,

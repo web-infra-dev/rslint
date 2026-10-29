@@ -1,5 +1,5 @@
 /**
- * Stable public facade for `@rslint/core/config-loader`.
+ * Shared integration facade for `@rslint/core/config-loader`.
  *
  * ConfigModuleHost imports the config-file evaluation and normalization
  * helpers directly so this facade can expose both APIs without an ESM cycle.
@@ -32,7 +32,3 @@ export {
   type LoadConfigsResponse,
   type LoadedConfigModuleResult,
 } from './config-discovery-protocol.js';
-export {
-  filterConfigsByParentIgnores,
-  type ConfigEntry,
-} from './config-hierarchy.js';

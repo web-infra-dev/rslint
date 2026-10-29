@@ -20,6 +20,7 @@ type discoveryWalkNode struct {
 	gitEntryBlocked    bool
 	gitCursor          gitignore.Cursor
 	targets            *discoveryTargetTrie
+	recursive          bool
 }
 type suspendedDiscoveryNode struct {
 	node      discoveryWalkNode
@@ -59,7 +60,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 		// Results are indexed by the already-sorted frontier. Merging on this
 		// goroutine keeps catalog state, stats, and loader batches deterministic
 		// regardless of worker completion order.
-		for _, result := range results {
+		for index, result := range results {
 			if result.err != nil {
 				return result.err
 			}
@@ -75,7 +76,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 				candidate := result.candidateToAdopt.candidate
 				coordinator.draft.addDirectory(candidate.directory, rslintconfig.DirectoryIdentity{
 					LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
-				})
+				}, queue[index].recursive)
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -95,7 +96,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					}
 					coordinator.draft.addDirectory(state.candidate.directory, rslintconfig.DirectoryIdentity{
 						LexicalPath: state.candidate.directory, CanonicalPath: state.candidate.physicalDirectory,
-					})
+					}, item.node.recursive)
 					item.node.ownerDir = state.candidate.directory
 					item.node.ownerPath = state.candidate.path
 					item.node.ignoreMatcher = state.ignoreMatcher
@@ -196,7 +197,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			}
 		}
 	}
-	if walkTargets != nil && len(walkTargets.children) == 0 {
+	if walkTargets != nil && len(walkTargets.children) == 0 && !node.recursive {
 		return result
 	}
 
@@ -212,7 +213,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		var childTargets *discoveryTargetTrie
 		if walkTargets != nil {
 			childTargets = walkTargets.child(name, coordinator.fs.UseCaseSensitiveFileNames())
-			if childTargets == nil {
+			if childTargets == nil && !node.recursive {
 				continue
 			}
 		}
@@ -248,6 +249,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 			gitEntryBlocked:    gitBlocked && !childConfigReachable,
 			gitCursor:          nextCursor,
 			targets:            childTargets,
+			recursive:          node.recursive,
 		})
 	}
 	result.children = children

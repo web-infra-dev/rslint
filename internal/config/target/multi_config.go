@@ -72,10 +72,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		owner, _ := automaticOwnerIndex.Resolve(explicitFile.target.Identity())
 		if owner != "" {
 			assignedExplicitOwners[pathID] = owner
-			filesByConfig[owner] = appendUniqueExplicitLintTarget(
-				filesByConfig[owner],
-				explicitFile,
-			)
+			filesByConfig[owner] = append(filesByConfig[owner], explicitFile)
 		}
 	}
 	filesSpecifiedByConfig := make(map[string]bool, len(configDirs))
@@ -92,12 +89,9 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		// target whose parent-ignore exception selected another candidate. Config
 		// discovery resolves that collision to one automatic boundary; retain its
 		// automatically assigned files when adding the catalog-owned literal scope.
-		for _, explicitFile := range explicitSet.targetsForPaths(scope.ExplicitFiles) {
-			filesByConfig[configDir] = appendUniqueExplicitLintTarget(
-				filesByConfig[configDir],
-				explicitFile,
-			)
-		}
+		// Scoped paths were reserved above, and targetsForPaths deduplicates this
+		// list, so these additions cannot repeat a path already in the bucket.
+		filesByConfig[configDir] = append(filesByConfig[configDir], explicitSet.targetsForPaths(scope.ExplicitFiles)...)
 		filesSpecifiedByConfig[configDir] = true
 	}
 
@@ -112,7 +106,11 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			}
 		}
 		configAllowDirs := allowDirs
-		if directories := scopes[configDir].Directories; len(allowDirs) > 0 && directories != nil {
+		directories := scopes[configDir].Directories
+		if recursive := scopes[configDir].RecursiveDirectories; recursive != nil {
+			directories = recursive
+		}
+		if len(allowDirs) > 0 && directories != nil {
 			// Config ancestry chooses the rules, not a wider scan root. Reuse
 			// only entries discovery admitted for this owner, including requested
 			// subdirectories and normally reached child-config boundaries. A
@@ -146,22 +144,6 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 		return allTargets[i].Path < allTargets[j].Path
 	})
 	return allTargets
-}
-
-func appendUniqueExplicitLintTarget(
-	targets []*explicitLintTarget,
-	target *explicitLintTarget,
-) []*explicitLintTarget {
-	if target == nil {
-		return targets
-	}
-	pathID := tspath.ToPath(target.target.Path, "", true)
-	for _, existing := range targets {
-		if existing != nil && tspath.ToPath(existing.target.Path, "", true) == pathID {
-			return targets
-		}
-	}
-	return append(targets, target)
 }
 
 func discoverLintTargetsForConfigInMap(

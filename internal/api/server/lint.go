@@ -57,6 +57,10 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		return tspath.ResolvePath(currentDirectory, filePath)
 	}
+	if req.Patterns != nil && (req.Files != nil || req.CanonicalFiles != nil || req.FileScanDirectories != nil ||
+		(req.ConfigDiscovery != nil && (req.ConfigDiscovery.Directories != nil || req.ConfigDiscovery.ExplicitFiles != nil))) {
+		return nil, errors.New("patterns and exact-file expansion metadata are mutually exclusive")
+	}
 	if len(req.CanonicalFiles) > 0 && len(req.CanonicalFiles) != len(req.Files) {
 		return nil, errors.New("canonicalFiles must be parallel to files")
 	}
@@ -78,7 +82,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		return normalizedPath
 	}
 
-	if req.Files != nil {
+	if req.Files != nil || req.Patterns != nil {
 		allowedFiles = make([]string, 0, len(req.Files)+len(req.FileContents))
 		for _, filePath := range req.Files {
 			addAllowedFile(filePath)
@@ -97,7 +101,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			// FileContents supplies the in-memory target set. When Files is
 			// present, FileContents is overlay-only dependency/config data and
 			// must not widen the explicit lint target set.
-			if req.Files == nil {
+			if req.Files == nil && req.Patterns == nil {
 				addAllowedFile(normalizedPath)
 			}
 			fileContents[normalizedPath] = v
@@ -137,6 +141,56 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs, canonicalPaths)
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
+	var inputDirectories, globRoots []string
+	scanDirectories := make(map[string][]string)
+	if req.Patterns != nil {
+		// Raw patterns enumerate the request's filesystem. FileContents remains
+		// a read overlay, including unselected dependencies and virtual exact
+		// targets; it does not add entries to the pattern-search namespace.
+		selection, err := target.SelectInputs(ctx, programBaseFS, currentDirectory, req.Patterns)
+		if err != nil {
+			return nil, fmt.Errorf("select lint inputs: %w", err)
+		}
+		allowedFiles = selection.Files
+		inputDirectories, globRoots = selection.Directories, selection.GlobRoots
+		scanDirectories = selection.ScanDirectories
+	}
+	if req.FileScanDirectories != nil && len(req.FileScanDirectories) != len(req.Files) {
+		return nil, errors.New("fileScanDirectories must be parallel to files")
+	}
+	explicitFiles := make(map[string]bool)
+	seenGlobRoots := make(map[string]bool)
+	// Duplicate exact paths contribute a union of scan entries. A literal
+	// occurrence still overrides every scanned occurrence below.
+	type scanEntry struct{ file, root string }
+	seenScanEntries := make(map[scanEntry]bool)
+	for index, path := range req.Files {
+		path = resolveRequestPath(path)
+		if req.FileScanDirectories != nil {
+			if req.FileScanDirectories[index] == nil {
+				explicitFiles[path] = true
+			} else {
+				roots := scanDirectories[path]
+				if roots == nil {
+					// Empty means no scan origins; nil would borrow every containing root.
+					roots = make([]string, 0, len(req.FileScanDirectories[index]))
+				}
+				for _, root := range req.FileScanDirectories[index] {
+					root = resolveRequestPath(root)
+					entry := scanEntry{path, root}
+					if !seenScanEntries[entry] {
+						seenScanEntries[entry] = true
+						roots = append(roots, root)
+					}
+					if !seenGlobRoots[root] {
+						seenGlobRoots[root] = true
+						globRoots = append(globRoots, root)
+					}
+				}
+				scanDirectories[path] = roots
+			}
+		}
+	}
 	identityFS := fs
 	if len(canonicalPaths) > 0 {
 		fs = &canonicalPathVFS{FS: fs, canonicalPaths: canonicalPaths}
@@ -150,7 +204,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		pathSpaces             *rslintconfig.PathSpaceSnapshot
 	)
 	var targetFiles []rslintconfig.PathIdentity
-	targetFileByPath := make(map[string]rslintconfig.PathIdentity, len(allowedFiles))
 	if allowedFiles != nil {
 		targetFiles = make([]rslintconfig.PathIdentity, 0, len(allowedFiles))
 		for _, path := range allowedFiles {
@@ -160,40 +213,61 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				identity.CanonicalPath = canonicalPath
 			}
 			targetFiles = append(targetFiles, identity)
-			targetFileByPath[rslintconfig.ExactPathID(path)] = identity
 		}
 	}
-	var targetDirectories []rslintconfig.DirectoryIdentity
-	if req.FileScanDirectories != nil && len(req.FileScanDirectories) != len(req.Files) {
-		return nil, errors.New("fileScanDirectories must be parallel to files")
+	targetDirectories := rslintconfig.ResolveDirectoryIdentities(inputDirectories, fs)
+	discoveryDirectories := append([]rslintconfig.DirectoryIdentity(nil), targetDirectories...)
+	discoveryDirectories = append(discoveryDirectories, rslintconfig.ResolveDirectoryIdentities(globRoots, fs)...)
+	var recursiveDirectories []rslintconfig.DirectoryIdentity
+	limitDirectoryWalk := len(globRoots) > 0
+	if limitDirectoryWalk {
+		recursiveDirectories = targetDirectories
 	}
-	if req.ConfigDiscovery == nil && req.FileScanDirectories != nil {
-		// A resolved inline config uses the same bounded input walk without a
-		// module loader. Config location never supplies directory scan entries.
-		request := discovery.ExplicitConfigRequest{
-			CWD:                       currentDirectory,
-			Config:                    append(rslintconfig.RslintConfig{}, rslintConfig...),
-			ConfigDirectory:           configDirectory,
-			TargetFiles:               make([]discovery.DiscoveryFile, 0, len(req.Files)),
-			LimitDirectoryWalkToFiles: true,
+	if req.ConfigDiscovery != nil {
+		for _, directory := range req.ConfigDiscovery.Directories {
+			discoveryDirectories = append(discoveryDirectories, rslintconfig.ResolveDirectoryIdentities([]string{resolveRequestPath(directory)}, fs)...)
 		}
-		scanDirectories := make(map[string]struct{})
-		for index, path := range req.Files {
-			directories := req.FileScanDirectories[index]
-			request.TargetFiles = append(request.TargetFiles, discovery.DiscoveryFile{
-				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
-				Explicit:        directories == nil,
-				ScanDirectories: directories,
-			})
-			for _, directory := range directories {
-				directory = resolveRequestPath(directory)
-				if _, seen := scanDirectories[directory]; !seen {
-					scanDirectories[directory] = struct{}{}
-					request.TargetDirectories = append(request.TargetDirectories, rslintconfig.ResolveDirectoryIdentities([]string{directory}, fs)...)
+		limitDirectoryWalk = limitDirectoryWalk || len(req.ConfigDiscovery.Directories) > 0
+		if len(req.ConfigDiscovery.ExplicitFiles) > 0 {
+			if len(req.ConfigDiscovery.ExplicitFiles) != len(req.Files) {
+				return nil, errors.New("configDiscovery.explicitFiles must be parallel to files")
+			}
+			if req.FileScanDirectories == nil {
+				for index, path := range req.Files {
+					path = resolveRequestPath(path)
+					if req.ConfigDiscovery.ExplicitFiles[index] {
+						explicitFiles[path] = true
+					} else {
+						scanDirectories[path] = nil
+					}
 				}
 			}
 		}
-		catalog, err := discovery.LoadExplicitConfig(ctx, fs, nil, request)
+	}
+	for path := range explicitFiles {
+		delete(scanDirectories, path)
+	}
+	var discoveryFiles []discovery.DiscoveryFile
+	if targetFiles != nil {
+		discoveryFiles = make([]discovery.DiscoveryFile, 0, len(targetFiles))
+	}
+	for _, identity := range targetFiles {
+		roots, scanned := scanDirectories[identity.Path]
+		discoveryFiles = append(discoveryFiles, discovery.DiscoveryFile{
+			PathIdentity: identity, Explicit: !scanned, ScanDirectories: roots,
+		})
+	}
+	if req.ConfigDiscovery == nil && (req.Patterns != nil || req.FileScanDirectories != nil) {
+		// Inline arrays use the same discovery scope without a module loader.
+		catalog, err := discovery.LoadExplicitConfig(ctx, fs, nil, discovery.ExplicitConfigRequest{
+			CWD:                       currentDirectory,
+			Config:                    append(rslintconfig.RslintConfig{}, rslintConfig...),
+			ConfigDirectory:           configDirectory,
+			TargetFiles:               discoveryFiles,
+			TargetDirectories:         discoveryDirectories,
+			RecursiveDirectories:      recursiveDirectories,
+			LimitDirectoryWalkToFiles: limitDirectoryWalk,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("resolve inline config inputs: %w", err)
 		}
@@ -202,9 +276,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	if configDiscovery := req.ConfigDiscovery; configDiscovery != nil {
 		if requester == nil {
 			return nil, errors.New("configDiscovery requires a bidirectional API host")
-		}
-		if len(configDiscovery.ExplicitFiles) > 0 && len(configDiscovery.ExplicitFiles) != len(req.Files) {
-			return nil, errors.New("configDiscovery.explicitFiles must be parallel to files")
 		}
 		var overrideConfig rslintconfig.RslintConfig
 		if len(configDiscovery.OverrideConfig) > 0 {
@@ -218,38 +289,13 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		discoveryRequest := discovery.ConfigDiscoveryRequest{
 			CWD:                       currentDirectory,
+			Files:                     discoveryFiles,
+			Directories:               discoveryDirectories,
+			RecursiveDirectories:      recursiveDirectories,
 			FallbackConfig:            rslintconfig.ConfigWithResolvedBasePaths(overrideConfig, currentDirectory),
 			Fresh:                     true,
-			LimitDirectoryWalkToFiles: len(configDiscovery.Directories) > 0,
-			ImplicitCWD:               allowedFiles == nil && len(configDiscovery.Directories) == 0,
-			SingleThreaded:            false,
-		}
-		if targetFiles != nil {
-			discoveryRequest.Files = make([]discovery.DiscoveryFile, 0, len(targetFiles))
-		}
-		for _, directory := range configDiscovery.Directories {
-			discoveryRequest.Directories = append(discoveryRequest.Directories, rslintconfig.ResolveDirectoryIdentities([]string{resolveRequestPath(directory)}, fs)...)
-		}
-		for index, path := range req.Files {
-			explicit := true
-			var scanDirectories []string
-			if req.FileScanDirectories != nil {
-				scanDirectories = req.FileScanDirectories[index]
-				explicit = scanDirectories == nil
-			} else if len(configDiscovery.ExplicitFiles) > 0 {
-				explicit = configDiscovery.ExplicitFiles[index]
-			}
-			discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{
-				PathIdentity:    targetFileByPath[rslintconfig.ExactPathID(resolveRequestPath(path))],
-				Explicit:        explicit,
-				ScanDirectories: scanDirectories,
-			})
-		}
-
-		if req.Files == nil {
-			for _, identity := range targetFiles {
-				discoveryRequest.Files = append(discoveryRequest.Files, discovery.DiscoveryFile{PathIdentity: identity, Explicit: true})
-			}
+			LimitDirectoryWalkToFiles: limitDirectoryWalk,
+			ImplicitCWD:               allowedFiles == nil && len(discoveryDirectories) == 0,
 		}
 
 		loader := &apiConfigModuleLoader{
@@ -268,6 +314,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 					ConfigPath:                resolveRequestPath(configDiscovery.ExplicitConfigPath),
 					TargetFiles:               discoveryRequest.Files,
 					TargetDirectories:         discoveryRequest.Directories,
+					RecursiveDirectories:      discoveryRequest.RecursiveDirectories,
 					LimitDirectoryWalkToFiles: discoveryRequest.LimitDirectoryWalkToFiles,
 					Fresh:                     true,
 				},
@@ -393,6 +440,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		OwnerScopes:     configTargetScopes,
 		FS:              fs,
 		Files:           targetFiles,
+		ScanDirectories: scanDirectories,
 		Directories:     targetDirectories,
 		GitPolicy:       gitPolicy,
 		PathSpaces:      pathSpaces,

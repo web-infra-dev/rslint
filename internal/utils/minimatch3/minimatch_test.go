@@ -12,6 +12,27 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
+func TestLiteral(t *testing.T) {
+	for _, test := range []struct {
+		pattern, want string
+		literal       bool
+	}{
+		{`src/\[dir\]`, "src/[dir]", true},
+		{"//server/share/src", "//server/share/src", true},
+		{"//server/share/{1..1}", "//server/share/1", true},
+		{"src/brace{dir}", "src/brace{dir}", true},
+		{"src/{a,b}", "", false},
+		{"src/@(a|b)", "", false},
+		{"src/**", "", false},
+		{"!!src", "", false},
+	} {
+		got, literal := minimatch3.New(test.pattern, minimatch3.Options{}).Literal()
+		if got != test.want || literal != test.literal {
+			t.Errorf("Literal(%q) = (%q, %v), want (%q, %v)", test.pattern, got, literal, test.want, test.literal)
+		}
+	}
+}
+
 // TestMatch pins this port against minimatch 3.1.5 itself: every expectation
 // below is what `minimatch(path, pattern)` answers on that version.
 func TestMatch(t *testing.T) {

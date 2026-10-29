@@ -84,18 +84,26 @@ func (draft *catalogDraft) addExplicitFile(ownerDirectory string, filePath strin
 	draft.scopes[ownerDirectory] = scope
 }
 
-func (draft *catalogDraft) addDirectory(ownerDirectory string, directory rslintconfig.DirectoryIdentity) {
+func (draft *catalogDraft) addDirectory(ownerDirectory string, directory rslintconfig.DirectoryIdentity, recursive bool) {
 	scope := draft.scopes[ownerDirectory]
-	for _, existing := range scope.Directories {
+	scope.Directories = appendUniqueSortedDirectory(scope.Directories, directory)
+	if recursive {
+		scope.RecursiveDirectories = appendUniqueSortedDirectory(scope.RecursiveDirectories, directory)
+	}
+	draft.scopes[ownerDirectory] = scope
+}
+
+func appendUniqueSortedDirectory(directories []rslintconfig.DirectoryIdentity, directory rslintconfig.DirectoryIdentity) []rslintconfig.DirectoryIdentity {
+	for _, existing := range directories {
 		if rslintconfig.ExactPathID(existing.LexicalPath) == rslintconfig.ExactPathID(directory.LexicalPath) {
-			return
+			return directories
 		}
 	}
-	scope.Directories = append(scope.Directories, directory)
-	sort.Slice(scope.Directories, func(i, j int) bool {
-		return scope.Directories[i].LexicalPath < scope.Directories[j].LexicalPath
+	directories = append(directories, directory)
+	sort.Slice(directories, func(i, j int) bool {
+		return directories[i].LexicalPath < directories[j].LexicalPath
 	})
-	draft.scopes[ownerDirectory] = scope
+	return directories
 }
 
 // finalize validates physical owner identity, publishes explicit-only

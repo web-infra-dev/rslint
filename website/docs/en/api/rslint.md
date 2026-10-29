@@ -74,17 +74,21 @@ See [Configuration File](/config/configuration-file) for config discovery and fl
 lintFiles(patterns: string | string[]): Promise<LintResult[]>
 ```
 
-Lints files matched by one or more glob patterns resolved against `cwd`.
+Accepts file paths, directory paths, glob patterns, or a mix of them. Relative paths and patterns start from `cwd`; absolute paths and patterns also work. Matching follows the same rules as the CLI.
 
 ```ts
 const results = await rslint.lintFiles([
   'src/**/*.ts',
-  'test/**/*.ts',
-  '!test/fixtures/**',
+  'test/',
+  'scripts/check.ts',
 ]);
 ```
 
-Supported files excluded by global config ignores or `.gitignore` are omitted. With automatic discovery, files in different monorepo packages can use different nearest configs. Results are ordered by file path rather than glob-walk order.
+Each checked file produces one result, even when several inputs match it. Results are sorted by file path. Existing file and directory names are treated literally, even if they contain glob characters.
+
+Your config's `files` and `ignores` settings and `.gitignore` still apply. To exclude `test/fixtures`, for example, add `test/fixtures/**` to `ignores` in your config. A `!pattern` input does not remove files selected by other inputs. Files in different packages can use different nearest configs.
+
+`lintFiles` selects files on disk. If a selected file appears in `virtualFiles`, rslint reads its content from memory. Use `lintText` for code that only exists in memory.
 
 If no file matches, `lintFiles` returns an empty array. This differs from ESLint v10's default `errorOnUnmatchedPattern` behavior, which throws for an unmatched glob.
 
