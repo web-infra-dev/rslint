@@ -67,8 +67,31 @@ func (fs *lintTrackingFS) FileExists(path string) bool {
 	return exists
 }
 
+const lintProgramDirectoryWatchName = "__rslint_watch__"
+
 func lintProgramDirectoryWatchInput(path string) string {
-	return tspath.CombinePaths(path, "__rslint_watch__")
+	return tspath.CombinePaths(path, lintProgramDirectoryWatchName)
+}
+
+// containsPath includes failed file probes and directory enumeration. Opening an
+// unsaved dependency can satisfy a previous miss without any disk notification.
+func (lookups lintProgramLookups) containsPath(fileName string, fs vfs.FS) bool {
+	if fileName == "" {
+		return false
+	}
+	path := lintProgramLexicalPathID(fileName, fs)
+	for _, name := range lookups.seenFiles {
+		if path == lintProgramLexicalPathID(name, fs) {
+			return true
+		}
+		if tspath.GetBaseFileName(name) == lintProgramDirectoryWatchName {
+			directory := lintProgramLexicalPathID(tspath.GetDirectoryPath(name), fs)
+			if strings.HasPrefix(string(path), strings.TrimSuffix(string(directory), "/")+"/") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (fs *lintTrackingFS) DirectoryExists(path string) bool {

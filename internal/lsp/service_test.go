@@ -547,7 +547,60 @@ func TestUnrelatedSourceOnlyDocumentsKeepDiagnostics(t *testing.T) {
 					t.Fatalf("unrelated %s postponed source-only diagnostics", event)
 				}
 			}
+			if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, 2, "var latest = 2;\n")); err != nil {
+				t.Fatal(err)
+			}
+			scheduled = s.lintSchedule.pending[uri]
+			if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+				TextDocument: &lsproto.TextDocumentItem{Uri: otherURI, Text: "const other = 1;\n", Version: 1},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if s.lintSchedule.pending[uri] != scheduled {
+				t.Fatal("unknown inputs postponed an already pending observation")
+			}
 		})
+	}
+}
+
+func TestSourceOnlyImportObservesOverlayFiles(t *testing.T) {
+	s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "import './missing.js';\n", config.RslintConfig{{
+		Plugins: []string{"import"}, Rules: config.Rules{"import/no-unresolved": "error"},
+	}})
+	if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+		t.Fatal(err)
+	}
+	if published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 1 {
+		t.Fatal("missing import did not produce a diagnostic")
+	}
+	dependency := documentURIFromPath(tspath.ResolvePath(s.cwd, "src/missing.js"))
+	for _, event := range []string{"open", "close"} {
+		want := 0
+		if event == "open" {
+			if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+				TextDocument: &lsproto.TextDocumentItem{Uri: dependency, Text: "export {};\n", Version: 1},
+			}); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+				TextDocument: lsproto.TextDocumentIdentifier{Uri: dependency},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			<-outgoing // The closed dependency is cleared before its consumer runs.
+			want = 1
+		}
+		if _, pending := s.lintSchedule.pending[uri]; !pending {
+			t.Fatalf("%s did not invalidate source-only import resolution", event)
+		}
+		if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+			t.Fatal(err)
+		}
+		published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+		if published.Uri != uri || len(published.Diagnostics) != want {
+			t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
+		}
 	}
 }
 

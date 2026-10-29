@@ -43,11 +43,12 @@ func rulesServedToEditors(configuredRules []rule.ConfiguredRule) []rule.Configur
 // snapshot to the linter's generation port. It selects and leases Programs but
 // never decides how or when lint work runs.
 type documentGenerationProvider struct {
-	server          *Server
-	uri             lsproto.DocumentUri
-	snapshot        documentLintSnapshot
-	requestPrograms documentProgramRequest
-	buildGeneration documentGenerationBuilder
+	server           *Server
+	uri              lsproto.DocumentUri
+	snapshot         documentLintSnapshot
+	requestPrograms  documentProgramRequest
+	buildGeneration  documentGenerationBuilder
+	sourceOnlyInputs *lintTrackingFS
 }
 
 // documentProjectConfigError identifies an admitted document's invalid effective
@@ -153,7 +154,10 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		}
 		request.fs = resident.overlayFS
 	}
-	loaders.fallback = request.fallback
+	loaders.fallback = func() (*compiler.Program, *ast.SourceFile, error) {
+		p.sourceOnlyInputs = newLintTrackingFS(request.filesystem())
+		return createStandaloneFallbackProgram(snapshot.target, p.sourceOnlyInputs)
+	}
 	releasePending = release != nil
 	if selectionFS == nil {
 		selectionFS = request.filesystem()

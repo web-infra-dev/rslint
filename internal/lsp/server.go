@@ -210,6 +210,9 @@ type Server struct {
 
 	lintSchedule            diagnosticScheduler
 	pendingDiagnosticResult *documentProgressiveDiagnostics
+	// Source-only observations retain filesystem lookup paths, not Programs.
+	// These distinguish independent documents from rules that resolve imports.
+	diagnosticInputs map[lsproto.DocumentUri]lintProgramLookups
 
 	// eslintPluginDispatch sends one plugin-lint batch to the Node host over
 	// the `rslint/pluginLint` reverse request and decodes its result.

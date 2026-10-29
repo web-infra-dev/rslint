@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 
+	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -76,15 +77,16 @@ func (s *Server) invalidateDocumentDiagnostics(uri lsproto.DocumentUri) {
 	s.docGeneration[uri]++
 	s.cancelInflightPluginDispatch(uri)
 	delete(s.diagnostics, uri)
+	delete(s.diagnosticInputs, uri)
 	if result := s.pendingDiagnosticResult; result != nil && result.uri == uri {
 		s.pendingDiagnosticResult = nil
 	}
 }
 
 // An editor update can change another document's dependency view even when its
-// own text is unchanged. Use the Program store's affected owners; project-backed
-// documents without a resident graph must observe the new overlay too. A document
-// configured for source-only lint has no other editor inputs to invalidate it.
+// own text is unchanged. Use the Program store's affected owners and source-only
+// observations' filesystem lookups. Unknown inputs must conservatively observe
+// the new overlay, but cannot postpone an already pending calculation.
 // Invalidation is immediate; dependent observations share the typing debounce
 // so opening and closing transient overlays does not repeatedly lint consumers.
 func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lsproto.DocumentUri) {
@@ -97,7 +99,9 @@ func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lspr
 			return
 		}
 		s.invalidateDocumentDiagnostics(dependent)
-		s.scheduleLint(dependent)
+		if _, pending := s.lintSchedule.pending[dependent]; !pending {
+			s.scheduleLint(dependent)
+		}
 	}
 	for _, owner := range owners {
 		invalidateDependent(owner)
@@ -111,11 +115,11 @@ func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lspr
 				continue
 			}
 		}
-		snapshot := s.documentLintSnapshot(document)
-		policy := snapshot.projectPolicy
-		if snapshot.configResolved && snapshot.projectPolicyError == nil &&
-			(policy.ProjectDisabled || policy.ExplicitProject == nil && policy.ServiceRootDirectory == "") {
-			continue
+		if inputs, known := s.diagnosticInputs[document]; known {
+			identity := config.FreezeFileIdentity(uriToPath(uri), s.fs)
+			if !inputs.containsPath(identity.Path, s.fs) && !inputs.containsPath(identity.CanonicalPath, s.fs) {
+				continue
+			}
 		}
 		invalidateDependent(document)
 	}
@@ -179,6 +183,7 @@ func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri
 	s.docGeneration[uri]++
 	generation := s.docGeneration[uri]
 	s.cancelInflightPluginDispatch(uri)
+	delete(s.diagnosticInputs, uri)
 	snapshot := s.documentLintSnapshot(uri)
 	presentation := &documentProgressiveDiagnostics{
 		server:           s,
@@ -190,8 +195,9 @@ func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri
 		s.releaseDocumentProgram(uri)
 		return presentation
 	}
+	provider := &documentGenerationProvider{server: s, uri: uri, snapshot: snapshot}
 	_, err := linter.RunPipeline(ctx, linter.NewProgressiveLintRequest(
-		&documentGenerationProvider{server: s, uri: uri, snapshot: snapshot},
+		provider,
 		linter.ArtifactDemand{
 			Native: rule.EditDemandAll,
 			Plugin: rule.EditDemandAll,
@@ -214,6 +220,12 @@ func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri
 			}}
 		}
 		return presentation
+	}
+	if provider.sourceOnlyInputs != nil {
+		if s.diagnosticInputs == nil {
+			s.diagnosticInputs = make(map[lsproto.DocumentUri]lintProgramLookups)
+		}
+		s.diagnosticInputs[uri] = provider.sourceOnlyInputs.drain()
 	}
 	// The pacer cannot see that the lint just dropped what it derived.
 	go runtime.GC()
