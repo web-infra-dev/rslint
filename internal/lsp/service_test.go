@@ -604,6 +604,66 @@ func TestSourceOnlyImportObservesOverlayFiles(t *testing.T) {
 	}
 }
 
+func TestProjectFallbackObservesEditorConfig(t *testing.T) {
+	for _, options := range []struct {
+		name   string
+		parser *config.ParserOptions
+	}{
+		{"explicit project", &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		{"project service", &config.ParserOptions{ProjectService: ptrTo(true)}},
+	} {
+		t.Run(options.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "const value: any = {}; value.member;\n", config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options.parser},
+				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			}})
+			configPath := tspath.ResolvePath(s.cwd, "tsconfig.json")
+			configURI := documentURIFromPath(configPath)
+			if err := os.WriteFile(tspath.ResolvePath(s.cwd, "src/other.ts"), []byte("export {};\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(configPath, []byte(`{"compilerOptions":{"noLib":true},"files":["src/other.ts"]}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+				t.Fatal(err)
+			}
+			if published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 0 {
+				t.Fatal("unmatched project did not fall back to source-only diagnostics")
+			}
+			for _, event := range []string{"open", "close"} {
+				want := 1
+				if event == "open" {
+					if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: configURI, Text: `{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`, Version: 1},
+					}); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: configURI},
+					}); err != nil {
+						t.Fatal(err)
+					}
+					<-outgoing
+					want = 0
+				}
+				if _, pending := s.lintSchedule.pending[uri]; !pending {
+					t.Fatalf("%s did not invalidate project selection", event)
+				}
+				if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
+				published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want {
+					t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
+				}
+			}
+		})
+	}
+}
+
 type cancelingDiagnosticFS struct {
 	vfs.FS
 	path   string
@@ -611,7 +671,7 @@ type cancelingDiagnosticFS struct {
 }
 
 func (fs *cancelingDiagnosticFS) ReadFile(path string) (string, bool) {
-	if path == fs.path {
+	if lintProgramLexicalPathID(path, fs.FS) == lintProgramLexicalPathID(fs.path, fs.FS) {
 		fs.cancel()
 	}
 	return fs.FS.ReadFile(path)
@@ -640,6 +700,9 @@ func TestQuickFixCancellationPreservesPendingDiagnostics(t *testing.T) {
 	}
 	if s.lintSchedule.pending[uri] != scheduled {
 		t.Fatal("canceled quick fix consumed or postponed background diagnostics")
+	}
+	if !s.lintPrograms.Usable() {
+		t.Fatal("canceled quick fix disabled Program caching")
 	}
 	s.fs = fs
 	if err := s.pushDiagnostics(context.Background(), uri); err != nil {

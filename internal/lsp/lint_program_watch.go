@@ -291,6 +291,9 @@ func (c *lintProgramCoverage) ensure(
 	if len(newWatchers) == 0 {
 		return false, true, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return false, false, err
+	}
 
 	c.nextWatcherID++
 	watcherID := project.WatcherID(fmt.Sprintf(

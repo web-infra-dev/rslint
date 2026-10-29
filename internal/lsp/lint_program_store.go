@@ -205,14 +205,15 @@ func (r *lintProgramRequest) parseProjectMetadata(
 			return nil, false, err
 		}
 		lookups := tracker.drain()
-		added, safe, _ := r.store.coverage.ensure(
+		added, safe := r.store.ensureCoverage(
 			r.ctx,
 			lookups.seenFiles,
 			tspath.GetDirectoryPath(configFileName),
 		)
+		if err := r.ctx.Err(); err != nil {
+			return nil, false, err
+		}
 		if !safe {
-			r.store.coverage.disabled = true
-			r.store.Invalidate()
 			r.freshOnly = true
 			return metadata, false, nil
 		}
@@ -232,6 +233,9 @@ func (r *lintProgramRequest) parseProjectMetadata(
 func (r *lintProgramRequest) load(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
+	if err := r.ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	r.prepareOverlay()
 	configFileName := metadata.configPath
 	if r.freshOnly || !r.store.Usable() {
@@ -363,6 +367,9 @@ func (r *lintProgramRequest) rebuild(
 	// Register any dependencies outside the prepared coverage, then rebuild
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
+		if err := r.ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		// Each retry starts after watcher registration with a fresh filesystem
 		// view, so cached misses cannot hide a change in the registration gap.
 		tracker := newLintTrackingFS(r.freshFS())
@@ -424,20 +431,24 @@ func (r *lintProgramRequest) result(
 	return state.program, sourceFile, nil
 }
 
+// Required coverage gates cache retention. An abandoned request cannot verify
+// new inputs, but says nothing about the client's watcher capability. Keep
+// acknowledged watches and let the next request rebuild and retry coverage.
+func (s *lintProgramStore) ensureCoverage(ctx context.Context, files []string, directory string) (added bool, safe bool) {
+	added, safe, _ = s.coverage.ensure(ctx, files, directory)
+	if !safe {
+		if ctx.Err() == nil {
+			s.coverage.disabled = true
+		}
+		s.Invalidate()
+	}
+	return added, safe
+}
+
 func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bool) {
 	lookups := state.tracker.drain()
 	state.recordFailedLookups(lookups, r.store.server.fs)
-	added, safe, err := r.store.coverage.ensure(
-		r.ctx,
-		lookups.seenFiles,
-		state.program.GetCurrentDirectory(),
-	)
-	if err != nil || !safe {
-		r.store.coverage.disabled = true
-		r.store.Invalidate()
-		return false, false
-	}
-	return added, true
+	return r.store.ensureCoverage(r.ctx, lookups.seenFiles, state.program.GetCurrentDirectory())
 }
 
 func (r *lintProgramRequest) finalize() {
@@ -448,10 +459,8 @@ func (r *lintProgramRequest) finalize() {
 	}
 	if r.discoveryFS != nil {
 		lookups := r.discoveryFS.drain()
-		added, safe, err := r.store.coverage.ensure(r.ctx, lookups.seenFiles, r.store.server.cwd)
-		if err != nil || !safe {
-			r.store.coverage.disabled = true
-			r.store.Invalidate()
+		added, safe := r.store.ensureCoverage(r.ctx, lookups.seenFiles, r.store.server.cwd)
+		if !safe {
 			return
 		}
 		if added {

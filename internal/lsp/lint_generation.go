@@ -154,9 +154,15 @@ func (p *documentGenerationProvider) AcquireGeneration(
 		}
 		request.fs = resident.overlayFS
 	}
-	loaders.fallback = func() (*compiler.Program, *ast.SourceFile, error) {
-		p.sourceOnlyInputs = newLintTrackingFS(request.filesystem())
-		return createStandaloneFallbackProgram(snapshot.target, p.sourceOnlyInputs)
+	loaders.fallback = request.fallback
+	// Only observations without project selection have a complete lookup set
+	// here. A configured project's fallback also depends on its earlier
+	// metadata and discovery reads, so its inputs must remain unknown.
+	if snapshot.projectPolicy.ProjectDisabled || snapshot.projectPolicy.ExplicitProject == nil && !serviceEnabled {
+		loaders.fallback = func() (*compiler.Program, *ast.SourceFile, error) {
+			p.sourceOnlyInputs = newLintTrackingFS(request.filesystem())
+			return createStandaloneFallbackProgram(snapshot.target, p.sourceOnlyInputs)
+		}
 	}
 	releasePending = release != nil
 	if selectionFS == nil {
