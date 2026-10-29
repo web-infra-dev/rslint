@@ -203,7 +203,12 @@ while package entry points and alias redirects retain their own lookup rules.
 Package alias fields reuse shared package metadata; all aliases reuse the same
 file probes before symlink resolution.
 Results retain failure details and separate resource suffixes from filesystem
-paths. `internal/utils/tsconfig` shares explicit and nearest config queries using
+paths. Package JSON transformations share immutable text and metadata within a
+Program generation, keyed by the exact underlying read path and the options that
+affect the transformation. Each request still records its own imports match and
+exports owner; resolver state and file probes remain request-local. Failed file
+reads are not retained by the transformation cache.
+`internal/utils/tsconfig` shares explicit and nearest config queries using
 tsgo's parser, including `extends`, without creating another Program.
 Node's option precedence, TypeScript alias policy and extension mapping remain
 in `nodeutil`. Restrictions retain lexical paths for unresolved local sources

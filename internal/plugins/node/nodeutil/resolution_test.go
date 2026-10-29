@@ -2,6 +2,7 @@ package nodeutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
-func programForResolution(t *testing.T, files map[string]string, fileName string) *program.Program {
+func programForResolution(t testing.TB, files map[string]string, fileName string) *program.Program {
 	t.Helper()
 	return programForResolutionFS(t, files, fileName, osvfs.FS())
 }
@@ -48,7 +49,7 @@ func TestResolverCachePreservesRecursiveErrorIdentity(t *testing.T) {
 	}
 }
 
-func programForResolutionFS(t *testing.T, files map[string]string, fileName string, base vfs.FS) *program.Program {
+func programForResolutionFS(t testing.TB, files map[string]string, fileName string, base vfs.FS) *program.Program {
 	t.Helper()
 	fs := utils.NewOverlayVFS(bundled.WrapFS(base), maps.Clone(files))
 	host := utils.CreateCompilerHost(tspath.GetDirectoryPath(fileName), fs)
@@ -714,4 +715,178 @@ func TestResolverEntryFieldSymlinks(t *testing.T) {
 			t.Errorf("case-insensitive package entry = %q, want %q", got, want)
 		}
 	}
+}
+
+func TestResolverPackageJSONRequestIsolation(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/package_json_cache.txtar")
+	names, err := archive.FileNames("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, root := range []string{"/package-cache", "C:/package-cache", "//server/share/package-cache"} {
+		t.Run(root, func(t *testing.T) {
+			files := make(map[string]string, len(names))
+			for _, name := range names {
+				data, err := archive.ReadFile(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				files[tspath.ResolvePath(root, name)] = string(data)
+			}
+			importOptions := moduleresolver.Options{Conditions: []string{"import"}, NodeExports: true, FullySpecified: true}
+			cases := []struct {
+				request string
+				options moduleresolver.Options
+				path    string
+			}{
+				{"#local", importOptions, "/src/local.js"},
+				{"#dep", importOptions, "/node_modules/dep/esm.js"},
+				{"dep", importOptions, "/node_modules/dep/esm.js"},
+				{"app/self", importOptions, "/src/local.js"},
+				{"#missing", importOptions, ""},
+				{"dep/hidden", importOptions, ""},
+				{"dep/gone", importOptions, ""},
+				{"dep/directory", importOptions, ""},
+				{"dep/directory", moduleresolver.Options{Conditions: []string{"import"}}, "/node_modules/dep/directory/index.js"},
+				{"#dep", moduleresolver.Options{Conditions: []string{"require"}, NodeExports: true}, "/node_modules/dep/cjs.js"},
+				{"dep", moduleresolver.Options{Conditions: []string{}, NodeExports: true}, ""},
+				{"dep", moduleresolver.Options{IgnoreExports: true}, "/node_modules/dep/cjs.js"},
+				{"legacy", moduleresolver.Options{}, "/node_modules/legacy/main.js"},
+				{"legacy", moduleresolver.Options{MainFields: []moduleresolver.MainField{}}, "/node_modules/legacy/index.js"},
+				{"legacy", moduleresolver.Options{MainFields: []moduleresolver.MainField{{Name: []string{"module"}, ForceRelative: true}}}, "/node_modules/legacy/module.js"},
+				{"legacy", moduleresolver.Options{MainFields: []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}}}, "/node_modules/legacy/main.js"},
+			}
+			const callers = 2
+			for i := range len(cases) * callers {
+				files[fmt.Sprintf("%s/src/caller%d/input.js", root, i)] = "export {};"
+			}
+			create := func() *program.Program {
+				return programForResolutionFS(t, files, root+"/input.js", resolutionFixtureBase{iovfs.From(fstest.MapFS{}, true)})
+			}
+			// Independent cold resolutions also preserve exact error text, suffixes,
+			// and terminal failures when the shared cache is exercised below.
+			want := make([]moduleresolver.Result, len(cases)*callers)
+			for i := range want {
+				tc := cases[i%len(cases)]
+				want[i] = moduleresolver.Resolve(create(), tc.request, fmt.Sprintf("%s/src/caller%d/input.js", root, i), tc.options)
+				if tc.path == "" {
+					if want[i].Path != "" || want[i].Error == "" {
+						t.Fatalf("%s: expected a failure, got %+v", tc.request, want[i])
+					}
+				} else if want[i].Path != root+tc.path || want[i].Error != "" {
+					t.Fatalf("%s: got %+v, want %s", tc.request, want[i], root+tc.path)
+				}
+			}
+			p := create()
+			start := make(chan struct{})
+			var group sync.WaitGroup
+			for i := range want {
+				group.Go(func() {
+					<-start
+					tc := cases[i%len(cases)]
+					got := moduleresolver.Resolve(p, tc.request, fmt.Sprintf("%s/src/caller%d/input.js", root, i), tc.options)
+					if got != want[i] {
+						t.Errorf("%s (%+v): got %+v, want %+v", tc.request, tc.options, got, want[i])
+					}
+				})
+			}
+			close(start)
+			group.Wait()
+		})
+	}
+}
+
+func TestResolverPackageJSONGenerationIsolation(t *testing.T) {
+	files := map[string]string{
+		"/package-cache/input.js":                   "export {};",
+		"/package-cache/other/input.js":             "export {};",
+		"/package-cache/node_modules/dep/first.js":  "export {};",
+		"/package-cache/node_modules/dep/second.js": "export {};",
+	}
+	var programs []*program.Program
+	var wants []moduleresolver.Result
+	for _, metadata := range []string{`{"main":"./first.js"}`, `{"main":`, `{"main":"./second.js"}`} {
+		files["/package-cache/node_modules/dep/package.json"] = metadata
+		p := programForResolutionFS(t, files, "/package-cache/input.js", resolutionFixtureBase{iovfs.From(fstest.MapFS{}, true)})
+		programs = append(programs, p)
+		wants = append(wants, moduleresolver.Resolve(p, "dep", "/package-cache/input.js", moduleresolver.Options{}))
+	}
+	if wants[0].Path != "/package-cache/node_modules/dep/first.js" || wants[1].Error != "Invalid package.json at /package-cache/node_modules/dep/package.json" || wants[2].Path != "/package-cache/node_modules/dep/second.js" {
+		t.Fatalf("unexpected generation results: %+v", wants)
+	}
+	for i, p := range programs {
+		if got := moduleresolver.Resolve(p, "dep", "/package-cache/other/input.js", moduleresolver.Options{}); got != wants[i] {
+			t.Errorf("generation %d: got %+v, want %+v", i, got, wants[i])
+		}
+	}
+}
+
+// Distinct importer directories bypass the final resolution cache while
+// sharing the package metadata work performed by a real multi-file lint.
+func BenchmarkResolverPackageJSON(b *testing.B) {
+	const root = "/resolver-bench"
+	const requests = 64
+	dependencies := make(map[string]string, 100)
+	for i := range 100 {
+		dependencies[fmt.Sprintf("dependency-%d", i)] = "^1.0.0"
+	}
+	metadata, err := json.Marshal(map[string]any{
+		"name": "dep", "version": "1.0.0", "dependencies": dependencies,
+		"exports": map[string]any{".": map[string]string{"import": "./esm.js", "require": "./cjs.js"}},
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	files := map[string]string{
+		root + "/input.js":                      "export {};",
+		root + "/package.json":                  `{"name":"app","imports":{"#dep":"dep"}}`,
+		root + "/node_modules/dep/package.json": string(metadata),
+		root + "/node_modules/dep/esm.js":       "export {};",
+		root + "/node_modules/dep/cjs.js":       "module.exports = {};",
+	}
+	importers := make([]string, requests)
+	for i := range importers {
+		importers[i] = fmt.Sprintf("%s/src/dir%d/input.js", root, i)
+		files[importers[i]] = "export {};"
+	}
+	options := moduleresolver.Options{Conditions: []string{"node", "import"}, NodeExports: true}
+	create := func(b *testing.B) *program.Program {
+		return programForResolutionFS(b, files, root+"/input.js", resolutionFixtureBase{FS: iovfs.From(fstest.MapFS{}, true)})
+	}
+	resolve := func(b *testing.B, p *program.Program, importer string) {
+		b.Helper()
+		if got := moduleresolver.Resolve(p, "#dep", importer, options); got.Path != root+"/node_modules/dep/esm.js" || got.Error != "" {
+			b.Fatalf("unexpected resolution: %+v", got)
+		}
+	}
+	b.Run("Cold", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			b.StopTimer()
+			p := create(b)
+			b.StartTimer()
+			resolve(b, p, importers[0])
+		}
+	})
+	b.Run("CrossRequest", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			b.StopTimer()
+			p := create(b)
+			resolve(b, p, root+"/input.js")
+			b.StartTimer()
+			for _, importer := range importers {
+				resolve(b, p, importer)
+			}
+		}
+		b.ReportMetric(requests, "requests/op")
+	})
+	b.Run("ResultHit", func(b *testing.B) {
+		p := create(b)
+		resolve(b, p, importers[0])
+		b.ReportAllocs()
+		for b.Loop() {
+			resolve(b, p, importers[0])
+		}
+	})
 }
