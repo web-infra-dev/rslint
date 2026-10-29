@@ -3,7 +3,7 @@ package target
 import (
 	"context"
 	"path/filepath"
-	"slices"
+	"runtime"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -27,16 +27,16 @@ func literalPatternPath(pattern string) (string, bool) {
 	return volume + literal, ok
 }
 
-// globDirectory returns the decoded static directory and the untouched pattern
-// below it. Only filesystem paths are cleaned; matching keeps escapes and dot
-// segments. Native volume boundaries make the upward search finite.
-func globDirectory(pattern string) (string, string) {
+// globDirectory returns the decoded static directory, its authored prefix, and
+// the untouched suffix. The caller normalizes dot segments in authored syntax
+// after fixing the scan entry. Native volume boundaries keep the search finite.
+func globDirectory(pattern string) (directory, prefix, relative string) {
 	volumeLength := len(filepath.VolumeName(pattern))
 	end := len(pattern)
 	for {
 		index := strings.LastIndexByte(pattern[volumeLength:end], '/')
 		if index < 0 {
-			return filepath.ToSlash(filepath.Join(pattern[:volumeLength], ".")), pattern[volumeLength:]
+			return filepath.ToSlash(filepath.Join(pattern[:volumeLength], ".")), pattern[:volumeLength], pattern[volumeLength:]
 		}
 		end = volumeLength + index
 		directoryEnd := end
@@ -44,7 +44,7 @@ func globDirectory(pattern string) (string, string) {
 			directoryEnd++
 		}
 		if literal, ok := literalPatternPath(pattern[:directoryEnd]); ok {
-			return literal, pattern[end+1:]
+			return literal, pattern[:directoryEnd], pattern[end+1:]
 		}
 	}
 }
@@ -81,7 +81,7 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		// static prefix must not reinterpret a later bang or negative extglob.
 		options := inputPatternOptions
 		options.NoNegate = !strings.HasPrefix(pattern, "!")
-		directory, relative := globDirectory(pattern)
+		directory, prefix, relative := globDirectory(pattern)
 		root, err := resolveInputPath(cwd, directory)
 		if err != nil {
 			return nil, err
@@ -90,10 +90,21 @@ func expandGlobs(ctx context.Context, fsys vfs.FS, cwd string, patterns []string
 		if !fsys.DirectoryExists(root) {
 			continue
 		}
-		// A dot component is redundant even after a wildcard. Parent components
-		// must remain in pattern syntax rather than canceling matching components.
-		parts := slices.DeleteFunc(strings.Split(relative, "/"), func(part string) bool { return part == "." })
-		pattern = strings.Join(parts, "/")
+		// Normalize both sides in authored syntax, so escapes in a returning
+		// suffix cannot be confused with the decoded filesystem root.
+		if runtime.GOOS == "windows" {
+			prefix, err = resolveInputPath(cwd, prefix)
+			if err != nil {
+				return nil, err
+			}
+		} else if !filepath.IsAbs(prefix) {
+			prefix = filepath.Join(cwd, prefix)
+		}
+		pattern, err = filepath.Rel(prefix, filepath.Join(prefix, relative))
+		if err != nil {
+			return nil, err
+		}
+		pattern = filepath.ToSlash(pattern)
 		group := groupsByRoot[root]
 		if group == nil {
 			group = &globGroup{root: root, patterns: make(map[patternKey]*compiledGlob)}

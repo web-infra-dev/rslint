@@ -88,6 +88,8 @@ func TestRunCLIQuotedGlobs(t *testing.T) {
 		{"extglob", []string{"src/@(a|missing).ts"}, []string{"src/a.ts"}},
 		{"escaped directory", []string{`src/\nested/*.ts`}, []string{"src/nested/b.ts"}},
 		{"dot segment", []string{"src/*/./*.ts"}, []string{"src/nested/b.ts"}},
+		{"parent after wildcard", []string{"src/*/../*.ts"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts"}},
+		{"parent after globstar", []string{"src/**/../*.ts"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts"}},
 		{"absolute", []string{tspath.ResolvePath(root, "src/**/*.ts")}, recursive},
 		{"literal priority", []string{"src/[ab].ts"}, []string{"src/[ab].ts"}},
 		{"brace and shallow", []string{"src/*.{js,ts}"}, []string{"src/.hidden.ts", "src/[ab].ts", "src/a.ts", "src/bundle.min.js"}},

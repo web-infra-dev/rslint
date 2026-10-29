@@ -57,10 +57,13 @@ func TestExpandGlobPrunesShallowDirectories(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, layout)
 	fsys := &globWalkRecorder{FS: osvfs.FS()}
-	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts"})
+	expansions, err := expandGlobs(context.Background(), fsys, root, []string{"src/*.ts", "src/*/../*.ts", "src/**/../*.ts"})
 	assert.NilError(t, err)
-	assert.Equal(t, expansions[0].Root, tspath.ResolvePath(root, "src"))
-	assert.DeepEqual(t, expansions[0].Files, []string{paths["src/a.ts"]})
+	for _, expansion := range expansions {
+		assert.Equal(t, expansion.Root, tspath.ResolvePath(root, "src"))
+		assert.DeepEqual(t, expansion.Files, []string{paths["src/a.ts"]})
+	}
+	assert.DeepEqual(t, fsys.roots, []string{tspath.ResolvePath(root, "src")})
 	assert.Equal(t, fsys.filesVisited, 1)
 }
 
@@ -130,7 +133,7 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 	}
 	root, paths := setupDiscoveryFixture(t, []string{"a.ts", "src/a.ts", "src/b.ts"})
 	volume := filepath.VolumeName(root)
-	selection, err := SelectInputs(context.Background(), osvfs.FS(), root, []string{volume + "a.ts", volume + "src/a.ts", volume + "src/*.ts"})
+	selection, err := SelectInputs(context.Background(), osvfs.FS(), root, []string{volume + "a.ts", volume + "src/a.ts", volume + "src/*.ts", volume + "src/*/../*.ts", volume + "src/*/../../src/*.ts"})
 	assert.NilError(t, err)
 	sort.Strings(selection.Files)
 	assert.DeepEqual(t, selection.Files, []string{paths["a.ts"], paths["src/a.ts"], paths["src/b.ts"]})
@@ -151,14 +154,14 @@ func TestSelectInputsWindowsPaths(t *testing.T) {
 		{"//server/[share]/src/*.ts", "//server/[share]/src", "*.ts"},
 		{"//server/[share]/*.ts", "//server/[share]/", "*.ts"},
 	} {
-		directory, relative := globDirectory(test.pattern)
+		directory, _, relative := globDirectory(test.pattern)
 		assert.Equal(t, directory, test.directory)
 		assert.Equal(t, relative, test.relative)
 	}
 }
 
 func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
-	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts", "hash/#group/a.ts"})
+	root, paths := setupDiscoveryFixture(t, []string{"src/a.ts", "src/nested/b.ts", "hash/#group/a.ts", "escaped/[dir]/a.ts"})
 	for _, test := range []struct {
 		name     string
 		patterns []string
@@ -190,10 +193,28 @@ func TestExpandGlobsGroupsOnlyEqualRoots(t *testing.T) {
 			files:    [][]string{{"src/a.ts", "src/nested/b.ts"}, {"src/nested/b.ts"}},
 		},
 		{
+			name:     "parent segments do not widen scan entries",
+			patterns: []string{"src/nested/*/../../*.ts", "src/*/../../*.ts"},
+			roots:    []string{"src/nested", "src"},
+			files:    [][]string{nil, nil},
+		},
+		{
+			name:     "parent segments can return to the scan entry",
+			patterns: []string{"src/*/../../src/*.ts", "src/nested/*/../../nested/*.ts"},
+			roots:    []string{"src", "src/nested"},
+			files:    [][]string{{"src/a.ts"}, {"src/nested/b.ts"}},
+		},
+		{
+			name:     "escaped roots retain authored syntax when returning",
+			patterns: []string{`escaped/\[dir\]/*/../../\[dir\]/*.ts`, `escaped/\[dir\]/*/../../[dir]/*.ts`},
+			roots:    []string{"escaped/[dir]"},
+			files:    [][]string{{"escaped/[dir]/a.ts"}, nil},
+		},
+		{
 			name:     "escaped and literal roots share a walk",
-			patterns: []string{`src/\nested/*.ts`, "src/nested/*.ts"},
+			patterns: []string{`src/\nested/*.ts`, "src/nested/*.ts", `src/\nested/*/../*.ts`},
 			roots:    []string{"src/nested"},
-			files:    [][]string{{"src/nested/b.ts"}, {"src/nested/b.ts"}},
+			files:    [][]string{{"src/nested/b.ts"}, {"src/nested/b.ts"}, {"src/nested/b.ts"}},
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -241,8 +262,8 @@ func TestExpandGlobsPreservesNegationContext(t *testing.T) {
 		{
 			name:     "bang after static prefix",
 			cwd:      "/project",
-			patterns: []string{"src/!*.ts", "/project/src/!*.ts"},
-			files:    [][]string{bang, bang},
+			patterns: []string{"src/!*.ts", "/project/src/!*.ts", "src/*/../!*.ts"},
+			files:    [][]string{bang, bang, bang},
 		},
 		{
 			name:     "negative file extglob",
