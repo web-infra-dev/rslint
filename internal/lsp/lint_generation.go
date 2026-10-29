@@ -130,6 +130,7 @@ func (p *documentGenerationProvider) AcquireGeneration(
 	request := newStandaloneLintProjectRequest(
 		snapshot.target,
 		func() vfs.FS { return server.currentEditorOverlayFSForTarget(p.uri, snapshot.target) },
+		server.contentMappers,
 	)
 	serviceEnabled := snapshot.projectPolicy.ServiceRootDirectory != ""
 	loaders := request.loaders()

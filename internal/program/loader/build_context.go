@@ -9,10 +9,12 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/contentmapper"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -28,12 +30,16 @@ import (
 //   - successful package.json/registered-tsconfig reads and extended-config
 //     parses through programMetadataFS and programExtendedConfigCache.
 //
+// It also carries the caller's content mapper Runtime, which decides whether
+// tsconfig content mappers run and owns the projects they open.
+//
 // RSLINT_DISABLE_PROGRAM_METADATA_CACHE is an undocumented diagnostic escape
 // hatch. When set, the Program VFS is not wrapped by either metadata snapshots
 // or concurrent-query coalescing, and tsconfig extends parsing uses the upstream
 // no-cache path. ParseCache keeps its own independent escape hatch.
 type buildContext struct {
 	fs                  vfs.FS
+	contentMappers      *contentmappers.Runtime
 	parseCache          *utils.ParseCache
 	metadataFS          *programMetadataFS
 	extendedConfigCache *programExtendedConfigCache
@@ -44,10 +50,11 @@ type buildContext struct {
 // newBuildContext creates a context for exactly one final VFS view.
 // Callers must apply overlays and canonical-path wrappers before constructing
 // the context so cached bytes can never bypass request-local file contents.
-func newBuildContext(fs vfs.FS) *buildContext {
+func newBuildContext(fs vfs.FS, contentMappers *contentmappers.Runtime) *buildContext {
 	context := &buildContext{
-		fs:         fs,
-		parseCache: utils.NewParseCache(),
+		fs:             fs,
+		contentMappers: contentMappers,
+		parseCache:     utils.NewParseCache(),
 	}
 	if os.Getenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE") != "" {
 		return context
@@ -97,6 +104,15 @@ func (c *buildContext) newCompilerHostWithCache(cwd string) compiler.CompilerHos
 	return utils.WithParseCache(host, c.parseCache)
 }
 
+// newProjectCompilerHostWithCache is newCompilerHostWithCache plus the content
+// mapper project that turns config's mapped files into virtual TypeScript.
+func (c *buildContext) newProjectCompilerHostWithCache(cwd string, config *tsoptions.ParsedCommandLine) compiler.CompilerHost {
+	// The caller's Runtime closes the project when its run or request ends.
+	project, _ := c.contentMappers.Open(config)
+	host := c.newCompilerHostWithContentMappers(cwd, project)
+	return utils.WithParseCache(host, c.parseCache)
+}
+
 // newTransientCompilerHost shares source snapshots with Program construction
 // without publishing its bound ASTs into the project-owned parse cache.
 func (c *buildContext) newTransientCompilerHost(cwd string) compiler.CompilerHost {
@@ -105,14 +121,14 @@ func (c *buildContext) newTransientCompilerHost(cwd string) compiler.CompilerHos
 }
 
 func (c *buildContext) newCompilerHost(cwd string) compiler.CompilerHost {
-	host := compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, nil)
-	if c.metadataFS != nil {
-		host = &programBuildCompilerHost{
-			CompilerHost: host,
-			context:      c,
-		}
+	return c.newCompilerHostWithContentMappers(cwd, nil)
+}
+
+func (c *buildContext) newCompilerHostWithContentMappers(cwd string, project contentmapper.Project) compiler.CompilerHost {
+	return &programBuildCompilerHost{
+		CompilerHost: compiler.NewCompilerHost(cwd, c.compilerFS(), bundled.LibPath(), c.extendedConfigCacheInterface(), nil, project),
+		context:      c,
 	}
-	return host
 }
 
 // createProjectProgram creates a tsconfig-backed Program and preserves the
@@ -122,7 +138,7 @@ func (c *buildContext) createProjectProgram(singleThreaded bool, cwd string, tsc
 	if err != nil {
 		return nil, err
 	}
-	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, c.newCompilerHostWithCache(cwd))
+	return utils.CreateProgramFromParsedConfigLenient(singleThreaded, config, c.newProjectCompilerHostWithCache(cwd, config))
 }
 
 // parseConfig reads metadata without binding the source cache to a filesystem.
@@ -137,11 +153,12 @@ func (c *buildContext) parseConfig(cwd string, tsconfigPath string) (*tsoptions.
 	host := c.newCompilerHost(cwd)
 	config, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		tsconfigPath,
-		&core.CompilerOptions{},
+		c.contentMappers.ParseOptions(),
 		nil,
 		host,
 		c.extendedConfigCacheInterface(),
 	)
+	c.contentMappers.Observe(config)
 	return config, nil
 }
 
@@ -190,8 +207,10 @@ func (c *buildContext) extendedConfigCacheInterface() tsoptions.ExtendedConfigCa
 	return c.extendedConfigCache
 }
 
-// programBuildCompilerHost only adds project-reference registration to the
-// upstream compiler host. All other CompilerHost behavior remains delegated.
+// programBuildCompilerHost only changes how the upstream compiler host parses
+// project references: it registers each referenced tsconfig and parses it with
+// the content mapper options of the root. All other CompilerHost behavior
+// remains delegated.
 type programBuildCompilerHost struct {
 	compiler.CompilerHost
 	context *buildContext
@@ -202,11 +221,12 @@ func (h *programBuildCompilerHost) GetResolvedProjectReference(fileName string, 
 	commandLine, _ := tsoptions.GetParsedCommandLineOfConfigFilePath(
 		fileName,
 		path,
-		nil,
+		h.context.contentMappers.ParseOptions(),
 		nil,
 		h,
 		h.context.extendedConfigCacheInterface(),
 	)
+	h.context.contentMappers.Observe(commandLine)
 	return commandLine
 }
 

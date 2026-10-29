@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"slices"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -71,6 +73,7 @@ func parseStandaloneLintProject(
 	tsConfigPath string,
 	parseFS vfs.FS,
 	identityFS vfs.FS,
+	mappers *contentmappers.Runtime,
 ) (*lintProjectMetadata, error) {
 	tsConfigPath = tspath.NormalizePath(tsConfigPath)
 	if parseFS == nil {
@@ -85,13 +88,16 @@ func parseStandaloneLintProject(
 	host := utils.CreateCompilerHost(configDir, parseFS)
 	parsed, _ := tsoptions.GetParsedCommandLineOfConfigFile(
 		parsePath,
-		&core.CompilerOptions{},
+		mappers.ParseOptions(),
 		nil,
 		host,
 		nil,
 	)
 	if parsed == nil {
 		return nil, fmt.Errorf("no parsed config returned for %q", tsConfigPath)
+	}
+	if mappers.Observe(parsed) {
+		log.Printf("[rslint] %s declares contentMappers, which run only when the client passes runExternalCode; the files they map provide no types", parsed.ConfigName())
 	}
 	if identityFS == nil {
 		identityFS = parseFS
@@ -211,12 +217,14 @@ type standaloneLintProjectRequest struct {
 	target   target.File
 	fs       vfs.FS
 	loadFS   func() vfs.FS
+	mappers  *contentmappers.Runtime
 	projects map[string]*lintProjectMetadata
 }
 
 func newStandaloneLintProjectRequest(
 	target target.File,
 	loadFS func() vfs.FS,
+	mappers *contentmappers.Runtime,
 ) *standaloneLintProjectRequest {
 	target.Path = tspath.NormalizePath(target.Path)
 	if target.CanonicalPath != "" {
@@ -225,6 +233,7 @@ func newStandaloneLintProjectRequest(
 	return &standaloneLintProjectRequest{
 		target:   target,
 		loadFS:   loadFS,
+		mappers:  mappers,
 		projects: make(map[string]*lintProjectMetadata),
 	}
 }
@@ -232,8 +241,9 @@ func newStandaloneLintProjectRequest(
 func newStandaloneLintProjectRequestWithFS(
 	target target.File,
 	fs vfs.FS,
+	mappers *contentmappers.Runtime,
 ) *standaloneLintProjectRequest {
-	request := newStandaloneLintProjectRequest(target, nil)
+	request := newStandaloneLintProjectRequest(target, nil, mappers)
 	request.fs = fs
 	return request
 }
@@ -254,7 +264,7 @@ func (request *standaloneLintProjectRequest) metadata(
 		return metadata, nil
 	}
 	fs := request.filesystem()
-	metadata, err := parseStandaloneLintProject(tsConfigPath, fs, fs)
+	metadata, err := parseStandaloneLintProject(tsConfigPath, fs, fs, request.mappers)
 	if err != nil {
 		return nil, err
 	}
@@ -265,10 +275,14 @@ func (request *standaloneLintProjectRequest) metadata(
 func (request *standaloneLintProjectRequest) program(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
+	// A standalone request builds one Program, and the mapper is only needed
+	// while that Program parses its mapped files.
+	mappers, release := request.mappers.Open(metadata.commandLine)
+	defer release()
 	program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
 		false, singleCheckerLintCommandLine(metadata.commandLine),
 		newLintProjectReferenceHost(
-			utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), request.filesystem()),
+			utils.CreateCompilerHostWithContentMappers(tspath.GetDirectoryPath(metadata.configPath), request.filesystem(), mappers),
 			request.projects,
 		),
 	)

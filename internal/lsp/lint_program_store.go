@@ -14,6 +14,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -27,6 +28,7 @@ type lintProgramStore struct {
 	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
+	contentMappers      *contentmappers.ProjectCache
 }
 
 type lintProgramKey = tspath.Path
@@ -63,6 +65,7 @@ type lintProgramRequest struct {
 func newLintProgramStore(server *Server) *lintProgramStore {
 	return &lintProgramStore{
 		server:              server,
+		contentMappers:      server.contentMappers.NewProjectCache(),
 		documentPrograms:    make(map[lsproto.DocumentUri]lintProgramKey),
 		parseCache:          utils.NewParseCache(),
 		coverage:            newLintProgramCoverage(server),
@@ -113,7 +116,10 @@ func (r *lintProgramRequest) key(configPath string) lintProgramKey {
 
 func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
 	commandLine := singleCheckerLintCommandLine(metadata.commandLine)
-	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
+	// Keyed by the metadata's own parse, so rebuilds reuse one mapper project
+	// until the tsconfig is parsed again.
+	mappers := r.store.contentMappers.Project(metadata.commandLine)
+	host := utils.WithASTCache(utils.CreateCompilerHostWithContentMappers(tspath.GetDirectoryPath(metadata.configPath), fsys, mappers), r.store.parseCache)
 	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
 		newLintProjectReferenceHost(host, r.projectMetadata))
 }
@@ -190,6 +196,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 			configFileName,
 			r.overlayFS,
 			r.store.server.fs,
+			r.store.server.contentMappers,
 		)
 		return metadata, false, err
 	}
@@ -200,6 +207,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 			configFileName,
 			tracker,
 			r.store.server.fs,
+			r.store.server.contentMappers,
 		)
 		if err != nil {
 			return nil, false, err

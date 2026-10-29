@@ -36,7 +36,7 @@ func rootProgramTestPlan(dir string, names ...string) target.Plan {
 }
 
 func rootProgramTestBuildContext() *buildContext {
-	return newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	return newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), nil)
 }
 
 func compareProgramSyntaxDiagnostics(t *testing.T, legacy, direct []rule.RuleDiagnostic) {
@@ -294,7 +294,7 @@ func TestLoadCLIMatchesCompatibilityRootAdmission(t *testing.T) {
 				fsys := newBindingIndexTestFS([]string{targetPath}, nil)
 				fsys.caseSensitive = test.caseSensitive
 				fsys.files[targetPath] = "const value = ;\n"
-				return newBuildContext(fsys)
+				return newBuildContext(fsys, nil)
 			}
 			plan := target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetPath,
 				CanonicalPath: targetPath}, ConfigDirectory: configDir,
@@ -383,12 +383,12 @@ func TestRootProgramsIsolateCaseFoldedPackageScopes(t *testing.T) {
 		{PathIdentity: rslintconfig.PathIdentity{Path: lower, CanonicalPath: lower}, ConfigDirectory: configDir},
 	}}
 
-	legacyContext := newBuildContext(newFS())
+	legacyContext := newBuildContext(newFS(), nil)
 	legacy, err := loadAPIForTest(ProjectSet{}, plan, configDir, legacyContext, true)
 	if err != nil {
 		t.Fatalf("loadAPIForTest: %v", err)
 	}
-	directContext := newBuildContext(newFS())
+	directContext := newBuildContext(newFS(), nil)
 	direct, err := sessionForTest(directContext).LoadCLI(ProjectSet{}, plan, configDir, true)
 	if err != nil {
 		t.Fatalf("prepareCLIForTest: %v", err)
@@ -442,7 +442,7 @@ func TestSourceOnlyProgramSyntaxDeduplicatesAgainstNonGoverningTypeCheckProgram(
 		childDir: {},
 	}
 	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	buildContext := newBuildContext(fsys)
+	buildContext := newBuildContext(fsys, nil)
 	set, err := buildProjectsForConfigs(configMap, true, buildContext)
 	if err != nil {
 		t.Fatalf("buildProjectsForConfigs: %v", err)

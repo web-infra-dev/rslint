@@ -99,6 +99,12 @@ func runTypeCheckForProgram(prog *program.Program, projectSources bool) []collec
 		if file == nil {
 			continue
 		}
+		// A content-mapped file (e.g. .vue) is in the Program only to give
+		// other files its types. Its diagnostics are positioned in the virtual
+		// TypeScript, and checking it is left to the framework's own tooling.
+		if file.ContentMapper() != "" {
+			continue
+		}
 
 		// Suppression for @ts-ignore / @ts-expect-error / @ts-nocheck and
 		// the corresponding TS2578 unused-directive errors is already

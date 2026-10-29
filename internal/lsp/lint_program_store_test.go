@@ -641,7 +641,7 @@ func TestLintProgramStoreProjectServiceCaseInsensitiveIdentity(t *testing.T) {
 	}
 	fileName := tspath.ResolvePath(directory, "app/second.ts")
 	target := lspConfigTarget(fileName, directory, server.fs)
-	request := newStandaloneLintProjectRequestWithFS(target, server.fs)
+	request := newStandaloneLintProjectRequestWithFS(target, server.fs, nil)
 	selected, _, err := selectConfiguredLintProject(nil, directory, target, server.fs, request.loaders())
 	if err != nil || lintProgramLexicalPathID(selected.configPath, server.fs) != lintProgramLexicalPathID(first.configPath, server.fs) {
 		t.Fatalf("speculative case-insensitive reference selection=%s error=%v", selected.configPath, err)
@@ -795,11 +795,11 @@ func TestLintProgramStoreDoesNotRetainProgramWithTransientProjectMetadata(t *tes
 			server.fs = bundled.WrapFS(osvfs.FS())
 			store := newLintProgramStore(server)
 			store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
-			metadata, err := parseStandaloneLintProject(configPath, server.fs, server.fs)
+			metadata, err := parseStandaloneLintProject(configPath, server.fs, server.fs, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
-			reference, err := parseStandaloneLintProject(refPath, server.fs, server.fs)
+			reference, err := parseStandaloneLintProject(refPath, server.fs, server.fs, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

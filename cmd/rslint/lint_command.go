@@ -24,6 +24,7 @@ import (
 	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/output"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -393,7 +394,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if err != nil {
 		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
-	programSession := loader.NewSession(sourceFS)
+	// One Runtime serves every Session of the run, so fix rounds reuse the
+	// mapper processes. Closing it stops them once linting is done.
+	mappers := contentmappers.New(contentmappers.Options{Enabled: args.RunExternalCode})
+	defer mappers.Close()
+	programSession := loader.NewSession(sourceFS, mappers)
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
 	var summaryFileCount int
 	activate := func() error {
@@ -505,7 +510,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 					overrides[tspath.NormalizePath(realPath)] = file.Text
 				}
 			}
-			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
+			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides), mappers)
 			binding, err := createPrograms(roundSession)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
@@ -611,6 +616,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
 		}
 	}
+	mappers.WriteIgnoredWarnings(os.Stderr, "--run-external-code")
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
 	if format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

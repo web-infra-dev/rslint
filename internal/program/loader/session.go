@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 )
 
 // Session owns Program-construction services for one immutable CLI/API source
@@ -23,11 +24,15 @@ type Session struct {
 	initialProgramsSet bool
 }
 
-func NewSession(fsys vfs.FS) *Session {
+// NewSession returns a Session that builds Programs from fsys. contentMappers
+// decides whether tsconfig content mappers run and owns the projects the
+// Session opens; it must outlive every Program the Session builds. Nil runs no
+// mappers.
+func NewSession(fsys vfs.FS, contentMappers *contentmappers.Runtime) *Session {
 	if isNilFS(fsys) {
 		return &Session{}
 	}
-	return &Session{context: newBuildContext(fsys)}
+	return &Session{context: newBuildContext(fsys, contentMappers)}
 }
 
 func isNilFS(fsys vfs.FS) bool {

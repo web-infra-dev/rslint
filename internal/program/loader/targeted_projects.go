@@ -125,13 +125,13 @@ func (c *buildContext) createProjectProgramFromParsedConfig(
 ) (*compiler.Program, error) {
 	if sourceReferences {
 		return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
-			singleThreaded, config, c.newCompilerHostWithCache(cwd),
+			singleThreaded, config, c.newProjectCompilerHostWithCache(cwd, config),
 		)
 	}
 	return utils.CreateProgramFromParsedConfigLenient(
 		singleThreaded,
 		config,
-		c.newCompilerHostWithCache(cwd),
+		c.newProjectCompilerHostWithCache(cwd, config),
 	)
 }
 
