@@ -166,6 +166,23 @@ func newLintProgramCoverage(server *Server) *lintProgramCoverage {
 	}
 }
 
+// prepareProgram covers predictable module lookup locations before the first
+// source read. Keep using the resolution mapper: ancestors need node_modules
+// watchers, never recursive watchers for the ancestor directories themselves.
+// Dependencies discovered outside this coverage still use the rebuild retry.
+func (c *lintProgramCoverage) prepareProgram(ctx context.Context, currentDirectory string) (bool, error) {
+	var inputs []string
+	tspath.ForEachAncestorDirectory(currentDirectory, func(directory string) (bool, bool) {
+		inputs = append(inputs, lintProgramDirectoryWatchInput(tspath.CombinePaths(directory, "node_modules")))
+		return false, false
+	})
+	if c.server.defaultLibraryPath != "" {
+		inputs = append(inputs, lintProgramDirectoryWatchInput(c.server.defaultLibraryPath))
+	}
+	_, safe, err := c.ensure(ctx, inputs, currentDirectory)
+	return safe, err
+}
+
 func (c *lintProgramCoverage) ensure(
 	ctx context.Context,
 	seenFiles []string,

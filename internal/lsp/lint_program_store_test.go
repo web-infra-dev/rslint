@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -1242,25 +1243,30 @@ func TestLintProgramStoreWatchedChangeRefreshesCustomProjectDiagnostics(t *testi
 }
 
 func TestLintProgramStoreWatcherFailureFallsBackToFreshPrograms(t *testing.T) {
-	const content = "export const value = 1;\n"
-	fixture := newLintProgramStoreFixture(t, content)
-	fixture.store.coverage.watchFiles = func(
-		context.Context,
-		project.WatcherID,
-		[]*lsproto.FileSystemWatcher,
-	) error {
-		return errors.New("watch registration failed")
-	}
-
-	first := fixture.load(t)
-	if fixture.store.Usable() {
-		t.Fatal("store remained enabled without dependency coverage")
-	}
-	if len(fixture.store.programs) != 0 {
-		t.Fatal("store retained a Program after watcher failure")
-	}
-	if second := fixture.load(t); second == first {
-		t.Fatal("disabled store did not fall back to fresh construction")
+	for _, phase := range []string{"metadata", "program preparation"} {
+		t.Run(phase, func(t *testing.T) {
+			fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+			failed := false
+			fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+				for _, watcher := range watchers {
+					if phase == "metadata" || project.FileSystemWatcherGlobString(watcher) == bundled.LibPath()+"/**/*" {
+						failed = true
+						return errors.New("watch registration failed")
+					}
+				}
+				return nil
+			}
+			first := fixture.load(t)
+			if !failed || fixture.store.Usable() {
+				t.Fatal("store remained enabled after watcher failure")
+			}
+			if len(fixture.store.programs) != 0 {
+				t.Fatal("store retained a Program after watcher failure")
+			}
+			if second := fixture.load(t); second == first {
+				t.Fatal("disabled store did not fall back to fresh construction")
+			}
+		})
 	}
 }
 
@@ -1574,4 +1580,174 @@ func TestLintProgramStoreWatchesExternalEmptyIncludeDirectory(t *testing.T) {
 		}
 	}
 	t.Fatalf("external empty include directory %q is not covered by %v", shared, watcherGlobs)
+}
+
+// Count a disk dependency read once per construction without observing editor
+// overlay reads or adding a production-only construction hook.
+type lintProgramSourceCountingFS struct {
+	vfs.FS
+	source string
+	reads  atomic.Int32
+}
+
+func (fs *lintProgramSourceCountingFS) ReadFile(path string) (string, bool) {
+	if path == fs.source {
+		fs.reads.Add(1)
+	}
+	return fs.FS.ReadFile(path)
+}
+
+func TestLintProgramStorePreparesBeforeSourceReads(t *testing.T) {
+	fixture := newLintProgramStoreFixture(t, "export const value = 1;\n")
+	dependency := tspath.ResolvePath(tspath.GetDirectoryPath(fixture.sourcePath), "dependency.ts")
+	if err := os.WriteFile(dependency, []byte("export const value = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	counted := &lintProgramSourceCountingFS{FS: fixture.server.fs, source: dependency}
+	fixture.server.fs = counted
+	prepared := false
+	fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+		for _, watcher := range watchers {
+			if project.FileSystemWatcherGlobString(watcher) == bundled.LibPath()+"/**/*" {
+				if counted.reads.Load() != 0 {
+					t.Fatal("prepared coverage after reading sources")
+				}
+				prepared = true
+				return os.WriteFile(dependency, []byte("export const value = 2;\n"), 0o644)
+			}
+		}
+		return nil
+	}
+	program := fixture.load(t)
+	if !prepared {
+		t.Fatal("did not prepare predictable coverage")
+	}
+	reads := counted.reads.Load()
+	source := program.GetSourceFile(dependency)
+	if source == nil || source.Text() != "export const value = 2;\n" {
+		t.Fatal("first build missed a change during preparation")
+	}
+	if fixture.load(t) != program || counted.reads.Load() != reads {
+		t.Fatal("warm request rebuilt a covered Program")
+	}
+}
+
+func TestLintProgramStoreUnpredictedCoverage(t *testing.T) {
+	for _, scenario := range []string{"changed dependency", "missing dependency", "coverage expands again", "registration failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			external := tspath.NormalizePath(filepath.Join(t.TempDir(), "value.ts"))
+			next := tspath.NormalizePath(filepath.Join(t.TempDir(), "next.ts"))
+			const initial = "export const value = 1;\n"
+			const changed = "export const value = 2;\n"
+			if scenario != "missing dependency" {
+				if err := os.WriteFile(external, []byte(initial), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			fixture := newLintProgramStoreFixture(t, "import '"+external+"'; export const value = 0;\n")
+			witness := tspath.ResolvePath(tspath.GetDirectoryPath(fixture.sourcePath), "witness.ts")
+			if err := os.WriteFile(witness, []byte(initial), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			counted := &lintProgramSourceCountingFS{FS: fixture.server.fs, source: witness}
+			fixture.server.fs = counted
+			gap := false
+			want := changed
+			if scenario == "coverage expands again" {
+				want = "import '" + next + "';\n" + changed
+			}
+			fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, _ []*lsproto.FileSystemWatcher) error {
+				if counted.reads.Load() != 1 || gap {
+					return nil
+				}
+				gap = true
+				if scenario == "registration failure" {
+					return errors.New("dependency registration failed")
+				}
+				if scenario == "coverage expands again" {
+					if err := os.WriteFile(next, []byte(changed), 0o644); err != nil {
+						return err
+					}
+				}
+				return os.WriteFile(external, []byte(want), 0o644)
+			}
+			program := fixture.load(t)
+			if !gap {
+				t.Fatal("did not exercise uncovered dependency registration")
+			}
+			if scenario == "registration failure" {
+				if fixture.store.Usable() || len(fixture.store.programs) != 0 {
+					t.Fatal("failed registration retained a usable store")
+				}
+				return
+			}
+			source := program.GetSourceFile(external)
+			if source == nil || source.Text() != want {
+				t.Fatal("retry did not observe the registration-gap change")
+			}
+			if counted.reads.Load() != 2 {
+				t.Fatalf("got %d source reads; want two builds", counted.reads.Load())
+			}
+			if scenario == "coverage expands again" {
+				if len(fixture.store.programs) != 0 {
+					t.Fatal("retained a Program built before its final coverage")
+				}
+				if source := program.GetSourceFile(next); source == nil || source.Text() != changed {
+					t.Fatal("second build omitted the new dependency")
+				}
+			} else if len(fixture.store.programs) != 1 {
+				t.Fatal("stable coverage did not retain the Program")
+			}
+		})
+	}
+}
+
+func TestLintProgramCoveragePreparationPaths(t *testing.T) {
+	for _, root := range []string{"/work", "C:/work", "//server/share/work"} {
+		for _, relative := range []bool{false, true} {
+			t.Run(root+"/relative="+strconv.FormatBool(relative), func(t *testing.T) {
+				server := newTestServer()
+				server.cwd = root + "/repo"
+				server.fs = &mockFS{}
+				server.defaultLibraryPath = bundled.LibPath()
+				coverage := newLintProgramCoverage(server)
+				coverage.relativePatternSupport = relative
+				calls := 0
+				got := make(map[string]bool)
+				coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+					calls++
+					for _, watcher := range watchers {
+						got[project.FileSystemWatcherGlobString(watcher)] = true
+					}
+					return nil
+				}
+				for range 2 {
+					safe, err := coverage.prepareProgram(context.Background(), server.cwd+"/app")
+					if err != nil || !safe {
+						t.Fatalf("coverage safe=%t error=%v", safe, err)
+					}
+				}
+				want := []string{root + "/repo/**/*", root + "/node_modules/**/*", bundled.LibPath() + "/**/*"}
+				switch root {
+				case "/work":
+					want = append(want, "/node_modules/**/*")
+				case "C:/work":
+					want = append(want, "C:/node_modules/**/*")
+				default:
+					want = append(want, "//server/share/node_modules/**/*", "//server/node_modules/**/*")
+				}
+				if calls != 1 || len(got) != len(want) {
+					t.Fatalf("registrations=%d patterns=%v; want one registration of %v", calls, got, want)
+				}
+				for _, pattern := range want {
+					if relative && !strings.HasPrefix(pattern, "bundled:") {
+						pattern = string(documentURIFromPath(strings.TrimSuffix(pattern, "/**/*"))) + "/**/*"
+					}
+					if !got[pattern] {
+						t.Errorf("missing %q in %v", pattern, got)
+					}
+				}
+			})
+		}
+	}
 }

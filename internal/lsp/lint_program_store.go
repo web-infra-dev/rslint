@@ -358,7 +358,13 @@ func (r *lintProgramRequest) rebuild(
 		return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 	}
 
-	// Register every dependency discovered by the first build, then rebuild
+	if safe, err := r.store.coverage.prepareProgram(r.ctx, tspath.GetDirectoryPath(configFileName)); err != nil || !safe {
+		r.store.coverage.disabled = true
+		r.store.Invalidate()
+		return r.loadFresh(metadata)
+	}
+
+	// Register any dependencies outside the prepared coverage, then rebuild
 	// once so no filesystem change can fall into the registration gap.
 	for attempt := range 2 {
 		// Each retry starts after watcher registration with a fresh filesystem
