@@ -451,7 +451,9 @@ func TestPushDiagnosticsPublishesBaselineBeforePluginAndAdmitsEnrichment(t *test
 		}}}, nil
 	})
 
-	s.pushDiagnostics(uri)
+	if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+		t.Fatal(err)
+	}
 	select {
 	case observed := <-baselineAtDispatch:
 		if want := fmt.Sprintf("%s:0", uri); observed != want {
@@ -511,7 +513,9 @@ func TestPushDiagnosticsDoesNotSubmitIneligibleEnrichment(t *testing.T) {
 				dispatched <- struct{}{}
 				return &linter.EslintPluginLintResult{}, nil
 			})
-			s.pushDiagnostics(uri)
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+				t.Fatal(err)
+			}
 			select {
 			case <-queue:
 			default:

@@ -772,7 +772,9 @@ func TestHandleConfigRefreshPublishesEffectiveProjectErrors(t *testing.T) {
 			publish := func(name string) []*lsproto.Diagnostic {
 				t.Helper()
 				uri := documentURIFromPath(tspath.ResolvePath(root, name))
-				s.pushDiagnostics(uri)
+				if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
 				select {
 				case message := <-outgoing:
 					request := message.AsRequest()
@@ -840,11 +842,12 @@ func TestHandleConfigRefreshPublishesEffectiveProjectErrors(t *testing.T) {
 			}
 			canceled, cancel := context.WithCancel(context.Background())
 			cancel()
-			s.backgroundCtx = canceled
-			if diagnostics := publish("source.ts"); len(diagnostics) != 0 {
-				t.Fatalf("cancellation was mislabeled as a project error: %+v", diagnostics)
+			if err := s.pushDiagnostics(canceled, uri); !errors.Is(err, context.Canceled) {
+				t.Fatalf("canceled diagnostic error = %v", err)
 			}
-			s.backgroundCtx = context.Background()
+			if len(outgoing) != 0 {
+				t.Fatal("cancellation published a project error or cleared existing diagnostics")
+			}
 			refresh("config-change", valid)
 			assertRuleDiagnostic("source.ts")
 			fixes, err = s.handleFixAllCodeAction(context.Background(), uri)

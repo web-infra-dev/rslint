@@ -108,14 +108,18 @@ func TestClientRequestCancelBeforeDispatch(t *testing.T) {
 }
 
 func TestDispatchLoopHonorsCancelBeforeRequestRegistration(t *testing.T) {
-	s, outgoing := newTestServerWithQueue()
-	s.requestQueue = make(chan *lsproto.RequestMessage, 1)
+	s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "var value = 1;\n",
+		config.RslintConfig{{Rules: config.Rules{"no-var": "error"}}})
+	s.requestQueue = make(chan *lsproto.RequestMessage, 3)
+	s.requestQueue <- lsproto.TextDocumentDidOpenInfo.NewNotificationMessage(&lsproto.DidOpenTextDocumentParams{
+		TextDocument: &lsproto.TextDocumentItem{Uri: uri, Text: "var value = 1;\n", Version: 1},
+	})
 	id, rawID := stringRequestID("queued-client-1")
 	req := &lsproto.RequestMessage{
 		ID:     id,
 		Method: lsproto.MethodTextDocumentCodeAction,
 		Params: &lsproto.CodeActionParams{
-			TextDocument: lsproto.TextDocumentIdentifier{Uri: "file:///project/index.ts"},
+			TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
 		},
 	}
 	s.registerClientRequest(context.Background(), req)
@@ -123,13 +127,20 @@ func TestDispatchLoopHonorsCancelBeforeRequestRegistration(t *testing.T) {
 	// readLoop registers before enqueueing, so cancellation cannot race ahead of
 	// the request context even when dispatch has not started.
 	s.cancelRequest(rawID)
+	s.requestQueue <- lsproto.TextDocumentDidCloseInfo.NewNotificationMessage(&lsproto.DidCloseTextDocumentParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	done := make(chan error, 1)
 	go func() { done <- s.dispatchLoop(ctx) }()
 
 	select {
 	case msg := <-outgoing:
+		if msg.Kind != jsonrpc.MessageKindResponse {
+			t.Fatal("canceled quick fix published diagnostics before the later close")
+		}
 		resp := msg.AsResponse()
 		if resp.ID == nil || *resp.ID != *id {
 			t.Fatalf("response id = %v, want %s", resp.ID, id.String())
@@ -139,6 +150,10 @@ func TestDispatchLoopHonorsCancelBeforeRequestRegistration(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("dispatch loop did not cancel the request queued before registration")
+	}
+	closed := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+	if closed.Uri != uri || len(closed.Diagnostics) != 0 {
+		t.Fatal("close did not follow the canceled quick fix")
 	}
 
 	cancel()

@@ -82,8 +82,9 @@ func (s *Server) invalidateDocumentDiagnostics(uri lsproto.DocumentUri) {
 }
 
 // An editor update can change another document's dependency view even when its
-// own text is unchanged. Use the Program store's affected owners; documents
-// without a resident graph must conservatively observe the new overlay too.
+// own text is unchanged. Use the Program store's affected owners; project-backed
+// documents without a resident graph must observe the new overlay too. A document
+// configured for source-only lint has no other editor inputs to invalidate it.
 // Invalidation is immediate; dependent observations share the typing debounce
 // so opening and closing transient overlays does not repeatedly lint consumers.
 func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lsproto.DocumentUri) {
@@ -102,10 +103,19 @@ func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lspr
 		invalidateDependent(owner)
 	}
 	for document := range s.documents {
+		if document == uri || !isLintableScriptFile(document) {
+			continue
+		}
 		if s.lintPrograms != nil {
 			if _, owned := s.lintPrograms.documentPrograms[document]; owned {
 				continue
 			}
+		}
+		snapshot := s.documentLintSnapshot(document)
+		policy := snapshot.projectPolicy
+		if snapshot.configResolved && snapshot.projectPolicyError == nil &&
+			(policy.ProjectDisabled || policy.ExplicitProject == nil && policy.ServiceRootDirectory == "") {
+			continue
 		}
 		invalidateDependent(document)
 	}
@@ -137,20 +147,27 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnosti
 // pushDiagnostics runs the linter for the given URI and pushes results to the client.
 // Must be called synchronously from the LSP message loop (not from a goroutine)
 // because document and Program state belongs to that loop.
-func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
+func (s *Server) pushDiagnostics(ctx context.Context, uri lsproto.DocumentUri) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.consumeDiagnosticRefresh()
+	result := s.prepareDiagnostics(ctx, uri)
+	if err := ctx.Err(); err != nil {
+		// A canceled quick fix must leave the background demand in place.
+		return err
+	}
 	delete(s.lintSchedule.pending, uri)
-	if result := s.prepareDiagnostics(uri); result != nil {
+	if result != nil {
 		result.publish()
 	}
+	return nil
 }
 
-func (s *Server) prepareDiagnostics(uri lsproto.DocumentUri) *documentProgressiveDiagnostics {
-	if !s.initialized {
+func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri) *documentProgressiveDiagnostics {
+	if !s.initialized || ctx.Err() != nil {
 		return nil
 	}
-
-	ctx := s.backgroundCtx
 
 	if !isLintableScriptFile(uri) {
 		return nil
@@ -181,6 +198,9 @@ func (s *Server) prepareDiagnostics(uri lsproto.DocumentUri) *documentProgressiv
 		},
 		presentation,
 	))
+	if ctx.Err() != nil {
+		return nil
+	}
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		presentation.diagnostics = nil

@@ -510,7 +510,7 @@ func (s *Server) dispatchLoop(ctx context.Context) (err error) {
 		if pending && delay == 0 {
 			delete(s.lintSchedule.pending, uri)
 			if _, open := s.documents[uri]; open {
-				s.pendingDiagnosticResult = s.prepareDiagnostics(uri)
+				s.pendingDiagnosticResult = s.prepareDiagnostics(ctx, uri)
 			}
 			continue
 		}

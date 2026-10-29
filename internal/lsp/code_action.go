@@ -38,7 +38,9 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	if isFixAllRequest(params.Context) {
 		return s.handleFixAllCodeAction(ctx, uri)
 	}
-	s.flushDocumentDiagnostics(uri)
+	if err := s.flushDocumentDiagnostics(ctx, uri); err != nil {
+		return lsproto.CodeActionResponse{}, err
+	}
 
 	snapshot := s.documentLintSnapshot(uri)
 	if snapshot.unavailable || snapshot.resolvedConfig.GloballyIgnored {

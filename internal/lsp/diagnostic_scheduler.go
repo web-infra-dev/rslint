@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"context"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
@@ -84,13 +85,17 @@ func (s *Server) queueOpenDocumentDiagnostics() {
 
 // A quick-fix request observes the input preceding it in the request queue.
 // Flush its pending diagnostics here, before processing any later notification.
-func (s *Server) flushDocumentDiagnostics(uri lsproto.DocumentUri) {
+func (s *Server) flushDocumentDiagnostics(ctx context.Context, uri lsproto.DocumentUri) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.consumeDiagnosticRefresh()
 	if result := s.pendingDiagnosticResult; result != nil && result.uri == uri {
 		s.pendingDiagnosticResult = nil
 		result.publish()
 	}
 	if _, pending := s.lintSchedule.pending[uri]; pending {
-		s.pushDiagnostics(uri)
+		return s.pushDiagnostics(ctx, uri)
 	}
+	return nil
 }
