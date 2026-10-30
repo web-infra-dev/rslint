@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -147,8 +146,10 @@ func TestLintProgramStoreWatchesDynamicMapperConfig(t *testing.T) {
 			registered := false
 			fixture.store.coverage.watchFiles = func(_ context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
 				for _, watcher := range watchers {
-					encoded, _ := json.Marshal(watcher)
-					if strings.Contains(strings.ToLower(string(encoded)), strings.ToLower(filepath.Dir(dependency))) {
+					// Compare normalized protocol paths directly. filepath.Dir
+					// introduces backslashes on Windows.
+					pattern := watcher.GlobPattern.Pattern
+					if pattern != nil && strings.EqualFold(*pattern, tspath.GetDirectoryPath(dependency)+"/**/*") {
 						registered = true
 						// Change during registration: the retry must reopen the mapper.
 						writeConfig("export const answer: string = 'registered';")
