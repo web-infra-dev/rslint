@@ -1,5 +1,5 @@
-// Package contentmapperstest provides an in-process content mapper for tests.
-package contentmapperstest
+// Package contentmappertest provides an in-process content mapper for tests.
+package contentmappertest
 
 import (
 	"bufio"

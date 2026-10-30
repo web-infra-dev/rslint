@@ -16,7 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
-	"github.com/web-infra-dev/rslint/internal/program/contentmappers/contentmapperstest"
+	"github.com/web-infra-dev/rslint/internal/testutil/contentmappertest"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -27,15 +27,15 @@ const mapperPackage = "fake-mapper"
 func writeMappedProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	contentmapperstest.WritePackage(t, dir, mapperPackage)
+	contentmappertest.WritePackage(t, dir, mapperPackage)
 	files := map[string]string{
 		"tsconfig.json": `{
   "compilerOptions": { "strict": true, "noEmit": true },
   "files": ["index.ts"],
-  "contentMappers": [{ "package": "` + mapperPackage + `", "extensions": ["` + contentmapperstest.Extension + `"] }]
+  "contentMappers": [{ "package": "` + mapperPackage + `", "extensions": ["` + contentmappertest.Extension + `"] }]
 }`,
-		"index.ts":                            "import { answer } from './data" + contentmapperstest.Extension + "';\nexport const doubled: number = answer * 2;\n",
-		"data" + contentmapperstest.Extension: "answer = 42\n",
+		"index.ts":                           "import { answer } from './data" + contentmappertest.Extension + "';\nexport const doubled: number = answer * 2;\n",
+		"data" + contentmappertest.Extension: "answer = 42\n",
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
@@ -105,7 +105,7 @@ func TestNilRuntimeRunsNothing(t *testing.T) {
 
 func TestDisabledRuntimeReportsIgnoredMappers(t *testing.T) {
 	t.Parallel()
-	spawner := &contentmapperstest.Spawner{Output: "export const answer = 42;\n"}
+	spawner := &contentmappertest.Spawner{Output: "export const answer = 42;\n"}
 	runtime := contentmappers.New(contentmappers.Options{Spawner: spawner})
 	defer runtime.Close()
 	configPath := writeMappedProject(t)
@@ -130,7 +130,7 @@ func TestDisabledRuntimeReportsIgnoredMappers(t *testing.T) {
 	}
 
 	program := build(t, runtime, config)
-	if program.GetSourceFile(tspath.GetDirectoryPath(configPath)+"/data"+contentmapperstest.Extension) != nil {
+	if program.GetSourceFile(tspath.GetDirectoryPath(configPath)+"/data"+contentmappertest.Extension) != nil {
 		t.Fatal("a dropped mapper must not map files")
 	}
 	if codes := semanticCodes(program, tspath.GetDirectoryPath(configPath)+"/index.ts"); !slices.Contains(codes, 2307) {
@@ -143,7 +143,7 @@ func TestDisabledRuntimeReportsIgnoredMappers(t *testing.T) {
 
 func TestEnabledRuntimeMapsFilesAndStopsMappers(t *testing.T) {
 	t.Parallel()
-	spawner := &contentmapperstest.Spawner{Output: "export const answer: number = 42;\n"}
+	spawner := &contentmappertest.Spawner{Output: "export const answer: number = 42;\n"}
 	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: spawner})
 	configPath := writeMappedProject(t)
 	dir := tspath.GetDirectoryPath(configPath)
@@ -153,9 +153,9 @@ func TestEnabledRuntimeMapsFilesAndStopsMappers(t *testing.T) {
 		t.Fatal("an enabled Runtime must not report ignored mappers")
 	}
 	program := build(t, runtime, config)
-	mapped := program.GetSourceFile(dir + "/data" + contentmapperstest.Extension)
+	mapped := program.GetSourceFile(dir + "/data" + contentmappertest.Extension)
 	if mapped == nil || mapped.ContentMapper() == "" {
-		t.Fatal("the mapper must provide data" + contentmapperstest.Extension)
+		t.Fatal("the mapper must provide data" + contentmappertest.Extension)
 	}
 	if codes := semanticCodes(program, dir+"/index.ts"); len(codes) != 0 {
 		t.Fatalf("index.ts diagnostics = %v, want none", codes)
@@ -177,7 +177,7 @@ func TestEnabledRuntimeMapsFilesAndStopsMappers(t *testing.T) {
 
 func TestReleaseStopsMapperBeforeRuntimeCloses(t *testing.T) {
 	t.Parallel()
-	spawner := &contentmapperstest.Spawner{Output: "export const answer: number = 42;\n"}
+	spawner := &contentmappertest.Spawner{Output: "export const answer: number = 42;\n"}
 	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: spawner})
 	defer runtime.Close()
 	config := parse(t, runtime, writeMappedProject(t))
@@ -200,7 +200,7 @@ func TestReleaseStopsMapperBeforeRuntimeCloses(t *testing.T) {
 
 func TestProjectCacheReusesProjectUntilReparse(t *testing.T) {
 	t.Parallel()
-	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: &contentmapperstest.Spawner{}})
+	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: &contentmappertest.Spawner{}})
 	defer runtime.Close()
 	cache := runtime.NewProjectCache()
 	configPath := writeMappedProject(t)

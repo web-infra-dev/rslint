@@ -126,7 +126,7 @@ contenteditable
 contentinfo
 contentmapper
 contentmappers
-contentmapperstest
+contentmappertest
 corge
 cpuprof
 ctype

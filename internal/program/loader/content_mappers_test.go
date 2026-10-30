@@ -11,12 +11,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
-	"github.com/web-infra-dev/rslint/internal/program/contentmappers/contentmapperstest"
+	"github.com/web-infra-dev/rslint/internal/testutil/contentmappertest"
 )
 
 func writeContentMapperFiles(t *testing.T, dir string, files map[string]string) {
 	t.Helper()
-	contentmapperstest.WritePackage(t, dir, "fake-mapper")
+	contentmappertest.WritePackage(t, dir, "fake-mapper")
 	for name, content := range files {
 		path := filepath.Join(dir, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -45,7 +45,7 @@ func TestBuildContextRunsContentMappersOnlyWhenEnabled(t *testing.T) {
 	root := tspath.NormalizePath(dir)
 
 	for _, enabled := range []bool{false, true} {
-		spawner := &contentmapperstest.Spawner{Output: "export const answer: number = 42;\n"}
+		spawner := &contentmappertest.Spawner{Output: "export const answer: number = 42;\n"}
 		mappers := contentmappers.New(contentmappers.Options{Enabled: enabled, Spawner: spawner})
 		context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), mappers)
 		program, err := context.createProjectProgram(true, root, "tsconfig.json")
