@@ -1007,7 +1007,7 @@ func TestLintProgramStoreWatchesMissingProjectConfig(t *testing.T) {
 }
 
 func TestLintProgramStoreWindowsDriveURIs(t *testing.T) {
-	for _, scenario := range []string{"unchanged reopen", "new included file", "unsaved included file"} {
+	for _, scenario := range []string{"unchanged reopen", "new included file", "unsaved included file", "unrelated edit"} {
 		t.Run(scenario, func(t *testing.T) {
 			const content = "export const value = 1;\n"
 			// Model both drive spellings, including Realpath preserving C:.
@@ -1029,6 +1029,19 @@ func TestLintProgramStoreWindowsDriveURIs(t *testing.T) {
 			fixture.store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
 			server.documents[fixture.sourceURI] = content
 			first := fixture.load(t)
+
+			if scenario == "unrelated edit" {
+				const outsideURI = lsproto.DocumentUri("file:///C%3A/repo/outside.ts")
+				for _, drive := range []string{"C:", "c:"} {
+					files[drive+"/repo/outside.ts"] = content
+				}
+				server.documents[outsideURI] = content
+				fixture.store.DidChange(outsideURI, content+"// edit\n")
+				if fixture.load(t) != first {
+					t.Fatal("unrelated uppercase-drive edit invalidated the resident Program")
+				}
+				return
+			}
 
 			if scenario == "unchanged reopen" {
 				delete(server.documents, fixture.sourceURI)
@@ -1547,7 +1560,110 @@ func TestLintProgramStoreReusesFrozenTargetForResidentAndRebuild(t *testing.T) {
 	}
 }
 
-func TestLintProgramStoreUnrelatedOpenDoesNotScanProgramSources(t *testing.T) {
+func TestLintProgramStoreColdLookupsKeepFrozenOverlaysAndRefreshDisk(t *testing.T) {
+	const content = "export const value = 1;\n"
+	const otherContent = "export const other = 2;\n"
+	fixture := newLintProgramStoreFixture(t, content)
+	root := tspath.NormalizePath(fixture.server.cwd)
+	firstPath := tspath.ResolvePath(root, "first.ts")
+	secondPath := tspath.ResolvePath(root, "second.ts")
+	otherPath := tspath.ResolvePath(root, "other.ts")
+	secondConfig := tspath.ResolvePath(root, "tsconfig.other.json")
+	queryPath := tspath.ResolvePath(root, "query.ts")
+	outsidePath := tspath.ResolvePath(root, "outside.ts")
+	for path, text := range map[string]string{
+		fixture.configPath: `{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`,
+		secondConfig:       `{"compilerOptions":{"noLib":true},"files":["other.ts","src/index.ts"]}`,
+		secondPath:         content,
+		otherPath:          otherContent,
+		outsidePath:        content,
+	} {
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(fixture.sourcePath, firstPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(firstPath, fixture.sourcePath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	first := fixture.load(t)
+	// Before the watcher notification arrives, another project observes the
+	// moved source while the first Program still owns its frozen target.
+	if err := os.Remove(fixture.sourcePath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secondPath, fixture.sourcePath); err != nil {
+		t.Fatal(err)
+	}
+	otherURI := documentURIFromPath(otherPath)
+	fixture.server.documents[otherURI] = otherContent
+	loadSecond := func() *compiler.Program {
+		t.Helper()
+		load, _, finalize := fixture.request(otherURI)
+		defer finalize()
+		program, source, err := load(secondConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if source == nil || source.Text() != otherContent {
+			t.Fatal("second project lost its selected editor source")
+		}
+		return program
+	}
+	second := loadSecond()
+	if len(fixture.store.programs) != 2 {
+		t.Fatal("fixture must retain both selected projects")
+	}
+	if err := os.Symlink(outsidePath, queryPath); err != nil {
+		t.Fatal(err)
+	}
+	queryURI := documentURIFromPath(queryPath)
+	fixture.server.documents[queryURI] = content
+	fixture.store.DidOpen(queryURI, content, true)
+	// An unrelated change takes the canonical fallback in both Programs. Their
+	// disk cache is shared, but the moved source's frozen identities must differ.
+	fixture.store.DidChange(queryURI, content)
+	firstCanonical := tspath.NormalizePath(fixture.server.fs.Realpath(firstPath))
+	secondCanonical := tspath.NormalizePath(fixture.server.fs.Realpath(secondPath))
+	for _, test := range []struct {
+		configPath, own, other string
+		program                *compiler.Program
+	}{
+		{fixture.configPath, firstCanonical, secondCanonical, first},
+		{secondConfig, secondCanonical, firstCanonical, second},
+	} {
+		state := fixture.store.programs[lintProgramLexicalPathID(test.configPath, fixture.server.fs)]
+		if state == nil || test.program.GetSourceFile(test.own) != nil {
+			t.Fatal("fixture must retain the lexical source and require canonical lookup")
+		}
+		source := state.sources.CanonicalSourceFile(test.own)
+		if source == nil || source != test.program.GetSourceFile(fixture.sourcePath) || source.Text() != content {
+			t.Fatalf("project %q lost its own frozen source binding", test.configPath)
+		}
+		if state.sources.CanonicalSourceFile(test.other) != nil {
+			t.Fatalf("project %q borrowed the other Program's source identity", test.configPath)
+		}
+	}
+	if err := os.Remove(queryPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secondPath, queryPath); err != nil {
+		t.Fatal(err)
+	}
+	// The next event must observe the alias's new identity. It now addresses a
+	// source in the second Program, so that Program must be refreshed.
+	affected := fixture.store.DidChange(queryURI, content)
+	if len(affected) != 1 || affected[0] != otherURI {
+		t.Fatalf("alias update affected %v; want only the second Program's owner", affected)
+	}
+	if updated := loadSecond(); updated == second {
+		t.Fatal("the next document event reused a cached unrelated alias identity")
+	}
+}
+
+func TestLintProgramStoreUnrelatedEventsBoundSourceQueries(t *testing.T) {
 	const content = "export const value = 1;\n"
 	fixture := newLintProgramStoreFixture(t, content)
 	for index := range 100 {
@@ -1573,6 +1689,41 @@ func TestLintProgramStoreUnrelatedOpenDoesNotScanProgramSources(t *testing.T) {
 	fixture.store.DidOpen(unrelatedURI, content, true)
 	if countingFS.calls > 3 {
 		t.Fatalf("unrelated open performed %d realpath calls; want O(1)", countingFS.calls)
+	}
+
+	// Retain a second Program with the same sources under another config.
+	// Both cold negative lookups must share their disk identity queries.
+	secondConfig := tspath.ResolvePath(fixture.server.cwd, "tsconfig.other.json")
+	configText, err := os.ReadFile(fixture.configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(secondConfig, configText, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	secondURI := documentURIFromPath(tspath.ResolvePath(tspath.GetDirectoryPath(fixture.sourcePath), "file-0.ts"))
+	fixture.server.documents[secondURI] = content
+	load, _, finalize := fixture.request(secondURI)
+	second, source, err := load(secondConfig)
+	finalize()
+	if err != nil || source == nil || len(fixture.store.programs) != 2 {
+		t.Fatalf("expected two resident Programs: source=%v error=%v", source, err)
+	}
+	countingFS.calls = 0
+	fixture.store.DidChange(unrelatedURI, content+"// edit\n")
+	// Allow the event target and directory identities as well as each unique
+	// source. Repeated full source scans would exceed this bound.
+	if limit := len(second.GetSourceFiles()) + 20; countingFS.calls > limit {
+		t.Fatalf("cold edit performed %d realpath calls; want at most %d", countingFS.calls, limit)
+	}
+	for _, state := range fixture.store.programs {
+		source := state.sources.SourceFileForPath(unrelatedPath, func() vfs.FS {
+			t.Fatal("warm lookup requested a cold-index filesystem")
+			return nil
+		})
+		if source != nil {
+			t.Fatal("unrelated file resolved to a Program source")
+		}
 	}
 }
 

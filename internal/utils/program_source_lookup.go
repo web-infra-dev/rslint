@@ -33,10 +33,10 @@ func (lookup *ProgramSourceLookup) UpdateProgramForReusedGraph(program *compiler
 	}
 }
 
-func (lookup *ProgramSourceLookup) canonicalPathID(filePath string) string {
+func canonicalSourcePathID(filePath string, fs vfs.FS) string {
 	filePath = tspath.NormalizePath(filePath)
-	if lookup.fs != nil {
-		if realPath := lookup.fs.Realpath(filePath); realPath != "" {
+	if fs != nil {
+		if realPath := fs.Realpath(filePath); realPath != "" {
 			filePath = tspath.NormalizePath(realPath)
 		}
 	}
@@ -61,7 +61,7 @@ func (lookup *ProgramSourceLookup) SourceFileForCandidate(candidate string, cano
 	if canonicalTarget == "" {
 		return nil
 	}
-	if lookup.canonicalPathID(sourceFile.FileName()) == lookup.canonicalPathID(canonicalTarget) {
+	if canonicalSourcePathID(sourceFile.FileName(), lookup.fs) == canonicalSourcePathID(canonicalTarget, lookup.fs) {
 		return sourceFile
 	}
 	return nil
@@ -73,18 +73,22 @@ func (lookup *ProgramSourceLookup) CanonicalSourceFile(canonicalPath string) *as
 	if lookup == nil || lookup.program == nil || lookup.fs == nil || canonicalPath == "" {
 		return nil
 	}
-	return lookup.canonicalSourceFileByID(lookup.canonicalPathID(canonicalPath))
+	return lookup.canonicalSourceFileByID(canonicalSourcePathID(canonicalPath, lookup.fs), nil)
 }
 
-func (lookup *ProgramSourceLookup) canonicalSourceFileByID(canonicalID string) *ast.SourceFile {
+func (lookup *ProgramSourceLookup) canonicalSourceFileByID(canonicalID string, indexFS func() vfs.FS) *ast.SourceFile {
 	if lookup == nil || lookup.program == nil || lookup.fs == nil || canonicalID == "" {
 		return nil
 	}
 	if !lookup.canonicalIndexBuilt {
+		fs := lookup.fs
+		if indexFS != nil {
+			fs = indexFS()
+		}
 		lookup.canonicalIndexBuilt = true
 		lookup.canonicalSources = make(map[string]*ast.SourceFile)
 		for _, sourceFile := range lookup.program.GetSourceFiles() {
-			canonicalID := lookup.canonicalPathID(sourceFile.FileName())
+			canonicalID := canonicalSourcePathID(sourceFile.FileName(), fs)
 			existing := lookup.canonicalSources[canonicalID]
 			if existing == nil || sourceFile.FileName() < existing.FileName() {
 				lookup.canonicalSources[canonicalID] = sourceFile
@@ -112,21 +116,23 @@ func (lookup *ProgramSourceLookup) SourceFileForTarget(filePath string, canonica
 	canonicalPath = tspath.NormalizePath(canonicalPath)
 	canonicalID := ExactPathID(canonicalPath)
 	if sourceFile := lookup.program.GetSourceFile(filePath); sourceFile != nil &&
-		lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+		canonicalSourcePathID(sourceFile.FileName(), lookup.fs) == canonicalID {
 		return sourceFile
 	}
 	if ExactPathID(canonicalPath) != ExactPathID(filePath) {
 		if sourceFile := lookup.program.GetSourceFile(canonicalPath); sourceFile != nil &&
-			lookup.canonicalPathID(sourceFile.FileName()) == canonicalID {
+			canonicalSourcePathID(sourceFile.FileName(), lookup.fs) == canonicalID {
 			return sourceFile
 		}
 	}
-	return lookup.canonicalSourceFileByID(canonicalID)
+	return lookup.canonicalSourceFileByID(canonicalID, nil)
 }
 
 // SourceFileForPath resolves a lexical filesystem path through exact and
-// canonical Program source identities.
-func (lookup *ProgramSourceLookup) SourceFileForPath(filePath string) *ast.SourceFile {
+// canonical Program source identities. indexFS is called only to build a cold
+// canonical source index. Its view must preserve the Program's frozen overlay
+// mapping and is not retained; nil uses the lookup's own filesystem.
+func (lookup *ProgramSourceLookup) SourceFileForPath(filePath string, indexFS func() vfs.FS) *ast.SourceFile {
 	if lookup == nil || lookup.program == nil || filePath == "" {
 		return nil
 	}
@@ -149,5 +155,5 @@ func (lookup *ProgramSourceLookup) SourceFileForPath(filePath string) *ast.Sourc
 			return sourceFile
 		}
 	}
-	return lookup.CanonicalSourceFile(canonicalPath)
+	return lookup.canonicalSourceFileByID(canonicalSourcePathID(canonicalPath, lookup.fs), indexFS)
 }

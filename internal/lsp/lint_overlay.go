@@ -99,7 +99,7 @@ func newCachedLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target
 	return newCachedLintQueryFS(newFrozenLintTargetOverlayFS(diskFS, files, target))
 }
 
-func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
+func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) *frozenLintTargetOverlayFS {
 	caseSensitive := true
 	if baseFS != nil {
 		caseSensitive = baseFS.UseCaseSensitiveFileNames()
@@ -116,6 +116,14 @@ func newFrozenLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target
 		canonicalPathID: lspLexicalPathID(canonicalPath, caseSensitive),
 		canonicalPath:   canonicalPath,
 	}
+}
+
+// withBaseFS shares disk observations while preserving this Program's frozen
+// target identity and editor texts. The returned view belongs to one event.
+func (fs *frozenLintTargetOverlayFS) withBaseFS(baseFS vfs.FS) *frozenLintTargetOverlayFS {
+	view := *fs
+	view.FS = utils.NewOverlayVFS(baseFS, fs.overlayFiles)
+	return &view
 }
 
 func (fs *frozenLintTargetOverlayFS) Realpath(filePath string) string {
