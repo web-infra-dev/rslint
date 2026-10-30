@@ -563,21 +563,29 @@ func TestUnrelatedSourceOnlyDocumentsKeepDiagnostics(t *testing.T) {
 	}
 }
 
-func TestSourceOnlyDiagnosticsUseEditorBOM(t *testing.T) {
+func TestDiagnosticsUseEditorBOM(t *testing.T) {
 	const content = "#!/usr/bin/env node\nexport {};\n"
 	for _, test := range []struct {
 		name, disk, editor string
+		parser             *config.ParserOptions
 	}{
-		{name: "editor adds BOM", disk: content, editor: utils.BOM + content},
-		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+		{name: "source only adds BOM", disk: content, editor: utils.BOM + content},
+		{name: "source only removes BOM", disk: utils.BOM + content, editor: content},
+		{name: "explicit project adds BOM", disk: content, editor: utils.BOM + content, parser: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		{name: "explicit project removes BOM", disk: utils.BOM + content, editor: content, parser: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		{name: "project service adds BOM", disk: content, editor: utils.BOM + content, parser: &config.ParserOptions{ProjectService: ptrTo(true)}},
+		{name: "project service removes BOM", disk: utils.BOM + content, editor: content, parser: &config.ParserOptions{ProjectService: ptrTo(true)}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, test.disk, config.RslintConfig{{
-				Plugins: []string{"node"}, Rules: config.Rules{"node/hashbang": "error"},
+				Plugins:         []string{"node"},
+				Rules:           config.Rules{"node/hashbang": "error"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: test.parser},
 			}})
 			if err := os.WriteFile(tspath.ResolvePath(s.cwd, "package.json"), []byte(`{"bin":"src/index.ts"}`), 0o644); err != nil {
 				t.Fatal(err)
 			}
+			var resident *lintProgramState
 			for i, text := range []string{test.editor, test.disk} {
 				if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, int32(i+1), text)); err != nil {
 					t.Fatal(err)
@@ -595,6 +603,14 @@ func TestSourceOnlyDiagnosticsUseEditorBOM(t *testing.T) {
 				}
 				if err != nil {
 					t.Fatal(err)
+				}
+				if test.parser != nil {
+					key, owned := s.lintPrograms.documentPrograms[uri]
+					state := s.lintPrograms.programs[key]
+					if !owned || state == nil || resident != nil && state != resident {
+						t.Fatal("BOM-only changes must retain the configured Program state")
+					}
+					resident = state
 				}
 				want := 0
 				if strings.HasPrefix(text, utils.BOM) {
