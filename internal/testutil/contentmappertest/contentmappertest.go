@@ -27,6 +27,9 @@ const Extension = ".fake"
 // into Output, as TypeScript.
 type Spawner struct {
 	Output string
+	// ConfigFile enables dynamic configuration: its contents become both the
+	// configuration identity and the mapped TypeScript output on openProject.
+	ConfigFile string
 
 	spawns atomic.Int32
 	closes atomic.Int32
@@ -43,7 +46,7 @@ func (s *Spawner) Closes() int { return int(s.closes.Load()) }
 func (s *Spawner) Spawn(command []string, dir string, stderr io.Writer) (io.ReadWriteCloser, error) {
 	s.spawns.Add(1)
 	client, server := net.Pipe()
-	go serve(server, s.Output)
+	go serve(server, s.Output, s.ConfigFile)
 	return &process{Conn: client, closes: &s.closes}, nil
 }
 
@@ -79,7 +82,7 @@ type message struct {
 
 // serve answers the mapper protocol over conn with Content-Length framing,
 // like the LSP base protocol.
-func serve(conn net.Conn, output string) {
+func serve(conn net.Conn, output string, configFile string) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	for {
@@ -99,6 +102,18 @@ func serve(conn net.Conn, output string) {
 			// The manifest declares no dynamicConfig, so ts-go rejects a
 			// config identity.
 			result = contentmapper.OpenProjectResult{}
+			if configFile != "" {
+				content, err := os.ReadFile(configFile)
+				if err != nil {
+					output = ""
+				} else {
+					output = string(content)
+				}
+				result = contentmapper.OpenProjectResult{
+					ConfigIdentity: "config:" + output,
+					WatchedFiles:   []string{configFile},
+				}
+			}
 		case contentmapper.MethodTransform:
 			result = contentmapper.TransformResult{MappedOutput: contentmapper.MappedOutput{Text: output, Extension: ".ts"}}
 		}
