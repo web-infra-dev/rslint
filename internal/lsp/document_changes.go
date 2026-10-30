@@ -6,8 +6,23 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 )
+
+// Rules use BOM-stripped source offsets. ESLint's -1 prefix offset includes
+// the BOM, which may still be present in the editor's document text.
+func sourcePositionToLSP(sourceFile ast.SourceFileLike, position int, editorHasBOM bool) lsproto.Position {
+	if position == -1 {
+		return lsproto.Position{}
+	}
+	line, character := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, position)
+	if editorHasBOM && line == 0 {
+		character++
+	}
+	return lsproto.Position{Line: uint32(line), Character: uint32(character)}
+}
 
 // applyDocumentChanges applies LSP content changes in order. Partial ranges are
 // interpreted against the document produced by the preceding change, as

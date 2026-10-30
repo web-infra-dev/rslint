@@ -60,8 +60,6 @@ func NewServer(opts *ServerOptions) *Server {
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:              make(chan struct{}, 1),
-		debounceCh:             make(chan struct{}, 1),
-		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
@@ -210,11 +208,11 @@ type Server struct {
 	// loop, which owns document and Program state.
 	refreshCh chan struct{}
 
-	// debounceCh receives a signal when the debounce timer fires, telling
-	// the dispatch loop to lint only the URIs in pendingLintURIs.
-	debounceCh      chan struct{}
-	pendingLintURIs map[lsproto.DocumentUri]struct{}
-	lintTimer       *time.Timer
+	lintSchedule            diagnosticScheduler
+	pendingDiagnosticResult *documentProgressiveDiagnostics
+	// Source-only observations retain filesystem lookup paths, not Programs.
+	// These distinguish independent documents from rules that resolve imports.
+	diagnosticInputs map[lsproto.DocumentUri]lintProgramLookups
 
 	// eslintPluginDispatch sends one plugin-lint batch to the Node host over
 	// the `rslint/pluginLint` reverse request and decodes its result.
@@ -245,7 +243,7 @@ type Server struct {
 	// pluginResultCh delivers eslint-plugin diagnostics computed off the
 	// dispatch loop (in a goroutine that calls eslintPluginDispatch) back to
 	// the main dispatch loop, which is the ONLY goroutine allowed to write
-	// the lock-free s.diagnostics map and publish. Mirrors refreshCh/debounceCh.
+	// the lock-free s.diagnostics map and publish.
 	pluginResultCh chan pluginLintResult
 
 	// inflightPluginDispatch tracks the in-flight background plugin dispatch per
@@ -256,11 +254,10 @@ type Server struct {
 	inflightPluginDispatch   map[lsproto.DocumentUri]*pluginDispatchHandle
 	inflightPluginDispatchMu sync.Mutex
 
-	// docGeneration tracks a per-URI revision counter. pushDiagnostics bumps it
-	// on every (re)lint and stamps the spawned plugin goroutine with the value.
-	// A plugin result whose generation no longer matches is stale (a newer
-	// keystroke already re-linted) and is dropped — cooperative ctx cancel does
-	// not guarantee the in-flight worker stops, so generation guards correctness.
+	// docGeneration tracks a per-URI revision counter. Input invalidation and
+	// each new observation advance it. Native and plugin results carry this
+	// value and can commit only while it still matches the open document.
+	// Cancellation alone cannot prevent a completed worker from returning.
 	// Only accessed from the main dispatch loop goroutine.
 	docGeneration map[lsproto.DocumentUri]uint64
 }
@@ -276,6 +273,19 @@ type pluginLintResult struct {
 
 // WatchFiles registers compiler and configuration dependencies with the client.
 func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Retrying an ID first settles the earlier registration. A failed or
+	// canceled reply cannot prove that the client did not install it.
+	if s.watchers.Has(id) {
+		if err := s.UnwatchFiles(ctx, id); err != nil {
+			return err
+		}
+	}
+	// Ownership starts before the request, and ends only after acknowledged
+	// removal. Callers can retry or replace registrations without losing IDs.
+	s.watchers.Add(id)
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
 			{
@@ -292,7 +302,6 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 		return fmt.Errorf("failed to register file watcher: %w", err)
 	}
 
-	s.watchers.Add(id)
 	return nil
 }
 
@@ -470,72 +479,117 @@ func (s *Server) read() (*lsproto.Message, error) {
 	return s.r.Read()
 }
 
-func (s *Server) dispatchLoop(ctx context.Context) error {
+func (s *Server) dispatchLoop(ctx context.Context) (err error) {
 	ctx, lspExit := context.WithCancel(ctx)
 	defer lspExit()
+	// Scheduled native work runs outside a request handler, but must retain
+	// the same fatal-panic boundary as blocking document notifications.
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("panic in LSP dispatch: %v", recovered)
+			s.Log(err, string(debug.Stack()))
+		}
+	}()
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+	var pluginResult *pluginLintResult
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		// Process a bounded FIFO prefix before starting another diagnostic. The
+		// channel capacity bounds this batch even under continuous input. Request
+		// handlers run in place, so a quick fix cannot observe a later edit/close.
+		for range len(s.requestQueue) {
+			s.dispatchRequest(ctx, <-s.requestQueue, lspExit)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+		}
+		s.consumeDiagnosticRefresh()
+		if result := s.pendingDiagnosticResult; result != nil {
+			s.pendingDiagnosticResult = nil
+			result.publish()
+		}
+		if pluginResult != nil {
+			s.mergePluginDiagnostics(*pluginResult)
+			pluginResult = nil
+		}
+		// Give completed enrichment a turn even when native work stays ready.
+		select {
+		case result := <-s.pluginResultCh:
+			s.mergePluginDiagnostics(result)
+		default:
+		}
+		uri, delay, pending := s.lintSchedule.next(time.Now())
+		if pending && delay == 0 {
+			delete(s.lintSchedule.pending, uri)
+			if _, open := s.documents[uri]; open {
+				s.pendingDiagnosticResult = s.prepareDiagnostics(ctx, uri)
+			}
+			continue
+		}
+		var timerCh <-chan time.Time
+		if pending {
+			timer.Reset(delay)
+			timerCh = timer.C
+		} else {
+			timer.Stop()
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-s.refreshCh:
-			// Project or configuration state changed.
-			// Re-lint all open documents on the main goroutine.
-			for uri := range s.documents {
-				s.pushDiagnostics(uri)
-			}
-		case <-s.debounceCh:
-			// Debounce timer fired — lint only documents with pending changes.
-			for uri := range s.pendingLintURIs {
-				s.pushDiagnostics(uri)
-			}
-			clear(s.pendingLintURIs)
-		case r := <-s.pluginResultCh:
-			// eslint-plugin diagnostics computed in a goroutine. Merge them
-			// into the lock-free s.diagnostics map and re-publish — on the
-			// main loop, the only goroutine permitted to touch s.diagnostics.
-			s.mergePluginDiagnostics(r)
 		case req := <-s.requestQueue:
-			requestCtx := ctx
-			if req.ID != nil {
-				requestCtx = s.clientRequestContext(requestCtx, req)
-			}
+			s.dispatchRequest(ctx, req, lspExit)
+		case <-s.refreshCh:
+			s.queueOpenDocumentDiagnostics()
+		case result := <-s.pluginResultCh:
+			pluginResult = &result
+		case <-timerCh:
+		}
+	}
+}
 
-			handle := func() {
-				if req.ID != nil {
-					defer s.finishClientRequest(req.ID)
-				}
-				defer func() {
-					if r := recover(); r != nil {
-						stack := debug.Stack()
-						s.Log("panic handling request", req.Method, r, string(stack))
-						if isBlockingMethod(req.Method) {
-							lspExit()
-						} else {
-							if req.ID != nil {
-								s.sendError(req.ID, fmt.Errorf("%w: panic handling request %s: %v", lsproto.ErrorCodeInternalError, req.Method, r))
-							} else {
-								s.Log("unhandled panic in notification", req.Method, r)
-							}
-						}
-					}
-				}()
-				if err := s.handleRequestOrNotification(requestCtx, req); err != nil {
-					if errors.Is(err, context.Canceled) {
-						s.sendError(req.ID, lsproto.ErrorCodeRequestCancelled)
-					} else if errors.Is(err, io.EOF) {
-						lspExit()
+func (s *Server) dispatchRequest(ctx context.Context, req *lsproto.RequestMessage, lspExit context.CancelFunc) {
+	requestCtx := ctx
+	if req.ID != nil {
+		requestCtx = s.clientRequestContext(requestCtx, req)
+	}
+
+	handle := func() {
+		if req.ID != nil {
+			defer s.finishClientRequest(req.ID)
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				stack := debug.Stack()
+				s.Log("panic handling request", req.Method, r, string(stack))
+				if isBlockingMethod(req.Method) {
+					lspExit()
+				} else {
+					if req.ID != nil {
+						s.sendError(req.ID, fmt.Errorf("%w: panic handling request %s: %v", lsproto.ErrorCodeInternalError, req.Method, r))
 					} else {
-						s.sendError(req.ID, err)
+						s.Log("unhandled panic in notification", req.Method, r)
 					}
 				}
 			}
-
-			if isBlockingMethod(req.Method) {
-				handle()
+		}()
+		if err := s.handleRequestOrNotification(requestCtx, req); err != nil {
+			if errors.Is(err, context.Canceled) {
+				s.sendError(req.ID, lsproto.ErrorCodeRequestCancelled)
+			} else if errors.Is(err, io.EOF) {
+				lspExit()
 			} else {
-				go handle()
+				s.sendError(req.ID, err)
 			}
 		}
+	}
+
+	if isBlockingMethod(req.Method) {
+		handle()
+	} else {
+		go handle()
 	}
 }
 

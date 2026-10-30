@@ -1275,6 +1275,70 @@ func TestLintProgramStoreWatcherFailureFallsBackToFreshPrograms(t *testing.T) {
 	}
 }
 
+func TestLintProgramStoreCancellationKeepsCacheRecoverable(t *testing.T) {
+	for _, phase := range []string{"metadata", "preparation", "dependency", "discovery finalization", "dependency finalization"} {
+		t.Run(phase, func(t *testing.T) {
+			external := tspath.ResolvePath(tspath.NormalizePath(t.TempDir()), "external.ts")
+			if err := os.WriteFile(external, []byte("export const value = 1;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			fixture := newLintProgramStoreFixture(t, "import '"+external+"';\n")
+			counted := &lintProgramSourceCountingFS{FS: fixture.server.fs, source: external}
+			fixture.server.fs = counted
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			finalizing, canceled := false, false
+			fixture.store.coverage.watchFiles = func(watchCtx context.Context, _ project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+				shouldCancel := phase == "metadata" || phase == "dependency" && counted.reads.Load() > 0 || finalizing
+				if phase == "preparation" {
+					for _, watcher := range watchers {
+						shouldCancel = shouldCancel || project.FileSystemWatcherGlobString(watcher) == bundled.LibPath()+"/**/*"
+					}
+				}
+				if shouldCancel {
+					canceled = true
+					cancel()
+					return watchCtx.Err()
+				}
+				return nil
+			}
+			request := fixture.store.request(ctx, fixture.sourceURI,
+				lspConfigTarget(fixture.sourcePath, fixture.server.cwd, fixture.server.fs))
+			metadata, err := request.metadata(fixture.configPath)
+			if err == nil {
+				_, _, err = request.load(metadata)
+			}
+			if err != nil && !errors.Is(err, context.Canceled) {
+				t.Fatal(err)
+			}
+			if strings.HasSuffix(phase, "finalization") {
+				probe := tspath.ResolvePath(tspath.NormalizePath(t.TempDir()), "missing.ts")
+				if phase == "discovery finalization" {
+					request.discoveryFS.FileExists(probe)
+				} else {
+					if request.usedState == nil {
+						t.Fatal("request did not acquire a resident Program")
+					}
+					request.usedState.tracker.FileExists(probe)
+				}
+				finalizing = true
+			}
+			request.finalize()
+			if !canceled || ctx.Err() == nil {
+				t.Fatal("did not cancel during the selected watcher phase")
+			}
+			if !fixture.store.Usable() || len(fixture.store.programs) != 0 {
+				t.Fatal("cancellation disabled caching or retained unverified state")
+			}
+			fixture.store.coverage.watchFiles = func(context.Context, project.WatcherID, []*lsproto.FileSystemWatcher) error { return nil }
+			recovered := fixture.load(t)
+			if fixture.load(t) != recovered {
+				t.Fatal("normal requests did not recover and reuse a watcher-protected Program")
+			}
+		})
+	}
+}
+
 func TestLintProgramStoreOpeningUnrelatedFileKeepsResidentProgram(t *testing.T) {
 	const content = "export const value = 1;\n"
 	fixture := newLintProgramStoreFixture(t, content)

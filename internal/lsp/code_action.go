@@ -5,27 +5,24 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
 
-// ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
-// source file's line map for position encoding.
-func ruleFixToTextEdit(sourceFile ast.SourceFileLike, fix rule.RuleFix) *lsproto.TextEdit {
-	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
-	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
+func ruleFixToTextEdit(sourceFile ast.SourceFileLike, fix rule.RuleFix, editorHasBOM bool) *lsproto.TextEdit {
 	return &lsproto.TextEdit{
 		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
-			End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
+			Start: sourcePositionToLSP(sourceFile, fix.Range.Pos(), editorHasBOM),
+			End:   sourcePositionToLSP(sourceFile, fix.Range.End(), editorHasBOM),
 		},
 		NewText: fix.Text,
 	}
@@ -37,6 +34,9 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	// Handle source.fixAll requests (triggered by editor.codeActionsOnSave)
 	if isFixAllRequest(params.Context) {
 		return s.handleFixAllCodeAction(ctx, uri)
+	}
+	if err := s.flushDocumentDiagnostics(ctx, uri); err != nil {
+		return lsproto.CodeActionResponse{}, err
 	}
 
 	snapshot := s.documentLintSnapshot(uri)
@@ -53,21 +53,19 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	}
 
 	var codeActions []lsproto.CommandOrCodeAction
+	editorHasBOM := strings.HasPrefix(s.documents[uri], utils.BOM)
 
 	// Find diagnostics that overlap with the requested range
 	for _, ruleDiag := range ruleDiagnostics {
 		// Check if diagnostic range overlaps with requested range
-		diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-		diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
 		diagRange := lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
+			Start: sourcePositionToLSP(ruleDiag.SourceFile, ruleDiag.Range.Pos(), editorHasBOM),
+			End:   sourcePositionToLSP(ruleDiag.SourceFile, ruleDiag.Range.End(), editorHasBOM),
 		}
 
 		if rangesOverlap(diagRange, params.Range) {
 			// Add code action for fixes
-			codeAction := createCodeActionFromRuleDiagnostic(ruleDiag, uri)
+			codeAction := createCodeActionFromRuleDiagnostic(ruleDiag, uri, editorHasBOM)
 			if codeAction != nil {
 				codeActions = append(codeActions, lsproto.CommandOrCodeAction{
 					Command:    nil,
@@ -75,13 +73,13 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 				})
 			}
 			// add extract disable rule actions
-			disableActions := createDisableRuleActions(ruleDiag, uri)
+			disableActions := createDisableRuleActions(ruleDiag, uri, editorHasBOM)
 			codeActions = append(codeActions, disableActions...)
 
 			// Add code actions for suggestions
 			if ruleDiag.Suggestions != nil {
 				for _, suggestion := range *ruleDiag.Suggestions {
-					suggestionAction := createCodeActionFromSuggestion(ruleDiag, suggestion, uri)
+					suggestionAction := createCodeActionFromSuggestion(ruleDiag, suggestion, uri, editorHasBOM)
 					if suggestionAction != nil {
 						codeActions = append(codeActions, lsproto.CommandOrCodeAction{
 							Command:    nil,
@@ -121,9 +119,8 @@ func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
 func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {
 	empty := lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}
 
-	// Clear pending debounce for this URI — we are about to lint it fresh,
-	// so any scheduled debounce lint for the same content is redundant.
-	delete(s.pendingLintURIs, uri)
+	// Fix-all computes speculative edits and does not publish diagnostics. Keep
+	// pending diagnostics even when no edits are produced or applied by the client.
 
 	if !s.initialized {
 		return empty, nil
@@ -274,7 +271,7 @@ func rangesOverlap(a, b lsproto.Range) bool {
 }
 
 // Helper function to create a code action from a rule diagnostic
-func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) *lsproto.CodeAction {
+func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, editorHasBOM bool) *lsproto.CodeAction {
 	fixes := ruleDiag.Fixes()
 	if len(fixes) == 0 {
 		return nil
@@ -283,7 +280,7 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix, editorHasBOM))
 	}
 
 	// Create workspace edit
@@ -297,13 +294,13 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 		Title:       "Fix: " + ruleDiag.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag, editorHasBOM)},
 		IsPreferred: ptrTo(true), // Mark auto-fixes as preferred
 	}
 }
 
 // Helper function to create a code action from a rule suggestion
-func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rule.RuleSuggestion, uri lsproto.DocumentUri) *lsproto.CodeAction {
+func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rule.RuleSuggestion, uri lsproto.DocumentUri, editorHasBOM bool) *lsproto.CodeAction {
 	fixes := suggestion.Fixes()
 	if len(fixes) == 0 {
 		return nil
@@ -312,7 +309,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix, editorHasBOM))
 	}
 
 	// Create workspace edit
@@ -326,19 +323,19 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 		Title:       "Suggestion: " + suggestion.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag, editorHasBOM)},
 		IsPreferred: ptrTo(false), // Mark suggestions as not preferred
 	}
 }
 
 // Helper function to create disable rule actions for diagnostics without fixes
-func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
+func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, editorHasBOM bool) []lsproto.CommandOrCodeAction {
 	if ruleDiag.Origin == rule.DiagnosticOriginTypeScript {
 		return nil
 	}
 	var actions []lsproto.CommandOrCodeAction
 
-	lspDiagnostic := convertRuleDiagnosticToLSP(ruleDiag)
+	lspDiagnostic := convertRuleDiagnosticToLSP(ruleDiag, editorHasBOM)
 
 	// Action 1: Disable rule for this line
 	disableLineAction := createDisableRuleForLineAction(ruleDiag, uri, lspDiagnostic)

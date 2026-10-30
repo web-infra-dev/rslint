@@ -261,12 +261,13 @@ type DeferredPluginRun func(
 ) (EslintPluginDispatchOutcome, error)
 
 // ProgressiveDiagnostics binds baseline presentation and asynchronous
-// enrichment admission to one request-scoped identity. RunPipeline publishes
+// enrichment admission to one request-scoped identity. RunPipeline hands off
 // the baseline synchronously only after releasing the generation, then
-// conditionally submits enrichment. Submit must register and take lifecycle
-// ownership synchronously, return promptly without running the task inline, and
-// invoke run exactly once, including cleanup when parentCtx is already canceled.
-// Timeout, supersession, transport injection, admission, and presentation belong
+// conditionally submits enrichment. Submit takes ownership synchronously and
+// returns promptly without running the task inline. Presentation may be staged
+// until inputs are validated; obsolete, unstarted enrichment can be discarded
+// because it owns only detached data. Admitted enrichment runs exactly once.
+// Timeout, cancellation, transport injection, admission, and presentation belong
 // to the implementation.
 type ProgressiveDiagnostics interface {
 	PublishBaseline(ctx context.Context, diagnostics []rule.RuleDiagnostic)

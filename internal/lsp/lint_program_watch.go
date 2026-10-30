@@ -12,6 +12,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/trackingvfs"
+
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // lintTrackingFS keeps the CompilerHost stable while swapping the upstream
@@ -59,6 +61,12 @@ func (fs *lintTrackingFS) ReadFile(path string) (string, bool) {
 	return content, ok
 }
 
+// Source metadata must come from the same editor layer as ReadFile.
+func (fs *lintTrackingFS) SourceHasBOM(path string) bool {
+	fs.SeenFiles.Add(path)
+	return utils.SourceHasBOM(fs.Inner, path)
+}
+
 func (fs *lintTrackingFS) FileExists(path string) bool {
 	exists := fs.FS.FileExists(path)
 	if !exists {
@@ -67,8 +75,31 @@ func (fs *lintTrackingFS) FileExists(path string) bool {
 	return exists
 }
 
+const lintProgramDirectoryWatchName = "__rslint_watch__"
+
 func lintProgramDirectoryWatchInput(path string) string {
-	return tspath.CombinePaths(path, "__rslint_watch__")
+	return tspath.CombinePaths(path, lintProgramDirectoryWatchName)
+}
+
+// containsPath includes failed file probes and directory enumeration. Opening an
+// unsaved dependency can satisfy a previous miss without any disk notification.
+func (lookups lintProgramLookups) containsPath(fileName string, fs vfs.FS) bool {
+	if fileName == "" {
+		return false
+	}
+	path := lintProgramLexicalPathID(fileName, fs)
+	for _, name := range lookups.seenFiles {
+		if path == lintProgramLexicalPathID(name, fs) {
+			return true
+		}
+		if tspath.GetBaseFileName(name) == lintProgramDirectoryWatchName {
+			directory := lintProgramLexicalPathID(tspath.GetDirectoryPath(name), fs)
+			if strings.HasPrefix(string(path), strings.TrimSuffix(string(directory), "/")+"/") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (fs *lintTrackingFS) DirectoryExists(path string) bool {
@@ -268,17 +299,22 @@ func (c *lintProgramCoverage) ensure(
 	if len(newWatchers) == 0 {
 		return false, true, nil
 	}
+	if err := ctx.Err(); err != nil {
+		return false, false, err
+	}
 
-	c.nextWatcherID++
+	// A failed attempt keeps its ID. WatchFiles removes any possibly installed
+	// registration before retrying it, so cancellation cannot accumulate watches.
 	watcherID := project.WatcherID(fmt.Sprintf(
 		"rslint-standalone-program-%d",
-		c.nextWatcherID,
+		c.nextWatcherID+1,
 	))
 	watchCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	if err := c.watchFiles(watchCtx, watcherID, newWatchers); err != nil {
 		return false, false, err
 	}
+	c.nextWatcherID++
 	for _, key := range newKeys {
 		c.coveredWatchers[key] = struct{}{}
 	}

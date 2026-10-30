@@ -174,9 +174,12 @@ func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 	for _, test := range []struct {
 		name, disk, editor string
 		wantActions        int
+		project            bool
 	}{
-		{name: "editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1},
-		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+		{name: "project: editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1, project: true},
+		{name: "project: editor removes BOM", disk: utils.BOM + content, editor: content, project: true},
+		{name: "source only: editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1},
+		{name: "source only: editor removes BOM", disk: utils.BOM + content, editor: content},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newLintProgramStoreFixture(t, test.disk)
@@ -188,10 +191,12 @@ func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 				t.Fatal(err)
 			}
 			entries := config.RslintConfig{{
-				Plugins:         []string{"node"},
-				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
-				Rules:           config.Rules{"node/hashbang": "error"},
+				Plugins: []string{"node"},
+				Rules:   config.Rules{"node/hashbang": "error"},
 			}}
+			if test.project {
+				entries[0].LanguageOptions = &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}
+			}
 			installJSConfigsForTest(server, map[string]config.RslintConfig{tspath.NormalizePath(server.cwd): entries})
 			response, err := server.handleFixAllCodeAction(context.Background(), fixture.sourceURI)
 			if err != nil {
@@ -218,16 +223,16 @@ func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 	}
 }
 
-func TestHandleFixAllCodeAction_ClearsPendingLintURI(t *testing.T) {
+func TestHandleFixAllCodeAction_PreservesPendingDiagnostics(t *testing.T) {
 	s := newTestServer()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
 	s.documents[uri] = "const x = 1;"
-	s.pendingLintURIs[uri] = struct{}{}
+	s.queueDiagnostics(uri)
 
 	_, _ = s.handleFixAllCodeAction(context.Background(), uri)
 
-	if _, ok := s.pendingLintURIs[uri]; ok {
-		t.Error("fixAll should clear pendingLintURIs for the target URI")
+	if _, ok := s.lintSchedule.pending[uri]; !ok {
+		t.Error("fixAll must retain unpublished diagnostics for the target URI")
 	}
 }
 
@@ -252,27 +257,27 @@ func TestHandleFixAllCodeAction_OtherPendingURIsPreserved(t *testing.T) {
 	uriA := lsproto.DocumentUri("file:///project/a.ts")
 	uriB := lsproto.DocumentUri("file:///project/b.ts")
 	s.documents[uriA] = "const a = 1;"
-	s.pendingLintURIs[uriA] = struct{}{}
-	s.pendingLintURIs[uriB] = struct{}{}
+	s.queueDiagnostics(uriA)
+	s.queueDiagnostics(uriB)
 
 	_, _ = s.handleFixAllCodeAction(context.Background(), uriA)
 
-	if _, ok := s.pendingLintURIs[uriA]; ok {
-		t.Error("fixAll target URI should be cleared from pendingLintURIs")
+	if _, ok := s.lintSchedule.pending[uriA]; !ok {
+		t.Error("fixAll must retain unpublished diagnostics for the target URI")
 	}
-	if _, ok := s.pendingLintURIs[uriB]; !ok {
-		t.Error("other URIs in pendingLintURIs should be preserved")
+	if _, ok := s.lintSchedule.pending[uriB]; !ok {
+		t.Error("other URIs in pending diagnostics should be preserved")
 	}
 }
 
-// ======== handleDidSave pendingLintURIs optimization tests ========
+// ======== handleDidSave pending diagnostics optimization tests ========
 
 func TestHandleDidSave_ClearsPendingLintURI(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
 	s.documents[uri] = "const x = 1;"
-	s.pendingLintURIs[uri] = struct{}{}
+	s.queueDiagnostics(uri)
 
 	savedText := "const x = 1;"
 	_ = s.handleDidSave(ctx, &lsproto.DidSaveTextDocumentParams{
@@ -280,8 +285,8 @@ func TestHandleDidSave_ClearsPendingLintURI(t *testing.T) {
 		Text:         &savedText,
 	})
 
-	if _, ok := s.pendingLintURIs[uri]; ok {
-		t.Error("didSave should clear pendingLintURIs for the saved URI")
+	if _, ok := s.lintSchedule.pending[uri]; ok {
+		t.Error("didSave should clear pending diagnostics for the saved URI")
 	}
 }
 
@@ -292,8 +297,8 @@ func TestHandleDidSave_OtherPendingURIsPreserved(t *testing.T) {
 	uriB := lsproto.DocumentUri("file:///project/b.ts")
 	s.documents[uriA] = "const a = 1;"
 	s.documents[uriB] = "const b = 1;"
-	s.pendingLintURIs[uriA] = struct{}{}
-	s.pendingLintURIs[uriB] = struct{}{}
+	s.queueDiagnostics(uriA)
+	s.queueDiagnostics(uriB)
 
 	savedText := "const a = 1;"
 	_ = s.handleDidSave(ctx, &lsproto.DidSaveTextDocumentParams{
@@ -301,11 +306,11 @@ func TestHandleDidSave_OtherPendingURIsPreserved(t *testing.T) {
 		Text:         &savedText,
 	})
 
-	if _, ok := s.pendingLintURIs[uriA]; ok {
-		t.Error("saved URI should be removed from pendingLintURIs")
+	if _, ok := s.lintSchedule.pending[uriA]; ok {
+		t.Error("saved URI should be removed from pending diagnostics")
 	}
-	if _, ok := s.pendingLintURIs[uriB]; !ok {
-		t.Error("other URIs should remain in pendingLintURIs")
+	if _, ok := s.lintSchedule.pending[uriB]; !ok {
+		t.Error("other URIs should remain in pending diagnostics")
 	}
 }
 

@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -39,8 +40,6 @@ func newTestServer() *Server {
 		documents:              make(map[lsproto.DocumentUri]string),
 		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:              make(chan struct{}, 1),
-		debounceCh:             make(chan struct{}, 1),
-		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
 		ruleCatalog:            rules.All(),
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
@@ -496,7 +495,413 @@ func TestHandleDidChange_UnopenedDocument(t *testing.T) {
 	}
 }
 
+func TestUnrelatedSourceOnlyDocumentsKeepDiagnostics(t *testing.T) {
+	for _, options := range []struct {
+		name   string
+		parser *config.ParserOptions
+	}{
+		{"no project", nil},
+		{"disabled project", &config.ParserOptions{ProjectDisabled: true}},
+		{"disabled service", &config.ParserOptions{ProjectService: ptrTo(false)}},
+	} {
+		t.Run(options.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "var value = 1;\n", config.RslintConfig{{
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options.parser},
+				Rules:           config.Rules{"no-var": "error"},
+			}})
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+				t.Fatal(err)
+			}
+			<-outgoing
+			s.scheduleLint(uri)
+			scheduled := s.lintSchedule.pending[uri]
+			result := s.prepareDiagnostics(context.Background(), uri)
+			s.pendingDiagnosticResult = result
+			generation := s.docGeneration[uri]
+			otherPath := tspath.ResolvePath(s.cwd, "src/unrelated.ts")
+			otherURI := documentURIFromPath(otherPath)
+			if err := os.WriteFile(otherPath, []byte("const other = 1;\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for _, event := range []string{"open", "change", "close"} {
+				var err error
+				switch event {
+				case "open":
+					err = s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: otherURI, Text: "const other = 1;\n", Version: 1},
+					})
+				case "change":
+					err = s.handleDidChange(context.Background(), makeDidChangeParams(otherURI, 2, "var other = 2;\n"))
+				case "close":
+					err = s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: otherURI},
+					})
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if s.docGeneration[uri] != generation || len(s.diagnostics[uri]) != 1 || s.pendingDiagnosticResult != result {
+					t.Fatalf("unrelated %s invalidated source-only diagnostics", event)
+				}
+				if s.lintSchedule.pending[uri] != scheduled {
+					t.Fatalf("unrelated %s postponed source-only diagnostics", event)
+				}
+			}
+			if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, 2, "var latest = 2;\n")); err != nil {
+				t.Fatal(err)
+			}
+			scheduled = s.lintSchedule.pending[uri]
+			if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+				TextDocument: &lsproto.TextDocumentItem{Uri: otherURI, Text: "const other = 1;\n", Version: 1},
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if s.lintSchedule.pending[uri] != scheduled {
+				t.Fatal("unknown inputs postponed an already pending observation")
+			}
+		})
+	}
+}
+
+func TestSourceOnlyDiagnosticsUseEditorBOM(t *testing.T) {
+	const content = "#!/usr/bin/env node\nexport {};\n"
+	for _, test := range []struct {
+		name, disk, editor string
+	}{
+		{name: "editor adds BOM", disk: content, editor: utils.BOM + content},
+		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, test.disk, config.RslintConfig{{
+				Plugins: []string{"node"}, Rules: config.Rules{"node/hashbang": "error"},
+			}})
+			if err := os.WriteFile(tspath.ResolvePath(s.cwd, "package.json"), []byte(`{"bin":"src/index.ts"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for i, text := range []string{test.editor, test.disk} {
+				if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, int32(i+1), text)); err != nil {
+					t.Fatal(err)
+				}
+				var err error
+				var response lsproto.CodeActionResponse
+				if i == 0 {
+					err = s.pushDiagnostics(context.Background(), uri)
+				}
+				if err == nil {
+					response, err = s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+						Range:        lsproto.Range{End: lsproto.Position{Line: 1}},
+					})
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := 0
+				if strings.HasPrefix(text, utils.BOM) {
+					want = 1
+				}
+				published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want || len(s.diagnostics[uri]) != want {
+					t.Fatalf("observation %d diagnostics = %+v, want %d from the editor BOM", i, published, want)
+				}
+				if want == 1 && s.diagnostics[uri][0].Message.Id != "unexpectedBOM" {
+					t.Fatalf("unexpected diagnostic: %+v", s.diagnostics[uri][0])
+				}
+				action := codeActionsByTitle(response)["Fix: This file must not have Unicode BOM."]
+				if want == 0 {
+					if action != nil {
+						t.Fatal("removed BOM still has a quick fix")
+					}
+					continue
+				}
+				if published.Diagnostics[0].Range.Start.Character != 1 || action == nil || action.Edit == nil || action.Edit.Changes == nil {
+					t.Fatal("BOM diagnostic or quick fix does not describe the editor text")
+				}
+				edits := (*action.Edit.Changes)[uri]
+				if len(edits) != 1 {
+					t.Fatalf("BOM quick fix edits = %+v, want one removal", edits)
+				}
+				updated, err := applyDocumentChanges(text, []lsproto.TextDocumentContentChangePartialOrWholeDocument{{
+					Partial: &lsproto.TextDocumentContentChangePartial{Range: edits[0].Range, Text: edits[0].NewText},
+				}})
+				if err != nil || updated != content {
+					t.Fatalf("BOM quick fix produced %q, %v; want %q", updated, err, content)
+				}
+			}
+		})
+	}
+}
+
+func TestSourceOnlyImportObservesOverlayFiles(t *testing.T) {
+	for _, scenario := range []struct {
+		name, specifier                    string
+		alias, external, nested, openAlias bool
+	}{
+		{name: "direct", specifier: "./missing.js"},
+		{name: "directory alias", specifier: "./alias/missing.js", alias: true},
+		{name: "external alias", specifier: "./alias/missing.js", alias: true, external: true},
+		{name: "missing parents", specifier: "./alias/generated/deep/missing.js", alias: true, external: true, nested: true},
+		{name: "open through alias", specifier: "../shared/missing.js", alias: true, openAlias: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "import '"+scenario.specifier+"';\n", config.RslintConfig{{
+				Plugins: []string{"import"}, Rules: config.Rules{"import/no-unresolved": "error"},
+			}})
+			sourceDirectory := tspath.ResolvePath(s.cwd, "src")
+			physicalDirectory, editorDirectory := sourceDirectory, sourceDirectory
+			if scenario.alias {
+				physicalDirectory = tspath.ResolvePath(s.cwd, "shared")
+				if scenario.external {
+					physicalDirectory = tspath.NormalizePath(t.TempDir())
+				}
+				if err := os.MkdirAll(physicalDirectory, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				alias := tspath.ResolvePath(sourceDirectory, "alias")
+				if err := os.Symlink(physicalDirectory, alias); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+				editorDirectory = physicalDirectory
+				if scenario.openAlias {
+					editorDirectory = alias
+				}
+				if scenario.nested {
+					editorDirectory = tspath.ResolvePath(editorDirectory, "generated/deep")
+				}
+			}
+			dependencyPath := tspath.ResolvePath(editorDirectory, "missing.js")
+			dependency := documentURIFromPath(dependencyPath)
+			// Pre-cover the source chains so an unrelated configuration refresh
+			// cannot hide a missed dependency invalidation.
+			s.gitPolicy = config.CollectGitPolicy(nil, s.cwd, s.fs, config.ResolveFileIdentities([]string{dependencyPath}, s.fs), config.ResolveDirectoryIdentities(
+				[]string{s.cwd, sourceDirectory, physicalDirectory, editorDirectory}, s.fs))
+			s.configDiscoveryActive = true
+			installJSConfigsForTest(s, s.jsConfigs)
+			if !s.gitPolicy.CoversDirectory(config.FreezeFileIdentity(dependencyPath, s.fs).CanonicalParentPath) {
+				t.Fatal("dependency directory is not covered by the fixture")
+			}
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+				t.Fatal(err)
+			}
+			if published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 1 {
+				t.Fatal("missing import did not produce a diagnostic")
+			}
+			for _, event := range []string{"open", "close"} {
+				want := 0
+				if event == "open" {
+					if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: dependency, Text: "export {};\n", Version: 1},
+					}); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: dependency},
+					}); err != nil {
+						t.Fatal(err)
+					}
+					nextTestLSPMessage(t, outgoing) // Clear the closed dependency.
+					want = 1
+				}
+				if _, pending := s.lintSchedule.pending[uri]; !pending {
+					t.Fatalf("%s did not invalidate source-only import resolution", event)
+				}
+				if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
+				published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want {
+					t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
+				}
+			}
+		})
+	}
+}
+
+func TestProjectFallbackObservesEditorConfig(t *testing.T) {
+	for _, options := range []struct {
+		name   string
+		parser *config.ParserOptions
+	}{
+		{"explicit project", &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		{"project service", &config.ParserOptions{ProjectService: ptrTo(true)}},
+	} {
+		t.Run(options.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "const value: any = {}; value.member;\n", config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: options.parser},
+				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			}})
+			configPath := tspath.ResolvePath(s.cwd, "tsconfig.json")
+			configURI := documentURIFromPath(configPath)
+			if err := os.WriteFile(tspath.ResolvePath(s.cwd, "src/other.ts"), []byte("export {};\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(configPath, []byte(`{"compilerOptions":{"noLib":true},"files":["src/other.ts"]}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+				t.Fatal(err)
+			}
+			if published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 0 {
+				t.Fatal("unmatched project did not fall back to source-only diagnostics")
+			}
+			for _, event := range []string{"open", "close"} {
+				want := 1
+				if event == "open" {
+					if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: configURI, Text: `{"compilerOptions":{"noLib":true},"files":["src/index.ts"]}`, Version: 1},
+					}); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: configURI},
+					}); err != nil {
+						t.Fatal(err)
+					}
+					<-outgoing
+					want = 0
+				}
+				if _, pending := s.lintSchedule.pending[uri]; !pending {
+					t.Fatalf("%s did not invalidate project selection", event)
+				}
+				if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
+				published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want {
+					t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
+				}
+			}
+		})
+	}
+}
+
+type cancelingDiagnosticFS struct {
+	vfs.FS
+	path   string
+	cancel context.CancelFunc
+}
+
+func (fs *cancelingDiagnosticFS) ReadFile(path string) (string, bool) {
+	if lintProgramLexicalPathID(path, fs.FS) == lintProgramLexicalPathID(fs.path, fs.FS) {
+		fs.cancel()
+	}
+	return fs.FS.ReadFile(path)
+}
+
+func TestQuickFixCancellationPreservesPendingDiagnostics(t *testing.T) {
+	s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "var value = 1;\n", config.RslintConfig{{
+		LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+		Rules:           config.Rules{"no-var": "error"},
+	}})
+	s.scheduleLint(uri)
+	scheduled := s.lintSchedule.pending[uri]
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	fs := s.fs
+	s.fs = &cancelingDiagnosticFS{FS: fs, path: tspath.ResolvePath(s.cwd, "tsconfig.json"), cancel: cancel}
+	_, err := s.handleCodeAction(ctx, &lsproto.CodeActionParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+		Range:        lsproto.Range{End: lsproto.Position{Line: 1}},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("quick fix error = %v, want cancellation during project loading", err)
+	}
+	if len(outgoing) != 0 || len(s.diagnostics[uri]) != 0 {
+		t.Fatal("canceled quick fix published diagnostics")
+	}
+	if s.lintSchedule.pending[uri] != scheduled {
+		t.Fatal("canceled quick fix consumed or postponed background diagnostics")
+	}
+	if !s.lintPrograms.Usable() {
+		t.Fatal("canceled quick fix disabled Program caching")
+	}
+	s.fs = fs
+	if err := s.pushDiagnostics(context.Background(), uri); err != nil {
+		t.Fatal(err)
+	}
+	published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+	if published.Uri != uri || len(published.Diagnostics) != 1 {
+		t.Fatalf("background diagnostics after cancellation = %+v", published)
+	}
+}
+
 // ======== handleDidSave tests ========
+
+func TestEditorDependencyInvalidatesPendingDiagnostics(t *testing.T) {
+	for _, resident := range []bool{true, false} {
+		t.Run(fmt.Sprintf("resident=%t", resident), func(t *testing.T) {
+			const consumer = "import { value } from './dependency';\nexport const result = value.member;\n"
+			const typed = "export const value = { member: 1 };\n"
+			const unsafe = "export const value: any = {};\n"
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, consumer, config.RslintConfig{{
+				Plugins:         []string{"@typescript-eslint"},
+				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
+				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
+			}})
+			s.lintPrograms.coverage.disabled = !resident
+			dependencyPath := tspath.ResolvePath(s.cwd, "src/dependency.ts")
+			dependencyURI := documentURIFromPath(dependencyPath)
+			if err := os.WriteFile(dependencyPath, []byte(typed), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for index, step := range []struct {
+				event   string
+				content string
+				want    int
+			}{
+				{"open", unsafe, 1},
+				{"change", typed, 0},
+				{"change", unsafe, 1},
+				{"close", "", 0},
+			} {
+				previous := s.prepareDiagnostics(context.Background(), uri)
+				s.pendingDiagnosticResult = previous
+				var err error
+				switch step.event {
+				case "open":
+					err = s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: dependencyURI, Text: step.content, Version: 1},
+					})
+				case "change":
+					err = s.handleDidChange(context.Background(), makeDidChangeParams(dependencyURI, int32(index+1), step.content))
+				case "close":
+					err = s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: dependencyURI},
+					})
+					closed := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+					if closed.Uri != dependencyURI || len(closed.Diagnostics) != 0 {
+						t.Fatal("close did not clear dependency diagnostics")
+					}
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if s.pendingDiagnosticResult != nil {
+					t.Fatalf("%s retained the consumer's obsolete result", step.event)
+				}
+				if scheduled, queued := s.lintSchedule.pending[uri]; !queued || scheduled.due.IsZero() {
+					t.Fatalf("%s did not debounce the affected consumer", step.event)
+				}
+				previous.publish()
+				if len(outgoing) != 0 {
+					t.Fatalf("%s published stale dependency diagnostics", step.event)
+				}
+				// A quick fix must observe the dependency update without waiting for
+				// the consumer's debounce deadline.
+				if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
+				published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != step.want {
+					t.Fatalf("%s consumer diagnostics = %+v, want %d", step.event, published, step.want)
+				}
+			}
+		})
+	}
+}
 
 func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
 	for _, event := range []string{"save", "watch"} {
@@ -509,11 +914,6 @@ func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
 			s.backgroundCtx = context.Background()
 			s.outgoingQueue = make(chan *lsproto.Message, 32)
 			s.lintPrograms = fixture.store
-			defer func() {
-				if s.lintTimer != nil {
-					s.lintTimer.Stop()
-				}
-			}()
 			dependencyPath := tspath.ResolvePath(s.cwd, "src/dependency.ts")
 			dependencyURI := documentURIFromPath(dependencyPath)
 			if err := os.WriteFile(dependencyPath, []byte(typed), 0o644); err != nil {
@@ -525,7 +925,9 @@ func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
 				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
 				Rules:           config.Rules{"@typescript-eslint/no-unsafe-member-access": "error"},
 			}}})
-			s.pushDiagnostics(fixture.sourceURI)
+			if err := s.pushDiagnostics(context.Background(), fixture.sourceURI); err != nil {
+				t.Fatal(err)
+			}
 			if got := len(s.diagnostics[fixture.sourceURI]); got != 0 {
 				t.Fatalf("initial consumer diagnostics=%d", got)
 			}
@@ -535,7 +937,9 @@ func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
 				}
 				// The dependency's own diagnostics already update the shared Program.
 				// Consumers still need publication even if no cache is invalidated.
-				s.pushDiagnostics(dependencyURI)
+				if err := s.pushDiagnostics(context.Background(), dependencyURI); err != nil {
+					t.Fatal(err)
+				}
 				program := fixture.load(t)
 				if err := os.WriteFile(dependencyPath, []byte(content), 0o644); err != nil {
 					t.Fatal(err)
@@ -562,7 +966,9 @@ func TestSavedDependencyRefreshesOpenConsumers(t *testing.T) {
 				default:
 					t.Fatal("saved dependency did not schedule consumer diagnostics")
 				}
-				s.pushDiagnostics(fixture.sourceURI)
+				if err := s.pushDiagnostics(context.Background(), fixture.sourceURI); err != nil {
+					t.Fatal(err)
+				}
 				if got, want := len(s.diagnostics[fixture.sourceURI]), 1-step; got != want {
 					t.Fatalf("refreshed consumer diagnostics=%d, want %d", got, want)
 				}
@@ -885,8 +1291,6 @@ func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 		outgoingQueue:          queue,
 		backgroundCtx:          context.Background(),
 		refreshCh:              make(chan struct{}, 1),
-		debounceCh:             make(chan struct{}, 1),
-		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
 		pluginResultCh:         make(chan pluginLintResult, 16),
 		docGeneration:          make(map[lsproto.DocumentUri]uint64),
 		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
@@ -951,184 +1355,46 @@ func TestPublishDiagnostics_EmptySlice(t *testing.T) {
 
 // ======== debounce tests ========
 
-func TestScheduleLint_AddsPendingURI(t *testing.T) {
-	s := newTestServer()
-	uri := lsproto.DocumentUri("file:///project/test.ts")
-
-	s.scheduleLint(uri)
-
-	if _, ok := s.pendingLintURIs[uri]; !ok {
-		t.Fatal("scheduleLint should add URI to pendingLintURIs")
+func TestDiagnosticSchedulerIndependentDeadlines(t *testing.T) {
+	now := time.Unix(1, 0)
+	var q diagnosticScheduler
+	const a = lsproto.DocumentUri("file:///project/a.ts")
+	const b = lsproto.DocumentUri("file:///project/b.ts")
+	q.schedule(a, now.Add(lintDebounceDelay))
+	q.schedule(b, now.Add(lintDebounceDelay))
+	q.schedule(a, now.Add(2*lintDebounceDelay))
+	if len(q.pending) != 2 {
+		t.Fatal("rescheduling duplicated a document")
 	}
-
-	// Stop the timer to prevent it from firing during test cleanup
-	if s.lintTimer != nil {
-		s.lintTimer.Stop()
+	if uri, delay, ok := q.next(now); !ok || uri != "" || delay != lintDebounceDelay {
+		t.Fatalf("next deadline = %q, %v, %v", uri, delay, ok)
 	}
-}
-
-func TestScheduleLint_MultipleURIs(t *testing.T) {
-	s := newTestServer()
-	uriA := lsproto.DocumentUri("file:///project/a.ts")
-	uriB := lsproto.DocumentUri("file:///project/b.ts")
-
-	s.scheduleLint(uriA)
-	s.scheduleLint(uriB)
-
-	if _, ok := s.pendingLintURIs[uriA]; !ok {
-		t.Error("uriA should be pending")
+	if uri, delay, ok := q.next(now.Add(lintDebounceDelay)); !ok || uri != b || delay != 0 {
+		t.Fatalf("editing A postponed ready B: %q, %v, %v", uri, delay, ok)
 	}
-	if _, ok := s.pendingLintURIs[uriB]; !ok {
-		t.Error("uriB should be pending")
-	}
-
-	if s.lintTimer != nil {
-		s.lintTimer.Stop()
-	}
-}
-
-func TestScheduleLint_SignalsDebounceCh(t *testing.T) {
-	s := newTestServer()
-	uri := lsproto.DocumentUri("file:///project/test.ts")
-
-	s.scheduleLint(uri)
-
-	// Wait for the debounce timer to fire (200ms + small buffer)
-	time.Sleep(300 * time.Millisecond)
-
-	select {
-	case <-s.debounceCh:
-		// good — signal received
-	default:
-		t.Fatal("expected a signal in debounceCh after debounce delay")
-	}
-}
-
-func TestScheduleLint_ResetsTimer(t *testing.T) {
-	s := newTestServer()
-	uri := lsproto.DocumentUri("file:///project/test.ts")
-
-	// Schedule, wait 150ms, schedule again — the timer should reset
-	s.scheduleLint(uri)
-	time.Sleep(150 * time.Millisecond)
-	s.scheduleLint(uri)
-
-	// At 200ms from the first call the original timer would have fired,
-	// but we reset it at 150ms so it shouldn't fire until 150+200=350ms.
-	time.Sleep(100 * time.Millisecond) // total 250ms from start
-	select {
-	case <-s.debounceCh:
-		t.Fatal("debounce timer should have been reset — signal came too early")
-	default:
-		// good
-	}
-
-	// Wait for the reset timer to fire
-	time.Sleep(200 * time.Millisecond) // total 450ms from start
-	select {
-	case <-s.debounceCh:
-		// good
-	default:
-		t.Fatal("expected signal after reset timer fires")
+	delete(q.pending, b)
+	q.schedule(b, time.Time{})
+	if uri, _, _ := q.next(now.Add(2 * lintDebounceDelay)); uri != a {
+		t.Fatalf("new work overtook the older ready document: %q", uri)
 	}
 }
 
 func TestHandleDidClose_CleansPendingLint(t *testing.T) {
 	s := newTestServer()
-	ctx := context.Background()
-	uri := lsproto.DocumentUri("file:///project/test.ts")
-
-	// Simulate a pending lint for this URI (as if scheduleLint was called)
-	s.documents[uri] = "const x = 1;"
-	s.pendingLintURIs[uri] = struct{}{}
-
-	err := s.handleDidClose(ctx, &lsproto.DidCloseTextDocumentParams{
-		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
-	})
-	if err != nil {
-		t.Fatalf("handleDidClose failed: %v", err)
-	}
-
-	// Pending lint URI should be cleaned up
-	if _, ok := s.pendingLintURIs[uri]; ok {
-		t.Error("pendingLintURIs should be cleaned up after didClose")
-	}
-	// Document and diagnostics should also be cleaned up
-	if _, ok := s.documents[uri]; ok {
-		t.Error("document should be removed after didClose")
-	}
-}
-
-func TestScheduleLint_DebounceCh_Full(t *testing.T) {
-	s := newTestServer()
-	uri := lsproto.DocumentUri("file:///project/test.ts")
-
-	// Pre-fill debounceCh so the timer callback hits the default branch
-	s.debounceCh <- struct{}{}
-
-	s.scheduleLint(uri)
-
-	// Wait for the timer to fire
-	time.Sleep(300 * time.Millisecond)
-
-	// Channel should still have exactly one signal (the pre-filled one)
-	select {
-	case <-s.debounceCh:
-		// good — consumed the pre-filled signal
-	default:
-		t.Fatal("expected a signal in debounceCh")
-	}
-
-	// Channel should now be empty — the timer's signal was dropped
-	select {
-	case <-s.debounceCh:
-		t.Fatal("expected empty debounceCh; timer should have dropped the signal")
-	default:
-		// good
-	}
-
-	// URI should still be in pending set
-	if _, ok := s.pendingLintURIs[uri]; !ok {
-		t.Error("URI should remain in pendingLintURIs even if debounceCh was full")
-	}
-}
-
-func TestDebounce_CloseRace(t *testing.T) {
-	s := newTestServer()
-	ctx := context.Background()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
 	s.documents[uri] = "const x = 1;"
-
-	// Step 1: scheduleLint adds URI to pending and starts a timer
 	s.scheduleLint(uri)
-	if _, ok := s.pendingLintURIs[uri]; !ok {
-		t.Fatal("URI should be pending after scheduleLint")
-	}
-
-	// Step 2: close the document before timer fires — clears pending
-	_ = s.handleDidClose(ctx, &lsproto.DidCloseTextDocumentParams{
+	if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
-	})
-	if _, ok := s.pendingLintURIs[uri]; ok {
-		t.Fatal("URI should be removed from pendingLintURIs after close")
+	}); err != nil {
+		t.Fatal(err)
 	}
-
-	// Step 3: wait for the timer to fire. Waiting on the signal synchronizes
-	// with the timer callback without assuming it will be scheduled within a
-	// fixed amount of time.
-	select {
-	case <-s.debounceCh:
-		// good — signal received
-	case <-time.After(2 * time.Second):
-		t.Fatal("timer did not fire after close")
+	if _, _, pending := s.lintSchedule.next(time.Now().Add(time.Second)); pending {
+		t.Fatal("closed document still has a scheduled diagnostic")
 	}
-
-	// Step 4: simulate what the dispatch loop does — iterate pending URIs
-	// pendingLintURIs is empty, so nothing should be linted
-	for lintURI := range s.pendingLintURIs {
-		t.Errorf("should not lint any URI, but found %s", lintURI)
+	if _, open := s.documents[uri]; open {
+		t.Fatal("closed document remained in the editor overlay")
 	}
-	clear(s.pendingLintURIs)
 }
 
 func TestHandleDidChange_UsesDebounce(t *testing.T) {
@@ -1145,13 +1411,10 @@ func TestHandleDidChange_UsesDebounce(t *testing.T) {
 	}
 
 	// With uninitialized server, no debounce should be scheduled
-	if len(s.pendingLintURIs) != 0 {
+	if len(s.lintSchedule.pending) != 0 {
 		t.Error("no pending URIs expected before initialization")
 	}
 
-	if s.lintTimer != nil {
-		s.lintTimer.Stop()
-	}
 }
 
 // ======== getConfigForURI tests ========

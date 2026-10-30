@@ -8,12 +8,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // methodPluginLint is the server→client reverse request that asks the
@@ -76,21 +78,15 @@ func (s *Server) installEslintPluginDispatch() linter.EslintPluginDispatchFunc {
 }
 
 func (p *documentProgressiveDiagnostics) Submit(
-	parentCtx context.Context,
+	_ context.Context,
 	run linter.DeferredPluginRun,
 ) {
-	p.server.startDiagnosticEnrichment(
-		parentCtx,
-		p.uri,
-		p.generation,
-		p.pluginGeneration,
-		run,
-	)
+	p.enrichment = run
 }
 
 // startDiagnosticEnrichment implements the progressive request's asynchronous
-// executor port. RunPipeline alone decides when to submit work; this adapter
-// supplies transport, deadline, cancellation, and stale-result admission.
+// executor port after the baseline commits. RunPipeline decides eligibility;
+// this adapter supplies transport, deadline, cancellation, and stale-result admission.
 func (s *Server) startDiagnosticEnrichment(
 	parentCtx context.Context,
 	uri lsproto.DocumentUri,
@@ -234,8 +230,9 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 	s.diagnostics[r.uri] = merged
 
 	lspDiags := make([]*lsproto.Diagnostic, 0, len(merged))
+	editorHasBOM := strings.HasPrefix(s.documents[r.uri], utils.BOM)
 	for _, d := range merged {
-		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d))
+		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d, editorHasBOM))
 	}
 	if err := s.PublishDiagnostics(s.backgroundCtx, &lsproto.PublishDiagnosticsParams{
 		Uri:         r.uri,

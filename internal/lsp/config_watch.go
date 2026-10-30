@@ -113,9 +113,6 @@ func (s *Server) updateGitPolicyWatchers(ctx context.Context, roots []config.Dir
 		s.gitPolicyWatcherGeneration++
 		id := project.WatcherID(fmt.Sprintf("%s-%d", gitignoreWatcherID, s.gitPolicyWatcherGeneration))
 		if err := s.WatchFiles(ctx, id, gitPolicyFileWatchers(roots, directories, relativePatterns)); err != nil {
-			// A failed or canceled response may still have installed this ID.
-			// Keep it in the existing registration set for later cleanup.
-			s.watchers.Add(id)
 			return err
 		}
 		s.gitPolicyWatcherID, s.gitPolicyWatcherKey = id, key

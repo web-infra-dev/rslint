@@ -313,12 +313,11 @@ func TestIsBlockingMethodCodeAction(t *testing.T) {
 	}
 }
 
-func TestDispatchLoopDebounceLintsOnlyPending(t *testing.T) {
+func TestDispatchLoopLintsOnlyPending(t *testing.T) {
 	s, queue := newTestServerWithQueue()
 	s.documents["file:///project/a.ts"] = "const x = 1;"
 	s.documents["file:///project/styles.css"] = "body {}"
-	s.pendingLintURIs["file:///project/a.ts"] = struct{}{}
-	s.debounceCh <- struct{}{}
+	s.queueDiagnostics("file:///project/a.ts")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -328,8 +327,8 @@ func TestDispatchLoopDebounceLintsOnlyPending(t *testing.T) {
 	if err := <-done; err != nil && !errors.Is(err, context.Canceled) {
 		t.Fatalf("dispatchLoop: %v", err)
 	}
-	if len(s.pendingLintURIs) != 0 {
-		t.Errorf("pendingLintURIs = %d, want 0", len(s.pendingLintURIs))
+	if len(s.lintSchedule.pending) != 0 {
+		t.Errorf("pending diagnostics = %d, want 0", len(s.lintSchedule.pending))
 	}
 	select {
 	case <-queue:
