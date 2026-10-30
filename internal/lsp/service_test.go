@@ -563,6 +563,75 @@ func TestUnrelatedSourceOnlyDocumentsKeepDiagnostics(t *testing.T) {
 	}
 }
 
+func TestSourceOnlyDiagnosticsUseEditorBOM(t *testing.T) {
+	const content = "#!/usr/bin/env node\nexport {};\n"
+	for _, test := range []struct {
+		name, disk, editor string
+	}{
+		{name: "editor adds BOM", disk: content, editor: utils.BOM + content},
+		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, test.disk, config.RslintConfig{{
+				Plugins: []string{"node"}, Rules: config.Rules{"node/hashbang": "error"},
+			}})
+			if err := os.WriteFile(tspath.ResolvePath(s.cwd, "package.json"), []byte(`{"bin":"src/index.ts"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for i, text := range []string{test.editor, test.disk} {
+				if err := s.handleDidChange(context.Background(), makeDidChangeParams(uri, int32(i+1), text)); err != nil {
+					t.Fatal(err)
+				}
+				var err error
+				var response lsproto.CodeActionResponse
+				if i == 0 {
+					err = s.pushDiagnostics(context.Background(), uri)
+				}
+				if err == nil {
+					response, err = s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+						Range:        lsproto.Range{End: lsproto.Position{Line: 1}},
+					})
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := 0
+				if strings.HasPrefix(text, utils.BOM) {
+					want = 1
+				}
+				published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want || len(s.diagnostics[uri]) != want {
+					t.Fatalf("observation %d diagnostics = %+v, want %d from the editor BOM", i, published, want)
+				}
+				if want == 1 && s.diagnostics[uri][0].Message.Id != "unexpectedBOM" {
+					t.Fatalf("unexpected diagnostic: %+v", s.diagnostics[uri][0])
+				}
+				action := codeActionsByTitle(response)["Fix: This file must not have Unicode BOM."]
+				if want == 0 {
+					if action != nil {
+						t.Fatal("removed BOM still has a quick fix")
+					}
+					continue
+				}
+				if published.Diagnostics[0].Range.Start.Character != 1 || action == nil || action.Edit == nil || action.Edit.Changes == nil {
+					t.Fatal("BOM diagnostic or quick fix does not describe the editor text")
+				}
+				edits := (*action.Edit.Changes)[uri]
+				if len(edits) != 1 {
+					t.Fatalf("BOM quick fix edits = %+v, want one removal", edits)
+				}
+				updated, err := applyDocumentChanges(text, []lsproto.TextDocumentContentChangePartialOrWholeDocument{{
+					Partial: &lsproto.TextDocumentContentChangePartial{Range: edits[0].Range, Text: edits[0].NewText},
+				}})
+				if err != nil || updated != content {
+					t.Fatalf("BOM quick fix produced %q, %v; want %q", updated, err, content)
+				}
+			}
+		})
+	}
+}
+
 func TestSourceOnlyImportObservesOverlayFiles(t *testing.T) {
 	for _, scenario := range []struct {
 		name, specifier                    string

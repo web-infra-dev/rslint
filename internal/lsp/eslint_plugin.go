@@ -8,12 +8,14 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // methodPluginLint is the server→client reverse request that asks the
@@ -228,8 +230,9 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 	s.diagnostics[r.uri] = merged
 
 	lspDiags := make([]*lsproto.Diagnostic, 0, len(merged))
+	editorHasBOM := strings.HasPrefix(s.documents[r.uri], utils.BOM)
 	for _, d := range merged {
-		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d))
+		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d, editorHasBOM))
 	}
 	if err := s.PublishDiagnostics(s.backgroundCtx, &lsproto.PublishDiagnosticsParams{
 		Uri:         r.uri,

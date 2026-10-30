@@ -277,6 +277,32 @@ func BenchmarkApplyDocumentChanges(b *testing.B) {
 // one in a source file is invisible.
 const bom = "\uFEFF"
 
+func TestRuleFixToTextEditUsesEditorBOM(t *testing.T) {
+	for _, test := range []struct {
+		name, text, replacement, want string
+		start, end                    int
+	}{
+		{name: "remove BOM", text: bom + "export {};\n", start: -1, end: 0, want: "export {};\n"},
+		{name: "unmarked prefix", text: "export {};\n", start: -1, end: 0, replacement: "#!/usr/bin/env node\n", want: "#!/usr/bin/env node\nexport {};\n"},
+		{name: "preserve BOM", text: bom + "var value = 1;\n", start: 0, end: 3, replacement: "let", want: bom + "let value = 1;\n"},
+		{name: "UTF-16 after BOM", text: bom + "'😀'; var value = 1;\n", start: len("'😀'; "), end: len("'😀'; var"), replacement: "let", want: bom + "'😀'; let value = 1;\n"},
+		{name: "later line", text: bom + "// 😀\r\nvar value = 1;\n", start: len("// 😀\r\n"), end: len("// 😀\r\nvar"), replacement: "let", want: bom + "// 😀\r\nlet value = 1;\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := textOnlySourceFile{text: strings.TrimPrefix(test.text, bom)}
+			edit := ruleFixToTextEdit(source, rule.RuleFix{
+				Range: core.NewTextRange(test.start, test.end), Text: test.replacement,
+			}, strings.HasPrefix(test.text, bom))
+			updated, err := applyDocumentChanges(test.text, []lsproto.TextDocumentContentChangePartialOrWholeDocument{{
+				Partial: &lsproto.TextDocumentContentChangePartial{Range: edit.Range, Text: edit.NewText},
+			}})
+			if err != nil || updated != test.want {
+				t.Fatalf("applied edit = %q, %v; want %q", updated, err, test.want)
+			}
+		})
+	}
+}
+
 // programOver writes a file with exactly the given bytes and returns a Program
 // over it, plus the normalized path.
 func programOver(t *testing.T, content string) (string, string, *compiler.Program, vfs.FS) {

@@ -174,9 +174,12 @@ func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 	for _, test := range []struct {
 		name, disk, editor string
 		wantActions        int
+		project            bool
 	}{
-		{name: "editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1},
-		{name: "editor removes BOM", disk: utils.BOM + content, editor: content},
+		{name: "project: editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1, project: true},
+		{name: "project: editor removes BOM", disk: utils.BOM + content, editor: content, project: true},
+		{name: "source only: editor adds BOM", disk: content, editor: utils.BOM + content, wantActions: 1},
+		{name: "source only: editor removes BOM", disk: utils.BOM + content, editor: content},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newLintProgramStoreFixture(t, test.disk)
@@ -188,10 +191,12 @@ func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 				t.Fatal(err)
 			}
 			entries := config.RslintConfig{{
-				Plugins:         []string{"node"},
-				LanguageOptions: &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}},
-				Rules:           config.Rules{"node/hashbang": "error"},
+				Plugins: []string{"node"},
+				Rules:   config.Rules{"node/hashbang": "error"},
 			}}
+			if test.project {
+				entries[0].LanguageOptions = &config.LanguageOptions{ParserOptions: &config.ParserOptions{Project: config.ProjectPaths{"./tsconfig.json"}}}
+			}
 			installJSConfigsForTest(server, map[string]config.RslintConfig{tspath.NormalizePath(server.cwd): entries})
 			response, err := server.handleFixAllCodeAction(context.Background(), fixture.sourceURI)
 			if err != nil {

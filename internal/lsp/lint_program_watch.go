@@ -12,6 +12,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/trackingvfs"
+
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // lintTrackingFS keeps the CompilerHost stable while swapping the upstream
@@ -57,6 +59,12 @@ func (fs *lintTrackingFS) ReadFile(path string) (string, bool) {
 		fs.failedLookups.Add(path)
 	}
 	return content, ok
+}
+
+// Source metadata must come from the same editor layer as ReadFile.
+func (fs *lintTrackingFS) SourceHasBOM(path string) bool {
+	fs.SeenFiles.Add(path)
+	return utils.SourceHasBOM(fs.Inner, path)
 }
 
 func (fs *lintTrackingFS) FileExists(path string) bool {

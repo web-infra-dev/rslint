@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // documentProgressiveDiagnostics implements the presentation and asynchronous
@@ -56,8 +57,9 @@ func (p *documentProgressiveDiagnostics) publish() {
 	lspDiagnostics := p.lspDiagnostics
 	if lspDiagnostics == nil {
 		lspDiagnostics = make([]*lsproto.Diagnostic, 0, len(p.diagnostics))
+		editorHasBOM := strings.HasPrefix(s.documents[p.uri], utils.BOM)
 		for _, diagnostic := range p.diagnostics {
-			lspDiagnostics = append(lspDiagnostics, convertRuleDiagnosticToLSP(diagnostic))
+			lspDiagnostics = append(lspDiagnostics, convertRuleDiagnosticToLSP(diagnostic, editorHasBOM))
 		}
 	}
 	if err := s.PublishDiagnostics(s.backgroundCtx, &lsproto.PublishDiagnosticsParams{
@@ -127,22 +129,11 @@ func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lspr
 	}
 }
 
-func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnostic {
-	diagnosticStart := ruleDiag.Range.Pos()
-	diagnosticEnd := ruleDiag.Range.End()
-	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
-
+func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, editorHasBOM bool) *lsproto.Diagnostic {
 	return &lsproto.Diagnostic{
 		Range: lsproto.Range{
-			Start: lsproto.Position{
-				Line:      uint32(startLine),
-				Character: uint32(startColumn),
-			},
-			End: lsproto.Position{
-				Line:      uint32(endLine),
-				Character: uint32(endColumn),
-			},
+			Start: sourcePositionToLSP(ruleDiag.SourceFile, ruleDiag.Range.Pos(), editorHasBOM),
+			End:   sourcePositionToLSP(ruleDiag.SourceFile, ruleDiag.Range.End(), editorHasBOM),
 		},
 		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
 		Source:   ptrTo("rslint"),
