@@ -176,23 +176,8 @@ jobs:
       - name: TypeCheck
         run: pnpm typecheck
 
-      - name: Install xvfb and dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
-
-      - name: VSCode Test Cache
-        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
-        with:
-          # Cache only immutable VS Code distributions. The v2 namespace keeps
-          # legacy archives containing user data/extensions from being restored.
-          path: packages/vscode-extension/.vscode-test/vscode-*
-          key: vscode-distributions-v2-${{ matrix.os }}
-          restore-keys: |
-            vscode-distributions-v2-${{ matrix.os }}-
-
       - name: Test
-        run: xvfb-run -a pnpm run test
+        run: pnpm run test
 
   binary-size:
     name: Binary Size
@@ -307,85 +292,11 @@ jobs:
         shell: pwsh
         run: go run ./tools/dump_rule_schemas > rule-schemas.json
 
-      # vscode-extension (package "rslint") is excluded here - it's tested on
-      # windows-latest instead, since the vscode-extension test does not run
-      # reliably on this self-hosted runner.
       - name: Build
-        run: pnpm -r --filter=@rslint/test-tools... build
+        run: pnpm run build
 
       - name: Test
-        run: pnpm -r --filter=@rslint/test-tools... test
-
-      - name: Upload rslint.exe
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-test-rslint-windows-amd64
-          path: npm/rslint/win32-x64-msvc/rslint.exe
-          retention-days: 1
-          if-no-files-found: error
-
-      - name: Upload rule schemas
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-test-rule-schemas-windows
-          path: rule-schemas.json
-          retention-days: 1
-          if-no-files-found: error
-
-  test-vscode-windows:
-    name: Test vscode-extension (windows-latest)
-    runs-on: windows-latest
-    needs: test-node-windows
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          submodules: true
-
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-
-      # Place the host addon in its platform package before building consumers.
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-      - name: Build native addon
-        run: pnpm --filter @rslint/native run build
-
-      - name: Download rslint.exe
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ci-test-rslint-windows-amd64
-          path: npm/rslint/win32-x64-msvc
-
-      - name: Download rule schemas
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ci-test-rule-schemas-windows
-          path: packages/rslint
-
-      # build:js only - skip @rslint/core's build:bin, which invokes `go
-      # build` directly. The host rslint.exe was already built on the
-      # self-hosted Windows runner and downloaded above; this job has no Go
-      # toolchain set up and shouldn't need one.
-      - name: Build
-        shell: bash
-        run: |
-          pnpm --filter @rslint/api build
-          pnpm --filter @rslint/core run build:js
-          pnpm --filter rslint build
-
-      - name: VSCode Test Cache
-        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
-        with:
-          # Cache only immutable VS Code distributions. The v2 namespace keeps
-          # legacy archives containing user data/extensions from being restored.
-          path: packages/vscode-extension/.vscode-test/vscode-*
-          key: vscode-distributions-v2-windows
-          restore-keys: |
-            vscode-distributions-v2-windows-
-
-      - name: Test
-        run: pnpm --filter rslint test
+        run: pnpm run test
 
   test-wasm:
     name: Test WASM
@@ -478,7 +389,6 @@ jobs:
       - test-go
       - test-node
       - test-node-windows
-      - test-vscode-windows
       - lint
       - test-wasm
       - test-rust
@@ -499,7 +409,6 @@ jobs:
             (needs.changes.outputs.changed != 'false' && (
               needs.test-node.result != 'success' ||
               needs.test-node-windows.result != 'success' ||
-              needs.test-vscode-windows.result != 'success' ||
               needs.test-wasm.result != 'success' ||
               needs.test-rust.result != 'success'
             ))
