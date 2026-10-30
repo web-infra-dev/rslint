@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -34,6 +35,7 @@ type lintProgramState struct {
 	program    *compiler.Program
 	tracker    *lintTrackingFS
 	sources    *utils.ProgramSourceLookup
+	overlayFS  *frozenLintTargetOverlayFS
 	dirtyFiles map[tspath.Path]struct{}
 	// Failed lookups close the gap between a file appearing and the client's
 	// corresponding watcher notification.
@@ -47,7 +49,7 @@ type lintProgramRequest struct {
 	ctx               context.Context
 	uri               lsproto.DocumentUri
 	overlayFiles      map[string]string
-	overlayFS         vfs.FS
+	overlayFS         *frozenLintTargetOverlayFS
 	discoveryFS       *lintTrackingFS
 	target            target.File
 	freshOnly         bool
@@ -287,6 +289,7 @@ func (r *lintProgramRequest) load(
 	}
 
 	state.program = program
+	state.overlayFS = r.overlayFS
 	if allGraphsReused {
 		state.sources.UpdateProgramForReusedGraph(program, r.overlayFS)
 	} else {
@@ -379,6 +382,7 @@ func (r *lintProgramRequest) rebuild(
 			program:                  program,
 			tracker:                  tracker,
 			sources:                  utils.NewProgramSourceLookup(program, r.overlayFS),
+			overlayFS:                r.overlayFS,
 			dirtyFiles:               make(map[tspath.Path]struct{}),
 			failedLookups:            make(map[tspath.Path]struct{}),
 			selectedSourceIdentities: make(map[tspath.Path]tspath.Path),
@@ -624,6 +628,9 @@ func (s *lintProgramStore) markContent(
 		return physicalID
 	}
 	changed := make(map[lintProgramKey]struct{})
+	// Allocate only while building a cold source index. Warm lookups keep the
+	// Program's normal filesystem; cold builds share disk queries for this event.
+	var disk *cachedvfs.FS
 	for configFileName, state := range s.programs {
 		previousIdentity, identityKnown :=
 			state.selectedSourceIdentities[lexicalID]
@@ -636,7 +643,12 @@ func (s *lintProgramStore) markContent(
 		if invalidatePossibleNewSource {
 			sourceFile = s.sourceFileForOpen(state, fileName)
 		} else {
-			sourceFile = state.sources.SourceFileForPath(fileName)
+			sourceFile = state.sources.SourceFileForPath(fileName, func() vfs.FS {
+				if disk == nil {
+					disk = cachedvfs.From(s.server.fs)
+				}
+				return state.overlayFS.withBaseFS(disk)
+			})
 		}
 		if sourceFile != nil {
 			if !identityKnown && lexicalID != physicalPathID() {

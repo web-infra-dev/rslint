@@ -351,7 +351,7 @@ func lintProjectSnapshotsEqual(selected, built *tsoptions.ParsedCommandLine, fs 
 }
 
 func sourceFileForPath(program *compiler.Program, filename string, fs vfs.FS) *ast.SourceFile {
-	return utils.NewProgramSourceLookup(program, fs).SourceFileForPath(filename)
+	return utils.NewProgramSourceLookup(program, fs).SourceFileForPath(filename, nil)
 }
 
 func sourceFileForTarget(
