@@ -10,7 +10,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -145,8 +144,7 @@ func (r *lintProgramRequest) prepareOverlay() {
 // observation. A new view after watcher registration or an editor event keeps
 // cached misses and symlink identities out of the next observation.
 func (r *lintProgramRequest) freshFS() vfs.FS {
-	disk := cachedvfs.From(r.store.server.fs)
-	return cachedvfs.From(newFrozenLintTargetOverlayFS(disk, r.overlayFiles, r.target))
+	return newCachedLintTargetOverlayFS(r.store.server.fs, r.overlayFiles, r.target)
 }
 
 func (r *lintProgramRequest) metadata(
