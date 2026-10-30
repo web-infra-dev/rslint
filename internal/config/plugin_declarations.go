@@ -10,6 +10,7 @@ type bundledPluginDeclaration struct {
 
 var bundledPluginDeclarations = []bundledPluginDeclaration{
 	{ruleNamespace: "@typescript-eslint", declarationNames: []string{"@typescript-eslint"}},
+	{ruleNamespace: "effector", declarationNames: []string{"eslint-plugin-effector", "effector"}},
 	{ruleNamespace: "import", declarationNames: []string{"eslint-plugin-import", "import"}},
 	{ruleNamespace: "jest", declarationNames: []string{"eslint-plugin-jest", "jest"}},
 	{ruleNamespace: "jsx-a11y", declarationNames: []string{"eslint-plugin-jsx-a11y", "jsx-a11y"}},

@@ -16,6 +16,7 @@ import (
 // silently drop community plugins mounted under that key.
 func TestEslintPluginDeclNameAliases_PinnedForJSGuard(t *testing.T) {
 	want := map[string]struct{}{
+		"eslint-plugin-effector":    {},
 		"eslint-plugin-import":      {},
 		"eslint-plugin-jest":        {},
 		"eslint-plugin-jsx-a11y":    {},

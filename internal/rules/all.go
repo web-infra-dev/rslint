@@ -3,6 +3,7 @@ package rules
 import (
 	"sync"
 
+	effectorPlugin "github.com/web-infra-dev/rslint/internal/plugins/effector"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
@@ -232,6 +233,7 @@ func allRules() []rule.Rule {
 	implementedRules = append(implementedRules, jsxA11yPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, nodePlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, promisePlugin.GetAllRules()...)
+	implementedRules = append(implementedRules, effectorPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, unicornPlugin.GetAllRules()...)
 	implementedRules = append(implementedRules, coreRules()...)
 	return implementedRules

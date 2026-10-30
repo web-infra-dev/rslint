@@ -161,6 +161,7 @@ doublestar
 DPUB
 dropeffect
 eacute
+effectorutil
 embedfs
 embertest
 endline
