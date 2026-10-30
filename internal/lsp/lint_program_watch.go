@@ -295,16 +295,18 @@ func (c *lintProgramCoverage) ensure(
 		return false, false, err
 	}
 
-	c.nextWatcherID++
+	// A failed attempt keeps its ID. WatchFiles removes any possibly installed
+	// registration before retrying it, so cancellation cannot accumulate watches.
 	watcherID := project.WatcherID(fmt.Sprintf(
 		"rslint-standalone-program-%d",
-		c.nextWatcherID,
+		c.nextWatcherID+1,
 	))
 	watchCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	if err := c.watchFiles(watchCtx, watcherID, newWatchers); err != nil {
 		return false, false, err
 	}
+	c.nextWatcherID++
 	for _, key := range newKeys {
 		c.coveredWatchers[key] = struct{}{}
 	}

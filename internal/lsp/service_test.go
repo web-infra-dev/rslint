@@ -564,43 +564,88 @@ func TestUnrelatedSourceOnlyDocumentsKeepDiagnostics(t *testing.T) {
 }
 
 func TestSourceOnlyImportObservesOverlayFiles(t *testing.T) {
-	s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "import './missing.js';\n", config.RslintConfig{{
-		Plugins: []string{"import"}, Rules: config.Rules{"import/no-unresolved": "error"},
-	}})
-	if err := s.pushDiagnostics(context.Background(), uri); err != nil {
-		t.Fatal(err)
-	}
-	if published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 1 {
-		t.Fatal("missing import did not produce a diagnostic")
-	}
-	dependency := documentURIFromPath(tspath.ResolvePath(s.cwd, "src/missing.js"))
-	for _, event := range []string{"open", "close"} {
-		want := 0
-		if event == "open" {
-			if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
-				TextDocument: &lsproto.TextDocumentItem{Uri: dependency, Text: "export {};\n", Version: 1},
-			}); err != nil {
+	for _, scenario := range []struct {
+		name, specifier                    string
+		alias, external, nested, openAlias bool
+	}{
+		{name: "direct", specifier: "./missing.js"},
+		{name: "directory alias", specifier: "./alias/missing.js", alias: true},
+		{name: "external alias", specifier: "./alias/missing.js", alias: true, external: true},
+		{name: "missing parents", specifier: "./alias/generated/deep/missing.js", alias: true, external: true, nested: true},
+		{name: "open through alias", specifier: "../shared/missing.js", alias: true, openAlias: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			s, uri, outgoing := newPushDiagnosticsPluginFixture(t, "import '"+scenario.specifier+"';\n", config.RslintConfig{{
+				Plugins: []string{"import"}, Rules: config.Rules{"import/no-unresolved": "error"},
+			}})
+			sourceDirectory := tspath.ResolvePath(s.cwd, "src")
+			physicalDirectory, editorDirectory := sourceDirectory, sourceDirectory
+			if scenario.alias {
+				physicalDirectory = tspath.ResolvePath(s.cwd, "shared")
+				if scenario.external {
+					physicalDirectory = tspath.NormalizePath(t.TempDir())
+				}
+				if err := os.MkdirAll(physicalDirectory, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				alias := tspath.ResolvePath(sourceDirectory, "alias")
+				if err := os.Symlink(physicalDirectory, alias); err != nil {
+					t.Skipf("directory symlink unavailable: %v", err)
+				}
+				editorDirectory = physicalDirectory
+				if scenario.openAlias {
+					editorDirectory = alias
+				}
+				if scenario.nested {
+					editorDirectory = tspath.ResolvePath(editorDirectory, "generated/deep")
+				}
+			}
+			dependencyPath := tspath.ResolvePath(editorDirectory, "missing.js")
+			dependency := documentURIFromPath(dependencyPath)
+			// Pre-cover the source chains so an unrelated configuration refresh
+			// cannot hide a missed dependency invalidation.
+			s.gitPolicy = config.CollectGitPolicy(nil, s.cwd, s.fs, config.ResolveFileIdentities([]string{dependencyPath}, s.fs), config.ResolveDirectoryIdentities(
+				[]string{s.cwd, sourceDirectory, physicalDirectory, editorDirectory}, s.fs))
+			s.configDiscoveryActive = true
+			installJSConfigsForTest(s, s.jsConfigs)
+			if !s.gitPolicy.CoversDirectory(config.FreezeFileIdentity(dependencyPath, s.fs).CanonicalParentPath) {
+				t.Fatal("dependency directory is not covered by the fixture")
+			}
+			if err := s.pushDiagnostics(context.Background(), uri); err != nil {
 				t.Fatal(err)
 			}
-		} else {
-			if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
-				TextDocument: lsproto.TextDocumentIdentifier{Uri: dependency},
-			}); err != nil {
-				t.Fatal(err)
+			if published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams); len(published.Diagnostics) != 1 {
+				t.Fatal("missing import did not produce a diagnostic")
 			}
-			<-outgoing // The closed dependency is cleared before its consumer runs.
-			want = 1
-		}
-		if _, pending := s.lintSchedule.pending[uri]; !pending {
-			t.Fatalf("%s did not invalidate source-only import resolution", event)
-		}
-		if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
-			t.Fatal(err)
-		}
-		published := (<-outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
-		if published.Uri != uri || len(published.Diagnostics) != want {
-			t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
-		}
+			for _, event := range []string{"open", "close"} {
+				want := 0
+				if event == "open" {
+					if err := s.handleDidOpen(context.Background(), &lsproto.DidOpenTextDocumentParams{
+						TextDocument: &lsproto.TextDocumentItem{Uri: dependency, Text: "export {};\n", Version: 1},
+					}); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+						TextDocument: lsproto.TextDocumentIdentifier{Uri: dependency},
+					}); err != nil {
+						t.Fatal(err)
+					}
+					nextTestLSPMessage(t, outgoing) // Clear the closed dependency.
+					want = 1
+				}
+				if _, pending := s.lintSchedule.pending[uri]; !pending {
+					t.Fatalf("%s did not invalidate source-only import resolution", event)
+				}
+				if err := s.flushDocumentDiagnostics(context.Background(), uri); err != nil {
+					t.Fatal(err)
+				}
+				published := nextTestLSPMessage(t, outgoing).AsRequest().Params.(*lsproto.PublishDiagnosticsParams)
+				if published.Uri != uri || len(published.Diagnostics) != want {
+					t.Fatalf("%s diagnostics = %+v, want %d", event, published, want)
+				}
+			}
+		})
 	}
 }
 

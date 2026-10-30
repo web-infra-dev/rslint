@@ -9,8 +9,10 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/jsonrpc"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/microsoft/TypeScript/tsc/shim/project"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -215,6 +217,99 @@ func TestSendRequestCancellationDoesNotBlockOnFullOutgoingQueue(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("full outgoing queue unexpectedly became empty")
+	}
+}
+
+func TestFileWatchRegistrationCancellationRetainsAndCleansOwnership(t *testing.T) {
+	directory := tspath.NormalizePath(t.TempDir())
+	s := NewServer(&ServerOptions{Cwd: directory, FS: osvfs.FS()})
+	s.lintPrograms = newLintProgramStore(s)
+
+	// A separate acknowledged registration must survive all retries below.
+	registered := make(chan error, 1)
+	go func() { registered <- s.WatchFiles(context.Background(), "active", nil) }()
+	request := nextConfigReverseRequest(t, s.outgoingQueue, lsproto.MethodClientRegisterCapability)
+	respondToConfigReverseRequest(t, s, request, nil, nil)
+	if err := awaitConfigWatchEvent(t, registered); err != nil {
+		t.Fatal(err)
+	}
+	input := []string{tspath.ResolvePath(directory, "source.ts")}
+	start := func(ctx context.Context) <-chan bool {
+		done := make(chan bool, 1)
+		go func() {
+			_, safe := s.lintPrograms.ensureCoverage(ctx, input, directory)
+			done <- safe
+		}()
+		return done
+	}
+	finish := func(done <-chan bool, wantSafe bool) {
+		t.Helper()
+		select {
+		case safe := <-done:
+			if safe != wantSafe || !s.lintPrograms.Usable() {
+				t.Fatal("registration recovery changed cache capability or trusted unconfirmed coverage")
+			}
+		case <-time.After(time.Second):
+			t.Fatal("watch registration did not complete")
+		}
+	}
+	var attempted project.WatcherID
+	for _, phase := range []string{"register", "unregister", "register"} {
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		done := start(ctx)
+		if attempted != "" {
+			removal := nextConfigReverseRequest(t, s.outgoingQueue, lsproto.MethodClientUnregisterCapability)
+			if removal.Params.(*lsproto.UnregistrationParams).Unregisterations[0].Id != string(attempted) {
+				t.Fatal("retry did not remove the unconfirmed registration")
+			}
+			if phase == "register" {
+				respondToConfigReverseRequest(t, s, removal, nil, nil)
+			}
+		}
+		if phase == "register" {
+			request := nextConfigReverseRequest(t, s.outgoingQueue, lsproto.MethodClientRegisterCapability)
+			id := project.WatcherID(request.Params.(*lsproto.RegistrationParams).Registrations[0].Id)
+			if attempted != "" && attempted != id {
+				t.Fatal("retry allocated another ID before settling the previous attempt")
+			}
+			attempted = id
+		}
+		// The client has applied the operation, but its response has not arrived.
+		cancel()
+		finish(done, false)
+		if message := nextTestLSPMessage(t, s.outgoingQueue); message.AsRequest().Method != lsproto.MethodCancelRequest {
+			t.Fatal("registration cancellation was not forwarded")
+		}
+		if !s.watchers.Has(attempted) || !s.watchers.Has("active") {
+			t.Fatal("cancellation lost an uncertain or acknowledged registration")
+		}
+	}
+
+	done := start(context.Background())
+	removal := nextConfigReverseRequest(t, s.outgoingQueue, lsproto.MethodClientUnregisterCapability)
+	respondToConfigReverseRequest(t, s, removal, nil, nil)
+	if !s.watchers.Has("active") {
+		t.Fatal("cleanup removed unrelated acknowledged coverage")
+	}
+	request = nextConfigReverseRequest(t, s.outgoingQueue, lsproto.MethodClientRegisterCapability)
+	respondToConfigReverseRequest(t, s, request, nil, nil)
+	finish(done, true)
+	if len(s.watchers.ToSlice()) != 2 {
+		t.Fatal("canceled attempts accumulated client registrations")
+	}
+	if added, safe := s.lintPrograms.ensureCoverage(context.Background(), input, directory); added || !safe {
+		t.Fatal("confirmed coverage was not reusable")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.WatchFiles(ctx, "not-sent", nil); !errors.Is(err, context.Canceled) || s.watchers.Has("not-sent") {
+		t.Fatal("an already canceled registration acquired ownership")
+	}
+	select {
+	case message := <-s.outgoingQueue:
+		t.Fatalf("confirmed coverage produced a redundant request: %+v", message)
+	default:
 	}
 }
 

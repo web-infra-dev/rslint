@@ -273,6 +273,19 @@ type pluginLintResult struct {
 
 // WatchFiles registers compiler and configuration dependencies with the client.
 func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// Retrying an ID first settles the earlier registration. A failed or
+	// canceled reply cannot prove that the client did not install it.
+	if s.watchers.Has(id) {
+		if err := s.UnwatchFiles(ctx, id); err != nil {
+			return err
+		}
+	}
+	// Ownership starts before the request, and ends only after acknowledged
+	// removal. Callers can retry or replace registrations without losing IDs.
+	s.watchers.Add(id)
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
 			{
@@ -289,7 +302,6 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 		return fmt.Errorf("failed to register file watcher: %w", err)
 	}
 
-	s.watchers.Add(id)
 	return nil
 }
 

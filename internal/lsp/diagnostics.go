@@ -9,6 +9,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -222,10 +224,25 @@ func (s *Server) prepareDiagnostics(ctx context.Context, uri lsproto.DocumentUri
 		return presentation
 	}
 	if provider.sourceOnlyInputs != nil {
+		lookups := provider.sourceOnlyInputs.drain()
+		// Freeze dependency identities before returning to the message loop.
+		// Missing files and parents can later be opened from either side of an
+		// alias, and a moved alias must not reinterpret an earlier observation.
+		identities := cachedvfs.From(provider.sourceOnlyInputs.Inner)
+		for _, path := range lookups.seenFiles {
+			identity := config.FreezeFileIdentity(path, identities)
+			physical := identity.CanonicalPath
+			if tspath.GetBaseFileName(path) == lintProgramDirectoryWatchName {
+				physical = lintProgramDirectoryWatchInput(identity.CanonicalParentPath)
+			}
+			if physical != identity.Path {
+				lookups.seenFiles = append(lookups.seenFiles, physical)
+			}
+		}
 		if s.diagnosticInputs == nil {
 			s.diagnosticInputs = make(map[lsproto.DocumentUri]lintProgramLookups)
 		}
-		s.diagnosticInputs[uri] = provider.sourceOnlyInputs.drain()
+		s.diagnosticInputs[uri] = lookups
 	}
 	// The pacer cannot see that the lint just dropped what it derived.
 	go runtime.GC()
