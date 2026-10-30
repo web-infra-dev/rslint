@@ -399,6 +399,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	mappers := contentmappers.New(contentmappers.Options{Enabled: args.RunExternalCode})
 	defer mappers.Close()
 	programSession := loader.NewSession(sourceFS, mappers)
+	// The Session whose mapper projects are still open. Each fix round
+	// releases the previous round's projects once its own are open.
+	mapperSession := programSession
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
 	var summaryFileCount int
 	activate := func() error {
@@ -513,8 +516,11 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides), mappers)
 			binding, err := createPrograms(roundSession)
 			if err != nil {
+				_ = roundSession.ReleaseContentMapperProjects()
 				return loader.LoadResult{}, nil, err
 			}
+			_ = mapperSession.ReleaseContentMapperProjects()
+			mapperSession = roundSession
 			if err := ctx.Err(); err != nil {
 				return loader.LoadResult{}, nil, err
 			}

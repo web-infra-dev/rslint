@@ -97,3 +97,41 @@ func TestBuildContextParsesProjectReferencesWithContentMapperOptions(t *testing.
 		t.Fatalf("IgnoredConfigs() = %v, want %v", got, want)
 	}
 }
+
+func TestBuildContextReleasesContentMapperProjects(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writeContentMapperFiles(t, dir, map[string]string{
+		"tsconfig.json": contentMapperTSConfig,
+		"index.ts":      "import { answer } from './data.fake';\nexport const doubled: number = answer * 2;\n",
+		"data.fake":     "answer = 42\n",
+	})
+	root := tspath.NormalizePath(dir)
+	spawner := &contentmappertest.Spawner{Output: "export const answer: number = 42;\n"}
+	mappers := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: spawner})
+	defer mappers.Close()
+
+	build := func() *buildContext {
+		context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), mappers)
+		if _, err := context.createProjectProgram(true, root, "tsconfig.json"); err != nil {
+			t.Fatal(err)
+		}
+		return context
+	}
+	previous := build()
+	current := build()
+	// Releasing the previous build after the next one opened its project keeps
+	// the shared mapper process running.
+	if err := previous.releaseContentMapperProjects(); err != nil {
+		t.Fatal(err)
+	}
+	if spawner.Spawns() != 1 || spawner.Closes() != 0 {
+		t.Fatalf("after releasing the previous build: %d mappers started, %d stopped; want 1, 0", spawner.Spawns(), spawner.Closes())
+	}
+	if err := current.releaseContentMapperProjects(); err != nil {
+		t.Fatal(err)
+	}
+	if spawner.Closes() != 1 {
+		t.Fatalf("after releasing every build: %d mappers stopped, want 1", spawner.Closes())
+	}
+}

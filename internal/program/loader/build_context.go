@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -31,7 +32,8 @@ import (
 //     parses through programMetadataFS and programExtendedConfigCache.
 //
 // It also carries the caller's content mapper Runtime, which decides whether
-// tsconfig content mappers run and owns the projects they open.
+// tsconfig content mappers run, and records the mapper projects its builds
+// open so releaseContentMapperProjects can close them before the Runtime does.
 //
 // RSLINT_DISABLE_PROGRAM_METADATA_CACHE is an undocumented diagnostic escape
 // hatch. When set, the Program VFS is not wrapped by either metadata snapshots
@@ -40,6 +42,8 @@ import (
 type buildContext struct {
 	fs                  vfs.FS
 	contentMappers      *contentmappers.Runtime
+	mapperMu            sync.Mutex
+	mapperReleases      []func() error
 	parseCache          *utils.ParseCache
 	metadataFS          *programMetadataFS
 	extendedConfigCache *programExtendedConfigCache
@@ -107,10 +111,28 @@ func (c *buildContext) newCompilerHostWithCache(cwd string) compiler.CompilerHos
 // newProjectCompilerHostWithCache is newCompilerHostWithCache plus the content
 // mapper project that turns config's mapped files into virtual TypeScript.
 func (c *buildContext) newProjectCompilerHostWithCache(cwd string, config *tsoptions.ParsedCommandLine) compiler.CompilerHost {
-	// The caller's Runtime closes the project when its run or request ends.
-	project, _ := c.contentMappers.Open(config)
+	project, release := c.contentMappers.Open(config)
+	if project != nil {
+		c.mapperMu.Lock()
+		c.mapperReleases = append(c.mapperReleases, release)
+		c.mapperMu.Unlock()
+	}
 	host := c.newCompilerHostWithContentMappers(cwd, project)
 	return utils.WithParseCache(host, c.parseCache)
+}
+
+// releaseContentMapperProjects closes the mapper projects opened so far.
+// Programs already built keep their mapped files.
+func (c *buildContext) releaseContentMapperProjects() error {
+	c.mapperMu.Lock()
+	releases := c.mapperReleases
+	c.mapperReleases = nil
+	c.mapperMu.Unlock()
+	var errs []error
+	for _, release := range releases {
+		errs = append(errs, release())
+	}
+	return errors.Join(errs...)
 }
 
 // newTransientCompilerHost shares source snapshots with Program construction

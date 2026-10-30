@@ -87,6 +87,18 @@ func (s *Session) ReleaseBuildCache() {
 	s.context.retainOnlySourceFiles(nil)
 }
 
+// ReleaseContentMapperProjects closes the content mapper projects this
+// Session's builds opened; otherwise they stay open until the Runtime closes.
+// Programs already built keep their mapped files, and a later build opens new
+// projects. A mapper process stops when its last project closes, so a caller
+// replacing this Session should release it after the new one has built.
+func (s *Session) ReleaseContentMapperProjects() error {
+	if s == nil || s.context == nil {
+		return nil
+	}
+	return s.context.releaseContentMapperProjects()
+}
+
 func (s *Session) retainCompilerPrograms(current []*compiler.Program) {
 	if s == nil || s.context == nil {
 		return
