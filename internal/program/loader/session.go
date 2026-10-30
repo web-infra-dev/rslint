@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 )
 
 // Session owns Program-construction services for one immutable CLI/API source
@@ -23,11 +24,15 @@ type Session struct {
 	initialProgramsSet bool
 }
 
-func NewSession(fsys vfs.FS) *Session {
+// NewSession returns a Session that builds Programs from fsys. contentMappers
+// decides whether tsconfig content mappers run and owns the projects the
+// Session opens; it must outlive every Program the Session builds. Nil runs no
+// mappers.
+func NewSession(fsys vfs.FS, contentMappers *contentmappers.Runtime) *Session {
 	if isNilFS(fsys) {
 		return &Session{}
 	}
-	return &Session{context: newBuildContext(fsys)}
+	return &Session{context: newBuildContext(fsys, contentMappers)}
 }
 
 func isNilFS(fsys vfs.FS) bool {
@@ -80,6 +85,18 @@ func (s *Session) ReleaseBuildCache() {
 	s.initialPrograms = nil
 	s.initialProgramsSet = false
 	s.context.retainOnlySourceFiles(nil)
+}
+
+// ReleaseContentMapperProjects closes the content mapper projects this
+// Session's builds opened; otherwise they stay open until the Runtime closes.
+// Programs already built keep their mapped files, and a later build opens new
+// projects. A mapper process stops when its last project closes, so a caller
+// replacing this Session should release it after the new one has built.
+func (s *Session) ReleaseContentMapperProjects() error {
+	if s == nil || s.context == nil {
+		return nil
+	}
+	return s.context.releaseContentMapperProjects()
 }
 
 func (s *Session) retainCompilerPrograms(current []*compiler.Program) {

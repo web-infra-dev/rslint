@@ -24,6 +24,7 @@ rslint [options] [files/directories...]
 | `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
 | `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
 | `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
+| `--run-external-code` | Run the content mappers declared in tsconfig ([details](#content-mappers))                     |
 | `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
 | `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
 | `--help`, `-h`        | Show help information                                                                          |
@@ -145,6 +146,16 @@ no-control-regex                        | native |     102.9 |   842 |     2.7%
 - **Relative** — the rule's share of the summed rule time.
 
 The table is written to stderr, so machine-readable output formats such as `jsonline` stay parseable. Files are linted by parallel workers, so summed rule time can exceed the run's wall-clock time. With `--fix`, times accumulate across all re-lint passes. Rules executed through the ESLint plugin compatibility layer are included: their time is measured inside the Node.js worker (rule `create` plus listener invocations), excluding parse and IPC overhead.
+
+## Content Mappers
+
+A tsconfig can declare `contentMappers`, npm packages that turn other file types, such as `.vue`, into TypeScript so they provide types to the files that import them. Each mapper runs as a child process, so like `tsc --runExternalCode`, Rslint runs them only with `--run-external-code`:
+
+```bash
+rslint --run-external-code
+```
+
+Without the flag, imports of mapped files do not resolve, and Rslint prints a warning for each tsconfig whose mappers it skipped. Mapped files are not linted themselves. In the editor, the language server runs mappers when the client passes `runExternalCode` in its initialization options, which clients set only for trusted workspaces.
 
 ## Exit Codes
 

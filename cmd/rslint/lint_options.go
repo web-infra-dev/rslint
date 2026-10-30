@@ -24,9 +24,12 @@ type lintArgs struct {
 	TraceOut       string
 	CpuprofOut     string
 	SingleThreaded bool
-	Format         string
-	NoColor        bool
-	ForceColor     bool
+	// RunExternalCode lets tsconfig content mappers run, like tsc's
+	// --runExternalCode.
+	RunExternalCode bool
+	Format          string
+	NoColor         bool
+	ForceColor      bool
 	// StdoutIsTTY is the TTY fact for the real output destination, reported
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
@@ -93,6 +96,7 @@ Options:
   --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
+  --run-external-code   Run the content mappers declared in tsconfig
   -h, --help            Show help
 `
 
@@ -144,6 +148,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
 	fs.StringVar(&args.CpuprofOut, "cpuprof", "", "file to put cpu profiling to")
 	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
+	fs.BoolVar(&args.RunExternalCode, "run-external-code", false, "run the content mappers declared in tsconfig")
 	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
 	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 

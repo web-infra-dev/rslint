@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 )
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
@@ -16,6 +17,16 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 	}
 
 	s.initializeParams = params
+
+	// Like ts-go's language server, content mappers run only when the client
+	// passes runExternalCode, which it sets for trusted workspaces.
+	runExternalCode := false
+	if params.InitializationOptions != nil &&
+		params.InitializationOptions.InitializationOptions != nil &&
+		params.InitializationOptions.InitializationOptions.RunExternalCode != nil {
+		runExternalCode = *params.InitializationOptions.InitializationOptions.RunExternalCode
+	}
+	s.contentMappers = contentmappers.New(contentmappers.Options{Enabled: runExternalCode})
 
 	// rslint diagnostics and edits use VS Code's native UTF-16 coordinates.
 	// UTF-16 is mandatory for LSP clients, so selecting it unconditionally keeps

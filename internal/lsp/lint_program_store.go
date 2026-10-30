@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/contentmapper"
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -27,6 +28,9 @@ type lintProgramStore struct {
 	programs            map[lintProgramKey]*lintProgramState
 	projectMetadata     map[string]*lintProjectMetadata
 	observedRootConfigs map[string]struct{}
+	// mapperStates are the states whose Programs hold a content mapper
+	// project, including states already replaced but not yet pruned.
+	mapperStates map[*lintProgramState]struct{}
 }
 
 type lintProgramKey = tspath.Path
@@ -42,6 +46,9 @@ type lintProgramState struct {
 	failedLookups            map[tspath.Path]struct{}
 	selectedSourceIdentities map[tspath.Path]tspath.Path
 	metadata                 *lintProjectMetadata
+	releaseMappers           func() error
+	mapperProject            contentmapper.Project
+	mapperWatchedFiles       []string
 }
 
 type lintProgramRequest struct {
@@ -69,6 +76,7 @@ func newLintProgramStore(server *Server) *lintProgramStore {
 		programs:            make(map[lintProgramKey]*lintProgramState),
 		projectMetadata:     make(map[string]*lintProjectMetadata),
 		observedRootConfigs: make(map[string]struct{}),
+		mapperStates:        make(map[*lintProgramState]struct{}),
 	}
 }
 
@@ -111,11 +119,27 @@ func (r *lintProgramRequest) key(configPath string) lintProgramKey {
 	return lintProgramLexicalPathID(configPath, r.store.server.fs)
 }
 
-func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, error) {
+// createProgram also returns the release of the Program's content mapper
+// project. A resident Program keeps the project in its state until prune drops
+// the state; any other caller passes it to releaseTransient.
+func (r *lintProgramRequest) createProgram(metadata *lintProjectMetadata, fsys vfs.FS) (*compiler.Program, contentmapper.Project, func() error, error) {
 	commandLine := singleCheckerLintCommandLine(metadata.commandLine)
-	host := utils.WithASTCache(utils.CreateCompilerHost(tspath.GetDirectoryPath(metadata.configPath), fsys), r.store.parseCache)
-	return utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
+	mappers, release := r.store.server.contentMappers.Open(metadata.commandLine)
+	host := utils.WithASTCache(utils.CreateCompilerHostWithContentMappers(tspath.GetDirectoryPath(metadata.configPath), fsys, mappers), r.store.parseCache)
+	program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(false, commandLine,
 		newLintProjectReferenceHost(host, r.projectMetadata))
+	if err != nil {
+		r.releaseTransient(metadata, release)
+		return nil, nil, nil, err
+	}
+	return program, mappers, release, nil
+}
+
+// releaseTransient releases the content mapper project of a Program that does
+// not stay resident, keeping the mapper processes running for later builds.
+func (r *lintProgramRequest) releaseTransient(metadata *lintProjectMetadata, release func() error) {
+	r.store.server.contentMappers.Retain(metadata.commandLine)
+	_ = release()
 }
 
 func (r *lintProgramRequest) loadMetadata(
@@ -190,6 +214,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 			configFileName,
 			r.overlayFS,
 			r.store.server.fs,
+			r.store.server.contentMappers,
 		)
 		return metadata, false, err
 	}
@@ -200,6 +225,7 @@ func (r *lintProgramRequest) parseProjectMetadata(
 			configFileName,
 			tracker,
 			r.store.server.fs,
+			r.store.server.contentMappers,
 		)
 		if err != nil {
 			return nil, false, err
@@ -333,10 +359,11 @@ func (r *lintProgramRequest) matchesMetadata(state *lintProgramState, root *lint
 func (r *lintProgramRequest) loadFresh(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
-	program, err := r.createProgram(metadata, r.freshFS())
+	program, _, release, err := r.createProgram(metadata, r.freshFS())
 	if err != nil {
 		return nil, nil, err
 	}
+	r.releaseTransient(metadata, release)
 	return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 }
 
@@ -356,10 +383,11 @@ func (r *lintProgramRequest) rebuild(
 	// can retain any successful metadata from this request, so none of those
 	// snapshots may cross the request boundary while coverage is unsettled.
 	if r.freshOnly || !r.store.Usable() || len(r.transientMetadata) != 0 {
-		program, err := r.createProgram(metadata, r.freshFS())
+		program, _, release, err := r.createProgram(metadata, r.freshFS())
 		if err != nil {
 			return nil, nil, err
 		}
+		r.releaseTransient(metadata, release)
 		return program, sourceFileForTarget(program, r.target, r.overlayFS), nil
 	}
 
@@ -367,6 +395,7 @@ func (r *lintProgramRequest) rebuild(
 
 	// Register any dependencies outside the prepared coverage, then rebuild
 	// once so no filesystem change can fall into the registration gap.
+	var retried func() error
 	for attempt := range 2 {
 		if err := r.ctx.Err(); err != nil {
 			return nil, nil, err
@@ -374,12 +403,17 @@ func (r *lintProgramRequest) rebuild(
 		// Each retry starts after watcher registration with a fresh filesystem
 		// view, so cached misses cannot hide a change in the registration gap.
 		tracker := newLintTrackingFS(r.freshFS())
-		program, err := r.createProgram(metadata, tracker)
+		program, mapperProject, release, err := r.createProgram(metadata, tracker)
+		// The retry has opened its own project, so the first attempt's can go.
+		if retried != nil {
+			_ = retried()
+		}
 		if err != nil {
 			return nil, nil, err
 		}
 		state := &lintProgramState{
 			program:                  program,
+			mapperProject:            mapperProject,
 			tracker:                  tracker,
 			sources:                  utils.NewProgramSourceLookup(program, r.overlayFS),
 			overlayFS:                r.overlayFS,
@@ -396,21 +430,36 @@ func (r *lintProgramRequest) rebuild(
 			// A fallback probe that did not contain this target must not make an
 			// unrelated Program resident. Previously selected resident Programs
 			// are handled by load and remain available to their documents.
+			r.releaseTransient(metadata, release)
 			return program, nil, nil
 		}
 		added, safe := r.cover(state)
 		if !safe {
+			r.releaseTransient(metadata, release)
 			return program, sourceFile, nil
 		}
 		if added && attempt == 0 {
+			// Reopening the same lease alone would reuse pre-registration config.
+			if mapperProject != nil {
+				if err := mapperProject.Refresh(); err != nil {
+					r.releaseTransient(metadata, release)
+					return nil, nil, err
+				}
+			}
+			retried = release
 			continue
 		}
 		if added {
 			// Lazy compiler reads expanded coverage again. Serve this Program
 			// once, but do not retain it across the uncovered interval.
+			r.releaseTransient(metadata, release)
 			return program, sourceFile, nil
 		}
 		delete(r.store.projectMetadata, configFileName)
+		// The replaced state keeps its project until prune, after this
+		// Program has opened its own, so the mapper processes keep running.
+		state.releaseMappers = release
+		r.store.mapperStates[state] = struct{}{}
 		r.store.programs[r.key(configFileName)] = state
 		return r.result(configFileName, state)
 	}
@@ -450,7 +499,15 @@ func (s *lintProgramStore) ensureCoverage(ctx context.Context, files []string, d
 func (r *lintProgramRequest) cover(state *lintProgramState) (added bool, safe bool) {
 	lookups := state.tracker.drain()
 	state.recordFailedLookups(lookups, r.store.server.fs)
-	return r.store.ensureCoverage(r.ctx, lookups.seenFiles, state.program.GetCurrentDirectory())
+	if state.mapperProject != nil {
+		files, err := state.mapperProject.WatchedFiles()
+		if err != nil {
+			// Unknown dependencies must never cross a request boundary.
+			return false, false
+		}
+		state.mapperWatchedFiles = files
+	}
+	return r.store.ensureCoverage(r.ctx, append(lookups.seenFiles, state.mapperWatchedFiles...), state.program.GetCurrentDirectory())
 }
 
 func (r *lintProgramRequest) finalize() {
@@ -509,9 +566,25 @@ func (s *lintProgramStore) prune() {
 		}
 	}
 	s.parseCache.RetainOnly(programs)
+	s.releaseMapperProjects()
 	if len(s.documentPrograms) == 0 {
 		clear(s.projectMetadata)
 		clear(s.observedRootConfigs)
+	}
+}
+
+// releaseMapperProjects releases the content mapper projects of states that
+// are no longer resident.
+func (s *lintProgramStore) releaseMapperProjects() {
+	resident := make(map[*lintProgramState]struct{}, len(s.programs))
+	for _, state := range s.programs {
+		resident[state] = struct{}{}
+	}
+	for state := range s.mapperStates {
+		if _, ok := resident[state]; !ok {
+			_ = state.releaseMappers()
+			delete(s.mapperStates, state)
+		}
 	}
 }
 
@@ -557,6 +630,28 @@ func (s *lintProgramStore) DidChangeWatchedFiles(
 	changes []*lsproto.FileEvent,
 ) bool {
 	needsRefresh := false
+	// Refresh before the open-source shortcut: a mapper dependency can itself
+	// be an open script. Include replaced states whose leases are still alive.
+	for state := range s.mapperStates {
+		for _, change := range changes {
+			if change == nil {
+				continue
+			}
+			changed := lintProgramLexicalPathID(uriToPath(change.Uri), s.server.fs)
+			if slices.ContainsFunc(state.mapperWatchedFiles, func(file string) bool {
+				return lintProgramLexicalPathID(file, s.server.fs) == changed
+			}) {
+				// Refresh marks the project unopened even if closeProject fails.
+				_ = state.mapperProject.Refresh()
+				needsRefresh = true
+				break
+			}
+		}
+	}
+	if needsRefresh {
+		s.Invalidate()
+		return true
+	}
 	for _, change := range changes {
 		if s.isOpenSourceOverlayWatchChange(change) {
 			uri := change.Uri
@@ -594,6 +689,8 @@ func (s *lintProgramStore) Invalidate() bool {
 	clear(s.programs)
 	clear(s.documentPrograms)
 	s.parseCache.RetainOnly(nil)
+	// Mapper projects are released by the next prune, after the replacement
+	// Programs have opened theirs, so the mapper processes keep running.
 	clear(s.projectMetadata)
 	clear(s.observedRootConfigs)
 	return hadState

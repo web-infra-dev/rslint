@@ -12,14 +12,16 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 )
 
 // speculativeLintEnvironment captures the base filesystem identity, process
 // directory, and open-editor text used to rebuild isolated fix-all generations.
 type speculativeLintEnvironment struct {
-	baseFS     vfs.FS
-	processCwd string
-	openFiles  map[string]string
+	baseFS         vfs.FS
+	processCwd     string
+	openFiles      map[string]string
+	contentMappers *contentmappers.Runtime
 }
 
 func (s *Server) freezeSpeculativeLintEnvironment(
@@ -28,9 +30,10 @@ func (s *Server) freezeSpeculativeLintEnvironment(
 ) speculativeLintEnvironment {
 	openFiles, _ := s.currentEditorOverlayFilesForFrozenTarget(uri, target, "", false)
 	return speculativeLintEnvironment{
-		baseFS:     s.fs,
-		processCwd: s.cwd,
-		openFiles:  openFiles,
+		baseFS:         s.fs,
+		processCwd:     s.cwd,
+		openFiles:      openFiles,
+		contentMappers: s.contentMappers,
 	}
 }
 
@@ -67,7 +70,7 @@ func acquireSpeculativeGeneration(
 	// see its new editor text and fresh filesystem results.
 	overlayFS := newCachedLintTargetOverlayFS(environment.baseFS, files, target)
 
-	request := newStandaloneLintProjectRequestWithFS(target, overlayFS)
+	request := newStandaloneLintProjectRequestWithFS(target, overlayFS, environment.contentMappers)
 	program, sourceFile, hasTypeInfo, err := acquireLintProgram(
 		snapshot.typeScriptConfigPaths,
 		snapshot.projectPolicy,

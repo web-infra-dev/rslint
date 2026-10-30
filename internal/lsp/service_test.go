@@ -2202,6 +2202,7 @@ func TestAcquireLintProgramUsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 		return newStandaloneLintProjectRequest(
 			target,
 			func() vfs.FS { return s.currentEditorOverlayFSForTarget(uri, target) },
+			nil,
 		).loaders()
 	}
 	sourceTarget := lspConfigTarget(sourcePath, dir, fsys)
@@ -2923,7 +2924,7 @@ func TestRunLint_IgnoredFileShortCircuits(t *testing.T) {
 				snapshot: documentLintSnapshotForTest(s, uri, cfg, cwd, false, nil),
 				requestPrograms: func(_ context.Context, _ lsproto.DocumentUri, lintTarget target.File) (lintProjectLoaders, linter.ReleaseFunc) {
 					projectRequests++
-					return newStandaloneLintProjectRequestWithFS(lintTarget, s.fs).loaders(), nil
+					return newStandaloneLintProjectRequestWithFS(lintTarget, s.fs, nil).loaders(), nil
 				},
 			}
 			generation, release, err := provider.AcquireGeneration(ctx, linter.SourceSnapshot{})

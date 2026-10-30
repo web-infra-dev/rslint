@@ -325,7 +325,7 @@ func TestBuildContextMetadataDiscoveryPreservesParallelSourceReuse(t *testing.T)
 		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		reads: make(map[string]int),
 	}
-	context := newBuildContext(baseFS)
+	context := newBuildContext(baseFS, nil)
 	var configs []*tsoptions.ParsedCommandLine
 	for _, name := range []string{"first.json", "second.json"} {
 		parsed, err := context.parseConfig(root, tspath.ResolvePath(root, name))
@@ -387,7 +387,7 @@ func TestBuildContextSharesExtendedConfigWithoutFreezingConfigDir(t *testing.T) 
 		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		reads: make(map[string]int),
 	}
-	context := newBuildContext(baseFS)
+	context := newBuildContext(baseFS, nil)
 	configA, err := context.parseConfig(root, filepath.Join(root, "packages/a/tsconfig.json"))
 	if err != nil {
 		t.Fatalf("parse config A: %v", err)
@@ -423,7 +423,7 @@ func TestBuildContextExtendedConfigCrossCycleDoesNotDeadlock(t *testing.T) {
 		"b.json":      `{"extends":"./a.json"}`,
 	})
 
-	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), nil)
 	parse := func(name string, done chan<- struct{}) {
 		host := context.newCompilerHostWithCache(root)
 		context.registerTSConfig(filepath.Join(root, name))
@@ -470,7 +470,7 @@ func TestBuildContextRegistersAndSharesProjectReferenceReads(t *testing.T) {
 		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 		reads: make(map[string]int),
 	}
-	context := newBuildContext(baseFS)
+	context := newBuildContext(baseFS, nil)
 	if _, err := context.createProjectProgram(true, root, filepath.Join(root, "root-a.json")); err != nil {
 		t.Fatalf("create root A Program: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 		"b.json":    `{"extends":"./base.json","files":[]}`,
 	})
 
-	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	context := newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), nil)
 	before, err := context.parseConfig(root, filepath.Join(root, "a.json"))
 	if err != nil {
 		t.Fatalf("parse config before write: %v", err)
@@ -517,12 +517,12 @@ func TestBuildContextWriteInvalidatesExtendedConfigGeneration(t *testing.T) {
 func TestBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	const path = "/repo/package.json"
 	base := newProgramMetadataTestFS(map[string]string{path: "first"})
-	first := newBuildContext(base)
+	first := newBuildContext(base, nil)
 	if content, _ := first.FS().ReadFile(path); content != "first" {
 		t.Fatalf("first request read %q", content)
 	}
 	base.set(path, "second")
-	second := newBuildContext(base)
+	second := newBuildContext(base, nil)
 	if content, _ := second.FS().ReadFile(path); content != "second" {
 		t.Fatalf("second request inherited stale metadata %q", content)
 	}
@@ -531,7 +531,7 @@ func TestBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 	}
 
 	t.Setenv("RSLINT_DISABLE_PROGRAM_METADATA_CACHE", "1")
-	disabled := newBuildContext(base)
+	disabled := newBuildContext(base, nil)
 	if disabled.FS() != vfs.FS(base) {
 		t.Fatal("escape hatch must preserve the exact caller VFS")
 	}
@@ -548,7 +548,7 @@ func TestBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 		"base.json":     `{"compilerOptions":{"strict":true}}`,
 		"tsconfig.json": `{"extends":"./base.json","files":[]}`,
 	})
-	disabled = newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	disabled = newBuildContext(bundled.WrapFS(cachedvfs.From(osvfs.FS())), nil)
 	if _, err := disabled.createProjectProgram(true, root, filepath.Join(root, "tsconfig.json")); err != nil {
 		t.Fatalf("escape hatch must preserve upstream extends parsing: %v", err)
 	}
@@ -557,12 +557,12 @@ func TestBuildContextRequestIsolationAndEscapeHatch(t *testing.T) {
 func TestBuildContextScopesParallelFSToCompilerHosts(t *testing.T) {
 	base := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	serial := newBuildContext(base)
+	serial := newBuildContext(base, nil)
 	if hostFS := serial.newCompilerHostWithCache("/").FS(); hostFS != serial.FS() {
 		t.Fatal("serial compiler host did not retain the context VFS")
 	}
 
-	parallel := newBuildContext(base)
+	parallel := newBuildContext(base, nil)
 	logicalFS := parallel.FS()
 	parallel.enableConcurrentProgramQueries()
 	firstHostFS := parallel.newCompilerHostWithCache("/").FS()
@@ -621,7 +621,7 @@ func TestSessionRejectsNilFilesystemBeforeLoading(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			session := NewSession(test.fs)
+			session := NewSession(test.fs, nil)
 			if session.FS() != nil {
 				t.Fatal("invalid session unexpectedly exposed a filesystem")
 			}
