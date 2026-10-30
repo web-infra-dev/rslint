@@ -22,6 +22,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/diagnostics"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 // Options configures a Runtime.
@@ -40,11 +41,12 @@ type Runtime struct {
 	enabled bool
 	spawner contentmapper.Spawner
 
-	mu      sync.Mutex
-	host    contentmapper.Host
-	leases  map[*lease]struct{}
-	ignored map[string]struct{}
-	closed  bool
+	mu       sync.Mutex
+	host     contentmapper.Host
+	leases   map[*lease]struct{}
+	retained map[tspath.Path]func() error
+	ignored  map[string]struct{}
+	closed   bool
 }
 
 type lease struct {
@@ -155,6 +157,35 @@ func (r *Runtime) Open(config *tsoptions.ParsedCommandLine) (project contentmapp
 	}
 }
 
+// Retain keeps the project for config open until Retain is called again for
+// the same tsconfig or the Runtime closes. A mapper process stops when its last
+// project closes, so builds that release their project as soon as the Program
+// is built call Retain to keep the processes running between builds. Call it
+// while the build still holds its own project, so the replaced project is not
+// the last one.
+func (r *Runtime) Retain(config *tsoptions.ParsedCommandLine) {
+	project, release := r.Open(config)
+	if project == nil {
+		return
+	}
+	key := tspath.ToPath(config.ConfigName(), "", true)
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		_ = release()
+		return
+	}
+	previous := r.retained[key]
+	if r.retained == nil {
+		r.retained = make(map[tspath.Path]func() error)
+	}
+	r.retained[key] = release
+	r.mu.Unlock()
+	if previous != nil {
+		_ = previous()
+	}
+}
+
 // Close releases every open project and stops every mapper process. Open
 // returns nil afterwards.
 func (r *Runtime) Close() error {
@@ -165,6 +196,7 @@ func (r *Runtime) Close() error {
 	r.closed = true
 	leases := r.leases
 	r.leases = nil
+	r.retained = nil
 	host := r.host
 	r.mu.Unlock()
 	var errs []error

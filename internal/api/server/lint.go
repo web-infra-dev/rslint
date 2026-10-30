@@ -494,6 +494,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		_ = mappers.Close()
 	}()
 	programSession := loader.NewSession(sourceFS, mappers)
+	// The Session whose mapper projects are still open. Each fix round
+	// releases the previous round's projects once its own are open.
+	mapperSession := programSession
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
@@ -581,8 +584,11 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides), mappers)
 			roundBinding, rebuildErr := buildBinding(roundSession)
 			if rebuildErr != nil {
+				_ = roundSession.ReleaseContentMapperProjects()
 				return linter.Generation{}, rebuildErr
 			}
+			_ = mapperSession.ReleaseContentMapperProjects()
+			mapperSession = roundSession
 			if err := ctx.Err(); err != nil {
 				return linter.Generation{}, err
 			}

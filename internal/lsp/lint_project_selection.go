@@ -276,9 +276,11 @@ func (request *standaloneLintProjectRequest) program(
 	metadata *lintProjectMetadata,
 ) (*compiler.Program, *ast.SourceFile, error) {
 	// A standalone request builds one Program, and the mapper is only needed
-	// while that Program parses its mapped files.
+	// while that Program parses its mapped files. Retain keeps the mapper
+	// processes running for the next request.
 	mappers, release := request.mappers.Open(metadata.commandLine)
 	defer release()
+	request.mappers.Retain(metadata.commandLine)
 	program, err := utils.CreateProgramFromParsedConfigLenientWithProjectReferences(
 		false, singleCheckerLintCommandLine(metadata.commandLine),
 		newLintProjectReferenceHost(

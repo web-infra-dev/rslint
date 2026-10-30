@@ -198,24 +198,36 @@ func TestReleaseStopsMapperBeforeRuntimeCloses(t *testing.T) {
 	}
 }
 
-func TestProjectCacheReusesProjectUntilReparse(t *testing.T) {
+func TestRetainKeepsMapperRunningBetweenBuilds(t *testing.T) {
 	t.Parallel()
-	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: &contentmappertest.Spawner{}})
-	defer runtime.Close()
-	cache := runtime.NewProjectCache()
+	spawner := &contentmappertest.Spawner{Output: "export const answer: number = 42;\n"}
+	runtime := contentmappers.New(contentmappers.Options{Enabled: true, Spawner: spawner})
 	configPath := writeMappedProject(t)
 
-	config := parse(t, runtime, configPath)
-	first := cache.Project(config)
-	if first == nil || cache.Project(config) != first {
-		t.Fatal("the cache must reuse the project while the parse is unchanged")
+	// Each build parses the tsconfig again and releases its project once the
+	// Program is built, as a standalone language server request does.
+	for range 2 {
+		config := parse(t, runtime, configPath)
+		project, release := runtime.Open(config)
+		runtime.Retain(config)
+		host := utils.CreateCompilerHostWithContentMappers(tspath.GetDirectoryPath(configPath), bundled.WrapFS(osvfs.FS()), project)
+		if _, err := utils.CreateProgramFromParsedConfigLenient(true, config, host); err != nil {
+			t.Fatal(err)
+		}
+		if err := release(); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if cache.Project(parse(t, runtime, configPath)) == first {
-		t.Fatal("a new parse must replace the project")
+	if spawner.Spawns() != 1 || spawner.Closes() != 0 {
+		t.Fatalf("%d mappers started, %d stopped; want 1, 0", spawner.Spawns(), spawner.Closes())
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if spawner.Closes() != 1 {
+		t.Fatalf("stopped %d mappers after Close, want 1", spawner.Closes())
 	}
 
 	var disabled *contentmappers.Runtime
-	if disabled.NewProjectCache().Project(config) != nil {
-		t.Fatal("a cache of a nil Runtime must not open projects")
-	}
+	disabled.Retain(parse(t, runtime, configPath))
 }
