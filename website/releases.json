@@ -1044,5 +1044,22 @@
       "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
       "releaseVersion": null
     }
+  },
+  {
+    "version": "0.10.0",
+    "rules": [
+      "eslint-plugin-import:dynamic-import-chunkname",
+      "eslint-plugin-import:no-deprecated",
+      "eslint-plugin-import:no-extraneous-dependencies",
+      "eslint-plugin-import:no-import-module-exports",
+      "eslint-plugin-import:no-internal-modules",
+      "eslint-plugin-unicorn:import-style",
+      "eslint-plugin-unicorn:name-replacements",
+      "eslint-plugin-unicorn:no-for-each"
+    ],
+    "typescript": {
+      "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
+      "releaseVersion": null
+    }
   }
 ]
