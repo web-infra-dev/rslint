@@ -48,9 +48,9 @@
     "typescript": "catalog:",
     "zx": "catalog:"
   },
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@10.34.9",
   "engines": {
-    "pnpm": ">=10.34.4"
+    "pnpm": ">=10.34.9"
   },
   "files": []
 }
