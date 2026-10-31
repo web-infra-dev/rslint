@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "Rslint (moved to Rstack)",
   "description": "Language support for Rslint",
-  "version": "0.9.5",
+  "version": "0.10.0",
   "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",
