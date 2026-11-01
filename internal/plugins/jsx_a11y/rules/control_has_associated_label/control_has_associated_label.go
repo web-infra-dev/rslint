@@ -85,6 +85,7 @@ var ControlHasAssociatedLabelRule = rule.Rule{
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
+		controlPatterns := jsxa11yutil.CompileMinimatchPatterns(opts.controlComponents)
 		// Upstream `newIgnoreElements = new Set([].concat(ignoreElements,
 		// ignoreList))` where `ignoreList = ['link']`. The `link` entry is
 		// applied unconditionally — there is no way to opt out via config.
@@ -148,7 +149,7 @@ var ControlHasAssociatedLabelRule = rule.Rule{
 				return
 			}
 
-			if jsxa11yutil.MayHaveAccessibleLabel(elementNode, 0, opts.depth, opts.labelAttributes, opts.controlComponents, getElementType) {
+			if jsxa11yutil.MayHaveAccessibleLabel(elementNode, 0, opts.depth, opts.labelAttributes, controlPatterns, getElementType) {
 				return
 			}
 

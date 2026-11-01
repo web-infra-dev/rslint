@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 	scopeAnalysis "github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
@@ -48,18 +49,18 @@ const (
 // both upstream and us, so we accept and discard it.
 type options struct {
 	allowAsProps    bool
-	propNamePattern string
+	propNamePattern *minimatch3.Matcher
 }
 
 func parseOptions(raw []any) options {
-	opts := options{propNamePattern: "render*"}
+	opts := options{propNamePattern: minimatch3.New("render*", minimatch3.Options{})}
 	if len(raw) == 0 {
 		return opts
 	}
 	optsMap, _ := raw[0].(map[string]interface{})
 	opts.allowAsProps, _ = optsMap["allowAsProps"].(bool)
 	if v, ok := optsMap["propNamePattern"].(string); ok && v != "" {
-		opts.propNamePattern = v
+		opts.propNamePattern = minimatch3.New(v, minimatch3.Options{})
 	}
 	return opts
 }
@@ -254,11 +255,11 @@ func hasAncestorJsxAttributeWithExpression(node *ast.Node) bool {
 // expression, or a JSX attribute whose name matches the glob / equals
 // `children`. Wrapper-transparent at every parent-walk site so paren / TS
 // wrappers (which ESTree flattens but tsgo preserves) don't break alignment.
-func isComponentInRenderProp(node *ast.Node, propNamePattern string) bool {
+func isComponentInRenderProp(node *ast.Node, propNamePattern *minimatch3.Matcher) bool {
 	// Direct value of a PropertyAssignment / shorthand method whose key
 	// matches the pattern.
 	if key := objectPropertyKey(node); key != nil {
-		if reactutil.MatchGlob(key.AsIdentifier().Text, propNamePattern) {
+		if propNamePattern.Match(key.AsIdentifier().Text) {
 			return true
 		}
 	}
@@ -287,7 +288,7 @@ func isComponentInRenderProp(node *ast.Node, propNamePattern string) bool {
 		return false
 	}
 	propName := nameNode.AsIdentifier().Text
-	if reactutil.MatchGlob(propName, propNamePattern) {
+	if propNamePattern.Match(propName) {
 		return true
 	}
 	return propName == "children"
@@ -356,7 +357,7 @@ func isReturnStatementOfHook(node *ast.Node) bool {
 // `{ render: ((props) => <Row/>) }` has arrow.Parent = ParenExpr in tsgo
 // but arrow.parent = PropertyAssignment in ESTree. Walk up through
 // wrappers so the skip behavior aligns with upstream byte-for-byte.
-func isDirectValueOfRenderProperty(node *ast.Node, propNamePattern string) bool {
+func isDirectValueOfRenderProperty(node *ast.Node, propNamePattern *minimatch3.Matcher) bool {
 	parent := reactutil.SkipExpressionWrappersUp(node)
 	if parent == nil || parent.Kind != ast.KindPropertyAssignment {
 		return false
@@ -365,7 +366,7 @@ func isDirectValueOfRenderProperty(node *ast.Node, propNamePattern string) bool 
 	if name == nil || name.Kind != ast.KindIdentifier {
 		return false
 	}
-	return reactutil.MatchGlob(name.AsIdentifier().Text, propNamePattern)
+	return propNamePattern.Match(name.AsIdentifier().Text)
 }
 
 // isStatelessComponentReturningNull mirrors upstream's sibling check: the

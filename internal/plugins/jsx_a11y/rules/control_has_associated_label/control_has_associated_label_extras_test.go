@@ -899,3 +899,26 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 		},
 	)
 }
+
+// A control matched by a negative extglob must not count as label text.
+func TestControlHasAssociatedLabelRuleMinimatchPatterns(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ControlHasAssociatedLabelRule, []rule_tester.ValidTestCase{
+		{
+			Code:    `<button><ControlLegacy /></button>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}},
+		},
+		{
+			Code:    `<ControlModern />;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    `<button><ControlModern /></button>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "controlHasAssociatedLabel"}},
+		},
+	})
+}

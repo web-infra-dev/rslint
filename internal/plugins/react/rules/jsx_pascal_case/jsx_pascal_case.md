@@ -62,8 +62,9 @@ Examples of **correct** code for this rule:
 - `allowLeadingUnderscore` (default `false`): strip a single leading `_` before
   running the PascalCase / all-caps check.
 - `ignore` (default `[]`): array of names to exempt. Entries are matched as
-  minimatch-style globs — supports `*`, `?`, character classes, and extglob
-  groups such as `+(a|b)`.
+  minimatch-style globs — supports `*`, `?`, character classes, brace expansion,
+  and extglob groups such as `+(a|b)` and `!(a|b)`. A leading `!` negates the
+  whole pattern.
 
 ### `allowAllCaps`
 
@@ -106,10 +107,6 @@ Examples of **correct** code for this rule, when `allowLeadingUnderscore` is
   <div />
 </_AllowedComponent>
 ```
-
-## Differences from ESLint
-
-- `ignore` entries do not support the `!(a|b)` negative extglob syntax.
 
 ## Original Documentation
 

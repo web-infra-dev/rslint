@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 //go:embed forbid_component_props.schema.json
@@ -21,11 +22,11 @@ const msgPropIsForbidden = `Prop "{{prop}}" is forbidden on Components`
 // entries are looked up by exact string equality first.
 type forbidEntry struct {
 	key                 string
-	isPattern           bool
+	pattern             *minimatch3.Matcher
 	allowList           []string
-	allowPatternList    []string
+	allowPatternList    []*minimatch3.Matcher
 	disallowList        []string
-	disallowPatternList []string
+	disallowPatternList []*minimatch3.Matcher
 	message             string
 }
 
@@ -66,18 +67,21 @@ func parseOptions(options []any) *forbidConfig {
 			if key == "" {
 				continue
 			}
-			e := &forbidEntry{key: key, isPattern: propPattern != ""}
+			e := &forbidEntry{key: key}
+			if propPattern != "" {
+				e.pattern = minimatch3.New(key, minimatch3.Options{})
+			}
 			if l, ok := v["allowedFor"].([]interface{}); ok {
 				e.allowList = stringSlice(l)
 			}
 			if l, ok := v["allowedForPatterns"].([]interface{}); ok {
-				e.allowPatternList = stringSlice(l)
+				e.allowPatternList = patternSlice(l)
 			}
 			if l, ok := v["disallowedFor"].([]interface{}); ok {
 				e.disallowList = stringSlice(l)
 			}
 			if l, ok := v["disallowedForPatterns"].([]interface{}); ok {
-				e.disallowPatternList = stringSlice(l)
+				e.disallowPatternList = patternSlice(l)
 			}
 			if msg, ok := v["message"].(string); ok && msg != "" {
 				e.message = msg
@@ -119,6 +123,14 @@ func stringSlice(raw []interface{}) []string {
 	return out
 }
 
+func patternSlice(raw []interface{}) []*minimatch3.Matcher {
+	patterns := make([]*minimatch3.Matcher, 0, len(raw))
+	for _, pattern := range stringSlice(raw) {
+		patterns = append(patterns, minimatch3.New(pattern, minimatch3.Options{}))
+	}
+	return patterns
+}
+
 // getPropOptions mirrors upstream `getPropOptions`: direct string-key lookup
 // wins; otherwise the first pattern entry whose key matches the prop wins.
 func (c *forbidConfig) getPropOptions(prop string) *forbidEntry {
@@ -126,10 +138,10 @@ func (c *forbidConfig) getPropOptions(prop string) *forbidEntry {
 		return e
 	}
 	for _, e := range c.ordered {
-		if !e.isPattern {
+		if e.pattern == nil {
 			continue
 		}
-		if reactutil.MatchGlob(prop, e.key) {
+		if e.pattern.Match(prop) {
 			return e
 		}
 	}
@@ -152,7 +164,7 @@ func (c *forbidConfig) isForbidden(prop, tag string) (forbidden bool, opts *forb
 		tagForbidden = slices.Contains(opts.disallowList, tag)
 		if !tagForbidden {
 			for _, p := range opts.disallowPatternList {
-				if reactutil.MatchGlob(tag, p) {
+				if p.Match(tag) {
 					tagForbidden = true
 					break
 				}
@@ -166,7 +178,7 @@ func (c *forbidConfig) isForbidden(prop, tag string) (forbidden bool, opts *forb
 		} else {
 			tagForbidden = true
 			for _, p := range opts.allowPatternList {
-				if reactutil.MatchGlob(tag, p) {
+				if p.Match(tag) {
 					tagForbidden = false
 					break
 				}

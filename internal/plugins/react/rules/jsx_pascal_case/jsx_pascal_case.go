@@ -2,13 +2,13 @@ package jsx_pascal_case
 
 import (
 	_ "embed"
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 //go:embed jsx_pascal_case.schema.json
@@ -26,14 +26,10 @@ type pascalCaseOptions struct {
 	ignore                 []compiledPattern
 }
 
-// compiledPattern pairs the raw ignore entry with its regex translation. The
-// raw string handles the exact-match fast path and the regex covers
-// minimatch-style globs (including extglob `+(a|b)`). `re` may be nil when
-// the pattern failed to compile — in that case only the exact-match arm
-// matches, which degrades gracefully on malformed input.
+// compiledPattern preserves the exact-name shortcut alongside minimatch.
 type compiledPattern struct {
-	raw string
-	re  *regexp.Regexp
+	raw     string
+	matcher *minimatch3.Matcher
 }
 
 func parseOptions(opts []any) pascalCaseOptions {
@@ -48,7 +44,7 @@ func parseOptions(opts []any) pascalCaseOptions {
 	if raw, ok := optsMap["ignore"].([]interface{}); ok {
 		for _, entry := range raw {
 			if s, ok := entry.(string); ok {
-				cfg.ignore = append(cfg.ignore, compiledPattern{raw: s, re: reactutil.GlobToRegex(s)})
+				cfg.ignore = append(cfg.ignore, compiledPattern{raw: s, matcher: minimatch3.New(s, minimatch3.Options{NoGlobStar: true})})
 			}
 		}
 	}
@@ -154,7 +150,7 @@ func ignoreCheck(patterns []compiledPattern, name string) bool {
 		if name == p.raw {
 			return true
 		}
-		if p.re != nil && p.re.MatchString(name) {
+		if p.matcher.Match(name) {
 			return true
 		}
 	}

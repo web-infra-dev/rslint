@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 // OpeningElementOf returns the focal "opening element" used for label-prop
@@ -108,15 +109,19 @@ func IsReactComponentName(name string) bool {
 	return ecmascript.StringToUpperCase(first) == first
 }
 
-// AnyMinimatch returns true iff at least one pattern in `patterns` matches
-// `name` per minimatch (via `reactutil.MatchGlob` — same glob engine used
-// by `react/jsx-handler-names` and other ports). Mirrors upstream's
-// `patterns.some((p) => minimatch(name, p))` predicate. Returns false on
-// an empty patterns slice and on an empty name (MatchGlob's empty-text
-// guard).
-func AnyMinimatch(name string, patterns []string) bool {
+// CompileMinimatchPatterns compiles component-name patterns once for a rule.
+func CompileMinimatchPatterns(patterns []string) []*minimatch3.Matcher {
+	matchers := make([]*minimatch3.Matcher, 0, len(patterns))
 	for _, pattern := range patterns {
-		if reactutil.MatchGlob(name, pattern) {
+		matchers = append(matchers, minimatch3.New(pattern, minimatch3.Options{}))
+	}
+	return matchers
+}
+
+// AnyMinimatch mirrors patterns.some((p) => minimatch(name, p)).
+func AnyMinimatch(name string, patterns []*minimatch3.Matcher) bool {
+	for _, pattern := range patterns {
+		if pattern.Match(name) {
 			return true
 		}
 	}
@@ -252,7 +257,7 @@ func labellingValueIsPresent(attr *ast.Node) bool {
 // caller passes `depth=0` for the root. Children of a JsxFragment are
 // recursed into transparently — upstream's switch has no JSXFragment case
 // for the label-text branches, but the children loop walks fragments.
-func MayHaveAccessibleLabel(node *ast.Node, depth, maxDepth int, labelAttributes, controlComponents []string, getElementType func(*ast.Node) string) bool {
+func MayHaveAccessibleLabel(node *ast.Node, depth, maxDepth int, labelAttributes []string, controlComponents []*minimatch3.Matcher, getElementType func(*ast.Node) string) bool {
 	if node == nil {
 		return false
 	}
@@ -353,11 +358,11 @@ func MayHaveAccessibleLabel(node *ast.Node, depth, maxDepth int, labelAttributes
 // Used by `label-has-associated-control` to detect a nested form control
 // (`input`, `meter`, `output`, `progress`, `select`, `textarea`, plus any
 // user-configured `controlComponents`) inside a `<label>`.
-func MayContainChildComponent(root *ast.Node, componentName string, maxDepth int, getElementType func(*ast.Node) string) bool {
+func MayContainChildComponent(root *ast.Node, componentName *minimatch3.Matcher, maxDepth int, getElementType func(*ast.Node) string) bool {
 	return mayContainChildComponentWalk(root, componentName, 1, maxDepth, getElementType)
 }
 
-func mayContainChildComponentWalk(node *ast.Node, componentName string, depth, maxDepth int, getElementType func(*ast.Node) string) bool {
+func mayContainChildComponentWalk(node *ast.Node, componentName *minimatch3.Matcher, depth, maxDepth int, getElementType func(*ast.Node) string) bool {
 	if node == nil {
 		return false
 	}
@@ -383,11 +388,11 @@ func mayContainChildComponentWalk(node *ast.Node, componentName string, depth, m
 		switch child.Kind {
 		case ast.KindJsxElement:
 			opening := child.AsJsxElement().OpeningElement
-			if opening != nil && reactutil.MatchGlob(getElementType(opening), componentName) {
+			if opening != nil && componentName.Match(getElementType(opening)) {
 				return true
 			}
 		case ast.KindJsxSelfClosingElement:
-			if reactutil.MatchGlob(getElementType(child), componentName) {
+			if componentName.Match(getElementType(child)) {
 				return true
 			}
 		}
