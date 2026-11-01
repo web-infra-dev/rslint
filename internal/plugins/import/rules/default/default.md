@@ -24,43 +24,29 @@ export default 1;
 import bar from "./bar";
 ```
 
-Modules that cannot be resolved or are ignored are not reported. Like upstream,
-this rule also skips files that fail its module text check or contain neither
-an import/export declaration nor a runtime dynamic import. Plain CommonJS
-exports and compiler-forced module markers alone do not establish an export map.
+### Module analysis
 
-With `esModuleInterop: true` explicitly enabled, local named exports also provide
-a default for this rule. Named re-exports and `export *` alone do not. For example,
-a default import from `export const value = 1` is accepted with this option.
+Modules that cannot be resolved or are ignored are not reported. Like upstream, this rule also skips files that fail its module text check or contain neither an import/export declaration nor a runtime dynamic import. Plain CommonJS exports and compiler-forced module markers alone do not establish an export map.
 
-The upstream text check can skip a file containing only `import './setup.mjs';`
-or a spaced dynamic `import ('./setup.mjs')`. This rule preserves that behavior.
+The upstream text check can skip a file containing only `import './setup.mjs';` or a spaced dynamic `import ('./setup.mjs')`. This rule preserves that behavior.
 
-TypeScript namespace assignments such as `export = React` support default imports
-when `allowSyntheticDefaultImports` is enabled, including implicitly through
-`moduleResolution: "bundler"`, `module: "preserve"`, `module: "system"`,
-`module: "node16"`, `module: "nodenext"`, or an explicit `esModuleInterop: true`.
-This applies to both `import React from "react"` and
-`import type React from "react"`. An explicit `allowSyntheticDefaultImports: false`
-disables this synthetic default even when `esModuleInterop` is enabled.
-CommonJS declarations also respect this option; enabling it alone does not
-supply a missing default for an ES module.
+### CommonJS and TypeScript interop
 
-When a namespace merges with a value declaration, such as micromatch's
-`declare namespace micromatch { ... }` and `declare const micromatch: Micromatch`,
-`export = micromatch` exposes that value as the default regardless of declaration
-order. This follows upstream's handling of exported variables and functions.
+TypeScript namespace assignments such as `export = React` support default imports when `allowSyntheticDefaultImports` is enabled, including implicitly through `moduleResolution: "bundler"`, `module: "preserve"`, `module: "system"`, `module: "node16"`, `module: "nodenext"`, or an explicit `esModuleInterop: true`. This applies to both `import React from "react"` and `import type React from "react"`.
+
+An explicit `allowSyntheticDefaultImports: false` disables this synthetic default even when `esModuleInterop` is enabled. CommonJS declarations also respect this option; enabling it alone does not supply a missing default for an ES module.
+
+When a namespace merges with a value declaration, such as micromatch's `declare namespace micromatch { ... }` and `declare const micromatch: Micromatch`, `export = micromatch` exposes that value as the default regardless of declaration order. This follows upstream's handling of exported variables and functions.
+
+With `esModuleInterop: true` explicitly enabled, local named exports also provide a default for this rule. Named re-exports and `export *` alone do not. For example, a default import from `export const value = 1` is accepted with this option.
+
+### Import attributes
 
 Import attributes select the effective module view. `type: "text"` exposes the loaded source as a default string export, and `type: "json"` exposes a default JSON value, independently of the target file's authored JavaScript exports. Unknown or dynamic attribute sets are skipped because their export shape is host-defined.
 
 ## Differences from upstream
 
-- For `export = namespace`, rslint respects `allowSyntheticDefaultImports` and
-  its implied defaults; upstream v2.32.0 checks `esModuleInterop` instead.
-  For example, `import type React from "./react"`, where `react.d.ts` declares
-  `export = React; declare namespace React {}`, is valid with
-  `module: "esnext"` and `moduleResolution: "bundler"`, or with
-  `module: "nodenext"` and no explicit interop option.
+- For `export = namespace`, rslint respects `allowSyntheticDefaultImports` and its implied defaults; upstream v2.32.0 checks `esModuleInterop` instead. For example, `import type React from "./react"`, where `react.d.ts` declares `export = React; declare namespace React {}`, is valid with `module: "esnext"` and `moduleResolution: "bundler"`, or with `module: "nodenext"` and no explicit interop option.
 
 ## Original Documentation
 
