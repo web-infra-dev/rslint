@@ -38,13 +38,18 @@ or a spaced dynamic `import ('./setup.mjs')`. This rule preserves that behavior.
 
 TypeScript namespace assignments such as `export = React` support default imports
 when `allowSyntheticDefaultImports` is enabled, including implicitly through
-`moduleResolution: "bundler"`, `module: "preserve"`, `module: "system"`, or an
-explicit `esModuleInterop: true`.
+`moduleResolution: "bundler"`, `module: "preserve"`, `module: "system"`,
+`module: "node16"`, `module: "nodenext"`, or an explicit `esModuleInterop: true`.
 This applies to both `import React from "react"` and
 `import type React from "react"`. An explicit `allowSyntheticDefaultImports: false`
 disables this synthetic default even when `esModuleInterop` is enabled.
 CommonJS declarations also respect this option; enabling it alone does not
 supply a missing default for an ES module.
+
+When a namespace merges with a value declaration, such as micromatch's
+`declare namespace micromatch { ... }` and `declare const micromatch: Micromatch`,
+`export = micromatch` exposes that value as the default regardless of declaration
+order. This follows upstream's handling of exported variables and functions.
 
 Import attributes select the effective module view. `type: "text"` exposes the loaded source as a default string export, and `type: "json"` exposes a default JSON value, independently of the target file's authored JavaScript exports. Unknown or dynamic attribute sets are skipped because their export shape is host-defined.
 
@@ -54,7 +59,8 @@ Import attributes select the effective module view. `type: "text"` exposes the l
   its implied defaults; upstream v2.32.0 checks `esModuleInterop` instead.
   For example, `import type React from "./react"`, where `react.d.ts` declares
   `export = React; declare namespace React {}`, is valid with
-  `module: "esnext"` and `moduleResolution: "bundler"`.
+  `module: "esnext"` and `moduleResolution: "bundler"`, or with
+  `module: "nodenext"` and no explicit interop option.
 
 ## Original Documentation
 

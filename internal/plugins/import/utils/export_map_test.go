@@ -127,9 +127,14 @@ func TestDefaultExportsAcrossNodeModuleFormats(t *testing.T) {
 						if found, ok := import_utils.HasExport(ctx, modules.SourceFromSpecifier(specifier), "default"); !ok || found != tc.want[i] {
 							t.Errorf("%s: HasExport(%s, default) = (%v, %v), want (%v, true)", tc.file, specifier.Text(), found, ok, tc.want[i])
 						}
-						// import/default follows upstream's explicit interop option,
-						// independently of the native Node default on an import edge.
+						// The fallback for ordinary ES modules still requires explicit
+						// interop, independently of the native Node import-edge default.
 						wantImportDefault := config == "tsconfig.interop.json" && i != 10
+						if config == "tsconfig.json" {
+							// NodeNext implies interop for CommonJS declarations,
+							// but not the upstream fallback for ordinary ES modules.
+							wantImportDefault = i == 2
+						}
 						if config == "tsconfig.no-synthetic.json" {
 							// The opt-out applies to CommonJS declarations. Upstream's
 							// explicit interop fallback for other modules is unchanged.
@@ -778,6 +783,26 @@ func TestHasDefaultExportRespectsDefaultImportOptions(t *testing.T) {
 			source:            "./typescript-export-assign-default-namespace",
 			module:            core.ModuleKindNodeNext,
 			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "node16 enables synthetic defaults for export equals namespaces",
+			source:            "./typescript-export-assign-default-namespace",
+			module:            core.ModuleKindNode16,
+			wantDefaultExport: true,
+			wantDefaultImport: true,
+		},
+		{
+			name:              "explicit synthetic opt-out overrides inferred NodeNext interop",
+			source:            "./typescript-export-assign-default-namespace",
+			module:            core.ModuleKindNodeNext,
+			syntheticDefaults: core.TSFalse,
+		},
+		{
+			name:            "explicit interop opt-out overrides the NodeNext default",
+			source:          "./typescript-export-assign-default-namespace",
+			module:          core.ModuleKindNodeNext,
+			esModuleInterop: core.TSFalse,
 		},
 		{
 			name:              "export equals local variable is default-visible when disabled",

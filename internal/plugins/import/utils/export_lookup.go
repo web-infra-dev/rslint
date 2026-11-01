@@ -251,11 +251,7 @@ func sourceFileHasExport(sourceFile *ast.SourceFile, exportName string, builder 
 
 		switch stmt.Kind {
 		case ast.KindExportAssignment:
-			interop := compilerOptionsESModuleInterop(builder.program())
-			if builder.defaultImport {
-				interop = explicitESModuleInterop(builder.program())
-			}
-			syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(builder.program(), interop)
+			syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(builder.program())
 			if exportName == defaultExportName && exportAssignmentHasDefaultWithSyntheticDefault(sourceFile, stmt.AsExportAssignment(), syntheticDefault) {
 				return true, true
 			}
@@ -296,7 +292,7 @@ func exportedDeclarationHasName(stmt *ast.Node, exportName string) bool {
 }
 
 func exportAssignmentHasDefault(sourceProgram *program.Program, sourceFile *ast.SourceFile, exportAssignment *ast.ExportAssignment) bool {
-	syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram, compilerOptionsESModuleInterop(sourceProgram))
+	syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram)
 	return exportAssignmentHasDefaultWithSyntheticDefault(sourceFile, exportAssignment, syntheticDefault)
 }
 
@@ -347,11 +343,12 @@ func exportAssignmentReferencedIdentifier(expr *ast.Node) (string, bool) {
 // The tsgo shim exposes the legacy option fields but no longer computes their
 // defaults. In particular, its resolver now defaults to bundler for older
 // module modes too, which must not implicitly enable legacy synthetic defaults.
-// The caller selects explicit interop for import/default, or inferred interop
-// for the export index, preserving their distinct compatibility behavior.
+// Synthetic defaults use effective interop, including Node16/NodeNext defaults.
+// import/default's separate fallback for ordinary ES modules still requires
+// explicitly enabled interop.
 //
 //nolint:staticcheck // Honor explicit legacy options for import/export compatibility.
-func compilerOptionsAllowSyntheticDefaultImports(sourceProgram *program.Program, interop bool) bool {
+func compilerOptionsAllowSyntheticDefaultImports(sourceProgram *program.Program) bool {
 	if !sourceProgram.IsValid() || sourceProgram.Options() == nil {
 		return false
 	}
@@ -363,7 +360,7 @@ func compilerOptionsAllowSyntheticDefaultImports(sourceProgram *program.Program,
 	if resolution == core.ModuleResolutionKindUnknown && options.Module == core.ModuleKindPreserve {
 		resolution = core.ModuleResolutionKindBundler
 	}
-	return interop || options.Module == core.ModuleKindSystem || resolution == core.ModuleResolutionKindBundler
+	return compilerOptionsESModuleInterop(sourceProgram) || options.Module == core.ModuleKindSystem || resolution == core.ModuleResolutionKindBundler
 }
 
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.
@@ -396,6 +393,9 @@ func sourceFileExportAssignmentLocalDeclarationKind(sourceFile *ast.SourceFile, 
 	if sourceFile == nil || sourceFile.Statements == nil {
 		return exportAssignmentLocalDeclarationOther, false
 	}
+	// A namespace can merge with a later value declaration. Only classify
+	// the export as namespace-only after checking every matching declaration.
+	hasNamespace := false
 	for _, stmt := range sourceFile.Statements.Nodes {
 		if stmt == nil {
 			continue
@@ -419,9 +419,12 @@ func sourceFileExportAssignmentLocalDeclarationKind(sourceFile *ast.SourceFile, 
 			}
 		case ast.KindModuleDeclaration:
 			if declarationHasName(stmt, name) {
-				return exportAssignmentLocalDeclarationModule, true
+				hasNamespace = true
 			}
 		}
+	}
+	if hasNamespace {
+		return exportAssignmentLocalDeclarationModule, true
 	}
 	return exportAssignmentLocalDeclarationOther, false
 }

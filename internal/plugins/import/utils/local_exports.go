@@ -226,7 +226,7 @@ func collectLocalExports(sourceProgram *program.Program, sourceFile *ast.SourceF
 	// not imply an emitted __esModule marker. Explicit ES module declarations
 	// and authored default/marker exports do not receive this fallback.
 	if !local.ImplicitDefault && isCommonJSDeclaration(sourceProgram, sourceFile) &&
-		compilerOptionsAllowSyntheticDefaultImports(sourceProgram, compilerOptionsESModuleInterop(sourceProgram)) {
+		compilerOptionsAllowSyntheticDefaultImports(sourceProgram) {
 		local.ImplicitDefault = true
 		for _, step := range local.Steps {
 			if step.Kind == exportStepLocalDefault || slices.Contains(step.Names, defaultExportName) || slices.Contains(step.Names, "__esModule") {
