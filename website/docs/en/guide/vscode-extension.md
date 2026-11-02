@@ -1,25 +1,37 @@
 ---
-description: 'Configure the Rslint VS Code extension for live diagnostics, code actions, automatic fixes, and workspace settings.'
+description: 'Install the Rstack VS Code extension for Rslint diagnostics, code actions, and automatic fixes, and migrate settings from the retired standalone extension.'
 ---
 
-# VSCode Extension
+# Editor Integration
 
-Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:
+Editor integration for Rslint lives in the unified [Rstack extension](https://github.com/rstackjs/rstack-editor), which also provides Rstest testing and `rs fmt` formatting.
 
-- Real-time diagnostics as you type
-- Code actions for auto-fixable rules
-- Auto-fix on save via `source.fixAll.rslint`
-- Multi-workspace support
+Install `rstack.rstack` from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) or, for Cursor, Trae, VSCodium, and other VS Code forks, from [Open VSX](https://open-vsx.org/extension/rstack/rstack).
 
-The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
+The extension ships no tool binaries. It resolves `@rslint/core` from your project, so the editor runs the same version as your CLI and picks up your `rslint.config.ts` automatically. Rslint diagnostics are provided by the project's language server: real-time diagnostics as you type, code actions for auto-fixable rules, auto-fix on save, and multi-workspace support.
 
-:::tip Rstack extension
+:::warning The standalone `rstack.rslint` extension is retired
 
-The unified Rstack extension (`rstack.rstack`) brings Rslint, Rstest, and formatting together in one install and is where new editor features land. This standalone `rstack.rslint` extension will be deprecated in the future, so we recommend that existing users migrate now and that new setups use `rstack.rstack`.
-
-To switch, install `rstack.rstack` from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rstack) or, for Cursor, Trae, and VSCodium, from [Open VSX](https://open-vsx.org/extension/rstack/rstack). Disable or uninstall `rstack.rslint` so only one copy of Rslint runs, then re-enter settings under `rstack.rslint.*` as described in the [migration notes](https://github.com/rstackjs/rstack-editor/blob/main/packages/vscode/README.md#coming-from-the-standalone-extensions).
+`rstack.rslint` shipped its final release and no longer receives updates. Uninstall or disable it so only one copy of Rslint runs, then re-enter your settings under the `rstack.*` keys below. Settings and keybindings are not migrated automatically.
 
 :::
+
+## Migrate settings
+
+| Standalone (`rslint.*`)                  | Rstack (`rstack.rslint.*`)                                       |
+| ---------------------------------------- | ---------------------------------------------------------------- |
+| `rslint.enable`                          | `rstack.rslint.enable`                                           |
+| `rslint.corePath`                        | `rstack.rslint.corePath`                                         |
+| `rslint.trace.server`                    | `rstack.rslint.trace.server`                                     |
+| `rslint.binPath`, `rslint.customBinPath` | No equivalent; use `rstack.rslint.corePath` to override the core |
+
+## Settings
+
+| Setting                      | Default | Description                                                                                        |
+| ---------------------------- | ------- | -------------------------------------------------------------------------------------------------- |
+| `rstack.rslint.enable`       | `true`  | Enable or disable the Rslint integration.                                                          |
+| `rstack.rslint.corePath`     | —       | Path to an `@rslint/core` package directory or its `package.json`; overrides automatic resolution. |
+| `rstack.rslint.trace.server` | `off`   | LSP trace level: `off`, `messages`, or `verbose`.                                                  |
 
 ## Auto-fix on Save
 
@@ -38,12 +50,3 @@ To automatically fix lint issues when you save a file, add the following to your
 | `"explicit"` | Fix on manual save (Ctrl+S / Cmd+S) only — **recommended** |
 | `"always"`   | Fix on every save, including auto-save                     |
 | `"never"`    | Disable auto-fix on save                                   |
-
-## Settings
-
-| Setting                | Default    | Description                                                 |
-| ---------------------- | ---------- | ----------------------------------------------------------- |
-| `rslint.enable`        | `true`     | Enable or disable the linter                                |
-| `rslint.binPath`       | `built-in` | Binary source: `built-in`, `local` (workspace), or `custom` |
-| `rslint.customBinPath` | —          | Path to a custom rslint binary (when `binPath` is `custom`) |
-| `rslint.trace.server`  | `off`      | LSP trace level: `off`, `messages`, or `verbose`            |

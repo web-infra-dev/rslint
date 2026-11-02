@@ -1,6 +1,6 @@
 ---
 name: debug-ci
-description: Reproduce Linux CI failures locally using Docker when the same tests pass on the host, especially Go platform differences and VS Code extension tests requiring xvfb. Read the workflow and setup actions for the revision being tested; Docker does not reproduce Windows or macOS runners.
+description: Reproduce Linux CI failures locally using Docker when the same tests pass on the host, especially Go platform differences. Read the workflow and setup actions for the revision being tested; Docker does not reproduce Windows or macOS runners.
 ---
 
 # Debug CI
@@ -22,7 +22,7 @@ Trace the affected packages and consumers, then state the selected commands befo
 
 ## Isolate the reproduction
 
-Use a disposable independent clone outside the working checkout. This keeps its `.git` directory usable inside Docker and keeps Linux dependencies, Go binaries and VS Code downloads out of the user's current workspace.
+Use a disposable independent clone outside the working checkout. This keeps its `.git` directory usable inside Docker and keeps Linux dependencies and Go binaries out of the user's current workspace.
 
 ```bash
 git clone --no-hardlinks --no-checkout <repository-url-or-local-path> <repro-dir>
@@ -49,21 +49,20 @@ git -C <repro-dir> submodule update --init --depth 1
 
 Ensure the chosen base ref and enough history for the lint merge-base exist in the isolated clone. A local clone's `origin` points to the source checkout, so verify the base commit rather than assuming its `origin/main` matches the source checkout's remote-tracking ref.
 
-Reuse the same isolated clone, image and container while their relevant inputs remain unchanged. Install dependencies or rebuild outputs only when the selected execution path needs them and they are missing or stale. Do not delete the current workspace's `node_modules` or `.vscode-test` directories to obtain a clean Linux environment.
+Reuse the same isolated clone, image and container while their relevant inputs remain unchanged. Install dependencies or rebuild outputs only when the selected execution path needs them and they are missing or stale. Do not delete the current workspace's `node_modules` directory to obtain a clean Linux environment.
 
 ## Match the Linux environment
 
 Reuse a matching image if available. Otherwise prepare a temporary Docker build context outside the repository, using the selected revision's sources below. Install only the tools needed by the selected checks.
 
-| Input                                              | Source                                                                                                                          |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Linux base and architecture                        | Failing job's runner and setup logs; select the matching Docker platform                                                        |
-| Go version                                         | Selected job's `go-version` or matrix in `.github/workflows/ci.yml`                                                             |
-| Node version and pnpm setup                        | Selected job and `.github/actions/setup-node/action.yml`; pnpm version also follows root `package.json`                         |
-| golangci-lint version                              | `golangci-lint-action` version input in the selected workflow                                                                   |
-| Rust toolchain, when the native parser is required | `.github/actions/setup-rust/action.yml` and the selected job's build prerequisites                                              |
-| xvfb and GUI packages                              | Selected workflow's install step; add missing Electron runtime libraries when the bare image lacks runner-provided dependencies |
-| Check environment                                  | Effective workflow, job and step variables, including values established by setup actions                                       |
+| Input                                              | Source                                                                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Linux base and architecture                        | Failing job's runner and setup logs; select the matching Docker platform                                |
+| Go version                                         | Selected job's `go-version` or matrix in `.github/workflows/ci.yml`                                     |
+| Node version and pnpm setup                        | Selected job and `.github/actions/setup-node/action.yml`; pnpm version also follows root `package.json` |
+| golangci-lint version                              | `golangci-lint-action` version input in the selected workflow                                           |
+| Rust toolchain, when the native parser is required | `.github/actions/setup-rust/action.yml` and the selected job's build prerequisites                      |
+| Check environment                                  | Effective workflow, job and step variables, including values established by setup actions               |
 
 Pass the versions read from those sources as Docker build arguments, with no fallback version constants in the Dockerfile. For example, declare `ARG GO_VERSION`, `ARG NODE_VERSION` and `ARG GOLANGCI_LINT_VERSION`, use those arguments in the corresponding installations, and pass their resolved values when building. Keep the base image and installation architecture consistent with `--platform`; for Go downloads, Docker's `TARGETARCH` can select the archive architecture.
 
@@ -97,12 +96,9 @@ The following are scoped examples, not a checklist. Replace the package or file 
 | --------------------------- | ---------------------------------------------------------------------------------------------- |
 | Go rule package             | `go test -count=1 ./internal/rules/max_params`                                                 |
 | Rstest integration file     | `pnpm --dir packages/rslint-test-tools exec rs test run tests/eslint/rules/max-params.test.ts` |
-| VS Code extension workspace | `xvfb-run -a pnpm --filter rslint test`                                                        |
 | Go lint                     | `golangci-lint run --new-from-merge-base=origin/main ./internal/rules/max_params`              |
 | Go formatting check         | `golangci-lint fmt --diff ./internal/rules/max_params/max_params.go`                           |
 | JS/TS/docs formatting check | `pnpm exec rs fmt --check <changed-files>`                                                     |
-
-The VS Code package uses its own `__tests__/runTest.ts` and Mocha runner, not Rstest. Its existing `test` script compiles and runs all extension suites and currently exposes no test-file or suite selector. The workspace command above is the smallest supported entry point; report that scope rather than inventing a filter or sending extension tests to `rs test`.
 
 Run Go lint once with the branch-diff filter and selected package directories; do not follow it with the root `lint:go` script. Substitute the actual base ref when it is not `origin/main`. For Go formatting, pass the changed Go file paths directly and use the repository's formatter configuration. `--diff` reports formatting differences without writing files; it does not select files from Git.
 

@@ -1,5 +1,4 @@
 {
-  "rslint.enable": true,
   "[json]": {
     "editor.tabSize": 2
   },

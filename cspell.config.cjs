@@ -13,7 +13,6 @@ module.exports = {
     'pnpm-lock.yaml',
     '**/go.{mod,sum}',
     'shim',
-    'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
     'packages/rslint/THIRD-PARTY-NOTICES.md',
     'packages/rslint/pkg/mod',

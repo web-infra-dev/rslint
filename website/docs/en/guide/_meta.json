@@ -11,7 +11,7 @@
   {
     "type": "file",
     "name": "vscode-extension",
-    "label": "VSCode Extension"
+    "label": "Editor Integration"
   },
   {
     "type": "section-header",
