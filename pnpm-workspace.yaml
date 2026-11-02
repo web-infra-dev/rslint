@@ -76,7 +76,7 @@ catalog:
   dagre: ^0.8.5
   fflate: ^0.8.3
   lucide-react: ^0.577.0
-  monaco-editor: ^0.56.0
+  monaco-editor: ^0.57.0
   react: ^19.2.8
   react-dom: ^19.2.8
   rsbuild-plugin-google-analytics: ^1.0.6
