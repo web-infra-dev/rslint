@@ -966,3 +966,32 @@ func TestLabelHasAssociatedControl_DefensiveOptions(t *testing.T) {
 				Errors:   []rule_tester.InvalidTestCaseError{expectedHtmlFor}},
 		})
 }
+
+// A control matched by a negative extglob must not count as label text.
+func TestLabelHasAssociatedControlRuleMinimatchPatterns(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &LabelHasAssociatedControlRule, []rule_tester.ValidTestCase{
+		{
+			Code:    `<label>Text<ControlModern /></label>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}},
+		},
+		{
+			Code:    `<label htmlFor="x"><ControlLegacy /></label>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}, "assert": "htmlFor"},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code:    `<label>Text<ControlLegacy /></label>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "either"}},
+		},
+		{
+			Code:    `<label htmlFor="x"><ControlModern /></label>;`,
+			Tsx:     true,
+			Options: map[string]interface{}{"controlComponents": []interface{}{"Control!(Legacy)"}, "assert": "htmlFor"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "accessibleLabel"}},
+		},
+	})
+}

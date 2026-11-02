@@ -181,6 +181,8 @@ var LabelHasAssociatedControlRule = rule.Rule{
 		controlComponents := make([]string, 0, len(builtinControlComponents)+len(opts.controlComponents))
 		controlComponents = append(controlComponents, builtinControlComponents...)
 		controlComponents = append(controlComponents, opts.controlComponents...)
+		labelPatterns := jsxa11yutil.CompileMinimatchPatterns(labelComponentNames)
+		controlPatterns := jsxa11yutil.CompileMinimatchPatterns(controlComponents)
 
 		// `htmlForAttributes = settings['jsx-a11y']?.attributes?.for ?? ['htmlFor']`.
 		// The user list REPLACES the default when set — upstream's `??`
@@ -206,7 +208,7 @@ var LabelHasAssociatedControlRule = rule.Rule{
 			// supports glob entries like `*Label` or `????Label`). The
 			// builtin `'label'` is also passed through minimatch, which
 			// for a plain lowercase string degenerates to exact equality.
-			if !jsxa11yutil.AnyMinimatch(tag, labelComponentNames) {
+			if !jsxa11yutil.AnyMinimatch(tag, labelPatterns) {
 				return
 			}
 
@@ -227,7 +229,7 @@ var LabelHasAssociatedControlRule = rule.Rule{
 			// the root are visited at depth 1 — a `recursionDepth=0` user
 			// override therefore bails before the first child.
 			hasNestedControl := false
-			for _, name := range controlComponents {
+			for _, name := range controlPatterns {
 				if jsxa11yutil.MayContainChildComponent(elementNode, name, opts.depth, getElementType) {
 					hasNestedControl = true
 					break
@@ -240,7 +242,7 @@ var LabelHasAssociatedControlRule = rule.Rule{
 			// the root (depth=0); a `recursionDepth=0` user override
 			// inspects only the root node and any of its labelling props,
 			// without descending.
-			hasAccessibleLabel := jsxa11yutil.MayHaveAccessibleLabel(elementNode, 0, opts.depth, opts.labelAttributes, controlComponents, getElementType)
+			hasAccessibleLabel := jsxa11yutil.MayHaveAccessibleLabel(elementNode, 0, opts.depth, opts.labelAttributes, controlPatterns, getElementType)
 
 			if !hasAccessibleLabel {
 				ctx.ReportNode(opening, rule.RuleMessage{

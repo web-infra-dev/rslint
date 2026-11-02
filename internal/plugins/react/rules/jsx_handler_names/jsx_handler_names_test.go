@@ -216,7 +216,7 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		{Code: `var x = <TestComponent onChange={this.bad} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "(", "eventHandlerPropPrefix": "("}},
 
 		// ---- Lock-in: invalid glob in ignoreComponentNames doesn't panic ----
-		// `MatchGlob` returns `false` for patterns that fail to compile, so
+		// The matcher returns `false` for patterns that fail to compile, so
 		// invalid globs silently fail to ignore — matching upstream
 		// minimatch's "no match on bad pattern" behavior. The rule then
 		// runs as usual and fires on the bad handler.
@@ -392,10 +392,9 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		{Code: `var x = <Special prop={handleX} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"Foo", "Bar*", "Special"}}},
 
 		// ---- Glob alignment: brace expansion `{a,b,c}` (minimatch parity) ----
-		// Upstream uses minimatch which expands `{1,2}` into "1 or 2". rslint's
-		// `MatchGlob` was upgraded to support this. Each branch must be honored
-		// independently — a future regression would either over-match or
-		// fail to match.
+		// Upstream uses minimatch which expands `{1,2}` into "1 or 2". Each
+		// branch must be honored independently — a future regression would
+		// either over-match or fail to match.
 		{Code: `var x = <Foo1 onChange={whateverHandler} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"Foo{1,2}"}}},
 		{Code: `var x = <Foo2 onChange={whateverHandler} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"Foo{1,2}"}}},
 

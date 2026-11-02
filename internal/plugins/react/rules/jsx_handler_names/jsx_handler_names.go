@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/minimatch3"
 )
 
 //go:embed jsx_handler_names.schema.json
@@ -25,7 +26,7 @@ type options struct {
 	eventHandlerPropPrefix string
 	checkLocalVariables    bool
 	checkInlineFunction    bool
-	ignoreComponentNames   []string
+	ignoreComponentNames   []*minimatch3.Matcher
 
 	// nil when the corresponding prefix is disabled (`false`); upstream's
 	// `EVENT_HANDLER_REGEX` / `PROP_EVENT_HANDLER_REGEX` are also `null` in
@@ -77,7 +78,7 @@ func parseOptions(raw []any) options {
 		if v, ok := m["ignoreComponentNames"].([]interface{}); ok {
 			for _, p := range v {
 				if s, ok := p.(string); ok {
-					opts.ignoreComponentNames = append(opts.ignoreComponentNames, s)
+					opts.ignoreComponentNames = append(opts.ignoreComponentNames, minimatch3.New(s, minimatch3.Options{}))
 				}
 			}
 		}
@@ -218,7 +219,7 @@ var JsxHandlerNamesRule = rule.Rule{
 				parent := reactutil.GetJsxParentElement(node)
 				componentName := reactutil.GetJsxElementTypeString(parent)
 				for _, pattern := range opts.ignoreComponentNames {
-					if reactutil.MatchGlob(componentName, pattern) {
+					if pattern.Match(componentName) {
 						return
 					}
 				}
