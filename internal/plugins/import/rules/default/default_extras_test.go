@@ -204,10 +204,19 @@ func TestDefaultSyntheticImports(t *testing.T) {
 		"tsconfig.no-interop.json",
 		"tsconfig.synthetic.json",
 		"tsconfig.preserve.json",
+		"tsconfig.nodenext.json",
+		"tsconfig.node16.json",
 	} {
 		t.Run(config, func(t *testing.T) {
 			rule_tester.RunRuleTester(root, config, t, &default_rule.DefaultRule,
 				[]rule_tester.ValidTestCase{
+					// Merged value declarations remain visible after a namespace.
+					{Code: `import micromatch from "micromatch"; micromatch.matcher("*.ts"); micromatch.scan("*.ts");`},
+					{Code: `import micromatch from "micromatch";`, FileName: "consumer.mts"},
+					{Code: `import type Micromatch from "micromatch";`},
+					{Code: `import match from "./merged-value-first";`},
+					{Code: `import match from "./merged-function";`},
+					{Code: `import match from "./micromatch-barrel";`},
 					// #2369: React-style export assignments support type and value imports.
 					{Code: `import type React from "react";`},
 					{Code: `import React from "react";`},
@@ -229,9 +238,20 @@ func TestDefaultSyntheticImports(t *testing.T) {
 				})
 		})
 	}
-	for _, config := range []string{"tsconfig.no-synthetic.json", "tsconfig.interop-no-synthetic.json"} {
+	for _, config := range []string{
+		"tsconfig.no-synthetic.json", "tsconfig.interop-no-synthetic.json",
+		"tsconfig.nodenext-no-interop.json", "tsconfig.nodenext-no-synthetic.json",
+	} {
 		t.Run(config, func(t *testing.T) {
-			valid := []rule_tester.ValidTestCase{{Code: `import value from "./actual-default";`}}
+			valid := []rule_tester.ValidTestCase{
+				{Code: `import value from "./actual-default";`},
+				// A merged const/function supplies a default independently of namespace interop.
+				{Code: `import micromatch from "micromatch";`},
+				{Code: `import type Micromatch from "micromatch";`},
+				{Code: `import match from "./merged-value-first";`},
+				{Code: `import match from "./merged-function";`},
+				{Code: `import match from "./micromatch-barrel";`},
+			}
 			if config == "tsconfig.interop-no-synthetic.json" {
 				// Keep upstream's explicit interop behavior for ordinary ES modules.
 				valid = append(valid,

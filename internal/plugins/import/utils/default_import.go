@@ -37,7 +37,7 @@ func (index *ModuleIndex) defaultImportInfoOf(sourceProgram *program.Program, fi
 		}
 		info := defaultImportInfo{available: true}
 		interop := explicitESModuleInterop(sourceProgram)
-		syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram, interop)
+		syntheticDefault := compilerOptionsAllowSyntheticDefaultImports(sourceProgram)
 		// Only declarations use the implicit-default fallback below.
 		// Export assignments are checked during the subsequent name lookup.
 		if !interop && (!syntheticDefault || !file.IsDeclarationFile) {
