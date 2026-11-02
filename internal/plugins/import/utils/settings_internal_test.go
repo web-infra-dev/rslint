@@ -3,6 +3,13 @@ package utils
 import (
 	"slices"
 	"testing"
+
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
+	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/modules"
 )
 
 // TestModuleSettingsKeySeparatesListElements locks in that the cache key keeps
@@ -88,4 +95,103 @@ func TestFileExtensions(t *testing.T) {
 	if extensions[:2][1] != "" {
 		t.Fatal("extension settings were mutated")
 	}
+}
+
+func TestImportResolverPreparedConfiguration(t *testing.T) {
+	fs := rslintUtils.NewOverlayVFS(osvfs.FS(), map[string]string{
+		"/import-prepare/input.ts": "export {};", "/import-prepare/other/input.ts": "export {};",
+		"/import-prepare/target.js": "export {};", "/import-prepare/target.custom": "export {};",
+		"/import-prepare/only-typed.ts":   "export {};",
+		"/import-prepare/other/target.js": "export {};",
+		"/import-prepare/a/pkg/index.js":  "export {};", "/import-prepare/b/pkg/index.js": "export {};",
+	})
+	p, err := program.NewFromRoots(program.RootOptions{
+		Host: rslintUtils.CreateCompilerHost("/import-prepare", fs), CompilerOptions: &core.CompilerOptions{},
+		RootFileNames: []string{"/import-prepare/input.ts", "/import-prepare/other/input.ts"}, SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := (rule.RuleContext{SourceFile: p.GetSourceFile("/import-prepare/input.ts")}).WithProgram(p)
+	other := (rule.RuleContext{SourceFile: p.GetSourceFile("/import-prepare/other/input.ts")}).WithProgram(p)
+	source := modules.SourceFromSpecifier(nil)
+	check := func(t *testing.T, r *ImportResolver, name, want string, found bool, wantError string) {
+		t.Helper()
+		path, ok, err := r.ResolveName(name, source)
+		if path != want || ok != found || err != wantError {
+			t.Fatalf("ResolveName(%q) = (%q, %v, %q), want (%q, %v, %q)", name, path, ok, err, want, found, wantError)
+		}
+	}
+	t.Run("share configuration with file-specific requests", func(t *testing.T) {
+		first, second := NewImportResolver(ctx), NewImportResolver(other)
+		if first.importResolverConfig != second.importResolverConfig {
+			t.Fatal("equal default settings rebuilt configuration")
+		}
+		check(t, first, "./target", "/import-prepare/target.js", true, "")
+		check(t, second, "./target", "/import-prepare/other/target.js", true, "")
+	})
+	t.Run("snapshot settings and separate changed configuration", func(t *testing.T) {
+		extensions, core := []string{".custom"}, []string{"virtual"}
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolver": map[string]any{"node": map[string]any{"extensions": extensions}}, "import/core-modules": core}
+		first := NewImportResolver(configured)
+		extensions[0], core[0] = ".js", "other"
+		second := NewImportResolver(configured)
+		if first.importResolverConfig == second.importResolverConfig {
+			t.Fatal("mutated settings reused old configuration")
+		}
+		check(t, first, "./target", "/import-prepare/target.custom", true, "")
+		check(t, second, "./target", "/import-prepare/target.js", true, "")
+		check(t, first, "virtual", "", true, "")
+		check(t, second, "virtual", "", false, "")
+	})
+	t.Run("working directory belongs to configuration identity", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolver": map[string]any{"node": map[string]any{"paths": []any{"."}}}}
+		first := NewImportResolver(configured.WithFileCache(rule.NewFileCacheWithProcessCurrentDirectory("/import-prepare/a")))
+		second := NewImportResolver(configured.WithFileCache(rule.NewFileCacheWithProcessCurrentDirectory("/import-prepare/b")))
+		check(t, first, "pkg", "/import-prepare/a/pkg/index.js", true, "")
+		check(t, second, "pkg", "/import-prepare/b/pkg/index.js", true, "")
+	})
+	t.Run("retain typed settings interpretation", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolver": []any{"node"}}
+		check(t, NewImportResolver(configured), "./target", "/import-prepare/target.js", true, "")
+		configured.Settings["import/resolver"] = []string{"node"}
+		check(t, NewImportResolver(configured), "./target", "", false, "invalid resolver config")
+		configured.Settings["import/resolver"] = map[string]any{"node": map[string]any{"extensions": []string{}}}
+		check(t, NewImportResolver(configured), "./target", "", false, "")
+		configured.Settings["import/resolver"] = map[string]any{"node": map[string][]string{"extensions": {}}}
+		check(t, NewImportResolver(configured), "./target", "/import-prepare/target.js", true, "")
+	})
+	t.Run("nil and empty extensions stay distinct", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolver": map[string]any{"node": map[string]any{"extensions": nil}}}
+		check(t, NewImportResolver(configured), "./target", "/import-prepare/target.js", true, "")
+		configured.Settings["import/resolver"] = map[string]any{"node": map[string]any{"extensions": []any{}}}
+		check(t, NewImportResolver(configured), "./target", "", false, "")
+	})
+	t.Run("typed nil resolver differs from default", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolver": []any(nil)}
+		check(t, NewImportResolver(configured), "./target", "", false, "")
+		configured.Settings["import/resolver"] = map[string]any(nil)
+		check(t, NewImportResolver(configured), "./target", "", false, "")
+		configured.Settings["import/resolver"] = nil
+		check(t, NewImportResolver(configured), "./target", "/import-prepare/target.js", true, "")
+	})
+	t.Run("typed nil legacy config retains node-only resolution", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/resolve": map[string]any(nil)}
+		check(t, NewImportResolver(configured), "./only-typed", "", false, "")
+		configured.Settings["import/resolve"] = nil
+		check(t, NewImportResolver(configured), "./only-typed", "/import-prepare/only-typed.ts", true, "")
+	})
+	t.Run("JSON replacement characters do not merge core settings", func(t *testing.T) {
+		configured := ctx
+		configured.Settings = map[string]any{"import/core-modules": []string{"\xff"}}
+		check(t, NewImportResolver(configured), "\xff", "", true, "")
+		configured.Settings["import/core-modules"] = []string{"\xfe"}
+		check(t, NewImportResolver(configured), "\xff", "", false, "")
+	})
 }

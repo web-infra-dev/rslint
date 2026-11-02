@@ -196,8 +196,12 @@ filesystem and generation-scoped cache, reusing tsgo's resolver for package
 traversal and export-path validation. It selects runtime files independently of
 compiler declaration lookup and does not load resolved files into the Program.
 Explicit options select aliases, extensions, export conditions, package entry
-fields and directory entry names. Fallback aliases run only after ordinary
-resolution fails; `fullySpecified` limits file/directory guessing for the request
+fields and directory entry names. Prepared options own an immutable copy and
+encode the same cache identity once, retaining nil versus empty search lists.
+Import rules share context-free resolver configuration by settings and process
+working directory, and runtime options by compiler resolution mode. Source
+attributes and file context stay on each request. Fallback aliases run only after
+ordinary resolution fails; `fullySpecified` limits file/directory guessing for the request
 while package entry points and alias redirects retain their own lookup rules.
 Package alias fields reuse shared package metadata; all aliases reuse the same
 file probes before symlink resolution.

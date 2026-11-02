@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -217,6 +218,26 @@ type importResolver struct {
 	pathAliases    *moduleresolver.PathAliasResolver
 }
 
+type runtimeOptionsKey struct{ mode core.ResolutionMode }
+
+func runtimeResolutionOptions(p *program.Program, mode core.ResolutionMode) *moduleresolver.PreparedOptions {
+	return program.Cached(p, runtimeOptionsKey{mode}, func() *moduleresolver.PreparedOptions {
+		options := p.Options().Clone()
+		options.NoDtsResolution = core.TSTrue
+		runtimeOptions := moduleresolver.Options{
+			Conditions: module.GetConditions(options, mode), NodeExports: true,
+			PreserveSymlinks: options.PreserveSymlinks == core.TSTrue,
+		}
+		if mode == core.ResolutionModeCommonJS {
+			// require's extensionless lookup accepts .js, .json and .node;
+			// .mjs and .cjs need an explicit extension.
+			runtimeOptions.Extensions = []string{".js", ".json", ".node"}
+			runtimeOptions.LiteralPaths = true
+		}
+		return moduleresolver.PrepareOptions(runtimeOptions)
+	})
+}
+
 // resolve groups imports by their runtime path and any distinct type target.
 func (r *importResolver) resolve(importDecl *ast.ImportDeclaration) moduleIdentity {
 	moduleSpecifier := importDecl.ModuleSpecifier
@@ -353,19 +374,7 @@ func (r *importResolver) resolveModule(importDecl *ast.ImportDeclaration, source
 		// Package entry points can share declarations while loading distinct
 		// runtime files. Use the existing resolver without the automatic types
 		// condition, retaining the request's import/require and custom conditions.
-		options := program.Options().Clone()
-		options.NoDtsResolution = core.TSTrue
-		runtimeOptions := moduleresolver.Options{
-			Conditions: module.GetConditions(options, mode), NodeExports: true,
-			PreserveSymlinks: options.PreserveSymlinks == core.TSTrue,
-		}
-		if mode == core.ResolutionModeCommonJS {
-			// require's extensionless lookup accepts .js, .json and .node;
-			// .mjs and .cjs need an explicit extension.
-			runtimeOptions.Extensions = []string{".js", ".json", ".node"}
-			runtimeOptions.LiteralPaths = true
-		}
-		resolved := moduleresolver.Resolve(program, sourcePath, fileName, runtimeOptions)
+		resolved := runtimeResolutionOptions(program, mode).Resolve(program, sourcePath, fileName)
 		if resolved.Path != "" {
 			identity := moduleIdentity{path: r.canonicalPath(resolved.Path)}
 			if mode != core.ResolutionModeCommonJS {
