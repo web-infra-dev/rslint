@@ -1,6 +1,7 @@
 package no_unresolved_test
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -20,6 +21,56 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
+
+// BenchmarkNoUnresolvedResolverConfiguration measures a warm per-file rule
+// invocation, including configuration preparation and module collection.
+// Direct contexts exercise mutable Go compatibility; environment contexts
+// exercise the immutable configuration identity bound by the native executor.
+func BenchmarkNoUnresolvedResolverConfiguration(b *testing.B) {
+	projects := make([]any, 64)
+	for i := range projects {
+		projects[i] = fmt.Sprintf("packages/pkg-%d/tsconfig.json", i)
+	}
+	for _, configured := range []struct {
+		name     string
+		settings map[string]any
+	}{
+		{"default", nil},
+		{"typescript-one-project", map[string]any{"import/resolver": map[string]any{"typescript": map[string]any{"project": "tsconfig.json"}}}},
+		{"typescript-64-projects", map[string]any{"import/resolver": map[string]any{"typescript": map[string]any{"project": projects}}}},
+	} {
+		for _, immutable := range []bool{false, true} {
+			mode := "direct"
+			if immutable {
+				mode = "environment"
+			}
+			b.Run(configured.name+"/"+mode, func(b *testing.B) {
+				const file = "/resolver-bench/input.ts"
+				fs := utils.NewOverlayVFS(osvfs.FS(), map[string]string{
+					file: "import './dep';", "/resolver-bench/dep.ts": "export {};",
+				})
+				p, err := program.NewFromRoots(program.RootOptions{
+					Host: utils.CreateCompilerHost("/resolver-bench", fs), CompilerOptions: &core.CompilerOptions{},
+					RootFileNames: []string{file}, SingleThreaded: true,
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				ctx := (rule.RuleContext{SourceFile: p.GetSourceFile(file), Settings: configured.settings}).WithProgram(p)
+				if immutable {
+					environment := &rule.RuleEnvironment{Settings: configured.settings}
+					ctx = ctx.WithFileCache(rule.NewFileCacheWithEnvironment("/resolver-bench", environment))
+				}
+				no_unresolved.NoUnresolvedRule.Run(ctx, nil)
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					no_unresolved.NoUnresolvedRule.Run(ctx, nil)
+				}
+			})
+		}
+	}
+}
 
 func unresolvedRoot(t *testing.T, insensitive bool) embedfs.Root {
 	t.Helper()

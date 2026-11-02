@@ -41,6 +41,8 @@ type ImportResolver struct {
 }
 
 type importResolverConfigKey struct{ settings, cwd string }
+type importResolverEnvironmentKey struct{ cwd string }
+type importResolverPresetKey struct{ preset, cwd string }
 
 func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 	cwd := ctx.ProcessCurrentDirectory()
@@ -48,20 +50,90 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 		cwd = ctx.Program().CurrentDirectory()
 	}
 	settings := ctx.Settings
-	// Key only resolution settings, retaining option-list boundaries.
-	// Working directory affects the node resolver's additional search paths.
-	encoded, err := json.Marshal([3]any{settings["import/resolver"], settings["import/resolve"], settings["import/core-modules"]})
-	build := func() *importResolverConfig { return compileImportResolverConfig(settings, cwd) }
-	var config *importResolverConfig
-	if err == nil && resolverConfigCacheable(settings["import/resolver"]) &&
-		resolverSettingCacheable(settings["import/resolve"]) && resolverSettingCacheable(settings["import/core-modules"]) {
-		config = rule.CachedByProgram(ctx, importResolverConfigKey{string(encoded), cwd}, build)
-	} else {
-		// Manually assembled settings can contain non-JSON values. Preserve
-		// their existing interpretation without caching an incomplete identity.
-		config = build()
-	}
+	config := rule.CachedByEnvironment(ctx, importResolverEnvironmentKey{cwd}, func() *importResolverConfig {
+		build := func() *importResolverConfig { return compileImportResolverConfig(settings, cwd) }
+		// Only the first file for an immutable environment prepares this key.
+		// Unbound Go contexts retain content-based caching and observe settings
+		// mutations when constructing another resolver.
+		if preset := resolverConfigPreset(settings); preset != "" {
+			return rule.CachedByProgram(ctx, importResolverPresetKey{preset, cwd}, build)
+		}
+		identity := resolverConfigIdentity(configuredResolvers(settings))
+		core := settings["import/core-modules"]
+		encoded, err := json.Marshal([2]any{identity, core})
+		if err == nil && resolverConfigCacheable(identity) && resolverSettingCacheable(core) {
+			return rule.CachedByProgram(ctx, importResolverConfigKey{string(encoded), cwd}, build)
+		}
+		// Preserve non-JSON and custom Go representations without caching an
+		// incomplete identity.
+		return build()
+	})
 	return &ImportResolver{ctx: ctx, importResolverConfig: config}
+}
+
+// Common option-free configurations have a fixed identity. Direct Go callers
+// need not allocate an equivalent JSON key on every rule invocation either.
+func resolverConfigPreset(settings map[string]any) string {
+	if settings["import/core-modules"] != nil {
+		return ""
+	}
+	raw := settings["import/resolver"]
+	if (raw == nil || raw == false || raw == "") && settings["import/resolve"] == nil {
+		return "default"
+	}
+	switch value := raw.(type) {
+	case string:
+		if value == "typescript" || value == "eslint-import-resolver-typescript" {
+			return value
+		}
+	case map[string]any:
+		if len(value) == 1 {
+			for _, name := range [...]string{"typescript", "eslint-import-resolver-typescript"} {
+				if _, ok := value[name]; ok {
+					return name
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// resolverConfigIdentity retains resolver order and the options actually read
+// by the native adapter. In particular, TypeScript project lists and unknown
+// resolver options do not affect native resolution and need not be traversed.
+func resolverConfigIdentity(raw any) any {
+	switch value := raw.(type) {
+	case []any:
+		if value == nil {
+			return value
+		}
+		entries := make([]any, len(value))
+		for i, entry := range value {
+			entries[i] = resolverConfigIdentity(entry)
+		}
+		return entries
+	case map[string]any:
+		if value == nil {
+			return value
+		}
+		entries := make(map[string]any, len(value))
+		for name, rawConfig := range value {
+			entries[name] = nil
+			if name == "node" || name == "eslint-import-resolver-node" {
+				config, _ := rawConfig.(map[string]any)
+				relevant := make(map[string]any)
+				for _, option := range [...]string{"extensions", "preserveSymlinks", "moduleDirectory", "paths"} {
+					if setting, ok := config[option]; ok {
+						relevant[option] = setting
+					}
+				}
+				entries[name] = relevant
+			}
+		}
+		return entries
+	default:
+		return raw
+	}
 }
 
 // Resolver arrays accept []any, while option lists also accept []string.
@@ -132,8 +204,7 @@ func resolverSettingCacheable(raw any) bool {
 	}
 }
 
-func compileImportResolverConfig(settings map[string]any, cwd string) *importResolverConfig {
-	r := &importResolverConfig{core: slices.Clone(settingsStringList(settings, "import/core-modules"))}
+func configuredResolvers(settings map[string]any) any {
 	raw := settings["import/resolver"]
 	if raw == nil || raw == false || raw == "" {
 		if legacy := settings["import/resolve"]; legacy != nil {
@@ -145,6 +216,12 @@ func compileImportResolverConfig(settings map[string]any, cwd string) *importRes
 			raw = []any{"node", "typescript"}
 		}
 	}
+	return raw
+}
+
+func compileImportResolverConfig(settings map[string]any, cwd string) *importResolverConfig {
+	r := &importResolverConfig{core: slices.Clone(settingsStringList(settings, "import/core-modules"))}
+	raw := configuredResolvers(settings)
 	set := func(name string, config map[string]any) {
 		entry := importResolver{name: name, defaultConfig: len(config) == 0}
 		if name == "node" || name == "eslint-import-resolver-node" {

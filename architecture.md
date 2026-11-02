@@ -198,8 +198,11 @@ compiler declaration lookup and does not load resolved files into the Program.
 Explicit options select aliases, extensions, export conditions, package entry
 fields and directory entry names. Prepared options own an immutable copy and
 encode the same cache identity once, retaining nil versus empty search lists.
-Import rules share context-free resolver configuration by settings and process
-working directory, and runtime options by compiler resolution mode. Source
+Import rules share context-free resolver configuration by immutable rule
+environment and process working directory, preparing its content key only once
+per Program generation. Content keys retain only options used by the native
+resolver; manually assembled contexts still compare their current settings.
+Runtime options are shared by compiler resolution mode. Source
 attributes and file context stay on each request. Fallback aliases run only after
 ordinary resolution fails; `fullySpecified` limits file/directory guessing for the request
 while package entry points and alias redirects retain their own lookup rules.
@@ -504,7 +507,11 @@ copied into every per-rule context.
 Configuration is resolved once per file shape into one immutable
 `RuleEnvironment` shared by that file's `ConfiguredRule` entries. During
 planning that environment belongs to the shared prepared rule set, while each
-file retains its own checker grant. Execution constructs settings and globals once per file and copies the resulting
+file retains its own checker grant. The file-shared cache also binds the original
+environment identity. `CachedByEnvironment` prepares immutable configuration-derived
+values once per environment and Program generation; consumer keys include any
+additional inputs such as cwd. Its values retain no Program or file context.
+Execution constructs settings and globals once per file and copies the resulting
 base context for each rule. Module references and whole-Program indexes are not
 context fields: generic source references come from `Program().ModuleGraph()`,
 while rule-specific derived indexes use `CachedByProgram`. Both remain keyed by
