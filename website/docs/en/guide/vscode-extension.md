@@ -2,7 +2,7 @@
 description: 'Install the Rstack VS Code extension for Rslint diagnostics, code actions, and automatic fixes, and migrate settings from the retired standalone extension.'
 ---
 
-# Editor Integration
+# VSCode Extension
 
 Editor integration for Rslint lives in the unified [Rstack extension](https://github.com/rstackjs/rstack-editor), which also provides Rstest testing and `rs fmt` formatting.
 
