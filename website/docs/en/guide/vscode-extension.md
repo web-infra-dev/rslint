@@ -1,5 +1,5 @@
 ---
-description: 'Install the Rstack VS Code extension for Rslint diagnostics, code actions, and automatic fixes, and migrate settings from the retired standalone extension.'
+description: 'Install the Rstack VS Code extension for Rslint diagnostics, code actions, and automatic fixes.'
 ---
 
 # VSCode Extension
@@ -12,18 +12,9 @@ The extension ships no tool binaries. It resolves `@rslint/core` from your proje
 
 :::warning The standalone `rstack.rslint` extension is retired
 
-`rstack.rslint` shipped its final release and no longer receives updates. Uninstall or disable it so only one copy of Rslint runs, then re-enter your settings under the `rstack.*` keys below. Settings and keybindings are not migrated automatically.
+`rstack.rslint` shipped its final release and no longer receives updates. Uninstall or disable it so only one copy of Rslint runs.
 
 :::
-
-## Migrate settings
-
-| Standalone (`rslint.*`)                  | Rstack (`rstack.rslint.*`)                                       |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| `rslint.enable`                          | `rstack.rslint.enable`                                           |
-| `rslint.corePath`                        | `rstack.rslint.corePath`                                         |
-| `rslint.trace.server`                    | `rstack.rslint.trace.server`                                     |
-| `rslint.binPath`, `rslint.customBinPath` | No equivalent; use `rstack.rslint.corePath` to override the core |
 
 ## Settings
 
