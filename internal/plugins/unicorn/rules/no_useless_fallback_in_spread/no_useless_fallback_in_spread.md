@@ -33,8 +33,7 @@ removing its fallback can change the result.
 
 ## Options
 
-This rule has no options. It is enabled at `error` severity in
-`unicornPlugin.configs.recommended`.
+This rule has no options.
 
 ## Differences from upstream
 
