@@ -19,6 +19,15 @@ func IsKnownNonString(ctx rule.RuleContext, node *ast.Node) bool {
 	}) == TypeNonTarget
 }
 
+// IsKnownNonStringSyntax uses authored syntax and annotations without compiler
+// inference, matching rules running without upstream parser type services.
+func IsKnownNonStringSyntax(ctx rule.RuleContext, node *ast.Node) bool {
+	ctx.TypeChecker = nil
+	return classifyStringReceiver(ctx, node, &stringReceiverWalkState{
+		visiting: make(map[*ast.Symbol]bool), memo: make(map[*ast.Symbol]TypeClass), callReturnTypes: true,
+	}) == TypeNonTarget
+}
+
 // IsKnownNonStringType reports whether the checker alone proves that node is
 // not string-like. Rules that require type information and intentionally do
 // not follow Unicorn's syntax classifier use this narrower helper.
@@ -35,6 +44,21 @@ type stringReceiverWalkState struct {
 	memo     map[*ast.Symbol]TypeClass
 	depth    int
 	steps    int
+	// The source-only regex classifier also follows authored call returns.
+	// Legacy syntactic classifiers retain their precedence for String calls.
+	callReturnTypes bool
+}
+
+type stringTypeWalkState struct {
+	visiting map[*ast.Symbol]bool
+	memo     map[*ast.Symbol]TypeClass
+	depth    int
+	steps    int
+	mayBeAny bool
+}
+
+func newStringTypeWalkState() *stringTypeWalkState {
+	return &stringTypeWalkState{visiting: make(map[*ast.Symbol]bool), memo: make(map[*ast.Symbol]TypeClass)}
 }
 
 const (
@@ -62,7 +86,7 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 	// An informative assertion wins. `any` and `unknown` fall through to the
 	// wrapped expression, matching upstream's getTypeFromExpression.
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if class := classifyStringTypeNode(ctx, node.Type(), map[*ast.Symbol]bool{}); class != TypeUnknown {
+		if class := classifyStringTypeNode(ctx, node.Type()); class != TypeUnknown {
 			return class
 		}
 		return classifyStringReceiver(ctx, node.Expression(), state)
@@ -90,6 +114,14 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
 		if class := classifyStringReceiver(ctx, node.AsBinaryExpression().Right, state); class != TypeUnknown {
 			return class
+		}
+	}
+	if state.callReturnTypes && ast.IsCallExpression(node) && !ast.IsOptionalChain(node) {
+		callee := utils.ESTreeCallCallee(node.Expression())
+		if callee != nil && ast.IsIdentifier(callee) {
+			if class := classifyStringFunctionReturn(ctx, callee); class != TypeUnknown {
+				return class
+			}
 		}
 	}
 	if isSyntacticStringCall(node) {
@@ -123,7 +155,7 @@ func classifyStringIdentifier(ctx rule.RuleContext, node *ast.Node, state *strin
 	if declaration == nil {
 		return TypeUnknown
 	}
-	if class := classifyStringTypeNode(ctx, stringBindingTypeAnnotation(declaration), map[*ast.Symbol]bool{}); class != TypeUnknown {
+	if class := classifyStringTypeNode(ctx, stringBindingTypeAnnotation(declaration)); class != TypeUnknown {
 		state.memo[symbol] = class
 		return class
 	}
@@ -159,31 +191,49 @@ func stringBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
 func classifyStringTypeNode(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
 ) TypeClass {
-	if node == nil || utils.IsJSDocSyntaxNode(node) {
+	return classifyStringTypeSyntax(ctx, node, newStringTypeWalkState(), false)
+}
+
+// The positive string proof also accepts the same TS-shaped nodes parsed from
+// JSDoc; existing classifiers retain their original JSDoc policy.
+func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, state *stringTypeWalkState, includeJSDoc bool) TypeClass {
+	if node == nil || (!includeJSDoc && utils.IsJSDocSyntaxNode(node)) || state.depth >= maxStringReceiverDepth || state.steps >= maxStringReceiverSteps {
+		state.mayBeAny = true
 		return TypeUnknown
 	}
+	state.depth++
+	state.steps++
+	defer func() { state.depth-- }()
 	for node.Kind == ast.KindParenthesizedType {
 		node = node.AsParenthesizedTypeNode().Type
 		if node == nil {
+			state.mayBeAny = true
 			return TypeUnknown
 		}
 	}
 	if node.Kind == ast.KindTypeOperator {
 		operator := node.AsTypeOperatorNode()
 		if operator.Operator != ast.KindReadonlyKeyword {
+			state.mayBeAny = true
 			return TypeUnknown
 		}
-		return classifyStringTypeNode(ctx, operator.Type, visitedSymbols)
+		return classifyStringTypeSyntax(ctx, operator.Type, state, includeJSDoc)
 	}
 
 	switch node.Kind {
+	case ast.KindJSDocNonNullableType:
+		return classifyStringTypeSyntax(ctx, node.Type(), state, includeJSDoc)
+	case ast.KindAnyKeyword:
+		state.mayBeAny = true
+		return TypeUnknown
+	case ast.KindUnknownKeyword:
+		return TypeUnknown
 	case ast.KindStringKeyword:
 		return TypeTarget
 	case ast.KindLiteralType:
 		literal := node.AsLiteralTypeNode().Literal
-		if literal != nil && literal.Kind == ast.KindStringLiteral {
+		if literal != nil && ast.IsStringLiteralLike(literal) {
 			return TypeTarget
 		}
 		return TypeNonTarget
@@ -197,19 +247,20 @@ func classifyStringTypeNode(
 		types := node.AsUnionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyStringTypeNode(ctx, part, visitedSymbols))
+			classes = append(classes, classifyStringTypeSyntax(ctx, part, state, includeJSDoc))
 		}
 		return combineStringUnion(classes)
 	case ast.KindIntersectionType:
 		types := node.AsIntersectionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyStringTypeNode(ctx, part, visitedSymbols))
+			classes = append(classes, classifyStringTypeSyntax(ctx, part, state, includeJSDoc))
 		}
 		return combineStringIntersection(classes)
 	case ast.KindTypeReference:
-		return classifyStringTypeReference(ctx, node.AsTypeReferenceNode().TypeName, visitedSymbols)
+		return classifyStringTypeReference(ctx, node.AsTypeReferenceNode().TypeName, state)
 	default:
+		state.mayBeAny = true
 		return TypeUnknown
 	}
 }
@@ -217,19 +268,30 @@ func classifyStringTypeNode(
 func classifyStringTypeReference(
 	ctx rule.RuleContext,
 	typeName *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
-) TypeClass {
-	if typeName == nil || !ast.IsIdentifier(typeName) || ctx.Refs == nil {
+	state *stringTypeWalkState,
+) (class TypeClass) {
+	if typeName == nil || !ast.IsIdentifier(typeName) || ctx.Refs == nil || state.depth >= maxStringReceiverDepth || state.steps >= maxStringReceiverSteps {
+		state.mayBeAny = true
 		return TypeUnknown
 	}
+	state.depth++
+	state.steps++
+	defer func() { state.depth-- }()
 	symbol := ctx.Refs.ResolveInFileWithMeaning(
 		typeName, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
-	if symbol == nil || visitedSymbols[symbol] {
+	if symbol == nil || state.visiting[symbol] {
+		state.mayBeAny = true
 		return TypeUnknown
 	}
-	visitedSymbols[symbol] = true
-	defer delete(visitedSymbols, symbol)
+	if cached, known := state.memo[symbol]; known {
+		return cached
+	}
+	state.visiting[symbol] = true
+	defer func() {
+		delete(state.visiting, symbol)
+		state.memo[symbol] = class
+	}()
 
 	for _, declaration := range symbol.Declarations {
 		if declaration == nil {
@@ -237,22 +299,28 @@ func classifyStringTypeReference(
 		}
 		switch declaration.Kind {
 		case ast.KindTypeAliasDeclaration:
-			return classifyStringTypeNode(ctx, declaration.AsTypeAliasDeclaration().Type, visitedSymbols)
+			return classifyStringTypeSyntax(ctx, declaration.AsTypeAliasDeclaration().Type, state, false)
 		case ast.KindTypeParameter:
-			return classifyStringTypeNode(ctx, declaration.AsTypeParameterDeclaration().Constraint, visitedSymbols)
+			// Alias arguments are not substituted here. A constraint alone cannot
+			// exclude an actual or defaulted any argument.
+			if declaration.Parent != nil && declaration.Parent.Kind == ast.KindTypeAliasDeclaration {
+				state.mayBeAny = true
+			}
+			return classifyStringTypeSyntax(ctx, declaration.AsTypeParameterDeclaration().Constraint, state, false)
 		case ast.KindInterfaceDeclaration:
-			return classifyStringInterface(ctx, declaration, visitedSymbols)
+			return classifyStringInterface(ctx, declaration, state)
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyStringClass(ctx, declaration, visitedSymbols, true)
+			return classifyStringClass(ctx, declaration, state, true)
 		}
 	}
+	state.mayBeAny = true
 	return TypeUnknown
 }
 
 func classifyStringInterface(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	state *stringTypeWalkState,
 ) TypeClass {
 	declaration := node.AsInterfaceDeclaration()
 	if declaration.HeritageClauses == nil || len(declaration.HeritageClauses.Nodes) == 0 {
@@ -270,7 +338,7 @@ func classifyStringInterface(
 				classes = append(classes, TypeUnknown)
 				continue
 			}
-			classes = append(classes, classifyStringTypeReference(ctx, heritage.TypeName, visitedSymbols))
+			classes = append(classes, classifyStringTypeReference(ctx, heritage.TypeName, state))
 		}
 	}
 	if len(classes) == 0 {
@@ -282,7 +350,7 @@ func classifyStringInterface(
 func classifyStringClass(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	state *stringTypeWalkState,
 	fromTypeReference bool,
 ) TypeClass {
 	heritage := ast.GetClassExtendsHeritageElement(node)
@@ -296,20 +364,24 @@ func classifyStringClass(
 	if superClass == nil || (fromTypeReference && !ast.IsIdentifier(superClass)) {
 		return TypeUnknown
 	}
-	return classifyStringClassReference(ctx, superClass, visitedSymbols)
+	return classifyStringClassReference(ctx, superClass, state)
 }
 
 func classifyStringClassReference(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	state *stringTypeWalkState,
 ) TypeClass {
 	node = ast.SkipParentheses(node)
-	if node == nil {
+	if node == nil || state.depth >= maxStringReceiverDepth || state.steps >= maxStringReceiverSteps {
+		state.mayBeAny = true
 		return TypeUnknown
 	}
+	state.depth++
+	state.steps++
+	defer func() { state.depth-- }()
 	if node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression {
-		return classifyStringClass(ctx, node, visitedSymbols, false)
+		return classifyStringClass(ctx, node, state, false)
 	}
 	if !ast.IsIdentifier(node) || ctx.Refs == nil {
 		return TypeUnknown
@@ -318,11 +390,12 @@ func classifyStringClassReference(
 	symbol := ctx.Refs.ResolveInFileWithMeaning(
 		node, ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
 	)
-	if symbol == nil || len(symbol.Declarations) == 0 || visitedSymbols[symbol] {
+	if symbol == nil || len(symbol.Declarations) == 0 || state.visiting[symbol] {
+		state.mayBeAny = true
 		return TypeUnknown
 	}
-	visitedSymbols[symbol] = true
-	defer delete(visitedSymbols, symbol)
+	state.visiting[symbol] = true
+	defer delete(state.visiting, symbol)
 
 	// Match Unicorn's first definition, including merged type/value
 	// declarations. Skipping an earlier type declaration changes its answer.
@@ -332,7 +405,7 @@ func classifyStringClassReference(
 	}
 	switch declaration.Kind {
 	case ast.KindClassDeclaration, ast.KindClassExpression:
-		return classifyStringClass(ctx, declaration, visitedSymbols, false)
+		return classifyStringClass(ctx, declaration, state, false)
 	case ast.KindVariableDeclaration:
 		declarationList := declaration.Parent
 		variable := declaration.AsVariableDeclaration()
@@ -342,7 +415,7 @@ func classifyStringClassReference(
 			!ast.IsIdentifier(variable.Name()) || variable.Initializer == nil {
 			return TypeUnknown
 		}
-		return classifyStringClassReference(ctx, variable.Initializer, visitedSymbols)
+		return classifyStringClassReference(ctx, variable.Initializer, state)
 	}
 	return TypeUnknown
 }

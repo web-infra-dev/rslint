@@ -68,6 +68,8 @@ func TestPreferStringTrimStartEndExtras(t *testing.T) {
 			// declarations cannot themselves be trim method calls.
 		},
 		[]rule_tester.InvalidTestCase{
+			// Both string literal AST forms remain string-like in the shared classifier.
+			trimInvalid("function f(value: `abc`) { value.trimLeft(); }", "file.ts", "trimLeft", "trimStart", 0),
 			// ---- Dimension 4: receiver and expression wrappers ----
 			// Parenthesized callees are transparent in ESTree and must remain so in tsgo.
 			trimInvalid(`(foo.trimLeft)()`, "file.js", "trimLeft", "trimStart", 0),
