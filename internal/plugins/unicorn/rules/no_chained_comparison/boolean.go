@@ -136,9 +136,9 @@ func isBooleanType(ctx rule.RuleContext, value *checker.Type) bool {
 	return false
 }
 
-// tsgo does not apply JSDoc annotations to TypeScript files. Read those same
-// annotations through the shared source helper, then let the checker resolve
-// their types, properties and call signatures rather than copying type logic.
+// Use expression types before declaration signatures or property symbols, which
+// lose call instantiation and flow narrowing. Explicit JSDoc still supplies
+// annotations that tsgo does not apply to TypeScript files.
 func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool) *checker.Type {
 	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || ctx.TypeChecker == nil || visiting[node] {
@@ -146,17 +146,19 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 	}
 	visiting[node] = true
 	defer delete(visiting, node)
+	actual := ctx.TypeChecker.GetTypeAtLocation(node)
+	known := actual != nil && !utils.IsTypeAnyType(actual) && !utils.IsTypeUnknownType(actual) && !utils.IsIntrinsicErrorType(actual)
 	switch node.Kind {
 	case ast.KindIdentifier:
 		if ctx.Refs != nil {
 			if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
 				declaration := symbol.Declarations[0]
 				if declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
-					return ctx.TypeChecker.GetTypeAtLocation(node)
+					return actual
 				}
 				if annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration); annotation != nil && !ast.IsFunctionLike(declaration) {
 					if optional {
-						return ctx.TypeChecker.GetTypeAtLocation(node)
+						return actual
 					}
 					return ctx.TypeChecker.GetTypeFromTypeNode(annotation)
 				}
@@ -172,9 +174,9 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 				if symbol := ctx.Refs.ResolveInFile(callee); symbol != nil && len(symbol.Declarations) == 1 {
 					declaration := symbol.Declarations[0]
 					if overridesJSDocCallable(declaration) || callableHasWrites(ctx, symbol) {
-						return ctx.TypeChecker.GetTypeAtLocation(node)
+						return actual
 					}
-					if annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration); annotation != nil && !optional {
+					if annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration); utils.IsJSDocSyntaxNode(annotation) && !optional {
 						if ast.IsFunctionLike(declaration) && ast.GetFunctionFlags(declaration)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
 							return ctx.TypeChecker.GetTypeFromTypeNode(annotation)
 						}
@@ -186,6 +188,9 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 					}
 				}
 			}
+			if known {
+				return actual
+			}
 			if callable := expressionType(ctx, callee, evaluator, visiting); callable != nil {
 				signatures := ctx.TypeChecker.GetSignaturesOfType(callable, checker.SignatureKindCall)
 				if len(signatures) == 1 {
@@ -194,6 +199,9 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 			}
 		}
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if known {
+			return actual
+		}
 		if !ast.IsOptionalChain(node) {
 			name, known := memberName(node, evaluator)
 			if receiver := expressionType(ctx, node.Expression(), evaluator, visiting); known && receiver != nil {
@@ -203,5 +211,5 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 			}
 		}
 	}
-	return ctx.TypeChecker.GetTypeAtLocation(node)
+	return actual
 }

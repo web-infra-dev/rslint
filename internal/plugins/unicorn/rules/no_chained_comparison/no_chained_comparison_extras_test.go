@@ -17,6 +17,15 @@ import (
 // with TypeScript type information. The upstream suite also covers syntax-only mode.
 func TestNoChainedComparisonExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_chained_comparison.NoChainedComparisonRule, []rule_tester.ValidTestCase{
+		// Use instantiated call results and flow-narrowed property values.
+		{Code: "declare const a: number, b: number; declare function id<T>(x: T): T; (a === b) === id(true);", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare function id<T>(x: T): T; (a === b) === id<boolean>(true);", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; const id = <T>(x: T): T => x; (a === b) === id(true);", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare function id<T>(x: T): T; const alias = id; (a === b) === alias(true);", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare const object: { id<T>(x: T): T }; (a === b) === object.id(true);", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare const object: { flag?: boolean }; if (object.flag !== undefined) { (a === b) === object.flag; }", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare const object: { flag?: boolean }; if (object[\"flag\"] !== undefined) { (a === b) === object[\"flag\"]; }", FileName: "case.ts"},
+		{Code: "declare const a: number, b: number; declare const object: { flag: boolean | null }; if (object.flag !== null) { (a === b) === object.flag; }", FileName: "case.ts"},
 		// JSDoc callable initializers and aliases, checked against Unicorn v79.0.0.
 		{Code: "/** @param {() => number} read */ function run(read = (): boolean => true) { return (a < b) === read(); }", FileName: "case.ts"},
 		// Computed keys use their values, rather than the identifier spelling.
@@ -55,6 +64,17 @@ func TestNoChainedComparisonExtras(t *testing.T) {
 		{Code: "(a < b) === new Set().has(c);", FileName: "case.ts"},
 		{Code: "let flag = Boolean(c); (a < b) === flag;", FileName: "case.ts"},
 	}, []rule_tester.InvalidTestCase{
+		// Actual numeric results must still report and retain their suggestions.
+		{Code: "declare const a: number, b: number; declare function id<T>(x: T): T; (a === b) === id(1);", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-chained-comparison/error", Message: comparisonMessage, Line: 1, Column: 70, EndLine: 1, EndColumn: 89, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "no-chained-comparison/suggestion", Output: "declare const a: number, b: number; declare function id<T>(x: T): T; a === b && b === id(1);"},
+			}},
+		}},
+		{Code: "declare const a: number, b: number; declare const object: { value?: number }; if (object.value !== undefined) { (a === b) === object.value; }", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-chained-comparison/error", Message: comparisonMessage, Line: 1, Column: 113, EndLine: 1, EndColumn: 139, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "no-chained-comparison/suggestion", Output: "declare const a: number, b: number; declare const object: { value?: number }; if (object.value !== undefined) { a === b && b === object.value; }"},
+			}},
+		}},
 		// JSDoc callable initializers and aliases, checked against Unicorn v79.0.0.
 		{Code: "/** @type {() => boolean} */ const read = async () => true; (a < b) === read();", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-chained-comparison/error", Message: comparisonMessage, Line: 1, Column: 61, EndLine: 1, EndColumn: 79, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
