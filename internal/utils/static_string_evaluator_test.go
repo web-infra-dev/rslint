@@ -1143,6 +1143,13 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		const arrayLength = [1]["length"];
 		const globalNumber = Math["PI"];
 		const frozen = Object.freeze([1]);
+		const instantiatedArray = (Object.freeze<number[]>)([1]);
+		const frozenRegExp = (Object.freeze<RegExp>)(/a/);
+		const sealedRegExp = (Object.seal<RegExp>)(/a/);
+		const fixedRegExp = (Object.preventExtensions<RegExp>)(/a/);
+		const optionalRegExp = (Object.freeze<RegExp>)?.(/a/);
+		const optionalMemberRegExp = (Object?.freeze<RegExp>)(/a/);
+		const computedRegExp = (Object["freeze"]<RegExp>)(/a/);
 		const frozenAlias = frozen;
 		const safeAlias = array;
 		const skippedMutable = true ? array : loose;
@@ -1194,6 +1201,13 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		{name: "arrayLength", known: true},
 		{name: "globalNumber", known: true},
 		{name: "frozen", known: true, isArray: true},
+		{name: "instantiatedArray", known: true, isArray: true},
+		{name: "frozenRegExp", known: true, isRegExp: true},
+		{name: "sealedRegExp", known: true, isRegExp: true},
+		{name: "fixedRegExp", known: true, isRegExp: true},
+		{name: "optionalRegExp"},
+		{name: "optionalMemberRegExp"},
+		{name: "computedRegExp"},
 		{name: "frozenAlias", known: true, isArray: true},
 		{name: "safeAlias", known: true, isArray: true},
 		{name: "skippedMutable", known: true, isArray: true},

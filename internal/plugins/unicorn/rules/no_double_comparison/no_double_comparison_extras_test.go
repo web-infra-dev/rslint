@@ -3,19 +3,28 @@ package no_double_comparison_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_double_comparison"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoDoubleComparisonExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_double_comparison.NoDoubleComparisonRule, []rule_tester.ValidTestCase{
+		// Instantiating a builtin callee does not change its RegExp result.
+		{Code: "const re = (Object.freeze<RegExp>)(/a/); re === x || re < x", FileName: "case.ts"},
+		{Code: "const re = (Object.seal<RegExp>)(/a/); re === x || re < x", FileName: "case.ts"},
+		{Code: "const re = (Object.preventExtensions<RegExp>)(/a/); re === x || re < x", FileName: "case.ts"},
 		// TypeScript wrappers, comment boundaries and JavaScript text values
 		{Code: "x === \"\\uD800\" || x < \"�\"", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
 		{Code: "const re = /a/ as RegExp; re === x || re < x", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
@@ -39,6 +48,13 @@ func TestNoDoubleComparisonExtras(t *testing.T) {
 		{Code: "const re = /a/; re <= x && re >= x", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
 		{Code: "const re = true ? /a/ : /b/; re === x || re < x", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
 	}, []rule_tester.InvalidTestCase{
+		// Instantiation does not make optional or computed calls statically safe.
+		{Code: "const re = (Object.freeze<RegExp>)?.(/a/); re === x || re < x", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-double-comparison", Message: "These comparisons can be simplified to `re <= x`.", Line: 1, Column: 44, EndLine: 1, EndColumn: 62, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-double-comparison/suggestion", Output: "const re = (Object.freeze<RegExp>)?.(/a/); re <= x"}}},
+		}},
+		{Code: "const re = (Object[\"freeze\"]<RegExp>)(/a/); re === x || re < x", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-double-comparison", Message: "These comparisons can be simplified to `re <= x`.", Line: 1, Column: 45, EndLine: 1, EndColumn: 63, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-double-comparison/suggestion", Output: "const re = (Object[\"freeze\"]<RegExp>)(/a/); re <= x"}}},
+		}},
 		// TypeScript wrappers, comment boundaries and JavaScript text values
 		{Code: "(x === y)<boolean> || x < y", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-double-comparison", Message: "These comparisons can be simplified to `x <= y`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-double-comparison/suggestion", Output: "x <= y"}}},
@@ -129,6 +145,94 @@ func TestNoDoubleComparisonExtras(t *testing.T) {
 		{Code: "/** @type {number} */ (x) === y || x < y", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-double-comparison", Message: "These comparisons can be simplified to `(x) <= y`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 41, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-double-comparison/suggestion", Output: "/** @type {number} */ (x) <= y"}}}}},
 		{Code: "(x === y || x < y) as boolean", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-double-comparison", Message: "These comparisons can be simplified to `x <= y`.", Line: 1, Column: 2, EndLine: 1, EndColumn: 18, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-double-comparison/suggestion", Output: "(x <= y) as boolean"}}}}},
 	})
+}
+
+func TestNoDoubleComparisonCrossFileRegExp(t *testing.T) {
+	root := fixtures.GetRootDir()
+	archive := txtarfs.MustParseFile(t, "testdata/global_regexp.txtar")
+	names, err := archive.FileNames("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := make(map[string]string, len(names))
+	for _, name := range names {
+		content, err := archive.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[tspath.ResolvePath(root.Dir, "global-regexp/"+name)] = string(content)
+	}
+	fs := utils.NewOverlayVFS(root.FS, files)
+	program, err := utils.CreateProgram(true, fs, root.Dir, "global-regexp/tsconfig.json", utils.CreateCompilerHost(root.Dir, fs))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []struct {
+		name    string
+		checker bool
+	}{{"source-only", false}, {"project", true}} {
+		t.Run(mode.name, func(t *testing.T) {
+			for _, test := range []struct {
+				name  string
+				count int
+			}{{"case.ts", 1}, {"padded.ts", 1}, {"local.ts", 0}, {"unreachable.ts", 0}} {
+				t.Run(test.name, func(t *testing.T) {
+					path := tspath.ResolvePath(root.Dir, "global-regexp/"+test.name)
+					source := program.GetSourceFile(path)
+					if source == nil {
+						t.Fatalf("fixture file %q is missing", path)
+					}
+					sourceProgram := lintprogram.NewFromCompiler(program)
+					if !mode.checker {
+						sourceProgram, err = lintprogram.NewFromBoundSources(program, []*ast.SourceFile{source})
+						if err != nil {
+							t.Fatal(err)
+						}
+					}
+					var diagnostics []rule.RuleDiagnostic
+					var hasChecker bool
+					linter.LintSingleFile(linter.LintSingleFileOptions{
+						Program: sourceProgram, File: path,
+						GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+							return []rule.ConfiguredRule{{Name: no_double_comparison.NoDoubleComparisonRule.Name, Severity: rule.SeverityError,
+								Run: func(ctx rule.RuleContext) rule.RuleListeners {
+									hasChecker = ctx.TypeChecker != nil
+									return no_double_comparison.NoDoubleComparisonRule.Run(ctx, nil)
+								},
+							}}
+						},
+						Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+					})
+					if hasChecker != mode.checker {
+						t.Fatalf("checker = %t, want %t", hasChecker, mode.checker)
+					}
+					if len(diagnostics) != test.count {
+						t.Fatalf("got %d diagnostics, want %d", len(diagnostics), test.count)
+					}
+					if test.count == 0 {
+						return
+					}
+					code := source.Text()
+					start := strings.Index(code, "re === x || re < x")
+					if start < 0 {
+						t.Fatal("fixture comparison is missing")
+					}
+					end := start + len("re === x || re < x")
+					diagnostic := diagnostics[0]
+					if diagnostic.Range != core.NewTextRange(start, end) || diagnostic.Message.Id != "no-double-comparison" || diagnostic.Message.Description != "These comparisons can be simplified to `re <= x`." || diagnostic.FixesPtr != nil {
+						t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+					}
+					if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 || (*diagnostic.Suggestions)[0].Message.Id != "no-double-comparison/suggestion" {
+						t.Fatalf("unexpected suggestions: %+v", diagnostic.Suggestions)
+					}
+					output, _, fixed := linter.ApplyRuleFixes(code, (*diagnostic.Suggestions)[:1])
+					if !fixed || output != code[:start]+"re <= x"+code[end:] {
+						t.Fatalf("unexpected suggestion output: %q", output)
+					}
+				})
+			}
+		})
+	}
 }
 
 func TestNoDoubleComparisonSuggestionsFollowDemand(t *testing.T) {

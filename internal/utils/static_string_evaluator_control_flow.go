@@ -102,7 +102,7 @@ func (safety *staticControlFlowSafety) passThroughArgument(node *ast.Node) (*ast
 		return nil, false
 	}
 	call := node.AsCallExpression()
-	callee := SkipAssertionsAndParens(call.Expression)
+	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
 	if call.QuestionDotToken != nil || len(node.Arguments()) != 1 || callee == nil ||
 		callee.Kind != ast.KindPropertyAccessExpression || ast.IsOptionalChainRoot(callee) ||
 		callee.AsPropertyAccessExpression().QuestionDotToken != nil {
@@ -330,7 +330,8 @@ func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {
 		if !ast.IsVarConst(declaration.Parent) {
 			return true
 		}
-		if declaration.End() > node.Pos() {
+		// Initialization order is meaningful only within the same source file.
+		if ast.GetSourceFileOfNode(declaration) != ast.GetSourceFileOfNode(node) || declaration.End() > node.Pos() {
 			return true
 		}
 		if safety.visiting[symbol] {

@@ -1,0 +1,17 @@
+-- tsconfig.json --
+{
+  "compilerOptions": { "target": "esnext", "strict": true },
+  "files": ["case.ts", "padded.ts", "local.ts", "unreachable.ts", "global.ts"]
+}
+-- global.ts --
+const re = /a/;
+-- case.ts --
+re === x || re < x;
+-- padded.ts --
+const padding = 0; re === x || re < x;
+-- local.ts --
+const local = /a/;
+local === x || local < x;
+-- unreachable.ts --
+const localWhen = true ? /a/ : re;
+localWhen === x || localWhen < x;
