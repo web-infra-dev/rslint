@@ -71,9 +71,9 @@ var NoUselessLengthCheckRule = rule.Rule{
 						if leading {
 							safe = true
 							for _, argument := range next.Arguments() {
-								// Tag calls also stay suggestions because they run
-								// for empty arrays after removing the guard.
-								if evaluator.HasSideEffect(argument, false) {
+								// Tags and spreads can run user code for an empty
+								// array after removing the guard.
+								if evaluator.HasSideEffect(argument, false) || hasEvaluatedSpread(argument) {
 									safe = false
 									break
 								}
@@ -221,6 +221,28 @@ func isSideEffectFreeFunction(evaluator *utils.StaticStringEvaluator, node *ast.
 	return !evaluator.HasSideEffect(node.Body(), false) && !containsSpreadOrTag(node.Body())
 }
 
+func hasEvaluatedSpread(node *ast.Node) bool {
+	found := false
+	utils.VisitDescendants(node, func(child *ast.Node) bool {
+		if found {
+			return false
+		}
+		if ast.IsFunctionLike(child) {
+			// Creating a callback or method does not evaluate its body or
+			// parameters, but a computed method name is evaluated immediately.
+			found = hasEvaluatedSpread(child.Name())
+			return false
+		}
+		switch child.Kind {
+		case ast.KindSpreadElement, ast.KindSpreadAssignment, ast.KindJsxSpreadAttribute:
+			found = true
+			return false
+		}
+		return !ast.IsTypeNode(child) || (child.Kind == ast.KindExpressionWithTypeArguments && !ast.IsPartOfTypeNode(child))
+	})
+	return found
+}
+
 func containsSpreadOrTag(node *ast.Node) bool {
 	// A runtime instantiation shares its kind with type-only heritage nodes.
 	if node != nil && node.Kind == ast.KindExpressionWithTypeArguments && !ast.IsPartOfTypeNode(node) {
@@ -229,7 +251,7 @@ func containsSpreadOrTag(node *ast.Node) bool {
 	if node == nil || ast.IsTypeNode(node) {
 		return false
 	}
-	return node.Kind == ast.KindSpreadElement || node.Kind == ast.KindSpreadAssignment || node.Kind == ast.KindTaggedTemplateExpression ||
+	return node.Kind == ast.KindSpreadElement || node.Kind == ast.KindSpreadAssignment || node.Kind == ast.KindJsxSpreadAttribute || node.Kind == ast.KindTaggedTemplateExpression ||
 		node.ForEachChild(containsSpreadOrTag)
 }
 
@@ -283,7 +305,16 @@ func unwrapLoop(ctx rule.RuleContext, node, loop *ast.Node) []rule.RuleFix {
 		return nil
 	}
 	text := sourceFile.Text()[loopRange.Pos():loopRange.End()]
-	return []rule.RuleFix{rule.RuleFixReplaceRange(outerRange, adjustLoopIndent(text, loopIndent, outerIndent))}
+	replacement := adjustLoopIndent(text, loopIndent, outerIndent)
+	if !ast.IsBlock(loop.AsForInOrOfStatement().Statement) && text[len(text)-1] != ';' {
+		if next, hasNext := utils.TokenAtOrAfter(sourceFile, outerRange.End()); hasNext {
+			last, hasLast := utils.TokenBeforePosition(sourceFile, loopRange.End())
+			if hasLast && unicornutil.NeedsSemicolonAfter(sourceFile, last, next.Text, utils.IsSameLine(sourceFile, outerRange.End(), next.Start)) {
+				replacement += ";"
+			}
+		}
+	}
+	return []rule.RuleFix{rule.RuleFixReplaceRange(outerRange, replacement)}
 }
 
 func indentAt(sourceFile *ast.SourceFile, pos int) (string, bool) {

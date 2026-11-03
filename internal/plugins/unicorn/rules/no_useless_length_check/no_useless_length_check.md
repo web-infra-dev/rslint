@@ -46,6 +46,7 @@ method checks offer an editor suggestion because removing the check can change
 which side effects run.
 
 A guarded `for…of` loop is unwrapped when its indentation can be preserved.
+When necessary, a semicolon keeps the following statement outside the loop.
 Comments in the removed text and multiline tokens prevent automatic fixes.
 Loops with an `else` branch, multiple statements in the guarded block, or
 `for await…of` are ignored. A loop binding referenced by the iterable also
@@ -67,6 +68,24 @@ array.length > 0 && array.some(tag`text`);
 
 Applying the suggestion calls `tag` even when `array` is empty. Review whether
 that call is safe before accepting the suggestion.
+
+Leading checks also offer suggestions when evaluating the method arguments
+performs a spread, including spreads nested inside arrays, objects, or JSX:
+
+```javascript
+array.length > 0 && array.some(...callbacks);
+array.length === 0 || array.every(predicate, { ...options });
+```
+
+Removing the guard can consume an iterator or invoke getters even when the
+array is empty. For leading checks, spreads inside an inline callback's body
+do not prevent an automatic fix because creating the callback does not run its
+body. For trailing checks, a callback that spreads JSX props offers a suggestion
+because a getter can change the array during iteration.
+
+rslint also adds a semicolon when unwrapping a loop would attach the following
+statement to its body. A following `[value].forEach(...)`, for example, stays
+outside the loop instead of becoming part of the loop body's last call.
 
 ## Original Documentation
 

@@ -22,6 +22,8 @@ func TestNoUselessLengthCheckEditDemand(t *testing.T) {
 		"if (array.length > 0) for (const element of array) use(element)",
 		"if (array.length > 0) { /* keep */ for (const element of array) use(element) }",
 		"array.length > 0 && /* keep */ array.some(createPredicate())",
+		"array.length > 0 && array.some(...callbacks)",
+		"if (array.length > 0) { for (const value of array) use(value) }\n[1].forEach(use)",
 	} {
 		t.Run(source, func(t *testing.T) {
 			program, file, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(source, "demand.js", "tsconfig.json")
@@ -171,6 +173,40 @@ func TestNoUselessLengthCheckExtraLoops(t *testing.T) {
 		{Code: "if (array.length > 0) { \tfor (const x of array) { \t\tuse(x); \t} }", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"for (const x of array) { \tuse(x); }"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
+		// Unwrapping a block must keep following expressions outside the loop body.
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n[1].forEach(use);", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n[1].forEach(use);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n(use)(value);", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n(use)(value);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n`text`;", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n`text`;"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) } after();", FileName: "case.js", Output: []string{"for (const value of array) consume(value); after();"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n// keep\n[1].forEach(use);", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n// keep\n[1].forEach(use);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value); }\n[1].forEach(use);", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n[1].forEach(use);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) { consume(value) } }\n[1].forEach(use);", FileName: "case.js", Output: []string{"for (const value of array) { consume(value) }\n[1].forEach(use);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\nafter();", FileName: "case.js", Output: []string{"for (const value of array) consume(value)\nafter();"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) while (ready) consume(value) }\n[1].forEach(use);", FileName: "case.js", Output: []string{"for (const value of array) while (ready) consume(value);\n[1].forEach(use);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n/x/.test(value);", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n/x/.test(value);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "if (array.length > 0) { for (const value of array) consume(value) }\n+value;", FileName: "case.js", Output: []string{"for (const value of array) consume(value);\n+value;"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "for-of", Message: "The non-empty check is useless as `for…of` does not iterate over an empty array.", Line: 1, Column: 11, EndLine: 1, EndColumn: 21, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
 	})
 }
 
@@ -182,8 +218,9 @@ func TestNoUselessLengthCheckExtraEdits(t *testing.T) {
 		{Code: "array.some() && array.length > 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 23, EndLine: 1, EndColumn: 33, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some()"}}},
 		}},
-		{Code: "array.length > 0 && array.some(...callbacks)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"array.some(...callbacks)"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		// Expanding an argument can invoke a custom iterator on an empty array.
+		{Code: "array.length > 0 && array.some(...callbacks)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(...callbacks)"}}},
 		}},
 		{Code: "array.some(value => value, ...args) && array.length > 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"array.some(value => value, ...args)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 46, EndLine: 1, EndColumn: 56, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -246,6 +283,37 @@ func TestNoUselessLengthCheckExtraEdits(t *testing.T) {
 			{MessageId: "zero", Message: "The empty check is useless as `Array#every()` returns `true` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 19, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			{MessageId: "zero", Message: "The empty check is useless as `Array#every()` returns `true` for an empty array.", Line: 1, Column: 60, EndLine: 1, EndColumn: 72, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
+		// Evaluating arguments may consume iterators or invoke getters; callback bodies remain deferred.
+		{Code: "array.length === 0 || array.every(...callbacks)", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero", Message: "The empty check is useless as `Array#every()` returns `true` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 19, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.every(...callbacks)"}}},
+		}},
+		{Code: "const array = []; let advances = 0; function* values() { advances++; yield Boolean; } const callbacks = values(); array.length > 0 && array.some(...callbacks);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 121, EndLine: 1, EndColumn: 131, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "const array = []; let advances = 0; function* values() { advances++; yield Boolean; } const callbacks = values(); array.some(...callbacks);"}}},
+		}},
+		{Code: "const array = []; const callbacks = { [Symbol.iterator]() { use(); return [Boolean][Symbol.iterator](); } }; array.length > 0 && array.some(...callbacks);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 116, EndLine: 1, EndColumn: 126, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "const array = []; const callbacks = { [Symbol.iterator]() { use(); return [Boolean][Symbol.iterator](); } }; array.some(...callbacks);"}}},
+		}},
+		{Code: "array.length > 0 && array.some(predicate, [...callbacks])", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(predicate, [...callbacks])"}}},
+		}},
+		{Code: "array.length > 0 && array.some(predicate, {...context})", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(predicate, {...context})"}}},
+		}},
+		{Code: "array.length > 0 && array.some(value => [...value])", FileName: "case.js", Output: []string{"array.some(value => [...value])"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "array.length > 0 && array.some(function (value) { return [...value]; })", FileName: "case.js", Output: []string{"array.some(function (value) { return [...value]; })"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "array.length > 0 && array.some(predicate, {get value() { return [...items]; }})", FileName: "case.js", Output: []string{"array.some(predicate, {get value() { return [...items]; }})"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "array.length > 0 && array.some(predicate, {[[...items]]() {}})", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(predicate, {[[...items]]() {}})"}}},
+		}},
+		{Code: "array.length > 0 && array.some(...(callbacks as [Function]))", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(...(callbacks as [Function]))"}}},
+		}},
 	})
 }
 
@@ -268,11 +336,12 @@ func TestNoUselessLengthCheckRepresentationAndSourceText(t *testing.T) {
 		{Code: "array.some(value => () => (fn)<T>) && array.length > 0", FileName: "case.ts", Output: []string{"array.some(value => () => (fn)<T>)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 45, EndLine: 1, EndColumn: 55, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
-		{Code: "array.some(value => <div {...value}/>) && array.length > 0", FileName: "case.tsx", Output: []string{"array.some(value => <div {...value}/>)"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 49, EndLine: 1, EndColumn: 59, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		{Code: "array.some(value => <div {...value}/>) && array.length > 0", FileName: "case.tsx", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 49, EndLine: 1, EndColumn: 59, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(value => <div {...value}/>)"}}},
 		}},
-		{Code: "array.length > 0 && array.some(<div {...value}/>)", FileName: "case.tsx", Output: []string{"array.some(<div {...value}/>)"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		// JSX props spreads can invoke getters while evaluating an argument.
+		{Code: "array.length > 0 && array.some(<div {...value}/>)", FileName: "case.tsx", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(<div {...value}/>)"}}},
 		}},
 		{Code: "const x = <A.B/>; A.length > 0 && A.some(Boolean)", FileName: "case.tsx", Output: []string{"const x = <A.B/>; A.some(Boolean)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 21, EndLine: 1, EndColumn: 31, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
