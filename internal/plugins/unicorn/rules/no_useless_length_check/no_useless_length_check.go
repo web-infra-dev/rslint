@@ -71,9 +71,9 @@ var NoUselessLengthCheckRule = rule.Rule{
 						if leading {
 							safe = true
 							for _, argument := range next.Arguments() {
-								// Tags and spreads can run user code for an empty
-								// array after removing the guard.
-								if evaluator.HasSideEffect(argument, true) || hasEvaluatedSpread(argument) {
+								// Spreads and computed keys can run user code for
+								// an empty array after removing the guard.
+								if evaluator.HasSideEffect(argument, true) || hasEvaluatedSpreadOrCoercion(evaluator, argument) {
 									safe = false
 									break
 								}
@@ -214,14 +214,14 @@ func isSideEffectFreeFunction(evaluator *utils.StaticStringEvaluator, node *ast.
 		return false
 	}
 	for _, parameter := range node.Parameters() {
-		if evaluator.HasSideEffect(parameter, true) || containsSpreadOrTag(parameter) {
+		if evaluator.HasSideEffect(parameter, true) || containsImplicitCallbackEffect(evaluator, parameter) {
 			return false
 		}
 	}
-	return !evaluator.HasSideEffect(node.Body(), true) && !containsSpreadOrTag(node.Body())
+	return !evaluator.HasSideEffect(node.Body(), true) && !containsImplicitCallbackEffect(evaluator, node.Body())
 }
 
-func hasEvaluatedSpread(node *ast.Node) bool {
+func hasEvaluatedSpreadOrCoercion(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
 	found := false
 	utils.VisitDescendants(node, func(child *ast.Node) bool {
 		if found {
@@ -230,29 +230,37 @@ func hasEvaluatedSpread(node *ast.Node) bool {
 		if ast.IsFunctionLike(child) {
 			// Creating a callback or method does not evaluate its body or
 			// parameters, but a computed method name is evaluated immediately.
-			found = hasEvaluatedSpread(child.Name())
+			found = hasEvaluatedSpreadOrCoercion(evaluator, child.Name())
 			return false
 		}
 		switch child.Kind {
 		case ast.KindSpreadElement, ast.KindSpreadAssignment, ast.KindJsxSpreadAttribute:
 			found = true
 			return false
+		case ast.KindComputedPropertyName:
+			if !unicornutil.IsStaticPrimitiveArgument(evaluator, child.Expression()) {
+				found = true
+				return false
+			}
 		}
 		return !ast.IsTypeNode(child) || (child.Kind == ast.KindExpressionWithTypeArguments && !ast.IsPartOfTypeNode(child))
 	})
 	return found
 }
 
-func containsSpreadOrTag(node *ast.Node) bool {
+func containsImplicitCallbackEffect(evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
 	// A runtime instantiation shares its kind with type-only heritage nodes.
 	if node != nil && node.Kind == ast.KindExpressionWithTypeArguments && !ast.IsPartOfTypeNode(node) {
-		return containsSpreadOrTag(node.Expression())
+		return containsImplicitCallbackEffect(evaluator, node.Expression())
 	}
 	if node == nil || ast.IsTypeNode(node) {
 		return false
 	}
+	if ast.IsBindingPattern(node) || (node.Kind == ast.KindComputedPropertyName && !unicornutil.IsStaticPrimitiveArgument(evaluator, node.Expression())) {
+		return true
+	}
 	return node.Kind == ast.KindSpreadElement || node.Kind == ast.KindSpreadAssignment || node.Kind == ast.KindJsxSpreadAttribute || node.Kind == ast.KindTaggedTemplateExpression ||
-		node.ForEachChild(containsSpreadOrTag)
+		node.ForEachChild(func(child *ast.Node) bool { return containsImplicitCallbackEffect(evaluator, child) })
 }
 
 func hasLoopBindingReferenceInRight(ctx rule.RuleContext, loop *ast.Node) bool {

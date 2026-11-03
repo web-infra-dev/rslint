@@ -319,3 +319,15 @@ func TestPreferArraySomeOptionalComparator(t *testing.T) {
 		}},
 	})
 }
+
+func TestPreferArraySomeReassignedFactoryWithoutChecker(t *testing.T) {
+	testRule := prefer_array_some.PreferArraySomeRule
+	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return prefer_array_some.PreferArraySomeRule.Run(ctx, options)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, nil, []rule_tester.InvalidTestCase{
+		// Reassignment invalidates the original factory return annotation.
+		{Code: "/** @returns {Set<number>} */ function make() { return new Set(); } make = () => [1]; const array = make(); if (array.find(Boolean)) {}", FileName: "case.js", Errors: []rule_tester.InvalidTestCaseError{findErrorExtras("/** @returns {Set<number>} */ function make() { return new Set(); } make = () => [1]; const array = make(); if (array.some(Boolean)) {}")}},
+	})
+}

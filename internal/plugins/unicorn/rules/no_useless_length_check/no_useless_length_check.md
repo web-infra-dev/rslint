@@ -11,8 +11,9 @@ The rule checks `.length === 0`, `.length !== 0`, and `.length > 0`, using the
 literal spelling `0`. Use it with `unicorn/explicit-length-check` to normalize
 other length checks. Known non-array receivers are ignored; typed arrays are
 supported. Only adjacent conditions in the same `&&` or `||` chain match.
-Explicit TypeScript and JSDoc return annotations on local factories are respected
-when identifying a non-array receiver.
+Explicit TypeScript and JSDoc return annotations on local factories, including
+callable binding annotations, are respected when identifying a non-array
+receiver. A reassigned factory's original annotation is not used.
 
 Examples of **incorrect** code:
 
@@ -60,10 +61,29 @@ This rule has no options.
 
 ## Differences from upstream
 
+rslint also recognizes known non-array results through a stable local factory
+alias. Given `var factory = make; const array = factory()`, it keeps
+`array.length > 0 && array.some(Boolean)` if `make()` explicitly returns an
+object. This also applies to a callable binding annotation such as
+`make: () => {length: number; some: Function}`. Unicorn v79.0.0 can remove the
+guard in these cases, even if the object's `some()` returns `true` when its
+`length` is zero.
+
 Property reads in evaluated call arguments or callbacks offer suggestions
 because a getter can run user code or change the array's length. For example,
 `array.some(value => value.ok) && array.length > 0` keeps its length guard until
 the suggestion is accepted. Unicorn v79.0.0 automatically removes this guard.
+
+Destructuring in a callback can also invoke getters or iterators that change
+the array's length. For example, `array.some(({ok}) => ok) && array.length > 0`
+offers a suggestion instead of Unicorn v79.0.0's automatic fix. The same applies
+to array destructuring and destructuring inside the callback body.
+
+Computed property keys in evaluated arguments or callbacks offer suggestions
+unless the key has a known primitive value. For example,
+`array.length > 0 && array.some(Boolean, {[key]: true})` keeps its guard because
+converting `key` to a property name can run user code even when `array` is empty.
+Unicorn v79.0.0 removes this check automatically.
 
 For the following leading check, rslint offers an editor suggestion because
 evaluating the tagged template can run user code even when the array is empty.
