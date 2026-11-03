@@ -23,6 +23,8 @@ func TestNoUselessLengthCheckEditDemand(t *testing.T) {
 		"if (array.length > 0) { /* keep */ for (const element of array) use(element) }",
 		"array.length > 0 && /* keep */ array.some(createPredicate())",
 		"array.length > 0 && array.some(...callbacks)",
+		"array.length > 0 && array.some(callbacks.predicate)",
+		"array.some(value => value.ok) && array.length > 0",
 		"if (array.length > 0) { for (const value of array) use(value) }\n[1].forEach(use)",
 	} {
 		t.Run(source, func(t *testing.T) {
@@ -130,6 +132,10 @@ func TestNoUselessLengthCheckExtraReceivers(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_length_check.NoUselessLengthCheckRule, []rule_tester.ValidTestCase{
 		{Code: "const array = new Set(); array.length > 0 && array.some(Boolean)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
 		{Code: "const array = {}; if (array.length > 0) for (const x of array) {}", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+		{Code: "function make(): {length: number; some(cb: unknown): boolean} { return {length: 0, some: () => true}; } const array = make(); const result = array.length > 0 && array.some(Boolean);", FileName: "case.ts"},
+		{Code: "/** @returns {{length: number, some: Function}} */ function make() { return {length: 0, some: () => true}; } const array = make(); array.length > 0 && array.some(Boolean);", FileName: "case.js"},
+		{Code: "const make = (): {length: number; some(cb: unknown): boolean} => ({length: 0, some: () => true}); const factory = make; const array = factory(); array.length > 0 && array.some(Boolean);", FileName: "case.ts"},
+		{Code: "/** @returns {{length: number, some: Function}} */ const make = () => ({length: 0, some: () => true}); const array = make(); array.length > 0 && array.some(Boolean);", FileName: "case.js"},
 	}, []rule_tester.InvalidTestCase{
 		{Code: "const array = new Int8Array(); array.length > 0 && array.some(Boolean)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"const array = new Int8Array(); array.some(Boolean)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 38, EndLine: 1, EndColumn: 48, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
@@ -313,6 +319,18 @@ func TestNoUselessLengthCheckExtraEdits(t *testing.T) {
 		}},
 		{Code: "array.length > 0 && array.some(...(callbacks as [Function]))", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(...(callbacks as [Function]))"}}},
+		}},
+		{Code: "const array = []; let reads = 0; const callbacks = {get predicate() { reads++; return Boolean; }}; array.length > 0 && array.some(callbacks.predicate);", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 106, EndLine: 1, EndColumn: 116, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "const array = []; let reads = 0; const callbacks = {get predicate() { reads++; return Boolean; }}; array.some(callbacks.predicate);"}}},
+		}},
+		{Code: "const array = [{get ok() { array.length = 0; return true; }}]; const result = array.some(x => x.ok) && array.length > 0;", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 110, EndLine: 1, EndColumn: 120, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "const array = [{get ok() { array.length = 0; return true; }}]; const result = array.some(x => x.ok);"}}},
+		}},
+		{Code: "array.length > 0 && array.some(callbacks.predicate)", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 7, EndLine: 1, EndColumn: 17, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(callbacks.predicate)"}}},
+		}},
+		{Code: "array.some(({value = settings.value}) => value) && array.length > 0", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 58, EndLine: 1, EndColumn: 68, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(({value = settings.value}) => value)"}}},
 		}},
 	})
 }

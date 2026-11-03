@@ -73,7 +73,7 @@ var NoUselessLengthCheckRule = rule.Rule{
 							for _, argument := range next.Arguments() {
 								// Tags and spreads can run user code for an empty
 								// array after removing the guard.
-								if evaluator.HasSideEffect(argument, false) || hasEvaluatedSpread(argument) {
+								if evaluator.HasSideEffect(argument, true) || hasEvaluatedSpread(argument) {
 									safe = false
 									break
 								}
@@ -214,11 +214,11 @@ func isSideEffectFreeFunction(evaluator *utils.StaticStringEvaluator, node *ast.
 		return false
 	}
 	for _, parameter := range node.Parameters() {
-		if evaluator.HasSideEffect(parameter, false) || containsSpreadOrTag(parameter) {
+		if evaluator.HasSideEffect(parameter, true) || containsSpreadOrTag(parameter) {
 			return false
 		}
 	}
-	return !evaluator.HasSideEffect(node.Body(), false) && !containsSpreadOrTag(node.Body())
+	return !evaluator.HasSideEffect(node.Body(), true) && !containsSpreadOrTag(node.Body())
 }
 
 func hasEvaluatedSpread(node *ast.Node) bool {

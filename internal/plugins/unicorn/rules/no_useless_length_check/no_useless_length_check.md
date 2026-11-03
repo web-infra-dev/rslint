@@ -11,6 +11,8 @@ The rule checks `.length === 0`, `.length !== 0`, and `.length > 0`, using the
 literal spelling `0`. Use it with `unicorn/explicit-length-check` to normalize
 other length checks. Known non-array receivers are ignored; typed arrays are
 supported. Only adjacent conditions in the same `&&` or `||` chain match.
+Explicit TypeScript and JSDoc return annotations on local factories are respected
+when identifying a non-array receiver.
 
 Examples of **incorrect** code:
 
@@ -57,6 +59,11 @@ prevents a report.
 This rule has no options.
 
 ## Differences from upstream
+
+Property reads in evaluated call arguments or callbacks offer suggestions
+because a getter can run user code or change the array's length. For example,
+`array.some(value => value.ok) && array.length > 0` keeps its length guard until
+the suggestion is accepted. Unicorn v79.0.0 automatically removes this guard.
 
 For the following leading check, rslint offers an editor suggestion because
 evaluating the tagged template can run user code even when the array is empty.

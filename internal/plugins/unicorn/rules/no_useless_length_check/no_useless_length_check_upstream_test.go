@@ -56,8 +56,9 @@ func TestNoUselessLengthCheckEditSafety(t *testing.T) {
 		{Code: "array.some(value => value > 0) && array.length > 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"array.some(value => value > 0)"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 41, EndLine: 1, EndColumn: 51, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
-		{Code: "array.every(value => value.isValid) || array.length === 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"array.every(value => value.isValid)"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "zero", Message: "The empty check is useless as `Array#every()` returns `true` for an empty array.", Line: 1, Column: 46, EndLine: 1, EndColumn: 58, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		// Upstream autofixes this case, but a property getter can mutate the array.
+		{Code: "array.every(value => value.isValid) || array.length === 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "zero", Message: "The empty check is useless as `Array#every()` returns `true` for an empty array.", Line: 1, Column: 46, EndLine: 1, EndColumn: 58, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.every(value => value.isValid)"}}},
 		}},
 		{Code: "array.some(value => array.pop()) && array.length > 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "non-zero", Message: "The non-empty check is useless as `Array#some()` returns `false` for an empty array.", Line: 1, Column: 43, EndLine: 1, EndColumn: 53, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "remove-length-check", Output: "array.some(value => array.pop())"}}},

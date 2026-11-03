@@ -232,6 +232,7 @@ tester.run('no-useless-length-check', {} as never, {
       output: 'array.some(value => value > 0)',
     },
     {
+      // Upstream autofixes; a getter can change the array.
       code: 'array.every(value => value.isValid) || array.length === 0',
       filename: 'case.js',
       errors: [
@@ -243,10 +244,15 @@ tester.run('no-useless-length-check', {} as never, {
           column: 46,
           endLine: 1,
           endColumn: 58,
-          suggestions: [],
+          suggestions: [
+            {
+              messageId: 'remove-length-check',
+              output: 'array.every(value => value.isValid)',
+            },
+          ],
         },
       ],
-      output: 'array.every(value => value.isValid)',
+      output: null,
     },
     {
       code: 'array.some(value => array.pop()) && array.length > 0',

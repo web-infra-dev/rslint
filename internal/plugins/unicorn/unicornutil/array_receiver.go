@@ -202,6 +202,11 @@ func classifyArrayReceiverInner(
 			return class
 		}
 	}
+	if state.useTypeInformation && ctx.TypeChecker == nil && ast.IsCallExpression(node) {
+		if class := classifyArrayFactoryReturn(ctx, node.Expression(), targetNames, nonTargetNames, state); class != arrayClassUnknown {
+			return class
+		}
+	}
 	if node.Kind == ast.KindConditionalExpression {
 		conditional := node.AsConditionalExpression()
 		class := combineArrayClassesUnion([]arrayClass{
@@ -575,6 +580,50 @@ func arrayBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
 	default:
 		return nil
 	}
+}
+
+// A local factory's explicit return annotation is useful even when source-only
+// linting has no checker. Resolve bindings through the existing per-file index.
+func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNames, nonTargetNames *utils.Set[string], state *arrayReceiverWalkState) arrayClass {
+	callee = utils.SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return arrayClassUnknown
+	}
+	if ast.IsIdentifier(callee) {
+		if ctx.Refs == nil {
+			return arrayClassUnknown
+		}
+		symbol := ctx.Refs.ResolveInFile(callee)
+		if symbol == nil || len(symbol.Declarations) != 1 || state.visiting[symbol] {
+			return arrayClassUnknown
+		}
+		state.visiting[symbol] = true
+		defer delete(state.visiting, symbol)
+		callee = symbol.Declarations[0]
+		if ast.IsVariableDeclaration(callee) && ast.IsVarConst(callee) {
+			return classifyArrayFactoryReturn(ctx, callee.AsVariableDeclaration().Initializer, targetNames, nonTargetNames, state)
+		}
+	}
+	if !ast.IsFunctionLike(callee) {
+		return arrayClassUnknown
+	}
+	annotation := callee.Type()
+	if annotation == nil && ast.IsInJSFile(callee) {
+		for host := callee; host != nil && annotation == nil; host = ast.GetNextJSDocCommentLocation(host) {
+			for _, doc := range host.JSDoc(ctx.SourceFile) {
+				if doc.AsJSDoc().Tags == nil {
+					continue
+				}
+				for _, tag := range doc.AsJSDoc().Tags.Nodes {
+					if ast.IsJSDocReturnTag(tag) && tag.TypeExpression() != nil {
+						annotation = tag.TypeExpression().Type()
+						break
+					}
+				}
+			}
+		}
+	}
+	return classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options)
 }
 
 func classifyArrayTypeNode(

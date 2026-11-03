@@ -48,6 +48,49 @@ func TestArrayClassificationQueryOrder(t *testing.T) {
 	}
 }
 
+func TestArrayFactoryReturnAnnotationsWithoutChecker(t *testing.T) {
+	for _, test := range []struct {
+		name, code, file string
+		nonArray         bool
+	}{
+		{"object", "function make(): {length: number} { return {length: 0}; } const value = make(); check(value);", "case.ts", true},
+		{"alias", "function make(): Set<number> { return new Set(); } const factory = make; const value = factory(); check(value);", "case.ts", true},
+		{"arrow", "const make = (): {length: number} => ({length: 0}); const value = make(); check(value);", "case.ts", true},
+		{"jsdoc", "/** @returns {{length: number}} */ function make() { return {length: 0}; } const value = make(); check(value);", "case.js", true},
+		{"jsdoc-arrow", "/** @returns {{length: number}} */ const make = () => ({length: 0}); const value = make(); check(value);", "case.js", true},
+		{"array", "function make(): number[] { return []; } const value = make(); check(value);", "case.ts", false},
+		{"typed-array", "function make(): Int8Array { return new Int8Array(); } const value = make(); check(value);", "case.ts", false},
+		{"jsdoc-array", "/** @returns {number[]} */ function make() { return []; } const value = make(); check(value);", "case.js", false},
+		{"unknown", "function make(): any { return {}; } const value = make(); check(value);", "case.ts", false},
+		{"cycle", "const make = alias; const alias = make; const value = make(); check(value);", "case.ts", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			testRule := rule.Rule{Name: "test/factory-return", Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+				ctx.TypeChecker = nil
+				seen := false
+				return rule.RuleListeners{
+					ast.KindCallExpression: func(node *ast.Node) {
+						callee := node.Expression()
+						if !ast.IsIdentifier(callee) || callee.Text() != "check" || len(node.Arguments()) != 1 {
+							return
+						}
+						seen = true
+						if IsKnownNonIndexedCollection(ctx, node.Arguments()[0]) != test.nonArray {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "classification", Description: "Incorrect factory return classification."})
+						}
+					},
+					rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
+						if !seen {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "missing", Description: "Missing classification input."})
+						}
+					},
+				}
+			}}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, []rule_tester.ValidTestCase{{Code: test.code, FileName: test.file}}, nil)
+		})
+	}
+}
+
 func parseTestSource(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
