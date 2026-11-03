@@ -5,8 +5,8 @@ import { runInNewContext } from 'node:vm';
 
 import { lint } from '@rslint/core/internal';
 
+import { buildConfigForSettings } from '../../src/util/load-test-config';
 import { RuleTester } from '../rule-tester';
-import config from '../rslint.config.mjs';
 
 const error = {
   messageId: 'no-chained-comparison/error',
@@ -556,7 +556,10 @@ describe('without a TypeScript project', () => {
 // first operand once, while deliberately changing the comparison's result.
 test('comment-preserving rewrites remain suggestions', async () => {
   const code = 'read(/* keep */) < middle < last;';
-  const configDirectory = path.resolve(import.meta.dirname, '..');
+  const { config, configDirectory } = await buildConfigForSettings(
+    path.resolve(import.meta.dirname, '../rslint.config.mjs'),
+    undefined,
+  );
   const filename = path.join(configDirectory, 'src/virtual.js');
   const lintCode = (source: string, fix = false) =>
     lint({
