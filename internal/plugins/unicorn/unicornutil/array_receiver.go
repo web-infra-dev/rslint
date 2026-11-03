@@ -6,6 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -199,6 +201,11 @@ func classifyArrayReceiverInner(
 
 	if ast.IsIdentifier(node) {
 		if class := classifyArrayIdentifier(ctx, node, targetNames, nonTargetNames, state); class != arrayClassUnknown {
+			return class
+		}
+	}
+	if state.useTypeInformation && ctx.TypeChecker == nil && ast.IsCallExpression(node) {
+		if class := classifyArrayFactoryReturn(ctx, node.Expression(), targetNames, nonTargetNames, state); class != arrayClassUnknown {
 			return class
 		}
 	}
@@ -575,6 +582,106 @@ func arrayBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
 	default:
 		return nil
 	}
+}
+
+// A local factory's explicit return annotation is useful even when source-only
+// linting has no checker. Resolve bindings through the existing per-file index.
+func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNames, nonTargetNames *utils.Set[string], state *arrayReceiverWalkState) arrayClass {
+	callee = utils.SkipAssertionsAndParens(callee)
+	if callee == nil {
+		return arrayClassUnknown
+	}
+	if ast.IsIdentifier(callee) {
+		if ctx.Refs == nil {
+			return arrayClassUnknown
+		}
+		symbol := ctx.Refs.ResolveInFile(callee)
+		if symbol == nil || len(symbol.Declarations) != 1 || state.visiting[symbol] {
+			return arrayClassUnknown
+		}
+		state.visiting[symbol] = true
+		defer delete(state.visiting, symbol)
+		declaration := symbol.Declarations[0]
+		if ast.IsVariableDeclaration(declaration) {
+			initializer, ok := arrayReceiverStaticEvaluator(ctx).ResolveIdentifierInitializer(callee)
+			if !ok {
+				return arrayClassUnknown
+			}
+			if class := classifyArrayTypeNode(ctx, arrayFactoryReturnAnnotation(ctx, declaration), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+				return class
+			}
+			return classifyArrayFactoryReturn(ctx, initializer, targetNames, nonTargetNames, state)
+		}
+		for _, reference := range ctx.Refs.References(symbol) {
+			if utils.IsWriteReference(reference) {
+				return arrayClassUnknown
+			}
+		}
+		callee = declaration
+	}
+	if !ast.IsFunctionLike(callee) {
+		return arrayClassUnknown
+	}
+	return classifyArrayTypeNode(ctx, arrayFactoryReturnAnnotation(ctx, callee), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options)
+}
+
+func arrayFactoryReturnAnnotation(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
+	annotation := declaration.Type()
+	if ast.IsVariableDeclaration(declaration) && annotation != nil {
+		if ast.IsFunctionTypeNode(annotation) {
+			annotation = annotation.Type()
+		} else {
+			annotation = nil
+		}
+	}
+	if annotation == nil && ast.IsInJSFile(declaration) {
+		for host := declaration; host != nil && annotation == nil; host = ast.GetNextJSDocCommentLocation(host) {
+			for _, doc := range host.JSDoc(ctx.SourceFile) {
+				if doc.AsJSDoc().Tags == nil {
+					continue
+				}
+				for _, tag := range doc.AsJSDoc().Tags.Nodes {
+					if tag.TypeExpression() == nil {
+						continue
+					}
+					tagType := tag.TypeExpression().Type()
+					if ast.IsJSDocReturnTag(tag) {
+						annotation = tagType
+					} else if ast.IsJSDocTypeTag(tag) && ast.IsFunctionTypeNode(tagType) {
+						annotation = tagType.Type()
+					} else if ast.IsJSDocTypeTag(tag) && ast.IsTypeReferenceNode(tagType) && ast.IsIdentifier(tagType.AsTypeReferenceNode().TypeName) && tagType.AsTypeReferenceNode().TypeName.Text() == "function" {
+						annotation = arrayClosureFactoryReturnAnnotation(ctx, tag, declaration)
+					}
+					if annotation != nil {
+						break
+					}
+				}
+			}
+		}
+	}
+	return annotation
+}
+
+func arrayClosureFactoryReturnAnnotation(ctx rule.RuleContext, tag, declaration *ast.Node) *ast.Node {
+	// tsgo parses Closure's `function(): T` only as the name `function`.
+	// Wrapping it as a type-literal method lets its JSDoc parser read T,
+	// including multiline comments, without implementing a type parser here.
+	text := "/** @type {" + ctx.SourceFile.Text()[tag.TypeExpression().Pos():tag.End()] + "} */ const factory = undefined;"
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
+	annotation := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
+	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
+		return nil
+	}
+	members := annotation.AsTypeLiteralNode().Members.Nodes
+	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
+		return nil
+	}
+	result := members[0].Type()
+	if result != nil {
+		// Resolve return-type names in the original factory's lexical scope.
+		result.Parent = declaration
+	}
+	return result
 }
 
 func classifyArrayTypeNode(
