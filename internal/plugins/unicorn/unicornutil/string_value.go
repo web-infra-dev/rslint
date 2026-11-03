@@ -20,6 +20,82 @@ func IsString(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStrin
 	})
 }
 
+// IsStringWithTypeInformation retains source annotations and mutation guards,
+// then uses an available project checker to prove otherwise unknown strings.
+func IsStringWithTypeInformation(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	node = utils.ESTreeRuntimeExpression(node)
+	if IsString(ctx, node, evaluator) {
+		return true
+	}
+	if ctx.TypeChecker == nil || node == nil || classifyRequiredStringType(ctx, node) != TypeTarget {
+		return false
+	}
+	sourceContext := ctx
+	sourceContext.TypeChecker = nil
+	return !IsKnownNonStringSyntax(sourceContext, node) &&
+		!hasStringJSDocReference(sourceContext, node, make(map[*ast.Symbol]bool)) &&
+		!hasModifiedStringBinding(sourceContext, node, evaluator, &stringReceiverWalkState{visiting: make(map[*ast.Symbol]bool)})
+}
+
+func hasModifiedStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, state *stringReceiverWalkState) bool {
+	node = utils.ESTreeRuntimeExpression(node)
+	if node == nil {
+		return false
+	}
+	if state.depth >= maxStringReceiverDepth || state.steps >= maxStringReceiverSteps {
+		return true
+	}
+	state.depth++
+	state.steps++
+	defer func() { state.depth-- }()
+	recur := func(child *ast.Node) bool { return hasModifiedStringBinding(ctx, child, evaluator, state) }
+	if ast.IsIdentifier(node) && ctx.Refs != nil {
+		symbol := ctx.Refs.ResolveInFile(node)
+		if symbol == nil || len(symbol.Declarations) != 1 {
+			return false
+		}
+		if state.visiting[symbol] {
+			return true
+		}
+		state.visiting[symbol] = true
+		defer delete(state.visiting, symbol)
+		declaration := symbol.Declarations[0]
+		if ast.IsVariableDeclaration(declaration) && declaration.AsVariableDeclaration().Initializer != nil {
+			if !ast.IsVarConst(declaration.Parent) {
+				if _, stable := evaluator.ResolveIdentifierInitializer(node); !stable {
+					return true
+				}
+			}
+			return recur(declaration.AsVariableDeclaration().Initializer)
+		}
+	}
+	switch node.Kind {
+	case ast.KindCallExpression:
+		callee := utils.ESTreeCallCallee(node.Expression())
+		if callee != nil && ast.IsIdentifier(callee) && ctx.Refs != nil {
+			if symbol := ctx.Refs.ResolveInFile(callee); symbol != nil {
+				for _, reference := range ctx.Refs.References(symbol) {
+					if !ast.IsDeclarationName(reference) && utils.IsWriteReference(reference) {
+						return true
+					}
+				}
+			}
+		}
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return recur(conditional.WhenTrue) || recur(conditional.WhenFalse)
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary.OperatorToken.Kind == ast.KindCommaToken || binary.OperatorToken.Kind == ast.KindEqualsToken {
+			return recur(binary.Right)
+		}
+		return recur(binary.Left) || recur(binary.Right)
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression, ast.KindSatisfiesExpression:
+		return recur(node.Expression())
+	}
+	return false
+}
+
 // Unicorn allows an unmodified let/var initializer as direct string evidence,
 // while its recursive type proof uses the stricter control-flow evaluator.
 func isString(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, state *stringReceiverWalkState) bool {

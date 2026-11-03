@@ -36,7 +36,7 @@ var NoInvalidCharacterComparisonRule = rule.Rule{
 					if evaluator == nil {
 						evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 					}
-					if !unicornutil.IsString(ctx, receiver, evaluator) {
+					if !unicornutil.IsStringWithTypeInformation(ctx, receiver, evaluator) {
 						continue
 					}
 					result := "false"

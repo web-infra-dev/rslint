@@ -16,12 +16,14 @@ import (
 	"io"
 	"os"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/inspector"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // Re-export types from inspector package for backward compatibility
@@ -207,6 +209,17 @@ type Diagnostic struct {
 	MessageId   string       `json:"messageId"`
 	Fixes       []Fix        `json:"fixes,omitempty"`
 	Suggestions []Suggestion `json:"suggestions,omitempty"`
+}
+
+func (diagnostic Diagnostic) MarshalJSON() ([]byte, error) {
+	type plainDiagnostic Diagnostic
+	if utf8.ValidString(diagnostic.Message) {
+		return json.Marshal(plainDiagnostic(diagnostic))
+	}
+	return json.Marshal(struct {
+		plainDiagnostic
+		Message ecmascript.JSONString `json:"message"`
+	}{plainDiagnostic(diagnostic), ecmascript.JSONString(diagnostic.Message)})
 }
 
 // Fix represents a single fix that can be applied

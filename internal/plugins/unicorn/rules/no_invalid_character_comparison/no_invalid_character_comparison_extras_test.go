@@ -6,12 +6,26 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_character_comparison"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
+// The pinned source-only cases do not enable upstream parser type services.
+func sourceOnlyRule() rule.Rule {
+	r := no_invalid_character_comparison.NoInvalidCharacterComparisonRule
+	run := r.Run
+	r.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return run(ctx, options)
+	}
+	return r
+}
+
 func TestNoInvalidCharacterComparisonExtras(t *testing.T) {
+	r := sourceOnlyRule()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
-		&no_invalid_character_comparison.NoInvalidCharacterComparisonRule,
+		&r,
 		[]rule_tester.ValidTestCase{
 			// Call and optional-chain boundaries.
 			{Code: "\"abc\".charAt(0, 1) === \"ab\"", FileName: "case.js"},
@@ -151,4 +165,36 @@ func TestNoInvalidCharacterComparisonExtras(t *testing.T) {
 				{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 			}},
 		})
+}
+
+func TestNoInvalidCharacterComparisonProjectTypes(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&no_invalid_character_comparison.NoInvalidCharacterComparisonRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `declare const read: () => string | number; read().charAt(0) === "ab";`},
+			{Code: `declare const text: {value: unknown}; text.value.at(0) === "ab";`},
+			{Code: `/** @type {unknown} */ const text = "abc"; text[0] === "ab";`},
+			{Code: `let text = "abc"; text = replacement; text[0] === "ab";`},
+			{Code: `function read(): string { return "abc"; } read = replacement; read().charAt(0) === "ab";`},
+			{Code: `let text = "abc"; text = replacement; const alias = text; alias[0] === "ab";`},
+			{Code: `function read(): string { return "abc"; } read = replacement; (flag ? read() : "abc")[0] === "ab";`},
+		}, []rule_tester.InvalidTestCase{
+			{Code: `declare const read: () => string; read().charAt(0) === "ab";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 35, EndLine: 1, EndColumn: 60}}},
+			{Code: `declare const text: {value: string}; text.value.at(0) !== "ab";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always true.", Line: 1, Column: 38, EndLine: 1, EndColumn: 63}}},
+			{Code: `interface Read {(): string}; declare const read: Read; read()[0] === "ab";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 56, EndLine: 1, EndColumn: 74}}},
+			{Code: `declare const read: () => string; const text = read(); text[0] === "ab";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 56, EndLine: 1, EndColumn: 72}}},
+			{Code: `export {}; type CharacterText<T extends string> = T; declare const text: CharacterText<string>; text.at(0) === "ab";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 97, EndLine: 1, EndColumn: 116}}},
+			{Code: `export {}; function check(text?: string) { if (text) { text[0] === "ab"; } }`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 56, EndLine: 1, EndColumn: 72}}},
+			{Code: `export {}; function check(text: unknown) { if (typeof text === "string") { text[0] === "ab"; } }`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `ab`, so this comparison is always false.", Line: 1, Column: 76, EndLine: 1, EndColumn: 92}}},
+		})
+}
+
+func TestNoInvalidCharacterComparisonLoneSurrogates(t *testing.T) {
+	r := sourceOnlyRule()
+	value := ecmascript.StringFromCodeUnits([]uint16{0xd800, 'a'})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &r, nil,
+		[]rule_tester.InvalidTestCase{{Code: `"x"[0] === "\uD800a";`, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "no-invalid-character-comparison", Message: "A single character can never equal the multi-character string `" + value + "`, so this comparison is always false.",
+			Line: 1, Column: 1, EndLine: 1, EndColumn: 21,
+		}}}})
 }

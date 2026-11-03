@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_character_comparison"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
 func TestNoInvalidCharacterComparisonUpstream(t *testing.T) {
+	r := sourceOnlyRule()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
-		&no_invalid_character_comparison.NoInvalidCharacterComparisonRule,
+		&r,
 		[]rule_tester.ValidTestCase{
 			// JSDoc / default parser.
 			{Code: "/** @param {?string} text */ function run(text) { return text.charAt(0) === \"ab\"; }", FileName: "file.ts"},
