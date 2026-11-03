@@ -93,6 +93,21 @@ func TestPreferStringStartsEndsWithExtras(t *testing.T) {
 			{Code: "type Date = { toISOString(): string[] }; function f(value: Date) { return value.toISOString().indexOf(\"a\") === 0; }", FileName: "safety.ts"},
 			{Code: "type RegExp = { source: string[] }; function f(value: RegExp) { return value.source.indexOf(\"a\") === 0; }", FileName: "safety.ts"},
 			{Code: "namespace Types { export type Date = { toISOString(): string[] }; } function f(value: Types.Date) { return value.toISOString().indexOf(\"a\") === 0; }", FileName: "safety.ts"},
+			// Review regressions: authored returns and intersections containing any.
+			{Code: `function read(): number { return 123; } const value = read(); /^1/.test(value);`, FileName: "review.ts"},
+			{Code: `function read(): number { return 123; } /^1/.test(flag ? read() : read());`, FileName: "review.ts"},
+			{Code: `function read(): number { return 123; } /^1/.test((read(), read()));`, FileName: "review.ts"},
+			{Code: `function String(): number { return 123; } const value = String(); /^1/.test(value);`, FileName: "review.ts"},
+			{Code: "function read(): number { return 123; } /^1/.test(read());", FileName: "review.ts"},
+			{Code: "/** @returns {number} */ function read() { return 123; } /^1/.test(read());", FileName: "review.js"},
+			{Code: "function String(): number { return 123; } /^1/.test(String());", FileName: "review.ts"},
+			{Code: "const read = (): number => 123; /^1/.test(read());", FileName: "review.ts"},
+			{Code: "const read = function (): number { return 123; }; /^1/.test(read());", FileName: "review.ts"},
+			{Code: "type Count = number; function read(): Count { return 123; } /^1/.test(read());", FileName: "review.ts"},
+			{Code: "function read(): number | null { return 123; } /^1/.test(read());", FileName: "review.ts"},
+			{Code: "/** @type {()=>number} */ let read; /^1/.test(read());", FileName: "review.js"},
+			{Code: "function f(value: string & any) { return value.indexOf(\"a\") === 0; } f([\"a\"]);", FileName: "review.ts"},
+			{Code: "type Flexible = any; function f(value: string & Flexible) { return value.indexOf(\"a\") === 0; }", FileName: "review.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{Code: "\"abc\".slice(0, -0) === \"\"", FileName: "file.ts",
@@ -381,6 +396,16 @@ func TestPreferStringStartsEndsWithExtras(t *testing.T) {
 			{Code: "function f(text: string, prefix: string) { return text.slice(0, prefix.length) === prefix; }", FileName: "safety.ts", Output: []string{"function f(text: string, prefix: string) { return text.startsWith(prefix); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-slice", Message: "Prefer `String#startsWith()` over comparing a string slice.", Line: 1, Column: 51, EndLine: 1, EndColumn: 90}}},
 			{Code: "function f() { const suffix = \"c\"; return \"abc\".slice(-suffix.length) === suffix; }", FileName: "safety.ts", Output: []string{"function f() { const suffix = \"c\"; return \"abc\".endsWith(suffix); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-ends-with-slice", Message: "Prefer `String#endsWith()` over comparing a string slice.", Line: 1, Column: 43, EndLine: 1, EndColumn: 81}}},
 			{Code: "function String() { return [\"a\"]; } /^a/.test(value);", FileName: "safety.ts", Output: []string{"function String() { return [\"a\"]; } value.startsWith('a');"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with", Message: "Prefer `String#startsWith()` over a regex with `^`.", Line: 1, Column: 37, EndLine: 1, EndColumn: 53, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "useOptionalChaining", Output: "function String() { return [\"a\"]; } value?.startsWith('a');"}, {MessageId: "useNullishCoalescing", Output: "function String() { return [\"a\"]; } (value ?? '').startsWith('a');"}}}}},
+			// Review regressions: string proof and receiver iteration order.
+			{Code: "function f(needle: string & any) { return \"abc\".indexOf(needle) === 0; } f(/a/);", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.", Line: 1, Column: 43, EndLine: 1, EndColumn: 70}}},
+			{Code: "type Flexible = any; function f(needle: string & Flexible) { return \"abc\".indexOf(needle) === 0; }", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.", Line: 1, Column: 69, EndLine: 1, EndColumn: 96}}},
+			{Code: "function f(needle: string & (number | any)) { return \"abc\".indexOf(needle) === 0; }", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.", Line: 1, Column: 54, EndLine: 1, EndColumn: 81}}},
+			{Code: "function f(needle: string & unknown) { return \"abc\".indexOf(needle) === 0; }", FileName: "review.ts", Output: []string{"function f(needle: string & unknown) { return \"abc\".startsWith(needle); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.", Line: 1, Column: 47, EndLine: 1, EndColumn: 74}}},
+			{Code: "function f(needle: string & {brand: any}) { return \"abc\".indexOf(needle) === 0; }", FileName: "review.ts", Output: []string{"function f(needle: string & {brand: any}) { return \"abc\".startsWith(needle); }"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.", Line: 1, Column: 52, EndLine: 1, EndColumn: 79}}},
+			{Code: "let needle: string = \"a\"; const parts = { *[Symbol.iterator]() { needle = \"ab\"; yield \"ab\"; } }; needle === `${[...parts]}`.slice(0, needle.length);", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-slice", Message: "Prefer `String#startsWith()` over comparing a string slice.", Line: 1, Column: 98, EndLine: 1, EndColumn: 148, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-string-starts-ends-with/slice-suggestion", Output: "let needle: string = \"a\"; const parts = { *[Symbol.iterator]() { needle = \"ab\"; yield \"ab\"; } }; `${[...parts]}`.startsWith(needle);"}}}}},
+			{Code: "let needle: string = \"a\"; const source = { get value() { needle = \"ab\"; return 1; } }; needle === `${{...source}}`.slice(0, needle.length);", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-slice", Message: "Prefer `String#startsWith()` over comparing a string slice.", Line: 1, Column: 88, EndLine: 1, EndColumn: 139, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-string-starts-ends-with/slice-suggestion", Output: "let needle: string = \"a\"; const source = { get value() { needle = \"ab\"; return 1; } }; `${{...source}}`.startsWith(needle);"}}}}},
+			{Code: "let needle: string = \"a\"; needle === `${() => [...parts]}`.slice(0, needle.length);", FileName: "review.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-slice", Message: "Prefer `String#startsWith()` over comparing a string slice.", Line: 1, Column: 27, EndLine: 1, EndColumn: 83, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "prefer-string-starts-ends-with/slice-suggestion", Output: "let needle: string = \"a\"; `${() => [...parts]}`.startsWith(needle);"}}}}},
+			{Code: "let needle: string = \"a\"; needle === `${[\"ab\"]}`.slice(0, needle.length);", FileName: "review.ts", Output: []string{"let needle: string = \"a\"; `${[\"ab\"]}`.startsWith(needle);"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-starts-with-slice", Message: "Prefer `String#startsWith()` over comparing a string slice.", Line: 1, Column: 27, EndLine: 1, EndColumn: 73}}},
 		},
 	)
 }
@@ -398,6 +423,8 @@ func TestPreferStringStartsEndsWithEditDemand(t *testing.T) {
 		{`"a" === String(read()).slice(0, 1)`, "", []string{`String(read()).startsWith("a")`}},
 		{`"ab".slice(0, (box.prefix as string).length) === (box.prefix as string)`, "", nil},
 		{`"a" === (box.text as string).slice(0, 1)`, "", []string{`(box.text as string).startsWith("a")`}},
+		{"\"a\" === `${[...parts]}`.slice(0, 1)", "", []string{"`${[...parts]}`.startsWith(\"a\")"}},
+		{"\"a\" === String.raw`abc`.slice(0, 1)", "", []string{"String.raw`abc`.startsWith(\"a\")"}},
 	} {
 		t.Run(test.code, func(t *testing.T) {
 			t.Parallel()
@@ -502,4 +529,48 @@ func TestPreferStringStartsEndsWithRepeatedAliases(t *testing.T) {
 				Line: 1, Column: len(prefix) + 1, EndLine: 1, EndColumn: len(code),
 			}},
 		}})
+}
+
+func TestPreferStringStartsEndsWithTypeAliases(t *testing.T) {
+	for _, test := range []struct {
+		name, operator, annotation string
+		depth                      int
+		fixed                      bool
+	}{
+		{"repeated union", " | ", "T40", 40, true},
+		{"repeated intersection", " & ", "T40", 40, true},
+		{"deep alias", "", "T600", 600, false},
+		{"incomplete intersection", "", "string & T600", 600, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var source strings.Builder
+			source.WriteString(`type T0 = string;`)
+			for i := 1; i <= test.depth; i++ {
+				fmt.Fprintf(&source, "type T%d = T%d", i, i-1)
+				if test.operator != "" {
+					fmt.Fprintf(&source, "%sT%d", test.operator, i-1)
+				}
+				source.WriteByte(';')
+			}
+			fmt.Fprintf(&source, "function f(value: %s) { return ", test.annotation)
+			prefix := source.String()
+			comparison := `value.indexOf("a") === 0`
+			code := prefix + comparison + "; }"
+			var valid []rule_tester.ValidTestCase
+			var invalid []rule_tester.InvalidTestCase
+			if test.fixed {
+				invalid = []rule_tester.InvalidTestCase{{
+					Code: code, FileName: "aliases.ts", Output: []string{prefix + `value.startsWith("a"); }`},
+					Errors: []rule_tester.InvalidTestCaseError{{
+						MessageId: "prefer-starts-with-indexOf", Message: "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+						Line: 1, Column: len(prefix) + 1, EndLine: 1, EndColumn: len(prefix) + len(comparison) + 1,
+					}},
+				}}
+			} else {
+				valid = []rule_tester.ValidTestCase{{Code: code, FileName: "aliases.ts"}}
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+				&prefer_string_starts_ends_with.PreferStringStartsEndsWithRule, valid, invalid)
+		})
+	}
 }

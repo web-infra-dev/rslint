@@ -139,7 +139,7 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 					return true
 				}
 			}
-			return stringFunctionReturnsString(ctx, callee)
+			return classifyStringFunctionReturn(ctx, callee) == TypeTarget
 		}
 		if call, ok := MatchDotMethodCall(node, DotMethodCallOptions{}); ok {
 			object := utils.ESTreeRuntimeExpression(call.Object)
@@ -270,30 +270,34 @@ func stringValueAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotat
 	return annotation, optional
 }
 
-func stringCallReturnType(ctx rule.RuleContext, annotation *ast.Node) bool {
+func classifyStringCallReturnType(ctx rule.RuleContext, annotation *ast.Node) TypeClass {
 	if annotation == nil {
-		return false
+		return TypeUnknown
 	}
 	annotation = ast.SkipTypeParentheses(annotation)
 	switch annotation.Kind {
 	case ast.KindFunctionType:
-		return isStringValueType(ctx, annotation.Type())
+		return classifyStringValueType(ctx, annotation.Type())
 	case ast.KindTypeLiteral:
-		found := false
+		var classes []TypeClass
 		for _, member := range annotation.AsTypeLiteralNode().Members.Nodes {
 			if member.Kind == ast.KindCallSignature {
-				found = true
-				if !isStringValueType(ctx, member.Type()) {
-					return false
-				}
+				classes = append(classes, classifyStringValueType(ctx, member.Type()))
 			}
 		}
-		return found
+		if len(classes) > 0 {
+			return combineStringUnion(classes)
+		}
 	case ast.KindUnionType:
-		members := annotation.AsUnionTypeNode().Types.Nodes
-		return len(members) > 0 && !slices.ContainsFunc(members, func(member *ast.Node) bool { return !stringCallReturnType(ctx, member) })
+		var classes []TypeClass
+		for _, member := range annotation.AsUnionTypeNode().Types.Nodes {
+			classes = append(classes, classifyStringCallReturnType(ctx, member))
+		}
+		if len(classes) > 0 {
+			return combineStringUnion(classes)
+		}
 	case ast.KindIntersectionType:
-		found, valid := false, true
+		var classes []TypeClass
 		var visit func(*ast.Node)
 		visit = func(member *ast.Node) {
 			member = ast.SkipTypeParentheses(member)
@@ -306,24 +310,32 @@ func stringCallReturnType(ctx rule.RuleContext, annotation *ast.Node) bool {
 			if member.Kind == ast.KindTypeLiteral && !slices.ContainsFunc(member.AsTypeLiteralNode().Members.Nodes, func(part *ast.Node) bool { return part.Kind == ast.KindCallSignature }) {
 				return
 			}
-			found = true
-			valid = valid && stringCallReturnType(ctx, member)
+			classes = append(classes, classifyStringCallReturnType(ctx, member))
 		}
 		visit(annotation)
-		return found && valid
+		if len(classes) > 0 {
+			return combineStringUnion(classes)
+		}
 	}
-	return false
+	return TypeUnknown
 }
 
 func isStringValueType(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil {
-		return false
+	return classifyStringValueType(ctx, node) == TypeTarget
+}
+
+func classifyStringValueType(ctx rule.RuleContext, node *ast.Node) TypeClass {
+	if node != nil && node.Kind == ast.KindStringKeyword {
+		return TypeTarget
 	}
-	// JSDoc types carry the JSDoc flag even for ordinary TS keyword nodes.
-	if node.Kind == ast.KindStringKeyword {
-		return true
+	state := newStringTypeWalkState()
+	class := classifyStringTypeSyntax(ctx, node, state, true)
+	// Unlike unknown, any absorbs a string intersection. Unresolved or bounded
+	// walks also cannot prove that every intersected type excludes any.
+	if class == TypeTarget && state.mayBeAny {
+		return TypeUnknown
 	}
-	return classifyStringTypeSyntax(ctx, node, make(map[*ast.Symbol]bool), true) == TypeTarget
+	return class
 }
 
 type stringFunctionReturnCacheKey struct{}
@@ -331,28 +343,28 @@ type stringFunctionReturnCacheKey struct{}
 // Calls through a local function use its authored return type. Native binding
 // annotations, overloads and mutated bindings stay unknown, matching Unicorn's
 // source-only function-call proof rather than inferring a body or signature.
-func stringFunctionReturnsString(ctx rule.RuleContext, callee *ast.Node) (isString bool) {
+func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class TypeClass) {
 	if ctx.Refs == nil {
-		return false
+		return TypeUnknown
 	}
 	symbol := ctx.Refs.ResolveInFile(callee)
 	if symbol == nil || len(symbol.Declarations) != 1 {
-		return false
+		return TypeUnknown
 	}
-	cache := rule.CachedByFile(ctx, stringFunctionReturnCacheKey{}, func() map[*ast.Symbol]bool {
-		return make(map[*ast.Symbol]bool)
+	cache := rule.CachedByFile(ctx, stringFunctionReturnCacheKey{}, func() map[*ast.Symbol]TypeClass {
+		return make(map[*ast.Symbol]TypeClass)
 	})
 	if cached, known := cache[symbol]; known {
 		return cached
 	}
-	defer func() { cache[symbol] = isString }()
+	defer func() { cache[symbol] = class }()
 	declaration := symbol.Declarations[0]
 	if declaration.Kind != ast.KindFunctionDeclaration && declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
-		return false
+		return TypeUnknown
 	}
 	for _, reference := range ctx.Refs.References(symbol) {
 		if reference != declaration.Name() && utils.IsWriteReference(reference) {
-			return false
+			return TypeUnknown
 		}
 	}
 	var function *ast.Node
@@ -370,29 +382,29 @@ func stringFunctionReturnsString(ctx rule.RuleContext, callee *ast.Node) (isStri
 	}
 	if function != nil {
 		if ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync) || len(function.TypeParameters()) > 0 {
-			return false
+			return TypeUnknown
 		}
 		if (function.Kind == ast.KindFunctionDeclaration && function.AsFunctionDeclaration().AsteriskToken != nil) ||
 			(function.Kind == ast.KindFunctionExpression && function.AsFunctionExpression().AsteriskToken != nil) {
-			return false
+			return TypeUnknown
 		}
 		if annotation, _ := stringValueAnnotation(ctx, function); annotation != nil {
-			return isStringValueType(ctx, annotation)
+			return classifyStringValueType(ctx, annotation)
 		}
 	}
 	annotation, optional := stringValueAnnotation(ctx, declaration)
 	if optional {
-		return false
+		return TypeUnknown
 	}
 	if declaration.Kind == ast.KindParameter {
 		raw := utils.ESTreeRuntimeExpression(declaration.AsParameterDeclaration().Initializer)
 		value := utils.SkipAssertionsAndParens(raw)
 		if raw != nil && (raw.Kind == ast.KindAsExpression || raw.Kind == ast.KindTypeAssertionExpression ||
 			(value != nil && ast.IsFunctionLike(value) && (value.Type() != nil || ast.HasSyntacticModifier(value, ast.ModifierFlagsAsync)))) {
-			return false
+			return TypeUnknown
 		}
 	}
-	return stringCallReturnType(ctx, annotation)
+	return classifyStringCallReturnType(ctx, annotation)
 }
 
 // Static folding must not bypass an authored JSDoc type through an alias or a

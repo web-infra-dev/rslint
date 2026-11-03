@@ -31,9 +31,14 @@ comparisons only when the receiver is known to be a string. Slice comparisons
 also require a string search value and matching bounds. A dynamic suffix length
 is checked only when the suffix is statically known to be nonempty.
 
+Regex tests are ignored when an authored function return annotation rules out a
+string result. A `string & any` annotation does not establish a string for an
+automatic fix; `string & unknown` still does.
+
 Automatic fixes preserve comments within copied operands. Reports whose fixes
 would remove other comments have no automatic fix. A reversed slice comparison
-offers a suggestion when moving the receiver would change evaluation order.
+offers a suggestion when moving the receiver could change evaluation order,
+including when a spread operand might invoke an iterator or getters.
 For regex arguments of unknown type, suggestions also offer string conversion,
 optional chaining, and nullish coalescing.
 
@@ -42,6 +47,9 @@ optional chaining, and nullish coalescing.
 This rule has no options.
 
 ## Differences from upstream
+
+Comparisons using very deeply nested type aliases may be left unchanged when
+their string type cannot be established promptly.
 
 Locally declared functions named `String`, `Date`, or other built-in string
 producers are checked using their own return annotations. Their names alone do

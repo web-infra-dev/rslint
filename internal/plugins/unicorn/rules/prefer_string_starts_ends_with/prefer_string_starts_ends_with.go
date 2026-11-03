@@ -207,7 +207,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 					}
 					return append([]rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, text)}, unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, node)...)
 				}
-				if reversed && evaluator.HasSideEffect(target, true) {
+				if reversed && hasReceiverSideEffect(target, evaluator) {
 					ctx.ReportNodeWithDeferredSuggestions(node, message(id), func() []rule.RuleSuggestion {
 						fixes := fix()
 						if len(fixes) == 0 {
@@ -238,6 +238,20 @@ func regexProblem(literal string) (string, string) {
 		return "prefer-ends-with", pattern[:len(pattern)-1]
 	}
 	return "", ""
+}
+
+func hasReceiverSideEffect(node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	if evaluator.HasSideEffect(node, true) {
+		return true
+	}
+	// Match upstream's conservative treatment of spreads and tagged templates;
+	// these may execute custom code the static evaluator has not observed.
+	found := false
+	utils.VisitDescendants(node, func(child *ast.Node) bool {
+		found = found || child.Kind == ast.KindSpreadElement || child.Kind == ast.KindSpreadAssignment || child.Kind == ast.KindTaggedTemplateExpression
+		return !found
+	})
+	return found
 }
 
 func isZero(node *ast.Node) bool {
