@@ -42,9 +42,10 @@ var NoUselessFallbackInSpreadRule = rule.Rule{
 				fixes := []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(start, end))}
 				// Delete only the surrounding parentheses, preserving comments and
 				// the left operand's grouping (in particular, sequence expressions).
+				// JSDoc @type casts require their parentheses to retain checkJs semantics.
 				// The validated spread boundary lets us walk this wrapper chain once.
 				for outer := logical.Parent; outer != spread; outer = outer.Parent {
-					if ast.IsParenthesizedExpression(outer) {
+					if ast.IsParenthesizedExpression(outer) && !ast.IsJSDocTypeAssertion(outer) {
 						start := scanner.GetTokenPosOfNode(outer, ctx.SourceFile, false)
 						fixes = append(fixes,
 							rule.RuleFixRemoveRange(core.NewTextRange(start, start+1)),

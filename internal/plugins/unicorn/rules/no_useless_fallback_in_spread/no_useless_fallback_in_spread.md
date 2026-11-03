@@ -35,6 +35,20 @@ removing its fallback can change the result.
 
 This rule has no options.
 
+## Differences from upstream
+
+Fixes keep the parentheses required by JavaScript JSDoc `@type` assertions:
+
+```javascript
+const object = {.../** @type {object} */ (value || {})};
+// Fixed:
+const object = {.../** @type {object} */ (value)};
+```
+
+This preserves the assertion when `checkJs` or `// @ts-check` is enabled.
+Unicorn v79.0.0 removes these parentheses, which can introduce a spread-type
+error when `value` has type `unknown`.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-useless-fallback-in-spread](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-useless-fallback-in-spread.md)

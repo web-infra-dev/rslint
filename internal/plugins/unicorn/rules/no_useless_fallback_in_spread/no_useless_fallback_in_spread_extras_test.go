@@ -2,6 +2,8 @@
 package no_useless_fallback_in_spread_test
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -15,9 +17,62 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestNoUselessFallbackInSpreadPreservesJSDocTypes(t *testing.T) {
+	for _, testCase := range []struct{ name, expression, fixed string }{
+		{"asserted fallback", "/** @type {object} */ (value %s {})", "/** @type {object} */ (value)"},
+		{"nested grouping", "((/** @type {object} */ (((value %s {})))))", "/** @type {object} */ (value)"},
+		{"nested casts", "/** @type {object} */ (/** @type {unknown} */ (value %s {}))", "/** @type {object} */ (/** @type {unknown} */ (value))"},
+		{"asserted operand", "(/** @type {object} */ (value) %s {})", "/** @type {object} */ (value)"},
+	} {
+		for _, operator := range []string{"||", "??"} {
+			t.Run(testCase.name+"/"+operator, func(t *testing.T) {
+				const body = "// @ts-check\n/** @param {unknown} value */\nfunction copy(value) {\n  return {...%s};\n}\n"
+				code := fmt.Sprintf(body, fmt.Sprintf(testCase.expression, operator))
+				helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+				program, sourceFile, err := helper.CreateTestProgram(code, "check-types.js", "tsconfig.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diagnostics := program.GetSemanticDiagnostics(context.Background(), sourceFile); len(diagnostics) != 0 {
+					t.Fatalf("input has %d checkJs diagnostics", len(diagnostics))
+				}
+				var diagnostics []rule.RuleDiagnostic
+				linter.LintSingleFile(linter.LintSingleFileOptions{
+					Program: lintprogram.NewFromCompiler(program), File: sourceFile.FileName(),
+					GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						return []rule.ConfiguredRule{{Name: no_useless_fallback_in_spread.NoUselessFallbackInSpreadRule.Name, Severity: rule.SeverityError,
+							Run: func(ctx rule.RuleContext) rule.RuleListeners {
+								return no_useless_fallback_in_spread.NoUselessFallbackInSpreadRule.Run(ctx, nil)
+							},
+						}}
+					},
+					Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+				})
+				if len(diagnostics) != 1 {
+					t.Fatalf("got %d rule diagnostics, want 1", len(diagnostics))
+				}
+				output, _, fixed := linter.ApplyRuleFixes(code, diagnostics)
+				if !fixed || output != fmt.Sprintf(body, testCase.fixed) {
+					t.Errorf("unexpected fixed output:\n%s", output)
+				}
+				fixedProgram, fixedFile, err := helper.CreateTestProgram(output, "check-types.js", "tsconfig.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if diagnostics := fixedProgram.GetSemanticDiagnostics(context.Background(), fixedFile); len(diagnostics) != 0 {
+					for _, diagnostic := range diagnostics {
+						t.Errorf("fix introduced checkJs diagnostic %d", diagnostic.Code())
+					}
+				}
+			})
+		}
+	}
+}
+
 func TestNoUselessFallbackInSpreadArtifactsFollowDemand(t *testing.T) {
 	for _, testCase := range []struct{ code, output string }{
 		{"const object = {...(foo ?? {})};", "const object = {...foo};"},
+		{"const object = {.../** @type {object} */ (value || {})};", "const object = {.../** @type {object} */ (value)};"},
 		{"const object = {...(foo ?? {/* keep */})};", "const object = {...(foo ?? {/* keep */})};"},
 	} {
 		t.Run(testCase.code, func(t *testing.T) {
@@ -132,7 +187,7 @@ func TestNoUselessFallbackInSpreadExtras(t *testing.T) {
 		{Code: "const object = {...(/** @type {object} */ (foo) || {})};", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"const object = {.../** @type {object} */ (foo)};"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-useless-fallback-in-spread", Message: "The empty object is useless.", Line: 1, Column: 52, EndLine: 1, EndColumn: 54, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
-		{Code: "const object = {.../** @type {object} */ (foo || {})};", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"const object = {.../** @type {object} */ foo};"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "const object = {.../** @type {object} */ (foo || {})};", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{"const object = {.../** @type {object} */ (foo)};"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-useless-fallback-in-spread", Message: "The empty object is useless.", Line: 1, Column: 50, EndLine: 1, EndColumn: 52, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
 		{Code: "const object = {...(foo || /** @type {object} */ ({}))};", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
