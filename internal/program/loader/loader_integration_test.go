@@ -2668,8 +2668,18 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 				t.Fatal(err)
 			}
 			if test.target == "target.js" {
-				if len(loads) != 0 {
-					t.Fatal("compatibility binding must be resolved before publishing work")
+				materialized := NewSession(fsys)
+				set, err := materialized.BuildProjects(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := materialized.LoadCLI(set, request.Targets, dir, false)
+				if err != nil || len(loads) != len(want.Programs) {
+					t.Fatalf("compatibility plan: loads=%d err=%v", len(loads), err)
+				}
+				got := consumeProgramLoads(t, loads)
+				if !reflect.DeepEqual(projectCompleteBindings(t, got, fsys), projectCompleteBindings(t, want, fsys)) || !reflect.DeepEqual(got.LintTargetBySourcePath, want.LintTargetBySourcePath) {
+					t.Fatal("compatibility units changed ordered Programs or source identity")
 				}
 			} else {
 				if len(loads) != 2 {
@@ -4184,42 +4194,383 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			if err != nil || len(loads) != 3 {
 				t.Fatalf("loads=%d, err=%v", len(loads), err)
 			}
-			type projection struct {
-				targets []string
-				sources []string
-				typed   bool
-			}
-			project := func(binding LoadResult) map[string]projection {
-				result := make(map[string]projection)
-				for index, program := range binding.Programs {
-					sources := make([]string, 0)
-					for _, source := range program.SourceFiles() {
-						sources = append(sources, source.FileName())
-					}
-					slices.Sort(sources)
-					targets := append([]string(nil), binding.TargetsByProgram[index]...)
-					slices.Sort(targets)
-					result[strings.Join(targets, "\n")] = projection{targets, sources, program.CanProvideProgramDiagnostics()}
-				}
-				return result
-			}
-			wantPrograms := project(want)
-			gotPrograms := make(map[string]projection)
+			wantPrograms := projectCompleteBindings(t, want, fsys)
+			var gotPrograms []completeBindingProjection
 			gotMapping := make(map[string]target.File)
 			for _, load := range loads {
 				binding, err := load.Load()
 				if err != nil {
 					t.Fatal(err)
 				}
-				for key, value := range project(binding) {
-					gotPrograms[key] = value
-				}
+				gotPrograms = append(gotPrograms, projectCompleteBindings(t, binding, fsys)...)
 				for key, value := range binding.LintTargetBySourcePath {
 					gotMapping[key] = value
 				}
 			}
 			if !reflect.DeepEqual(gotPrograms, wantPrograms) || !reflect.DeepEqual(gotMapping, want.LintTargetBySourcePath) {
 				t.Fatal("admitted loads changed complete source graphs, target grouping, capabilities, or source identity")
+			}
+		})
+	}
+}
+
+type completeBindingProjection struct {
+	Roots       []string
+	Sources     []string
+	Options     string
+	Targets     []target.File
+	SourcePaths []string
+	Typed       []bool
+	Diagnostics bool
+}
+
+func projectCompleteBindings(t *testing.T, binding LoadResult, fsys vfs.FS) []completeBindingProjection {
+	t.Helper()
+	result := make([]completeBindingProjection, 0, len(binding.Programs))
+	for index, program := range binding.Programs {
+		options, err := json.Marshal(program.Options())
+		if err != nil {
+			t.Fatal(err)
+		}
+		projection := completeBindingProjection{
+			Roots: slices.Clone(program.RootFileNames()), Options: string(options),
+			SourcePaths: slices.Clone(binding.TargetsByProgram[index]),
+			Diagnostics: program.CanProvideProgramDiagnostics(),
+		}
+		for _, source := range program.SourceFiles() {
+			projection.Sources = append(projection.Sources, fmt.Sprintf("%s\x00%d\x00%t\x00%s", source.FileName(), source.ScriptKind, source.IsDeclarationFile, source.Text()))
+		}
+		slices.Sort(projection.Roots)
+		slices.Sort(projection.Sources)
+		for _, path := range projection.SourcePaths {
+			file, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, path, fsys)
+			if !ok {
+				t.Fatalf("missing target identity for %q", path)
+			}
+			projection.Targets = append(projection.Targets, file)
+			source := program.GetSourceFile(path)
+			projection.Typed = append(projection.Typed, program.CanProvideTypeChecker(source))
+		}
+		result = append(result, projection)
+	}
+	return result
+}
+
+func consumeProgramLoads(t *testing.T, loads []ProgramLoad) LoadResult {
+	t.Helper()
+	result := LoadResult{LintTargetBySourcePath: make(map[string]target.File)}
+	for index, load := range loads {
+		binding, err := load.Load()
+		if err != nil {
+			t.Fatalf("load %d: %v", index, err)
+		}
+		result.Programs = append(result.Programs, binding.Programs...)
+		result.TargetsByProgram = append(result.TargetsByProgram, binding.TargetsByProgram...)
+		for path, file := range binding.LintTargetBySourcePath {
+			if previous, exists := result.LintTargetBySourcePath[path]; exists && previous != file {
+				t.Fatalf("loads disagreed on target identity for %q", path)
+			}
+			result.LintTargetBySourcePath[path] = file
+		}
+	}
+	return result
+}
+
+func referenceLoadRequest(t *testing.T) (string, vfs.FS, ProjectBuildRequest) {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(txtarfs.MustParseFile(t, "testdata/project_references.txtar").Materialize(t, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir = tspath.NormalizePath(dir)
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	entry := func(pattern, project string) rslintconfig.ConfigEntry {
+		return rslintconfig.ConfigEntry{Files: []string{pattern}, LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{project}},
+		}}
+	}
+	config := rslintconfig.RslintConfig{entry("ref/**/*.ts", "ref/tsconfig.json"), entry("plain/**/*.ts", "plain/tsconfig.json")}
+	configs := map[string]rslintconfig.RslintConfig{dir: config}
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{
+		Config: config, ConfigDirectory: dir, FS: fsys,
+		Files: rslintconfig.ResolveFileIdentities([]string{
+			tspath.ResolvePath(dir, "ref/src/entry.ts"), tspath.ResolvePath(dir, "plain/src/entry.ts"), tspath.ResolvePath(dir, "gap.ts"),
+		}, fsys),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := configLint.NewResolver(configLint.ResolverOptions{
+		ConfigsByOwner: configs, DefaultRootDirectory: dir, FS: fsys,
+		PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+	})
+	policies, err := resolver.ProjectPolicies(plan.Files, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Files) != 3 {
+		t.Fatalf("fixture selected %d targets, want 3", len(plan.Files))
+	}
+	// Keep the reference owner first for the lifetime and error-order cases.
+	slices.SortFunc(plan.Files, func(left, right target.File) int { return strings.Compare(right.Path, left.Path) })
+	return dir, fsys, ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: Targeted}
+}
+
+func TestProgramLoadsExplicitReferencesPreserveCompleteBindings(t *testing.T) {
+	for _, declarations := range []bool{true, false} {
+		for _, serial := range []bool{true, false} {
+			t.Run(fmt.Sprintf("declarations=%t/serial=%t", declarations, serial), func(t *testing.T) {
+				dir, fsys, request := referenceLoadRequest(t)
+				if !declarations {
+					if err := os.Remove(tspath.ResolvePath(dir, "lib/dist/value.d.ts")); err != nil {
+						t.Fatal(err)
+					}
+				}
+				request.SingleThreaded = serial
+				materialized := NewSession(fsys)
+				set, err := materialized.BuildProjects(request)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := materialized.LoadCLI(set, request.Targets, dir, serial)
+				if err != nil {
+					t.Fatal(err)
+				}
+				loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+				if err != nil || len(loads) != 3 {
+					t.Fatalf("loads=%d err=%v", len(loads), err)
+				}
+				got := consumeProgramLoads(t, loads)
+				if !reflect.DeepEqual(projectCompleteBindings(t, got, fsys), projectCompleteBindings(t, want, fsys)) || !reflect.DeepEqual(got.LintTargetBySourcePath, want.LintTargetBySourcePath) {
+					t.Fatal("preflight changed complete Programs, options, target identities, config owners, or checker capabilities")
+				}
+				// Check the fixture actually exercises declaration redirection.
+				ref := want.Programs[0]
+				hasDeclaration := ref.GetSourceFile(tspath.ResolvePath(dir, "lib/dist/value.d.ts")) != nil
+				if hasDeclaration != declarations {
+					t.Fatal("unexpected reference declaration admission")
+				}
+			})
+		}
+	}
+}
+
+func TestProgramLoadsRetainProjectConstructionModes(t *testing.T) {
+	for _, scope := range []ProjectScope{Targeted, ActiveOwners} {
+		t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
+			dir, fsys, request := referenceLoadRequest(t)
+			sibling := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "ref/src/sibling.ts"))
+			request.Targets.Files[1] = sibling
+			request.Policies[sibling] = rslintconfig.ProjectPolicy{ServiceRootDirectory: dir}
+			request.Scope = scope
+			materialized := NewSession(fsys)
+			set, err := materialized.BuildProjects(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := materialized.LoadCLI(set, request.Targets, dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+			if err != nil || len(loads) != 3 {
+				t.Fatalf("loads=%d err=%v", len(loads), err)
+			}
+			got := consumeProgramLoads(t, loads)
+			if !reflect.DeepEqual(projectCompleteBindings(t, got, fsys), projectCompleteBindings(t, want, fsys)) || !reflect.DeepEqual(got.LintTargetBySourcePath, want.LintTargetBySourcePath) {
+				t.Fatal("explicit and service construction modes were merged or reordered")
+			}
+			if got.Programs[0].Options().ConfigFilePath != got.Programs[1].Options().ConfigFilePath ||
+				got.Programs[0].GetSourceFile(tspath.ResolvePath(dir, "lib/src/value.ts")) != nil ||
+				got.Programs[1].GetSourceFile(tspath.ResolvePath(dir, "lib/src/value.ts")) == nil {
+				t.Fatal("fixture did not retain both reference modes of the same config")
+			}
+		})
+	}
+}
+
+func TestProgramLoadsReferenceBindings(t *testing.T) {
+	for _, name := range []string{"broad", "compiler roots", "overlapping candidates", "multiple reference projects", "symlink target", "alias claim"} {
+		t.Run(name, func(t *testing.T) {
+			dir, fsys, request := referenceLoadRequest(t)
+			compilerRoots := false
+			file := request.Targets.Files[0]
+			switch name {
+			case "broad":
+				request.Scope = ActiveOwners
+			case "compiler roots":
+				compilerRoots = true
+			case "overlapping candidates":
+				policy := request.Policies[file]
+				policy.ExplicitProject = &rslintconfig.ProjectDeclaration{BaseDirectory: dir, Patterns: rslintconfig.ProjectPaths{"ref/tsconfig.json", "plain/tsconfig.json"}}
+				request.Policies[file] = policy
+				writeProgramTestFiles(t, dir, map[string]string{"plain/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/entry.ts","../ref/src/entry.ts"]}`})
+			case "multiple reference projects":
+				writeProgramTestFiles(t, dir, map[string]string{"plain/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/entry.ts"],"references":[{"path":"../lib"}]}`})
+			case "symlink target", "alias claim":
+				alias := tspath.ResolvePath(dir, "ref/src/alias.ts")
+				if err := os.Symlink(file.Path, alias); err != nil {
+					t.Skipf("symlinks unavailable: %v", err)
+				}
+				aliasFile := testLintTarget(fsys, dir, alias)
+				if name == "symlink target" {
+					request.Targets.Files[0] = aliasFile
+					request.Policies[aliasFile] = request.Policies[file]
+					writeProgramTestFiles(t, dir, map[string]string{"ref/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/alias.ts"],"references":[{"path":"../lib"}]}`})
+				} else {
+					request.Targets.Files = append(request.Targets.Files, aliasFile)
+					request.Policies[aliasFile] = rslintconfig.ProjectPolicy{}
+				}
+			}
+			session := NewSession(fsys)
+			cache := session.context.parseCache
+			loads, err := session.PlanLoads(request, dir, compilerRoots)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if session.context.parseCache != cache {
+				t.Fatal("complete binding replaced the request's parse cache")
+			}
+			materialized := NewSession(fsys)
+			set, err := materialized.BuildProjects(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := materialized.LoadCLI(set, request.Targets, dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if compilerRoots {
+				if len(loads) != 0 {
+					t.Fatal("compiler-root consumers must retain their existing whole binding")
+				}
+				return
+			}
+			if len(loads) != len(want.Programs) {
+				t.Fatalf("loads=%d, complete Programs=%d", len(loads), len(want.Programs))
+			}
+			got := consumeProgramLoads(t, loads)
+			if !reflect.DeepEqual(projectCompleteBindings(t, got, fsys), projectCompleteBindings(t, want, fsys)) || !reflect.DeepEqual(got.LintTargetBySourcePath, want.LintTargetBySourcePath) {
+				t.Fatal("per-project units changed complete binding or target identity")
+			}
+		})
+	}
+}
+
+func TestProgramLoadsReferenceBindingErrors(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		brokenPlain  bool
+		samePhysical bool
+		validRef     bool
+	}{{name: "missing exact source"}, {name: "earlier project error", brokenPlain: true}, {name: "physical binding succeeds", samePhysical: true}, {name: "later project error", brokenPlain: true, validRef: true}} {
+		t.Run(test.name, func(t *testing.T) {
+			dir, underlying, request := referenceLoadRequest(t)
+			files := make(map[string]string)
+			for _, project := range []string{"ref", "plain"} {
+				if (project == "plain" && !test.brokenPlain) || (project == "ref" && test.validRef) {
+					continue
+				}
+				config := `{"compilerOptions":{"noLib":true},"files":["src/first.ts","src/entry.ts"]`
+				if project == "ref" {
+					config += `,"references":[{"path":"../lib"}]`
+				}
+				files[tspath.ResolvePath(dir, project+"/tsconfig.json")] = config + `}`
+				files[tspath.ResolvePath(dir, project+"/src/first.ts")] = `import "./Entry";`
+				files[tspath.ResolvePath(dir, project+"/src/Entry.ts")] = `export const alternate = 1;`
+			}
+			var fsys vfs.FS = &exactCaseProgramFS{FS: underlying, files: files}
+			if test.samePhysical {
+				fsys = &canonicalIdentityTestFS{FS: fsys, realPaths: map[string]string{
+					tspath.ResolvePath(dir, "ref/src/Entry.ts"): tspath.ResolvePath(dir, "ref/src/entry.ts"),
+				}}
+			}
+			// Keep a valid ref first in one case to catch publication of work
+			// before a later ordinary project fails. Other cases check ordering.
+			if !test.validRef {
+				request.Targets.Files[0], request.Targets.Files[1] = request.Targets.Files[1], request.Targets.Files[0]
+			}
+			materialized := NewSession(fsys)
+			wantSet, want := materialized.BuildProjects(request)
+			wantProject := "ref/tsconfig.json"
+			if test.brokenPlain {
+				wantProject = "plain/tsconfig.json"
+			}
+			if test.samePhysical {
+				if want != nil || exactProgramSourceFile(wantSet.compilerPrograms[1], tspath.ResolvePath(dir, "ref/src/entry.ts")) != nil {
+					t.Fatalf("fixture must bind a physical alias with no exact source: %v", want)
+				}
+			} else if want == nil || !strings.Contains(want.Error(), tspath.ResolvePath(dir, wantProject)) {
+				t.Fatalf("fixture did not cause the intended exact-source miss: %v", want)
+			}
+			session := NewSession(fsys)
+			cache := session.context.parseCache
+			loads, err := session.PlanLoads(request, dir, false)
+			if session.context.parseCache != cache {
+				t.Fatal("binding replaced the request cache")
+			}
+			if !test.samePhysical && (err == nil || err.Error() != want.Error() || len(loads) != 0) {
+				t.Fatalf("must report the authoritative error before publishing work: loads=%d err=%v want=%v", len(loads), err, want)
+			}
+			if test.samePhysical && err != nil {
+				t.Fatal(err)
+			}
+			_, got := session.BuildProjects(request)
+			if test.samePhysical {
+				if got != nil {
+					t.Fatal(got)
+				}
+				wantBinding, err := materialized.LoadCLI(wantSet, request.Targets, dir, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(loads) != len(wantBinding.Programs) {
+					t.Fatalf("physical binding plan: loads=%d, want %d", len(loads), len(wantBinding.Programs))
+				}
+				gotBinding := consumeProgramLoads(t, loads)
+				if !reflect.DeepEqual(projectCompleteBindings(t, gotBinding, fsys), projectCompleteBindings(t, wantBinding, fsys)) || !reflect.DeepEqual(gotBinding.LintTargetBySourcePath, wantBinding.LintTargetBySourcePath) {
+					t.Fatal("complete plan changed physical fallback")
+				}
+			} else if got == nil || got.Error() != want.Error() {
+				t.Fatalf("fallback error=%v, complete binding error=%v", got, want)
+			}
+		})
+	}
+}
+
+func TestProgramLoadsReferenceBindingLifetime(t *testing.T) {
+	for _, consume := range []bool{true, false} {
+		t.Run(fmt.Sprintf("consume=%t", consume), func(t *testing.T) {
+			dir, fsys, request := referenceLoadRequest(t)
+			session := NewSession(fsys)
+			loads, err := session.PlanLoads(request, dir, false)
+			if err != nil || len(loads) != 3 {
+				t.Fatalf("loads=%d err=%v", len(loads), err)
+			}
+			var collected func() bool
+			if consume {
+				binding, err := loads[0].Load()
+				if err != nil || len(binding.Programs) != 1 {
+					t.Fatalf("binding=%v err=%v", binding, err)
+				}
+				program := weak.Make(binding.Programs[0])
+				collected = func() bool { return program.Value() == nil }
+				binding = LoadResult{}
+			} else {
+				// A retained compiler Program would also retain its options.
+				options := weak.Make(loads[0].Options)
+				collected = func() bool { return options.Value() == nil }
+				loads = nil
+			}
+			deadline := time.Now().Add(10 * time.Second)
+			for !collected() && time.Now().Before(deadline) {
+				runtime.GC()
+				time.Sleep(5 * time.Millisecond)
+			}
+			runtime.KeepAlive(loads)
+			runtime.KeepAlive(session)
+			if !collected() {
+				t.Fatal("consumed or abandoned preflight retained its Program")
 			}
 		})
 	}

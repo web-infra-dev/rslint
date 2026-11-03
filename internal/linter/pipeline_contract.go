@@ -62,8 +62,9 @@ func (s SourceSnapshot) Empty() bool { return len(s.files) == 0 }
 // read-only disk base, an overlay VFS, or editor state, but it never owns or
 // advances fix rounds and must not persist the snapshot.
 //
-// Planning does not construct Programs. The pipeline acquires and releases
-// each planned unit; a provider only decides how to construct or borrow it.
+// Providers resolve binding compatibility before publishing executable work.
+// The pipeline acquires and releases each planned unit; a provider decides
+// whether acquisition constructs, transfers a validated binding, or borrows.
 type GenerationProvider interface {
 	PlanGeneration(ctx context.Context, snapshot SourceSnapshot) (GenerationPlan, error)
 }

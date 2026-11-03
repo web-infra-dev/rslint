@@ -13,10 +13,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// ProgramLoad constructs and binds a complete Program, never a subset of
-// its roots or dependency graph. Options and TargetCount are metadata only;
-// the caller decides when to load. Load must be called once, and different
+// ProgramLoad acquires a complete binding, never a subset of a Program's roots
+// or dependency graph. Options and TargetCount are metadata only;
+// the caller decides when to acquire. Load must be called once, and different
 // loads may run concurrently. Returned Programs belong solely to the caller.
+// A validated binding is transferred on Load and is not retained afterward.
 type ProgramLoad struct {
 	TargetCount int
 	Options     *core.CompilerOptions
@@ -30,7 +31,8 @@ type ProgramLoad struct {
 //
 // Call on a fresh Session, before constructing any Programs. Config validation
 // and root identity ranking are shared with BuildProjects. The loads retain
-// immutable metadata and source snapshots, but no completed Program or AST.
+// immutable metadata and source snapshots. When metadata cannot establish
+// independent CLI loads, the complete batch is bound before publishing units.
 func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoots bool) ([]ProgramLoad, error) {
 	if request.Scope == AllDeclared {
 		return nil, nil
@@ -108,7 +110,10 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 			return nil, errs[i]
 		}
 		if !independent[i] {
-			return nil, nil
+			if compilerRoots {
+				return nil, nil
+			}
+			return s.planBoundProjectLoads(request, cwd)
 		}
 	}
 	if !request.SingleThreaded {
@@ -204,6 +209,41 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 				}
 				finalizeResult(&binding)
 				return binding, nil
+			},
+		})
+	}
+	return loads, nil
+}
+
+// A readable direct root can still disappear through reference redirection or
+// package deduplication in another project. Complete the authoritative binding
+// before any rules run, then transfer each Program to the ordinary scheduler.
+func (s *Session) planBoundProjectLoads(request ProjectBuildRequest, cwd string) ([]ProgramLoad, error) {
+	defer s.ReleaseBuildCache()
+	projects, err := s.BuildProjects(request)
+	if err != nil {
+		return nil, err
+	}
+	binding, err := s.LoadCLI(projects, request.Targets, cwd, request.SingleThreaded)
+	if err != nil {
+		return nil, err
+	}
+	loads := make([]ProgramLoad, 0, len(binding.Programs))
+	for index, program := range binding.Programs {
+		// Allocate the Program slice separately: a subslice would keep the
+		// entire batch alive after an individual unit finishes.
+		unit := LoadResult{
+			Programs:               []*lintprogram.Program{program},
+			TargetsByProgram:       [][]string{binding.TargetsByProgram[index]},
+			LintTargetBySourcePath: binding.LintTargetBySourcePath,
+		}
+		loads = append(loads, ProgramLoad{
+			TargetCount: len(binding.TargetsByProgram[index]),
+			Options:     program.Options(),
+			Load: func() (LoadResult, error) {
+				result := unit
+				unit = LoadResult{}
+				return result, nil
 			},
 		})
 	}

@@ -1,0 +1,54 @@
+-- ref/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":true,"moduleResolution":"bundler","module":"esnext"},"files":["src/entry.ts","src/sibling.ts"],"references":[{"path":"../lib"}]}
+-- ref/src/entry.ts --
+import { value } from "../../lib/src/value";
+export const answer = value;
+-- ref/src/sibling.ts --
+export const sibling: number = "wrong";
+-- lib/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true,"rootDir":"src","outDir":"dist"},"files":["src/value.ts"]}
+-- lib/src/value.ts --
+export const value = 123;
+-- lib/dist/value.d.ts --
+export declare const value: "declaration";
+-- plain/tsconfig.json --
+{"compilerOptions":{"noLib":true,"strict":false},"files":["src/entry.ts"]}
+-- plain/src/entry.ts --
+import { value } from "../../lib/src/value";
+export const answer = value;
+-- gap.ts --
+export const gap = 1;
+-- service-lib/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true,"rootDir":"src","outDir":"../svc/z-output"},"files":["src/value.ts"]}
+-- service-lib/src/value.ts --
+export const value = 1;
+-- svc/z-output/value.d.ts --
+export declare const value: 1;
+-- svc/0-ok.ts --
+export const ok = 1;
+-- svc/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["0-ok.ts","z-output/value.d.ts"],"references":[{"path":"../service-lib"}]}
+-- service-other-lib/tsconfig.json --
+{"compilerOptions":{"noLib":true,"composite":true,"rootDir":"src","outDir":"../svc/middle/generated"},"files":["src/other.ts"]}
+-- service-other-lib/src/other.ts --
+export const other = 1;
+-- svc/middle/generated/other.d.ts --
+export declare const other: 1;
+-- svc/middle/tsconfig.json --
+{"compilerOptions":{"noLib":true},"files":["generated/other.d.ts"],"references":[{"path":"../../service-other-lib"}]}
+-- plain/node_modules/duplicate-package/package.json --
+{"name":"duplicate-package","version":"1.0.0","types":"../../pkg/index.ts"}
+-- plain/pkg/index.ts --
+export const value = 1;
+-- plain/two/node_modules/duplicate-package/package.json --
+{"name":"duplicate-package","version":"1.0.0","types":"../../pkg/index.ts"}
+-- plain/two/pkg/index.ts --
+export const value = 2;
+-- plain/a.ts --
+import { value } from "duplicate-package";
+export const first = value;
+-- plain/two/b.ts --
+import { value } from "duplicate-package";
+export const second = value;
+-- plain/dedup.json --
+{"compilerOptions":{"noLib":true,"moduleResolution":"node","module":"commonjs"},"files":["a.ts","two/b.ts","two/pkg/index.ts"]}

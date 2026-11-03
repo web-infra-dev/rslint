@@ -1498,6 +1498,130 @@ func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
 	}
 }
 
+func TestCLIExplicitReferenceLoadsDoNotRepeatPluginWork(t *testing.T) {
+	for _, mode := range []string{"independent", "overlapping candidates", "redirected root"} {
+		t.Run(mode, func(t *testing.T) {
+			dir, err := filepath.EvalSymlinks(txtarfs.MustParseFile(t, "../../internal/program/loader/testdata/project_references.txtar").Materialize(t, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir = tspath.NormalizePath(dir)
+			refTarget := "ref/src/entry.ts"
+			projects := rslintconfig.ProjectPaths{"ref/tsconfig.json"}
+			if mode == "overlapping candidates" {
+				projects = append(projects, "plain/tsconfig.json")
+			}
+			if mode == "redirected root" {
+				refTarget = "lib/src/value.ts"
+				writeLintTargetContractFiles(t, dir, map[string]string{
+					"ref/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["../lib/src/value.ts"],"references":[{"path":"../lib"}]}`,
+				})
+			}
+			catalog := explicitConfigCatalogForTest(dir, rslintconfig.RslintConfig{
+				{Files: []string{"**/*.ts"}, Plugins: []string{"external"}, Rules: rslintconfig.Rules{"external/check": "error"}},
+				{Files: []string{refTarget}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: projects}}},
+				{Files: []string{"plain/**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"plain/tsconfig.json"}}}},
+			})
+			catalog.EslintPlugins = []rslintconfig.EslintPluginEntry{{Prefix: "external", RuleNames: []string{"check"}}}
+			var mu sync.Mutex
+			calls := make(map[string]int)
+			code, stdout, stderr := runLintCommandWithDispatcherForTest(t, dir, lintArgs{
+				ConfigCatalog: catalog,
+				AllowFiles:    []string{tspath.ResolvePath(dir, "plain/src/entry.ts"), tspath.ResolvePath(dir, refTarget)},
+				Format:        "jsonline", NoColor: true,
+			}, linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				results := make([]linter.EslintPluginFileResult, len(request.Files))
+				for index, file := range request.Files {
+					calls[file.Path]++
+					results[index].FilePath = file.Path
+				}
+				return &linter.EslintPluginLintResult{Results: results}, nil
+			}))
+			if mode == "redirected root" {
+				if code != 1 || len(calls) != 0 || !strings.Contains(stderr, "absent from its TypeScript Program") {
+					t.Fatalf("preflight failure executed rules or changed the binding error: code=%d calls=%v stdout=%q stderr=%q", code, calls, stdout, stderr)
+				}
+				return
+			}
+			if code != 0 || len(calls) != 2 {
+				t.Fatalf("code=%d calls=%v stdout=%q stderr=%q", code, calls, stdout, stderr)
+			}
+			for path, count := range calls {
+				if count != 1 {
+					t.Fatalf("plugin executed %d times for %s", count, path)
+				}
+			}
+		})
+	}
+}
+
+func TestCLIReferenceBatchChecksBeforeRules(t *testing.T) {
+	for _, name := range []string{"single reference", "multiple references", "service error order", "disabled source redirect", "package deduplication"} {
+		t.Run(name, func(t *testing.T) {
+			dir, err := filepath.EvalSymlinks(txtarfs.MustParseFile(t, "../../internal/program/loader/testdata/project_references.txtar").Materialize(t, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir = tspath.NormalizePath(dir)
+			config := rslintconfig.RslintConfig{
+				{Files: []string{"**/*.ts"}, Plugins: []string{"external"}, Rules: rslintconfig.Rules{"external/check": "error"}},
+				{Files: []string{"ref/**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"ref/tsconfig.json"}}}},
+				{Files: []string{"plain/**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"plain/tsconfig.json"}}}},
+				{Files: []string{"svc/**/*.ts"}, LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)}}},
+			}
+			files := []string{"ref/src/entry.ts", "svc/z-output/value.d.ts"}
+			firstError := "svc/z-output/value.d.ts"
+			switch name {
+			case "multiple references":
+				writeLintTargetContractFiles(t, dir, map[string]string{"plain/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["src/entry.ts"],"references":[{"path":"../lib"}]}`})
+				files = append([]string{"plain/src/entry.ts"}, files...)
+			case "service error order":
+				config[0].Plugins = nil
+				config[0].Rules = rslintconfig.Rules{"no-debugger": "error"}
+				files = []string{"ref/src/entry.ts", "svc/0-ok.ts", "svc/middle/generated/other.d.ts", "svc/z-output/value.d.ts"}
+				firstError = "svc/middle/generated/other.d.ts"
+			case "disabled source redirect":
+				writeLintTargetContractFiles(t, dir, map[string]string{
+					"service-lib/tsconfig.json": `{"compilerOptions":{"noLib":true,"composite":true,"rootDir":"../svc","outDir":"../svc/z-output"},"files":["../svc/0-ok.ts"]}`,
+					"svc/tsconfig.json":         `{"compilerOptions":{"noLib":true,"disableSourceOfProjectReferenceRedirect":true},"files":["0-ok.ts"],"references":[{"path":"../service-lib"}]}`,
+					"svc/z-output/0-ok.d.ts":    "export declare const ok: 1;",
+				})
+				files = []string{"ref/src/entry.ts", "svc/0-ok.ts"}
+				firstError = "svc/0-ok.ts"
+			case "package deduplication":
+				config = append(config, rslintconfig.ConfigEntry{
+					Files:           []string{"plain/a.ts", "plain/two/pkg/index.ts"},
+					LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"plain/dedup.json"}}},
+				})
+				files = []string{"ref/src/entry.ts", "plain/a.ts", "plain/two/pkg/index.ts"}
+				firstError = "plain/two/pkg/index.ts"
+			}
+			catalog := explicitConfigCatalogForTest(dir, config)
+			if name != "service error order" {
+				catalog.EslintPlugins = []rslintconfig.EslintPluginEntry{{Prefix: "external", RuleNames: []string{"check"}}}
+			}
+			for index := range files {
+				files[index] = tspath.ResolvePath(dir, files[index])
+			}
+			var mu sync.Mutex
+			calls := 0
+			code, stdout, stderr := runLintCommandWithDispatcherForTest(t, dir, lintArgs{
+				ConfigCatalog: catalog, AllowFiles: files, Format: "jsonline", NoColor: true, SingleThreaded: true,
+			}, linter.EslintPluginDispatchFunc(func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+				mu.Lock()
+				defer mu.Unlock()
+				calls++
+				return &linter.EslintPluginLintResult{}, nil
+			}))
+			if code != 1 || calls != 0 || stdout != "" || !strings.Contains(stderr, firstError) || !strings.Contains(stderr, "absent from its TypeScript Program") {
+				t.Fatalf("binding failure escaped the global rule boundary or changed its priority: code=%d calls=%d stdout=%q stderr=%q", code, calls, stdout, stderr)
+			}
+		})
+	}
+}
+
 // --- shouldShortCircuitMachineOutput ---
 //
 // Locks two regressions:
