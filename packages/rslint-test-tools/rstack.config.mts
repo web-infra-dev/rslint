@@ -892,6 +892,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-unsafe-string-replacement.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-continue.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-error-capture-stack-trace.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-useless-fallback-in-spread.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-spread.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',
