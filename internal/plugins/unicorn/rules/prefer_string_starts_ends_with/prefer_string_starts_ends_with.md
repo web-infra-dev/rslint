@@ -43,6 +43,23 @@ This rule has no options.
 
 ## Differences from upstream
 
+Locally declared functions named `String`, `Date`, or other built-in string
+producers are checked using their own return annotations. Their names alone do
+not make their results strings. The string-conversion suggestion is also omitted
+when `String` is locally declared.
+
+Slice comparisons have no fix or suggestion when replacing them would remove a
+possible getter evaluation. For example, this comparison is reported without an
+edit because `box.prefix` may return a different value on each read:
+
+```typescript
+'abc'.slice(0, (box.prefix as string).length) === (box.prefix as string);
+```
+
+A reversed comparison such as `prefix === (box.text as string).slice(0,
+prefix.length)` offers only a suggestion when reading `box.text` could affect
+`prefix`.
+
 When configured with a TypeScript project, upstream can report or skip
 additional expressions based on inferred types. This rule follows upstream's
 behavior without that inference. For example, the first comparison below is

@@ -60,7 +60,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 				knownString := target.Kind == ast.KindTemplateExpression || target.Kind == ast.KindNoSubstitutionTemplateLiteral
 				if ast.IsCallExpression(target) {
 					callee := utils.ESTreeCallCallee(target.Expression())
-					knownString = callee != nil && ast.IsIdentifier(callee) && callee.Text() == "String"
+					knownString = callee != nil && ast.IsIdentifier(callee) && callee.Text() == "String" && unicornutil.IsGlobalReference(ctx, callee)
 				}
 				knownNonString := false
 				if !knownString {
@@ -114,7 +114,16 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 						return nil
 					}
 					var suggestions []rule.RuleSuggestion
+					var canUseString bool
+					if ctx.Refs != nil {
+						canUseString = ctx.Refs.IsGlobalNameReference(node, "String", ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
+					} else {
+						canUseString = !utils.IsShadowed(node, "String")
+					}
 					for _, kind := range []string{"useStringCasting", "useOptionalChaining", "useNullishCoalescing"} {
+						if kind == "useStringCasting" && !canUseString {
+							continue
+						}
 						if kind == "useOptionalChaining" && node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression && node.Parent.AsTaggedTemplateExpression().Tag == node {
 							continue
 						}
@@ -145,6 +154,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 				}
 				method, id := "startsWith", "prefer-starts-with-indexOf"
 				var search *ast.Node
+				var removedEvaluation *ast.Node
 				reversed := false
 				if indexOf {
 					search = call.Call.Arguments()[0]
@@ -159,7 +169,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 					if !ok || !unicornutil.IsString(ctx, search, evaluator) {
 						return
 					}
-					method = sliceMethod(call.Call.Arguments(), search, evaluator)
+					method, removedEvaluation = sliceMethod(call.Call.Arguments(), search, evaluator)
 					if method == "" {
 						return
 					}
@@ -175,6 +185,9 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 				negated := operator == ast.KindExclamationEqualsToken || operator == ast.KindExclamationEqualsEqualsToken
 				fix := func() []rule.RuleFix {
 					if (indexOf && !unicornutil.IsString(ctx, search, evaluator)) || removesComments(ctx, node, target, search) {
+						return nil
+					}
+					if removedEvaluation != nil && evaluator.HasSideEffect(removedEvaluation, true) {
 						return nil
 					}
 					text := utils.TrimmedNodeText(ctx.SourceFile, utils.OutermostParenthesizedExpression(target))
@@ -194,7 +207,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 					}
 					return append([]rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, text)}, unicornutil.SpaceAroundKeywordFixes(ctx.SourceFile, node)...)
 				}
-				if reversed && evaluator.HasSideEffect(target, false) {
+				if reversed && evaluator.HasSideEffect(target, true) {
 					ctx.ReportNodeWithDeferredSuggestions(node, message(id), func() []rule.RuleSuggestion {
 						fixes := fix()
 						if len(fixes) == 0 {
@@ -254,24 +267,33 @@ func matchingLength(node, search *ast.Node) bool {
 		unicornutil.IsSameReference(node.Expression(), search)
 }
 
-func sliceMethod(args []*ast.Node, search *ast.Node, evaluator *utils.StaticStringEvaluator) string {
+// The second result is the expression evaluated only by a removed length
+// bound. Checking the receiver, rather than its intrinsic string length, keeps
+// plain identifier bounds fixable without dropping getter evaluations.
+func sliceMethod(args []*ast.Node, search *ast.Node, evaluator *utils.StaticStringEvaluator) (string, *ast.Node) {
 	value, known := evaluator.EvalValueIfNoSideEffects(search)
 	text, stringValue := value.(string)
 	length := jsnum.Number(ecmascript.StringCodeUnitCount(text))
 	if len(args) == 2 && isZero(utils.ESTreeRuntimeExpression(args[0])) {
 		bound, numeric := numericLiteral(args[1])
-		if (known && stringValue && numeric && bound == length) || matchingLength(args[1], search) {
-			return "startsWith"
+		if known && stringValue && numeric && bound == length {
+			return "startsWith", nil
+		}
+		if matchingLength(args[1], search) {
+			return "startsWith", utils.ESTreeRuntimeExpression(args[1]).Expression()
 		}
 	}
 	if len(args) == 1 && known && stringValue && length > 0 {
 		bound, numeric := numericLiteral(args[0])
 		first := utils.ESTreeRuntimeExpression(args[0])
-		if (numeric && bound == -length) || (first.Kind == ast.KindPrefixUnaryExpression && first.AsPrefixUnaryExpression().Operator == ast.KindMinusToken && matchingLength(first.AsPrefixUnaryExpression().Operand, search)) {
-			return "endsWith"
+		if numeric && bound == -length {
+			return "endsWith", nil
+		}
+		if first.Kind == ast.KindPrefixUnaryExpression && first.AsPrefixUnaryExpression().Operator == ast.KindMinusToken && matchingLength(first.AsPrefixUnaryExpression().Operand, search) {
+			return "endsWith", utils.ESTreeRuntimeExpression(first.AsPrefixUnaryExpression().Operand).Expression()
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func removesComments(ctx rule.RuleContext, node, target, search *ast.Node) bool {

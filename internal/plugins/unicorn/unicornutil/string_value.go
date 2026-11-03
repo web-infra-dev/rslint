@@ -1,10 +1,11 @@
 package unicornutil
 
 import (
+	"slices"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"slices"
 )
 
 // IsString proves that an expression produces a string primitive. Unlike
@@ -134,14 +135,17 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 		if ast.IsIdentifier(callee) {
 			switch callee.Text() {
 			case "String", "Date", "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent", "atob", "btoa":
-				return true
+				if IsGlobalReference(ctx, callee) {
+					return true
+				}
 			}
 			return stringFunctionReturnsString(ctx, callee)
 		}
 		if call, ok := MatchDotMethodCall(node, DotMethodCallOptions{}); ok {
 			object := utils.ESTreeRuntimeExpression(call.Object)
 			method := call.Property.Text()
-			if ast.IsIdentifier(object) && object.Text() == "String" && (method == "fromCharCode" || method == "fromCodePoint" || method == "raw") {
+			if ast.IsIdentifier(object) && object.Text() == "String" && IsGlobalReference(ctx, object) &&
+				(method == "fromCharCode" || method == "fromCodePoint" || method == "raw") {
 				return true
 			}
 			switch method {
@@ -168,7 +172,7 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 		tag := utils.ESTreeRuntimeExpression(node.AsTaggedTemplateExpression().Tag)
 		if tag.Kind == ast.KindPropertyAccessExpression && !ast.IsOptionalChain(tag) && tag.Name().Kind == ast.KindIdentifier && tag.Name().Text() == "raw" {
 			object := utils.ESTreeRuntimeExpression(tag.Expression())
-			if ast.IsIdentifier(object) && object.Text() == "String" {
+			if ast.IsIdentifier(object) && object.Text() == "String" && IsGlobalReference(ctx, object) {
 				return true
 			}
 		}
@@ -191,7 +195,7 @@ func isStringBuiltinValue(ctx rule.RuleContext, node *ast.Node, name string, vis
 	}
 	if node.Kind == ast.KindNewExpression || (name == "RegExp" && node.Kind == ast.KindCallExpression && !ast.IsOptionalChain(node)) {
 		callee := utils.ESTreeRuntimeExpression(node.Expression())
-		return ast.IsIdentifier(callee) && callee.Text() == name
+		return ast.IsIdentifier(callee) && callee.Text() == name && IsGlobalReference(ctx, callee)
 	}
 	if !ast.IsIdentifier(node) || ctx.Refs == nil {
 		return false
@@ -208,7 +212,12 @@ func isStringBuiltinValue(ctx rule.RuleContext, node *ast.Node, name string, vis
 		return false
 	}
 	if annotation != nil {
-		return annotation.Kind == ast.KindTypeReference && annotation.AsTypeReferenceNode().TypeName.Text() == name
+		if annotation.Kind != ast.KindTypeReference {
+			return false
+		}
+		typeName := annotation.AsTypeReferenceNode().TypeName
+		return ast.IsIdentifier(typeName) && typeName.Text() == name &&
+			ctx.Refs.IsGlobalNameReference(typeName, name, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
 	}
 	return declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) &&
 		isStringBuiltinValue(ctx, declaration.AsVariableDeclaration().Initializer, name, visiting)
