@@ -32,6 +32,12 @@ type packageJSON struct {
 
 func (f *nodeResolutionFS) ReadFile(name string) (string, bool) {
 	physical := f.physical(name)
+	if f.options.NodeMain && f.resolver.mainTarget && strings.HasSuffix(name, "/package.json") {
+		// Node's LOAD_AS_DIRECTORY tries a main target as a file, then uses
+		// LOAD_INDEX. Nested package metadata does not participate, even when
+		// it is malformed. Hide it from tsgo without reading or caching it.
+		return "{}", f.FS.FileExists(physical)
+	}
 	text, ok := f.FS.ReadFile(physical)
 	if !ok || !strings.HasSuffix(name, "/package.json") {
 		return text, ok

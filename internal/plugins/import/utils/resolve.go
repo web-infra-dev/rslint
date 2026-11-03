@@ -243,7 +243,14 @@ func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresol
 // Node resolution, independently of the legacy import resolver's exports-blind
 // lookup. Unknown runtime policy is a reason to omit a suggestion, not to guess.
 func (r *ImportResolver) EquivalentNodeCandidate(source modules.Source, candidate, packageRoot string) bool {
-	if len(r.resolvers) != 1 || !r.resolvers[0].defaultConfig || len(r.core) != 0 {
+	configured := r.ctx.Settings["import/resolver"]
+	// The implicit TypeScript fallback does not alter this independent Node
+	// runtime check. Explicit resolver chains retain their unknown policy.
+	defaults := (configured == nil || configured == false || configured == "") && r.ctx.Settings["import/resolve"] == nil
+	if r.err != "" || len(r.resolvers) == 0 || !r.resolvers[0].defaultConfig || len(r.core) != 0 {
+		return false
+	}
+	if len(r.resolvers) != 1 && !defaults {
 		return false
 	}
 	switch r.resolvers[0].name {
@@ -306,7 +313,7 @@ func (r *ImportResolver) EquivalentNodeCandidate(source modules.Source, candidat
 		Extensions: []string{".js", ".json", ".node"},
 		Conditions: []string{"node", condition},
 		MainFields: []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}},
-		MainFiles:  []string{"index"}, NodeExports: true,
+		MainFiles:  []string{"index"}, NodeMain: true, NodeExports: true,
 		FullySpecified: !require, NoDirectory: !require, LiteralPaths: require,
 	}
 	// Default Node resolves relative to the real importer directory and

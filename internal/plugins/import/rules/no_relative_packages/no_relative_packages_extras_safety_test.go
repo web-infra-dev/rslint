@@ -224,3 +224,55 @@ func TestNoRelativePackagesUnicodeSuggestion(t *testing.T) {
 	item := safePackageCase("packages/a/source.cjs", code, "../b/工具.js", "b/工具.js", map[string]any{"commonjs": true})
 	rule_tester.RunRuleTester(root, "tsconfig.json", t, &target.NoRelativePackagesRule, nil, []rule_tester.InvalidTestCase{item})
 }
+
+func TestNoRelativePackagesNestedMain(t *testing.T) {
+	for _, resolver := range []struct {
+		name     string
+		settings map[string]any
+	}{
+		{"default", nil},
+		{"node", map[string]any{"import/resolver": "node"}},
+	} {
+		t.Run(resolver.name, func(t *testing.T) {
+			for _, tc := range []struct {
+				id, description, imported, candidate string
+			}{
+				{"M05", "nested main cannot prove equivalence", "../b", ""},
+				{"M06", "target index remains a safe entry", "../b", "b"},
+				{"M07", "missing target index falls back to package index", "../b", "b"},
+				{"M08", "main target file precedes directory index", "../b", "b"},
+				{"M09", "direct directory request still reads its main", "../b/sub", "b/sub"},
+			} {
+				t.Run(tc.id+"/"+tc.description, func(t *testing.T) {
+					root := safetyRoot(t, tc.id, true, false)
+					code := fmt.Sprintf("const value = require(%q);", tc.imported)
+					item := safePackageCase("packages/a/source.cjs", code, tc.imported, tc.candidate, map[string]any{"commonjs": true})
+					item.Settings = resolver.settings
+					rule_tester.RunRuleTester(root, "tsconfig.json", t, &target.NoRelativePackagesRule, nil, []rule_tester.InvalidTestCase{item})
+				})
+			}
+		})
+	}
+}
+
+func TestNoRelativePackagesResolverDefaults(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		settings map[string]any
+	}{
+		{"omitted", nil},
+		{"false", map[string]any{"import/resolver": false}},
+		{"empty string", map[string]any{"import/resolver": ""}},
+		{"node string", map[string]any{"import/resolver": "node"}},
+		{"node alias", map[string]any{"import/resolver": "eslint-import-resolver-node"}},
+		{"empty node options", map[string]any{"import/resolver": map[string]any{"node": map[string]any{}}}},
+		{"empty legacy options", map[string]any{"import/resolve": map[string]any{}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := safetyRoot(t, "C01", true, false)
+			item := safePackageCase("packages/a/source.cjs", `const value = require("../b");`, "../b", "b", map[string]any{"commonjs": true})
+			item.Settings = tc.settings
+			rule_tester.RunRuleTester(root, "tsconfig.json", t, &target.NoRelativePackagesRule, nil, []rule_tester.InvalidTestCase{item})
+		})
+	}
+}

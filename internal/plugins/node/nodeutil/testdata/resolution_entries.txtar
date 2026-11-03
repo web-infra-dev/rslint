@@ -157,3 +157,43 @@ module.exports = 1;
 {"main":"index.js","browser":{"./index.js":false}}
 -- node_modules/ignored-file/index.js --
 module.exports = 1;
+-- node-main/input.js --
+export {};
+-- node-main/b/package.json --
+{"main":"sub"}
+-- node-main/b/sub/package.json --
+{"main":"tool.js"}
+-- node-main/b/sub/index.js --
+module.exports = "INDEX";
+-- node-main/b/sub/tool.js --
+module.exports = "NESTED MAIN";
+-- node-main/missing-index/package.json --
+{"main":"sub"}
+-- node-main/missing-index/index.js --
+module.exports = "ROOT INDEX";
+-- node-main/missing-index/sub/package.json --
+{"main":"tool.js"}
+-- node-main/missing-index/sub/tool.js --
+module.exports = "NESTED MAIN";
+-- node-main/file-first/package.json --
+{"main":"sub"}
+-- node-main/file-first/sub.js --
+module.exports = "FILE";
+-- node-main/file-first/sub/package.json --
+{"main":"tool.js"}
+-- node-main/file-first/sub/index.js --
+module.exports = "INDEX";
+-- node-main/file-first/sub/tool.js --
+module.exports = "NESTED MAIN";
+-- node-main/malformed-main/package.json --
+{"main":"sub"}
+-- node-main/malformed-main/sub/package.json --
+{ invalid json }
+-- node-main/malformed-main/sub/index.js --
+module.exports = "INDEX";
+-- node-main/missing-entry/package.json --
+{"main":"sub"}
+-- node-main/missing-entry/sub/package.json --
+{"main":"tool.js"}
+-- node-main/missing-entry/sub/tool.js --
+module.exports = "NESTED MAIN";

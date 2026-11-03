@@ -363,3 +363,65 @@ import value from "../b/tool.js";
 {"name":"b"}
 -- E03/packages/b/tool.js --
 module.exports = "ORIGINAL";
+-- M05/packages/a/package.json --
+{"name":"a"}
+-- M05/packages/a/source.cjs --
+const value = require("../b");
+-- M05/packages/b/package.json --
+{"name":"b","main":"sub","exports":"./sub/tool.js"}
+-- M05/packages/b/sub/package.json --
+{"main":"tool.js"}
+-- M05/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- M05/packages/b/sub/tool.js --
+module.exports = "CHANGED";
+-- M06/packages/a/package.json --
+{"name":"a"}
+-- M06/packages/a/source.cjs --
+const value = require("../b");
+-- M06/packages/b/package.json --
+{"name":"b","main":"sub","exports":"./sub/index.js"}
+-- M06/packages/b/sub/package.json --
+{"main":"tool.js"}
+-- M06/packages/b/sub/index.js --
+module.exports = "ORIGINAL";
+-- M06/packages/b/sub/tool.js --
+module.exports = "CHANGED";
+-- M07/packages/a/package.json --
+{"name":"a"}
+-- M07/packages/a/source.cjs --
+const value = require("../b");
+-- M07/packages/b/package.json --
+{"name":"b","main":"sub","exports":"./index.js"}
+-- M07/packages/b/index.js --
+module.exports = "ORIGINAL";
+-- M07/packages/b/sub/package.json --
+{"main":"tool.js"}
+-- M07/packages/b/sub/tool.js --
+module.exports = "CHANGED";
+-- M08/packages/a/package.json --
+{"name":"a"}
+-- M08/packages/a/source.cjs --
+const value = require("../b");
+-- M08/packages/b/package.json --
+{"name":"b","main":"sub","exports":"./sub.js"}
+-- M08/packages/b/sub.js --
+module.exports = "ORIGINAL";
+-- M08/packages/b/sub/package.json --
+{"main":"tool.js"}
+-- M08/packages/b/sub/index.js --
+module.exports = "INDEX";
+-- M08/packages/b/sub/tool.js --
+module.exports = "CHANGED";
+-- M09/packages/a/package.json --
+{"name":"a"}
+-- M09/packages/a/source.cjs --
+const value = require("../b/sub");
+-- M09/packages/b/package.json --
+{"name":"b","main":"sub"}
+-- M09/packages/b/sub/package.json --
+{"main":"tool.js"}
+-- M09/packages/b/sub/index.js --
+module.exports = "INDEX";
+-- M09/packages/b/sub/tool.js --
+module.exports = "ORIGINAL";

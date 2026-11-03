@@ -38,6 +38,8 @@ Suggestions are limited to `.js`, `.cjs`, and `.mjs` inputs and targets. They ar
 
 Suggestions assume default Node runtime behavior. Projects using custom conditions, symlink flags, or a bundler should review the suggested change against their own resolution settings.
 
+The built-in TypeScript fallback does not disable this independent Node check. Explicit resolver chains still omit suggestions. When a package's `main` names a directory, verification tries that target as a file and then its index files; it does not follow the target directory's own `package.json` entry point.
+
 ## Differences from upstream
 
 Upstream v2.32.0 offers unconditional autofixes based on the resolved file directory and the written basename. This can duplicate directory names, lose a package's `main` entry semantics, mistake a file named like its package directory for the package root, turn `..` into `.`, or select a private or different exports target. Rslint intentionally offers no autofix and only verified manual suggestions. Its diagnostic names the original import without promising an unverified replacement path.

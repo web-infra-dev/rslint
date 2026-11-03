@@ -202,6 +202,9 @@ resolution fails; `fullySpecified` limits file/directory guessing for the reques
 while package entry points and alias redirects retain their own lookup rules.
 Package alias fields reuse shared package metadata; all aliases reuse the same
 file probes before symlink resolution.
+Suggestion verification can select Node's `main` lookup independently of
+enhanced-resolve entry fields. A `main` directory contributes only its index
+files; its package metadata is excluded from that target lookup.
 Results retain failure details and separate resource suffixes from filesystem
 paths. Package JSON transformations share immutable text and metadata within a
 Program generation, keyed by the exact underlying read path and the options that
