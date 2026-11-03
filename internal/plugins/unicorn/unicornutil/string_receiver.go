@@ -301,6 +301,11 @@ func classifyStringTypeReference(
 		case ast.KindTypeAliasDeclaration:
 			return classifyStringTypeSyntax(ctx, declaration.AsTypeAliasDeclaration().Type, state, false)
 		case ast.KindTypeParameter:
+			// Alias arguments are not substituted here. A constraint alone cannot
+			// exclude an actual or defaulted any argument.
+			if declaration.Parent != nil && declaration.Parent.Kind == ast.KindTypeAliasDeclaration {
+				state.mayBeAny = true
+			}
 			return classifyStringTypeSyntax(ctx, declaration.AsTypeParameterDeclaration().Constraint, state, false)
 		case ast.KindInterfaceDeclaration:
 			return classifyStringInterface(ctx, declaration, state)

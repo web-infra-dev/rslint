@@ -124,7 +124,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 						if kind == "useStringCasting" && !canUseString {
 							continue
 						}
-						if kind == "useOptionalChaining" && node.Parent != nil && node.Parent.Kind == ast.KindTaggedTemplateExpression && node.Parent.AsTaggedTemplateExpression().Tag == node {
+						if kind == "useOptionalChaining" && isTemplateTag(node) {
 							continue
 						}
 						description := map[string]string{
@@ -252,6 +252,22 @@ func hasReceiverSideEffect(node *ast.Node, evaluator *utils.StaticStringEvaluato
 		return !found
 	})
 	return found
+}
+
+func isTemplateTag(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil; parent = node.Parent {
+		if parent.Kind == ast.KindTaggedTemplateExpression {
+			return parent.AsTaggedTemplateExpression().Tag == node
+		}
+		// Parentheses terminate an optional chain. Only follow access/call
+		// receivers and erased TS assertions within the same chain.
+		_, transparent := utils.TransparentExpression(parent)
+		if (!ast.IsAccessExpression(parent) && !ast.IsCallExpression(parent) && !transparent) || parent.Expression() != node {
+			return false
+		}
+		node = parent
+	}
+	return false
 }
 
 func isZero(node *ast.Node) bool {

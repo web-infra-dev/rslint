@@ -51,6 +51,20 @@ This rule has no options.
 Comparisons using very deeply nested type aliases may be left unchanged when
 their string type cannot be established promptly.
 
+Generic aliases whose result depends on a type parameter do not establish a
+string by themselves. For example, `type Text<T extends string> = T` does not
+enable this check for `Text<string>`. Use a direct `string` annotation or
+assertion to enable fixes.
+
+The optional-chaining suggestion is omitted for template tags reached through
+an unparenthesized member or call chain, for example:
+
+```javascript
+/^a/.test(value).toString`tag`;
+```
+
+Parentheses around the test result keep that suggestion available.
+
 Locally declared functions named `String`, `Date`, or other built-in string
 producers are checked using their own return annotations. Their names alone do
 not make their results strings. The string-conversion suggestion is also omitted
