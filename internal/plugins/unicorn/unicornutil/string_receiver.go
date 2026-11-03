@@ -19,6 +19,13 @@ func IsKnownNonString(ctx rule.RuleContext, node *ast.Node) bool {
 	}) == TypeNonTarget
 }
 
+// IsKnownNonStringSyntax uses authored syntax and annotations without compiler
+// inference, matching rules running without upstream parser type services.
+func IsKnownNonStringSyntax(ctx rule.RuleContext, node *ast.Node) bool {
+	ctx.TypeChecker = nil
+	return IsKnownNonString(ctx, node)
+}
+
 // IsKnownNonStringType reports whether the checker alone proves that node is
 // not string-like. Rules that require type information and intentionally do
 // not follow Unicorn's syntax classifier use this narrower helper.
@@ -161,7 +168,13 @@ func classifyStringTypeNode(
 	node *ast.Node,
 	visitedSymbols map[*ast.Symbol]bool,
 ) TypeClass {
-	if node == nil || utils.IsJSDocSyntaxNode(node) {
+	return classifyStringTypeSyntax(ctx, node, visitedSymbols, false)
+}
+
+// The positive string proof also accepts the same TS-shaped nodes parsed from
+// JSDoc; existing classifiers retain their original JSDoc policy.
+func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, visitedSymbols map[*ast.Symbol]bool, includeJSDoc bool) TypeClass {
+	if node == nil || (!includeJSDoc && utils.IsJSDocSyntaxNode(node)) {
 		return TypeUnknown
 	}
 	for node.Kind == ast.KindParenthesizedType {
@@ -175,15 +188,17 @@ func classifyStringTypeNode(
 		if operator.Operator != ast.KindReadonlyKeyword {
 			return TypeUnknown
 		}
-		return classifyStringTypeNode(ctx, operator.Type, visitedSymbols)
+		return classifyStringTypeSyntax(ctx, operator.Type, visitedSymbols, includeJSDoc)
 	}
 
 	switch node.Kind {
+	case ast.KindJSDocNonNullableType:
+		return classifyStringTypeSyntax(ctx, node.Type(), visitedSymbols, includeJSDoc)
 	case ast.KindStringKeyword:
 		return TypeTarget
 	case ast.KindLiteralType:
 		literal := node.AsLiteralTypeNode().Literal
-		if literal != nil && literal.Kind == ast.KindStringLiteral {
+		if literal != nil && ast.IsStringLiteralLike(literal) {
 			return TypeTarget
 		}
 		return TypeNonTarget
@@ -197,14 +212,14 @@ func classifyStringTypeNode(
 		types := node.AsUnionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyStringTypeNode(ctx, part, visitedSymbols))
+			classes = append(classes, classifyStringTypeSyntax(ctx, part, visitedSymbols, includeJSDoc))
 		}
 		return combineStringUnion(classes)
 	case ast.KindIntersectionType:
 		types := node.AsIntersectionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyStringTypeNode(ctx, part, visitedSymbols))
+			classes = append(classes, classifyStringTypeSyntax(ctx, part, visitedSymbols, includeJSDoc))
 		}
 		return combineStringIntersection(classes)
 	case ast.KindTypeReference:

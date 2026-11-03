@@ -1,0 +1,5982 @@
+[
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {{decodeURI: () => string[]}} value */ function run(value) { return value.decodeURI().indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {Date} value */ function run(value) { return value.toJSON().indexOf(\"2026\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {?Date} value */ function run(value) { return value.toISOString().indexOf(\"2026\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {{toISOString: () => number[]}} value */ function run(value) { return value.toISOString().indexOf(2026) === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return encodeURI(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 95,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return encodeURI(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return encodeURIComponent(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 104,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return encodeURIComponent(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return decodeURI(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 95,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return decodeURI(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return decodeURIComponent(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 104,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return decodeURIComponent(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return atob(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return atob(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {unknown} value */ function run(value) { return btoa(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return btoa(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 1",
+    "code": "/** @param {Date} value */ function run(value) { return value.toISOString().indexOf(\"2026\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 98,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {Date} value */ function run(value) { return value.toISOString().startsWith(\"2026\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {{decodeURI: () => string[]}} value */ function run(value) { return value.decodeURI().indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {Date} value */ function run(value) { return value.toJSON().indexOf(\"2026\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {?Date} value */ function run(value) { return value.toISOString().indexOf(\"2026\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {{toISOString: () => number[]}} value */ function run(value) { return value.toISOString().indexOf(2026) === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return encodeURI(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 95,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return encodeURI(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return encodeURIComponent(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 104,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return encodeURIComponent(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return decodeURI(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 95,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return decodeURI(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return decodeURIComponent(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 104,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return decodeURIComponent(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return atob(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return atob(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {unknown} value */ function run(value) { return btoa(value).indexOf(\"a\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 60,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {unknown} value */ function run(value) { return btoa(value).startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 2",
+    "code": "/** @param {Date} value */ function run(value) { return value.toISOString().indexOf(\"2026\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 98,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {Date} value */ function run(value) { return value.toISOString().startsWith(\"2026\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 4",
+    "code": "/** @param {number[]} value */ function run(value) { return value.indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 4",
+    "code": "/** @param {string} value */ function run(value) { return value.indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 59,
+        "endLine": 1,
+        "endColumn": 83,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {string} value */ function run(value) { return value.startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 5",
+    "code": "(/* keep */ \"abc\").indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": ["(/* keep */ \"abc\").startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 5",
+    "code": "\"abc\".indexOf((/* keep */ \"a\")) !== 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"abc\".startsWith((/* keep */ \"a\"));"]
+  },
+  {
+    "group": "upstream group 5",
+    "code": "\"abc\".slice(-1) === (/* keep */ \"c\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 37,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"abc\".endsWith((/* keep */ \"c\"));"]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "0 === ((\"abc\" /* keep */)).indexOf(\"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 40,
+        "suggestions": []
+      }
+    ],
+    "output": ["((\"abc\" /* keep */)).startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "\"abc\".slice(0, 1) != (\"a\" // keep\r\n);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 2,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"abc\".startsWith((\"a\" // keep\r\n));"]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "before()\n0 === (/* keep */ \"abc\").indexOf(\"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": ["before()\n;(/* keep */ \"abc\").startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "(text as /* keep */ string).indexOf(\"a\") === 0;",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 47,
+        "suggestions": []
+      }
+    ],
+    "output": ["(text as /* keep */ string).startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "function f(text: string, prefix: string) { return text.slice(0, prefix.length) === (prefix as /* keep */ string); }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 51,
+        "endLine": 1,
+        "endColumn": 113,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "function f(text: string, prefix: string) { return text.startsWith((prefix as /* keep */ string)); }"
+    ]
+  },
+  {
+    "group": "upstream group 6",
+    "code": "\"abc\"./* discard */indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 6",
+    "code": "\"abc\".indexOf(/* discard */ \"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 39,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 6",
+    "code": "(\"abc\".indexOf(\"a\") /* discard */) === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 41,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 6",
+    "code": "\"abc\".slice(0, /* discard */ 1) === (/* keep */ \"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 53,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 6",
+    "code": "\"abc\".slice(0, 1) /* discard */ === (/* keep */ \"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 53,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 7",
+    "code": "/^a/.test({value: \"abc\"}.value);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["({value: \"abc\"}.value).startsWith('a');"]
+  },
+  {
+    "group": "upstream group 7",
+    "code": "/c$/.test({value: \"abc\"}.value);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["({value: \"abc\"}.value).endsWith('c');"]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "const text = \"abc\"; const element = <div>{\"a\" === text.slice(0, 1)}</div>;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 43,
+        "endLine": 1,
+        "endColumn": 67,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; const element = <div>{text.startsWith(\"a\")}</div>;"
+    ]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "const text = \"abc\";\r\n(\"c\") === (text).slice(-1);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 27,
+        "suggestions": []
+      }
+    ],
+    "output": ["const text = \"abc\";\r\n(text).endsWith((\"c\"));"]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "const text: string = \"abc\"; \"a\" === (text as string).slice(0, 1);",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 29,
+        "endLine": 1,
+        "endColumn": 65,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\"; (text as string).startsWith(\"a\");"
+    ]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "const text: string = \"abc\"; \"c\" !== text!.slice(-1);",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 29,
+        "endLine": 1,
+        "endColumn": 52,
+        "suggestions": []
+      }
+    ],
+    "output": ["const text: string = \"abc\"; !text!.endsWith(\"c\");"]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "const text: string = \"abc\"; \"a\" === (text satisfies string).slice(0, 1);",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 29,
+        "endLine": 1,
+        "endColumn": 72,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\"; (text satisfies string).startsWith(\"a\");"
+    ]
+  },
+  {
+    "group": "upstream group 8",
+    "code": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } needle === String(value()).slice(0, needle.length);",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 76,
+        "endLine": 1,
+        "endColumn": 126,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).startsWith(needle);"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return/* keep *//^a/.test(text); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 54,
+        "endLine": 1,
+        "endColumn": 69,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return/* keep */text.startsWith('a'); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return(/^a/).test(text); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 61,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return (text).startsWith('a'); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return!/^a/.test(text); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 45,
+        "endLine": 1,
+        "endColumn": 60,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return!text.startsWith('a'); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return(0) !== text.indexOf(\"a\"); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 69,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return !text.startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return(\"c\") !== text.slice(-1); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 68,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return !text.endsWith((\"c\")); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return /c$/.test(text); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 45,
+        "endLine": 1,
+        "endColumn": 60,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.endsWith('c'); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return\t(0) === text.indexOf(\"a\"); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 45,
+        "endLine": 1,
+        "endColumn": 70,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return\ttext.startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return/* keep */(\"a\") === text.slice(0, 1); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 54,
+        "endLine": 1,
+        "endColumn": 80,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return/* keep */text.startsWith((\"a\")); }"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; const element = <div>{(0) === text.indexOf(\"a\")}</div>;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 43,
+        "endLine": 1,
+        "endColumn": 68,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; const element = <div>{text.startsWith(\"a\")}</div>;"
+    ]
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return(0) /* keep */ === text.indexOf(\"a\"); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 80,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 9",
+    "code": "const text = \"abc\"; function run() { return(\"a\") /* keep */ === text.slice(0, 1); }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 81,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.startsWith(\"bar\")",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.endsWith(\"bar\")",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "reject(new Error(\"foo\"))",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"\".test()",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "test()",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "test.test()",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "startWith(\"bar\")",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo()()",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "if (foo.match(/^foo/)) {}",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "if (/^foo/.exec(foo)) {}",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo+/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo+$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^[,af]/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/[,af]$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^\\w/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/\\w$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo./.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo.$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/\\^foo/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo/i.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo/m.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo/im.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^A|B/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/A|B$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo$/y.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo$/gy.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") !== 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "0 === foo.indexOf(\"bar\")",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "let foo = \"hello\"; foo = 123; foo.indexOf(\"h\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") === 1",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") > 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") >= 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf(\"bar\") < 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\".indexOf(\"bar\") === -1",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\".indexOf(\"bar\", 1) === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo?.indexOf(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo.indexOf?.(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\"?.indexOf(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\".indexOf?.(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "foo[\"indexOf\"](\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\"[\"indexOf\"](\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "\"foo\".indexOf(...\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "new String(\"foo\").indexOf(\"bar\") === 0",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "function foo(value: number) { /^foo/.test(value); }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "function foo(values: string[]) { return values.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "function foo(value: [string]) { return value.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "type Value = {indexOf(searchString: string): number}; const value: Value = {} as never; { type Value = string; value.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 17,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.startsWith('foo')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 17,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.endsWith('foo')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^!/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).startsWith('!')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.startsWith('!')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').startsWith('!')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.startsWith('!')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/!$/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).endsWith('!')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.endsWith('!')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').endsWith('!')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.endsWith('!')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^ /.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).startsWith(' ')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.startsWith(' ')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').startsWith(' ')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.startsWith(' ')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/ $/.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).endsWith(' ')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.endsWith(' ')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').endsWith(' ')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.endsWith(' ')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^foo/y.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 18,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.startsWith('foo')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/foo$/g.test(bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 18,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(bar).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "bar?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(bar ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["bar.endsWith('foo')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const object = {value: true}; Object.defineProperty(object, \"value\", {get() { return false; }}); /^foo/.test(object.value ? \"foo\" : value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 98,
+        "endLine": 1,
+        "endColumn": 139,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const object = {value: true}; Object.defineProperty(object, \"value\", {get() { return false; }}); String(object.value ? \"foo\" : value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const object = {value: true}; Object.defineProperty(object, \"value\", {get() { return false; }}); (object.value ? \"foo\" : value)?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const object = {value: true}; Object.defineProperty(object, \"value\", {get() { return false; }}); ((object.value ? \"foo\" : value) ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "const object = {value: true}; Object.defineProperty(object, \"value\", {get() { return false; }}); (object.value ? \"foo\" : value).startsWith('foo')"
+    ]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const foo = {}; /^abc/.test(foo);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 17,
+        "endLine": 1,
+        "endColumn": 33,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const foo = {}; String(foo).startsWith('abc');"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const foo = {}; foo?.startsWith('abc');"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const foo = {}; (foo ?? '').startsWith('abc');"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const foo = 123; /^abc/.test(foo);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 18,
+        "endLine": 1,
+        "endColumn": 34,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const foo = 123; String(foo).startsWith('abc');"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const foo = 123; foo?.startsWith('abc');"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const foo = 123; (foo ?? '').startsWith('abc');"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const foo = \"hello\"; /^abc/.test(foo);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 22,
+        "endLine": 1,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": ["const foo = \"hello\"; foo.startsWith('abc');"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const value = \"hello\"; /^abc/.test(value satisfies {startsWith(searchString: string): boolean});",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 96,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const value = \"hello\"; (value satisfies {startsWith(searchString: string): boolean}).startsWith('abc');"
+    ]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "/^b/.test((a))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String((a)).startsWith('b')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(a)?.startsWith('b')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((a) ?? '').startsWith('b')"
+          }
+        ]
+      }
+    ],
+    "output": ["(a).startsWith('b')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "(/^b/).test((a))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 17,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "(String((a))).startsWith('b')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "((a))?.startsWith('b')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((a) ?? '').startsWith('b')"
+          }
+        ]
+      }
+    ],
+    "output": ["((a)).startsWith('b')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const fn = async () => /^b/.test(await foo)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 44,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const fn = async () => String(await foo).startsWith('b')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const fn = async () => (await foo)?.startsWith('b')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const fn = async () => ((await foo) ?? '').startsWith('b')"
+          }
+        ]
+      }
+    ],
+    "output": ["const fn = async () => (await foo).startsWith('b')"]
+  },
+  {
+    "group": "upstream group 10",
+    "code": "const fn = async () => (/^b/).test(await foo)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 24,
+        "endLine": 1,
+        "endColumn": 46,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const fn = async () => (String(await foo)).startsWith('b')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const fn = async () => (await foo)?.startsWith('b')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const fn = async () => ((await foo) ?? '').startsWith('b')"
+          }
+        ]
+      }
+    ],
+    "output": ["const fn = async () => (await foo).startsWith('b')"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "`foo`.indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["`foo`.startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "String(x).indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 29,
+        "suggestions": []
+      }
+    ],
+    "output": ["String(x).startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(\"f\") !== 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(\"f\") /* comment */ === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 39,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "function foo(s: string) { return s.indexOf(bar!) === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 34,
+        "endLine": 1,
+        "endColumn": 55,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "0 === \"foo\".indexOf(\"f\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "0 !== \"foo\".indexOf(\"f\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(\"f\") == 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 24,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(\"f\") != 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 24,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"foo\".startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "const foo = \"hello\"; foo.indexOf(\"h\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 22,
+        "endLine": 1,
+        "endColumn": 44,
+        "suggestions": []
+      }
+    ],
+    "output": ["const foo = \"hello\"; foo.startsWith(\"h\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(typeof foo).indexOf(\"u\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["(typeof foo).startsWith(\"u\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(\"a\" + b).indexOf(\"a\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 29,
+        "suggestions": []
+      }
+    ],
+    "output": ["(\"a\" + b).startsWith(\"a\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "function foo(bar: string) { return bar.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 36,
+        "endLine": 1,
+        "endColumn": 58,
+        "suggestions": []
+      }
+    ],
+    "output": ["function foo(bar: string) { return bar.startsWith(\"x\"); }"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "type StringAlias = string; function foo(bar: StringAlias) { return bar.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 68,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "type StringAlias = string; function foo(bar: StringAlias) { return bar.startsWith(\"x\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(foo as string).indexOf(\"x\") === 0",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 35,
+        "suggestions": []
+      }
+    ],
+    "output": ["(foo as string).startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(foo satisfies string).indexOf(\"x\") === 0",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 42,
+        "suggestions": []
+      }
+    ],
+    "output": ["(foo satisfies string).startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(<string>foo).indexOf(\"x\") === 0",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 33,
+        "suggestions": []
+      }
+    ],
+    "output": ["(<string>foo).startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "function foo(bar: string) { return bar!.indexOf(\"x\") === 0; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 36,
+        "endLine": 1,
+        "endColumn": 59,
+        "suggestions": []
+      }
+    ],
+    "output": ["function foo(bar: string) { return bar!.startsWith(\"x\"); }"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "const value: string = \"x\"\nvalue!.indexOf(\"x\") === 0",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 26,
+        "suggestions": []
+      }
+    ],
+    "output": ["const value: string = \"x\"\nvalue!.startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(a ? \"foo\" : \"bar\").indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 39,
+        "suggestions": []
+      }
+    ],
+    "output": ["(a ? \"foo\" : \"bar\").startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(0, \"foo\").indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 30,
+        "suggestions": []
+      }
+    ],
+    "output": ["(0, \"foo\").startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf((0, \"f\")) === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 30,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"foo\".startsWith((0, \"f\"))"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "String.fromCharCode(65).indexOf(\"A\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 43,
+        "suggestions": []
+      }
+    ],
+    "output": ["String.fromCharCode(65).startsWith(\"A\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "String.fromCodePoint(65).indexOf(\"A\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 44,
+        "suggestions": []
+      }
+    ],
+    "output": ["String.fromCodePoint(65).startsWith(\"A\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "(\"foo\").indexOf(\"f\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 27,
+        "suggestions": []
+      }
+    ],
+    "output": ["(\"foo\").startsWith(\"f\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "let foo = \"hello\"; foo.indexOf(\"h\") === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 20,
+        "endLine": 1,
+        "endColumn": 42,
+        "suggestions": []
+      }
+    ],
+    "output": ["let foo = \"hello\"; foo.startsWith(\"h\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(/f/) === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "const pattern = /f/; \"foo\".indexOf(pattern) === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 22,
+        "endLine": 1,
+        "endColumn": 50,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(new RegExp(\"f\")) === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 37,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "\"foo\".indexOf(bar) === 0",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 11",
+    "code": "foo\n0 === (value as string).indexOf(\"x\")",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 37,
+        "suggestions": []
+      }
+    ],
+    "output": ["foo\n;(value as string).startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 11",
+    "code": "foo\n0 === (\"a\" + value).indexOf(\"a\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 33,
+        "suggestions": []
+      }
+    ],
+    "output": ["foo\n;(\"a\" + value).startsWith(\"a\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "value.slice(0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const value = [1, 2, 3]; value.slice(0, 1) === \"1\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice?.(0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\"?.slice(0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\"[\"slice\"](0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(...[0, 5]) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, ...[5]) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(1, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 4) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-4) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-5, -1) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "function foo(value: string, prefix: string, other: string) { return value.slice(0, other.length) === prefix; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-0) === \"\"",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const suffix = \"\"; \"shark\".slice(-suffix.length) === suffix",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "function foo(value: string, suffix: string) { return value.slice(-suffix.length) === suffix; }",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) === 123",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-5) === /shark/",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) === prefix",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const modes = new Set(['foo']);\nmodes.clear();\n'foo'.slice(0, 1) === (modes.size ? 'f' : 'foo');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const modes = new Set(['foo']);\nmodes.clear();\n'foo'.slice(0, 1) === ((modes.size && 'f') || prefix);",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".startsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 30,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".endsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\" === \"shark\".slice(0, 5)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".startsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\" !== \"shark\".slice(-5)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 30,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"shark\".endsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) == \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 31,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".startsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) !== \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"shark\".startsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-5) != \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 29,
+        "suggestions": []
+      }
+    ],
+    "output": ["!\"shark\".endsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "(\"shark\").slice(0, 5) === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 34,
+        "suggestions": []
+      }
+    ],
+    "output": ["(\"shark\").startsWith(\"shark\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "function foo(value: string, prefix: string) { return value.slice(0, prefix.length) === prefix; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 54,
+        "endLine": 1,
+        "endColumn": 94,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "function foo(value: string, prefix: string) { return value.startsWith(prefix); }"
+    ]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "(\"a\" + value).slice(0, 1) === \"a\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 34,
+        "suggestions": []
+      }
+    ],
+    "output": ["(\"a\" + value).startsWith(\"a\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "function foo(value: string) { return value!.slice(0, 1) === \"x\"; }",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 38,
+        "endLine": 1,
+        "endColumn": 64,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "function foo(value: string) { return value!.startsWith(\"x\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const value: string = \"x\"\nvalue!.slice(0, 1) === \"x\"",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 27,
+        "suggestions": []
+      }
+    ],
+    "output": ["const value: string = \"x\"\nvalue!.startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 1) === (0, \"s\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 33,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".startsWith((0, \"s\"))"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(-1) === (0, \"k\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 31,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"shark\".endsWith((0, \"k\"))"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "const suffix = \"ark\"; \"shark\".slice(-suffix.length) === suffix",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 23,
+        "endLine": 1,
+        "endColumn": 63,
+        "suggestions": []
+      }
+    ],
+    "output": ["const suffix = \"ark\"; \"shark\".endsWith(suffix)"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "\"shark\".slice(0, 5) /* comment */ === \"shark\"",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 46,
+        "suggestions": []
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "upstream group 12",
+    "code": "foo\n\"x\" === (value as string).slice(0, 1)",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 38,
+        "suggestions": []
+      }
+    ],
+    "output": ["foo\n;(value as string).startsWith(\"x\")"]
+  },
+  {
+    "group": "upstream group 12",
+    "code": "foo\n\"a\" !== (\"a\" + value).slice(-1)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 2,
+        "column": 1,
+        "endLine": 2,
+        "endColumn": 32,
+        "suggestions": []
+      }
+    ],
+    "output": ["foo\n!(\"a\" + value).endsWith(\"a\")"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(\"string\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"string\".startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test((0, \"string\"))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": ["(0, \"string\").startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "async function a() {return /^a/.test(await foo())}",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 28,
+        "endLine": 1,
+        "endColumn": 50,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "async function a() {return String(await foo()).startsWith('a')}"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "async function a() {return (await foo())?.startsWith('a')}"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "async function a() {return ((await foo()) ?? '').startsWith('a')}"
+          }
+        ]
+      }
+    ],
+    "output": ["async function a() {return (await foo()).startsWith('a')}"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo + bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo + bar).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(foo + bar)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((foo + bar) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(foo + bar).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo || bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 22,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo || bar).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(foo || bar)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((foo || bar) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(foo || bar).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new SomeString)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 26,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new SomeString).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(new SomeString)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new SomeString ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(new SomeString).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new (SomeString))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 28,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new (SomeString)).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(new (SomeString))?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new (SomeString) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(new (SomeString)).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new SomeString())",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 28,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new SomeString()).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "new SomeString()?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new SomeString() ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["new SomeString().startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new new SomeClassReturnsAStringSubClass())",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 53,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new new SomeClassReturnsAStringSubClass()).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(new new SomeClassReturnsAStringSubClass())?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new new SomeClassReturnsAStringSubClass() ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(new new SomeClassReturnsAStringSubClass()).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new SomeString(/* comment */))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 41,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new SomeString(/* comment */)).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "new SomeString(/* comment */)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new SomeString(/* comment */) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["new SomeString(/* comment */).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(new SomeString(\"string\"))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 36,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(new SomeString(\"string\")).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "new SomeString(\"string\")?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(new SomeString(\"string\") ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["new SomeString(\"string\").startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo.bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 19,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo.bar).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "foo.bar?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo.bar ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["foo.bar.startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo.bar())",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo.bar()).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "foo.bar()?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo.bar() ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["foo.bar().startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo?.bar)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo?.bar).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "foo?.bar?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo?.bar ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["foo?.bar.startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo?.bar())",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 22,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo?.bar()).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "foo?.bar()?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo?.bar() ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["foo?.bar().startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo!)",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 16,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo!).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "foo!?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo! ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["foo!.startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(`string`)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": []
+      }
+    ],
+    "output": ["`string`.startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(tagged`string`)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 26,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(tagged`string`).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "tagged`string`?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(tagged`string` ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["tagged`string`.startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "(/^a/).test((0, \"string\"))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 27,
+        "suggestions": []
+      }
+    ],
+    "output": ["((0, \"string\")).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(true ? a : b)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 24,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(true ? a : b).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(true ? a : b)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((true ? a : b) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(true ? a : b).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/a$/.test(a ??= b)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 19,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(a ??= b).endsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(a ??= b)?.endsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((a ??= b) ?? '').endsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(a ??= b).endsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(a || b)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 18,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(a || b).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(a || b)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((a || b) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(a || b).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(a && b)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 18,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(a && b).startsWith('a')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(a && b)?.startsWith('a')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((a && b) ?? '').startsWith('a')"
+          }
+        ]
+      }
+    ],
+    "output": ["(a && b).startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/u.test(\"string\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"string\".startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/v.test(\"string\")",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": []
+      }
+    ],
+    "output": ["\"string\".startsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/a$/.test(`${unknown}`)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 24,
+        "suggestions": []
+      }
+    ],
+    "output": ["`${unknown}`.endsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/a$/.test(String(unknown))",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 27,
+        "suggestions": []
+      }
+    ],
+    "output": ["String(unknown).endsWith('a')"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/* 1 */\n(\n\t/* 2 */\n\t(\n\t\t/* 3 */\n\t\t/^a/\n\t\t/* 4 */\n\t)\n\t/* 5 */\n)\n/* 6 */\n. /* 7 */ test /* 8 */ (\n\t/* 9 */\n\t(\n\t\t/* 10 */\n\t\t(\n\t\t\t/* 11 */\n\t\t\ta\n\t\t\t/* 12 */\n\t\t)\n\t\t/* 13 */\n\t)\n\t/* 14 */\n) /* 15 */",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 2,
+        "column": 1,
+        "endLine": 24,
+        "endColumn": 2,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "/* 1 */\n(\n\t/* 2 */\n\t(\n\t\t/* 3 */\n\t\tString((\n\t\t/* 10 */\n\t\t(\n\t\t\t/* 11 */\n\t\t\ta\n\t\t\t/* 12 */\n\t\t)\n\t\t/* 13 */\n\t))\n\t\t/* 4 */\n\t)\n\t/* 5 */\n)\n/* 6 */\n. /* 7 */ startsWith /* 8 */ (\n\t/* 9 */\n\t'a'\n\t/* 14 */\n) /* 15 */"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "/* 1 */\n(\n\t/* 2 */\n\t(\n\t\t/* 3 */\n\t\t(\n\t\t/* 10 */\n\t\t(\n\t\t\t/* 11 */\n\t\t\ta\n\t\t\t/* 12 */\n\t\t)\n\t\t/* 13 */\n\t)\n\t\t/* 4 */\n\t)\n\t/* 5 */\n)\n/* 6 */\n?. /* 7 */ startsWith /* 8 */ (\n\t/* 9 */\n\t'a'\n\t/* 14 */\n) /* 15 */"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "/* 1 */\n(\n\t/* 2 */\n\t(\n\t\t/* 3 */\n\t\t(\n\t\t/* 10 */\n\t\t(\n\t\t\t/* 11 */\n\t\t\ta\n\t\t\t/* 12 */\n\t\t)\n\t\t/* 13 */\n\t) ?? ''\n\t\t/* 4 */\n\t)\n\t/* 5 */\n)\n/* 6 */\n. /* 7 */ startsWith /* 8 */ (\n\t/* 9 */\n\t'a'\n\t/* 14 */\n) /* 15 */"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "/* 1 */\n(\n\t/* 2 */\n\t(\n\t\t/* 3 */\n\t\t(\n\t\t/* 10 */\n\t\t(\n\t\t\t/* 11 */\n\t\t\ta\n\t\t\t/* 12 */\n\t\t)\n\t\t/* 13 */\n\t)\n\t\t/* 4 */\n\t)\n\t/* 5 */\n)\n/* 6 */\n. /* 7 */ startsWith /* 8 */ (\n\t/* 9 */\n\t'a'\n\t/* 14 */\n) /* 15 */"
+    ]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "/^a/.test(foo)\n`tpl`",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 15,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(foo).startsWith('a')\n`tpl`"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(foo ?? '').startsWith('a')\n`tpl`"
+          }
+        ]
+      }
+    ],
+    "output": ["foo.startsWith('a')\n`tpl`"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "bar(/^a/.test(foo)`tpl`)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 5,
+        "endLine": 1,
+        "endColumn": 19,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "bar(String(foo).startsWith('a')`tpl`)"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "bar((foo ?? '').startsWith('a')`tpl`)"
+          }
+        ]
+      }
+    ],
+    "output": ["bar(foo.startsWith('a')`tpl`)"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "`${/^a/.test(foo)`tpl`}`",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 18,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "`${String(foo).startsWith('a')`tpl`}`"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "`${(foo ?? '').startsWith('a')`tpl`}`"
+          }
+        ]
+      }
+    ],
+    "output": ["`${foo.startsWith('a')`tpl`}`"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "(/^a/.test(foo))\n`tpl`",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 2,
+        "endLine": 1,
+        "endColumn": 16,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "(String(foo).startsWith('a'))\n`tpl`"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "(foo?.startsWith('a'))\n`tpl`"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "((foo ?? '').startsWith('a'))\n`tpl`"
+          }
+        ]
+      }
+    ],
+    "output": ["(foo.startsWith('a'))\n`tpl`"]
+  },
+  {
+    "group": "upstream group 13",
+    "code": "`${/^a/.test((foo))}`",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 4,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "`${String((foo)).startsWith('a')}`"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "`${(foo)?.startsWith('a')}`"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "`${((foo) ?? '').startsWith('a')}`"
+          }
+        ]
+      }
+    ],
+    "output": ["`${(foo).startsWith('a')}`"]
+  },
+  {
+    "group": "upstream group 14",
+    "code": "({value: \"abc\"}.value.indexOf(\"a\")) === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 42,
+        "suggestions": []
+      }
+    ],
+    "output": ["({value: \"abc\"}.value).startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 14",
+    "code": "({value: \"abc\"}.value.slice(0, 1)) === \"a\";",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 43,
+        "suggestions": []
+      }
+    ],
+    "output": ["({value: \"abc\"}.value).startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 14",
+    "code": "const value = ({value: \"abc\"}.value.indexOf(\"a\")) === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 15,
+        "endLine": 1,
+        "endColumn": 56,
+        "suggestions": []
+      }
+    ],
+    "output": ["const value = {value: \"abc\"}.value.startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 14",
+    "code": "({value: \"abc\"}.value.indexOf(\"a\")) !== 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 42,
+        "suggestions": []
+      }
+    ],
+    "output": ["!{value: \"abc\"}.value.startsWith(\"a\");"]
+  },
+  {
+    "group": "upstream group 15",
+    "code": "/** @param {() => ?string} read */ function run(read) { return read().indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 15",
+    "code": "/** @returns {string} */ async function read() { return source; } read().indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 15",
+    "code": "/** @param {() => string} read */ function run(read) { return read().indexOf(\"a\") === 0; }",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 63,
+        "endLine": 1,
+        "endColumn": 88,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @param {() => string} read */ function run(read) { return read().startsWith(\"a\"); }"
+    ]
+  },
+  {
+    "group": "upstream group 16",
+    "code": "/** @type {unknown} */ const value = \"text\"; const alias = value; alias.indexOf(\"t\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 16",
+    "code": "/** @type {unknown} */ const value = \"text\"; (value as unknown).indexOf(\"t\") === 0;",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 17",
+    "code": "/** @type {{(): string; (value: number): number}} */ let read; read().indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 17",
+    "code": "/** @type {(() => string) | (() => number)} */ let read; read().indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "upstream group 17",
+    "code": "/** @type {{(): string; label: string}} */ let read; read().indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 54,
+        "endLine": 1,
+        "endColumn": 79,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @type {{(): string; label: string}} */ let read; read().startsWith(\"a\");"
+    ]
+  },
+  {
+    "group": "upstream group 17",
+    "code": "/** @type {(() => string) & {label: string}} */ let read; read().indexOf(\"a\") === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 59,
+        "endLine": 1,
+        "endColumn": 84,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "/** @type {(() => string) & {label: string}} */ let read; read().startsWith(\"a\");"
+    ]
+  },
+  {
+    "group": "comment-preserving string boundary edits evaluate operands once in order",
+    "code": "String(read(/* receiver */)).indexOf(String(search(/* search */))) === 0;",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 73,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "String(read(/* receiver */)).startsWith(String(search(/* search */)));"
+    ]
+  },
+  {
+    "group": "comment-preserving string boundary edits evaluate operands once in order",
+    "code": "String(read(/* receiver */)).slice(0, 1) === (/* search */ \"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 64,
+        "suggestions": []
+      }
+    ],
+    "output": ["String(read(/* receiver */)).startsWith((/* search */ \"a\"));"]
+  },
+  {
+    "group": "comment-preserving string boundary edits evaluate operands once in order",
+    "code": "String(read(/* receiver */)).slice(-1) !== (/* search */ \"a\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 62,
+        "suggestions": []
+      }
+    ],
+    "output": ["!String(read(/* receiver */)).endsWith((/* search */ \"a\"));"]
+  },
+  {
+    "group": "comment-preserving reversed string boundary edits remain suggestions when value capture changes",
+    "code": "let needle: string = \"a\"; function read() { needle = \"ab\"; return \"ab\"; } (/* search */ needle) === String(read(/* receiver */)).slice(0, needle.length);",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 75,
+        "endLine": 1,
+        "endColumn": 153,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "let needle: string = \"a\"; function read() { needle = \"ab\"; return \"ab\"; } String(read(/* receiver */)).startsWith((/* search */ needle));"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "comment-preserving reversed string boundary edits remain suggestions when value capture changes",
+    "code": "let needle: string = \"a\"; function read() { needle = \"ab\"; return \"ab\"; } String(read(/* receiver */)).startsWith((/* search */ needle));",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for ===",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = needle === String(value()).slice(0, needle.length);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 4,
+        "column": 16,
+        "endLine": 4,
+        "endColumn": 66,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = String(value()).startsWith(needle);\nJSON.stringify({result, events});"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for ===",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = String(value()).startsWith(needle);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for !==",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = needle !== String(value()).slice(0, needle.length);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 4,
+        "column": 16,
+        "endLine": 4,
+        "endColumn": 66,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = !String(value()).startsWith(needle);\nJSON.stringify({result, events});"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for !==",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = !String(value()).startsWith(needle);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for ==",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = needle == String(value()).slice(0, needle.length);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 4,
+        "column": 16,
+        "endLine": 4,
+        "endColumn": 65,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = String(value()).startsWith(needle);\nJSON.stringify({result, events});"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "reversed slice suggestions expose the changed value capture for !=",
+    "code": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = needle != String(value()).slice(0, needle.length);\nJSON.stringify({result, events});",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 4,
+        "column": 16,
+        "endLine": 4,
+        "endColumn": 65,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "const events = [];\nlet needle: string = \"a\";\nfunction value() { events.push(\"receiver\"); needle = \"ab\"; return \"ab\"; }\nconst result = !String(value()).startsWith(needle);\nJSON.stringify({result, events});"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "left-side slice calls retain their autofixes and evaluation order",
+    "code": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).slice(0, needle.length) === needle;",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 76,
+        "endLine": 1,
+        "endColumn": 126,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).startsWith(needle);"
+    ]
+  },
+  {
+    "group": "left-side slice calls retain their autofixes and evaluation order",
+    "code": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).slice(0, needle.length) !== needle;",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 76,
+        "endLine": 1,
+        "endColumn": 126,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } !String(value()).startsWith(needle);"
+    ]
+  },
+  {
+    "group": "left-side slice calls retain their autofixes and evaluation order",
+    "code": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).slice(0, needle.length) == needle;",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 76,
+        "endLine": 1,
+        "endColumn": 125,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).startsWith(needle);"
+    ]
+  },
+  {
+    "group": "left-side slice calls retain their autofixes and evaluation order",
+    "code": "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } String(value()).slice(0, needle.length) != needle;",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 76,
+        "endLine": 1,
+        "endColumn": 125,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "let needle: string = \"a\"; function value() { needle = \"ab\"; return \"ab\"; } !String(value()).startsWith(needle);"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve return: /^a/.test(text)",
+    "code": "const text = \"abc\"; function run() { return/^a/.test(text); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 59,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.startsWith('a'); } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve throw: /^a/.test(text)",
+    "code": "const text = \"abc\"; function run() { try { throw/^a/.test(text); } catch (value) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 49,
+        "endLine": 1,
+        "endColumn": 64,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { try { throw text.startsWith('a'); } catch (value) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve yield: /^a/.test(text)",
+    "code": "const text = \"abc\"; function run() { function* values() { yield/^a/.test(text); } return values().next().value; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 64,
+        "endLine": 1,
+        "endColumn": 79,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { function* values() { yield text.startsWith('a'); } return values().next().value; } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve case: /^a/.test(text)",
+    "code": "const text = \"abc\"; function run() { switch (true) { case/^a/.test(text): return true; default: return false; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 58,
+        "endLine": 1,
+        "endColumn": 73,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { switch (true) { case text.startsWith('a'): return true; default: return false; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve of: /^a/.test(text)",
+    "code": "const text = \"abc\"; function run() { for (const value of/^a/.test(text) ? [true] : [false]) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 72,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { for (const value of text.startsWith('a') ? [true] : [false]) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve return: /c$/.test(text)",
+    "code": "const text = \"abc\"; function run() { return/c$/.test(text); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 59,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.endsWith('c'); } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve throw: /c$/.test(text)",
+    "code": "const text = \"abc\"; function run() { try { throw/c$/.test(text); } catch (value) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 49,
+        "endLine": 1,
+        "endColumn": 64,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { try { throw text.endsWith('c'); } catch (value) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve yield: /c$/.test(text)",
+    "code": "const text = \"abc\"; function run() { function* values() { yield/c$/.test(text); } return values().next().value; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 64,
+        "endLine": 1,
+        "endColumn": 79,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { function* values() { yield text.endsWith('c'); } return values().next().value; } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve case: /c$/.test(text)",
+    "code": "const text = \"abc\"; function run() { switch (true) { case/c$/.test(text): return true; default: return false; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 58,
+        "endLine": 1,
+        "endColumn": 73,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { switch (true) { case text.endsWith('c'): return true; default: return false; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve of: /c$/.test(text)",
+    "code": "const text = \"abc\"; function run() { for (const value of/c$/.test(text) ? [true] : [false]) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 72,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { for (const value of text.endsWith('c') ? [true] : [false]) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve return: (0) === text.indexOf(\"a\")",
+    "code": "const text = \"abc\"; function run() { return(0) === text.indexOf(\"a\"); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 69,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.startsWith(\"a\"); } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve throw: (0) === text.indexOf(\"a\")",
+    "code": "const text = \"abc\"; function run() { try { throw(0) === text.indexOf(\"a\"); } catch (value) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 49,
+        "endLine": 1,
+        "endColumn": 74,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { try { throw text.startsWith(\"a\"); } catch (value) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve yield: (0) === text.indexOf(\"a\")",
+    "code": "const text = \"abc\"; function run() { function* values() { yield(0) === text.indexOf(\"a\"); } return values().next().value; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 64,
+        "endLine": 1,
+        "endColumn": 89,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { function* values() { yield text.startsWith(\"a\"); } return values().next().value; } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve case: (0) === text.indexOf(\"a\")",
+    "code": "const text = \"abc\"; function run() { switch (true) { case(0) === text.indexOf(\"a\"): return true; default: return false; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 58,
+        "endLine": 1,
+        "endColumn": 83,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { switch (true) { case text.startsWith(\"a\"): return true; default: return false; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve of: (0) === text.indexOf(\"a\")",
+    "code": "const text = \"abc\"; function run() { for (const value of(0) === text.indexOf(\"a\") ? [true] : [false]) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 82,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { for (const value of text.startsWith(\"a\") ? [true] : [false]) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve return: (\"a\") === text.slice(0, 1)",
+    "code": "const text = \"abc\"; function run() { return(\"a\") === text.slice(0, 1); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 70,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.startsWith((\"a\")); } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve throw: (\"a\") === text.slice(0, 1)",
+    "code": "const text = \"abc\"; function run() { try { throw(\"a\") === text.slice(0, 1); } catch (value) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 49,
+        "endLine": 1,
+        "endColumn": 75,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { try { throw text.startsWith((\"a\")); } catch (value) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve yield: (\"a\") === text.slice(0, 1)",
+    "code": "const text = \"abc\"; function run() { function* values() { yield(\"a\") === text.slice(0, 1); } return values().next().value; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 64,
+        "endLine": 1,
+        "endColumn": 90,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { function* values() { yield text.startsWith((\"a\")); } return values().next().value; } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve case: (\"a\") === text.slice(0, 1)",
+    "code": "const text = \"abc\"; function run() { switch (true) { case(\"a\") === text.slice(0, 1): return true; default: return false; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 58,
+        "endLine": 1,
+        "endColumn": 84,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { switch (true) { case text.startsWith((\"a\")): return true; default: return false; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve of: (\"a\") === text.slice(0, 1)",
+    "code": "const text = \"abc\"; function run() { for (const value of(\"a\") === text.slice(0, 1) ? [true] : [false]) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 83,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { for (const value of text.startsWith((\"a\")) ? [true] : [false]) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve return: (\"c\") === text.slice(-1)",
+    "code": "const text = \"abc\"; function run() { return(\"c\") === text.slice(-1); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 44,
+        "endLine": 1,
+        "endColumn": 68,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return text.endsWith((\"c\")); } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve throw: (\"c\") === text.slice(-1)",
+    "code": "const text = \"abc\"; function run() { try { throw(\"c\") === text.slice(-1); } catch (value) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 49,
+        "endLine": 1,
+        "endColumn": 73,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { try { throw text.endsWith((\"c\")); } catch (value) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve yield: (\"c\") === text.slice(-1)",
+    "code": "const text = \"abc\"; function run() { function* values() { yield(\"c\") === text.slice(-1); } return values().next().value; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 64,
+        "endLine": 1,
+        "endColumn": 88,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { function* values() { yield text.endsWith((\"c\")); } return values().next().value; } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve case: (\"c\") === text.slice(-1)",
+    "code": "const text = \"abc\"; function run() { switch (true) { case(\"c\") === text.slice(-1): return true; default: return false; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 58,
+        "endLine": 1,
+        "endColumn": 82,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { switch (true) { case text.endsWith((\"c\")): return true; default: return false; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword edits preserve of: (\"c\") === text.slice(-1)",
+    "code": "const text = \"abc\"; function run() { for (const value of(\"c\") === text.slice(-1) ? [true] : [false]) { return value; } } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 81,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { for (const value of text.endsWith((\"c\")) ? [true] : [false]) { return value; } } run();"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve return: suggestion 1",
+    "code": "function run(text) { return/^a/.test(text); } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 28,
+        "endLine": 1,
+        "endColumn": 43,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "function run(text) { return String(text).startsWith('a'); } run(\"abc\");"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "function run(text) { return text?.startsWith('a'); } run(\"abc\");"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "function run(text) { return (text ?? '').startsWith('a'); } run(\"abc\");"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "function run(text) { return text.startsWith('a'); } run(\"abc\");"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve return: suggestion 1",
+    "code": "function run(text) { return String(text).startsWith('a'); } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve return: suggestion 2",
+    "code": "function run(text) { return text?.startsWith('a'); } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve return: suggestion 3",
+    "code": "function run(text) { return (text ?? '').startsWith('a'); } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve throw: suggestion 1",
+    "code": "function run(text) { try { throw/^a/.test(text); } catch (value) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 33,
+        "endLine": 1,
+        "endColumn": 48,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "function run(text) { try { throw String(text).startsWith('a'); } catch (value) { return value; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "function run(text) { try { throw text?.startsWith('a'); } catch (value) { return value; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "function run(text) { try { throw (text ?? '').startsWith('a'); } catch (value) { return value; } } run(\"abc\");"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "function run(text) { try { throw text.startsWith('a'); } catch (value) { return value; } } run(\"abc\");"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve throw: suggestion 1",
+    "code": "function run(text) { try { throw String(text).startsWith('a'); } catch (value) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve throw: suggestion 2",
+    "code": "function run(text) { try { throw text?.startsWith('a'); } catch (value) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve throw: suggestion 3",
+    "code": "function run(text) { try { throw (text ?? '').startsWith('a'); } catch (value) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve yield: suggestion 1",
+    "code": "function run(text) { function* values() { yield/^a/.test(text); } return values().next().value; } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 48,
+        "endLine": 1,
+        "endColumn": 63,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "function run(text) { function* values() { yield String(text).startsWith('a'); } return values().next().value; } run(\"abc\");"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "function run(text) { function* values() { yield text?.startsWith('a'); } return values().next().value; } run(\"abc\");"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "function run(text) { function* values() { yield (text ?? '').startsWith('a'); } return values().next().value; } run(\"abc\");"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "function run(text) { function* values() { yield text.startsWith('a'); } return values().next().value; } run(\"abc\");"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve yield: suggestion 1",
+    "code": "function run(text) { function* values() { yield String(text).startsWith('a'); } return values().next().value; } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve yield: suggestion 2",
+    "code": "function run(text) { function* values() { yield text?.startsWith('a'); } return values().next().value; } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve yield: suggestion 3",
+    "code": "function run(text) { function* values() { yield (text ?? '').startsWith('a'); } return values().next().value; } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve case: suggestion 1",
+    "code": "function run(text) { switch (true) { case/^a/.test(text): return true; default: return false; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 42,
+        "endLine": 1,
+        "endColumn": 57,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "function run(text) { switch (true) { case String(text).startsWith('a'): return true; default: return false; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "function run(text) { switch (true) { case text?.startsWith('a'): return true; default: return false; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "function run(text) { switch (true) { case (text ?? '').startsWith('a'): return true; default: return false; } } run(\"abc\");"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "function run(text) { switch (true) { case text.startsWith('a'): return true; default: return false; } } run(\"abc\");"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve case: suggestion 1",
+    "code": "function run(text) { switch (true) { case String(text).startsWith('a'): return true; default: return false; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve case: suggestion 2",
+    "code": "function run(text) { switch (true) { case text?.startsWith('a'): return true; default: return false; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve case: suggestion 3",
+    "code": "function run(text) { switch (true) { case (text ?? '').startsWith('a'): return true; default: return false; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve of: suggestion 1",
+    "code": "function run(text) { for (const value of/^a/.test(text) ? [true] : [false]) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 41,
+        "endLine": 1,
+        "endColumn": 56,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "function run(text) { for (const value of String(text).startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "function run(text) { for (const value of text?.startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "function run(text) { for (const value of (text ?? '').startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "function run(text) { for (const value of text.startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");"
+    ]
+  },
+  {
+    "group": "string boundary keyword suggestions preserve of: suggestion 1",
+    "code": "function run(text) { for (const value of String(text).startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve of: suggestion 2",
+    "code": "function run(text) { for (const value of text?.startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary keyword suggestions preserve of: suggestion 3",
+    "code": "function run(text) { for (const value of (text ?? '').startsWith('a') ? [true] : [false]) { return value; } } run(\"abc\");",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return typeof(/^a/.test(text)); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 52,
+        "endLine": 1,
+        "endColumn": 67,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return typeof(text.startsWith('a')); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return void(/^a/.test(text)); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 50,
+        "endLine": 1,
+        "endColumn": 65,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return void(text.startsWith('a')); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { const result = []; for (const key in/^a/.test(text) ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 74,
+        "endLine": 1,
+        "endColumn": 89,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { const result = []; for (const key in text.startsWith('a') ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return (/^a/.test(text))in{true: 1}; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 46,
+        "endLine": 1,
+        "endColumn": 61,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return (text.startsWith('a'))in{true: 1}; } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return typeof((0) === text.indexOf(\"a\")); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 52,
+        "endLine": 1,
+        "endColumn": 77,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return typeof (text.startsWith(\"a\")); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return void((0) === text.indexOf(\"a\")); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 50,
+        "endLine": 1,
+        "endColumn": 75,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return void (text.startsWith(\"a\")); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { const result = []; for (const key in(0) === text.indexOf(\"a\") ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 74,
+        "endLine": 1,
+        "endColumn": 99,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { const result = []; for (const key in text.startsWith(\"a\") ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return ((0) === text.indexOf(\"a\"))in{true: 1}; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 46,
+        "endLine": 1,
+        "endColumn": 71,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return (text.startsWith(\"a\")) in{true: 1}; } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return typeof((\"a\") === text.slice(0, 1)); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 52,
+        "endLine": 1,
+        "endColumn": 78,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return typeof (text.startsWith((\"a\"))); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return void((\"a\") === text.slice(0, 1)); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 50,
+        "endLine": 1,
+        "endColumn": 76,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return void (text.startsWith((\"a\"))); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { const result = []; for (const key in(\"a\") === text.slice(0, 1) ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 74,
+        "endLine": 1,
+        "endColumn": 100,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { const result = []; for (const key in text.startsWith((\"a\")) ? {matched: 1} : {}) { result.push(key); } return JSON.stringify(result); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve typeof, void, and in grouping",
+    "code": "const text = \"abc\"; function run() { return ((\"a\") === text.slice(0, 1))in{true: 1}; } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 46,
+        "endLine": 1,
+        "endColumn": 72,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; function run() { return (text.startsWith((\"a\"))) in{true: 1}; } run();"
+    ]
+  },
+  {
+    "group": "regex boundary autofixes preserve direct typeof and void keyword spacing",
+    "code": "const text = \"abc\"; typeof/^a/.test(text);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 27,
+        "endLine": 1,
+        "endColumn": 42,
+        "suggestions": []
+      }
+    ],
+    "output": ["const text = \"abc\"; typeof text.startsWith('a');"]
+  },
+  {
+    "group": "regex boundary autofixes preserve direct typeof and void keyword spacing",
+    "code": "const text = \"abc\"; void/^a/.test(text);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 25,
+        "endLine": 1,
+        "endColumn": 40,
+        "suggestions": []
+      }
+    ],
+    "output": ["const text = \"abc\"; void text.startsWith('a');"]
+  },
+  {
+    "group": "string boundary autofixes preserve awaited expressions",
+    "code": "const text = \"abc\"; async function run() { return await/^a/.test(text); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 56,
+        "endLine": 1,
+        "endColumn": 71,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; async function run() { return await text.startsWith('a'); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve awaited expressions",
+    "code": "const text = \"abc\"; async function run() { return await((0) === text.indexOf(\"a\")); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 82,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; async function run() { return await (text.startsWith(\"a\")); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve awaited expressions",
+    "code": "const text = \"abc\"; async function run() { return await((\"a\") === text.slice(0, 1)); } run();",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 57,
+        "endLine": 1,
+        "endColumn": 83,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text = \"abc\"; async function run() { return await (text.startsWith((\"a\"))); } run();"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve single evaluation of sequence receivers",
+    "code": "let calls = 0; function run() { return/^a/.test((calls++, \"abc\")); } const found = run(); JSON.stringify({calls, found});",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 39,
+        "endLine": 1,
+        "endColumn": 66,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "let calls = 0; function run() { return String((calls++, \"abc\")).startsWith('a'); } const found = run(); JSON.stringify({calls, found});"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "let calls = 0; function run() { return (calls++, \"abc\")?.startsWith('a'); } const found = run(); JSON.stringify({calls, found});"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "let calls = 0; function run() { return ((calls++, \"abc\") ?? '').startsWith('a'); } const found = run(); JSON.stringify({calls, found});"
+          }
+        ]
+      }
+    ],
+    "output": [
+      "let calls = 0; function run() { return (calls++, \"abc\").startsWith('a'); } const found = run(); JSON.stringify({calls, found});"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve single evaluation of sequence receivers",
+    "code": "let calls = 0; function run() { return(0) === (calls++, \"abc\").indexOf(\"a\"); } const found = run(); JSON.stringify({calls, found});",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 1,
+        "column": 39,
+        "endLine": 1,
+        "endColumn": 76,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "let calls = 0; function run() { return (calls++, \"abc\").startsWith(\"a\"); } const found = run(); JSON.stringify({calls, found});"
+    ]
+  },
+  {
+    "group": "string boundary autofixes preserve single evaluation of sequence receivers",
+    "code": "let calls = 0; function run() { return(\"a\") === (calls++, \"abc\").slice(0, 1); } const found = run(); JSON.stringify({calls, found});",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 39,
+        "endLine": 1,
+        "endColumn": 77,
+        "suggestions": [
+          {
+            "messageId": "prefer-string-starts-ends-with/slice-suggestion",
+            "output": "let calls = 0; function run() { return (calls++, \"abc\").startsWith((\"a\")); } const found = run(); JSON.stringify({calls, found});"
+          }
+        ]
+      }
+    ],
+    "output": []
+  },
+  {
+    "group": "string boundary autofixes preserve single evaluation of sequence receivers",
+    "code": "let calls = 0; function run() { return (calls++, \"abc\").startsWith((\"a\")); } const found = run(); JSON.stringify({calls, found});",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "TypeScript string boundary keyword edits preserve assertions and CRLF",
+    "code": "const text: string = \"abc\";\r\nfunction run() {\r\n  return/^a/.test(text!);\r\n}\r\nrun();",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 3,
+        "column": 9,
+        "endLine": 3,
+        "endColumn": 25,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\";\r\nfunction run() {\r\n  return text!.startsWith('a');\r\n}\r\nrun();"
+    ]
+  },
+  {
+    "group": "TypeScript string boundary keyword edits preserve assertions and CRLF",
+    "code": "const text: string = \"abc\";\r\nfunction run() {\r\n  return(0) === (text as string).indexOf(\"a\");\r\n}\r\nrun();",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-indexOf",
+        "message": "Prefer `String#startsWith()` over `String#indexOf() === 0`.",
+        "line": 3,
+        "column": 9,
+        "endLine": 3,
+        "endColumn": 46,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\";\r\nfunction run() {\r\n  return (text as string).startsWith(\"a\");\r\n}\r\nrun();"
+    ]
+  },
+  {
+    "group": "TypeScript string boundary keyword edits preserve assertions and CRLF",
+    "code": "const text: string = \"abc\";\r\nfunction run() {\r\n  return(\"a\") === (text satisfies string).slice(0, 1);\r\n}\r\nrun();",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 3,
+        "column": 9,
+        "endLine": 3,
+        "endColumn": 54,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\";\r\nfunction run() {\r\n  return (text satisfies string).startsWith((\"a\"));\r\n}\r\nrun();"
+    ]
+  },
+  {
+    "group": "TypeScript string boundary keyword edits preserve assertions and CRLF",
+    "code": "const text: string = \"abc\";\r\nfunction run() {\r\n  return(\"c\") === (<string>text).slice(-1);\r\n}\r\nrun();",
+    "fileName": "file.ts",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 3,
+        "column": 9,
+        "endLine": 3,
+        "endColumn": 43,
+        "suggestions": []
+      }
+    ],
+    "output": [
+      "const text: string = \"abc\";\r\nfunction run() {\r\n  return (<string>text).endsWith((\"c\"));\r\n}\r\nrun();"
+    ]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 19,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/g.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/d.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/s.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/u.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/v.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/y.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/gy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/dsy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 22,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/uy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/^foo/vy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 21,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).startsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.startsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').startsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.startsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 19,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/g.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/d.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/s.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/u.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/v.test(value)",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 1,
+        "endLine": 1,
+        "endColumn": 20,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "String(value).endsWith('foo')"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "value?.endsWith('foo')"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "(value ?? '').endsWith('foo')"
+          }
+        ]
+      }
+    ],
+    "output": ["value.endsWith('foo')"]
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/y.test(value)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/gy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/dsy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/uy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "regex flag conversions preserve matching results",
+    "code": "/foo$/vy.test(value)",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = /^bar/.test(baz);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with",
+        "message": "Prefer `String#startsWith()` over a regex with `^`.",
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 29,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const foo = String(baz).startsWith('bar');"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const foo = baz?.startsWith('bar');"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const foo = (baz ?? '').startsWith('bar');"
+          }
+        ]
+      }
+    ],
+    "output": ["const foo = baz.startsWith('bar');"]
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = baz.startsWith('bar');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = /bar$/.test(baz);",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with",
+        "message": "Prefer `String#endsWith()` over a regex with `$`.",
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 29,
+        "suggestions": [
+          {
+            "messageId": "useStringCasting",
+            "output": "const foo = String(baz).endsWith('bar');"
+          },
+          {
+            "messageId": "useOptionalChaining",
+            "output": "const foo = baz?.endsWith('bar');"
+          },
+          {
+            "messageId": "useNullishCoalescing",
+            "output": "const foo = (baz ?? '').endsWith('bar');"
+          }
+        ]
+      }
+    ],
+    "output": ["const foo = baz.endsWith('bar');"]
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = baz.endsWith('bar');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = someString.indexOf('bar') === 0;",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = someString.startsWith('bar');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = 'barbaz'.slice(0, 3) === 'bar';",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-starts-with-slice",
+        "message": "Prefer `String#startsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 43,
+        "suggestions": []
+      }
+    ],
+    "output": ["const foo = 'barbaz'.startsWith('bar');"]
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = 'barbaz'.startsWith('bar');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = 'foobaz'.slice(-3) === 'baz';",
+    "fileName": "file.jsx",
+    "errors": [
+      {
+        "messageId": "prefer-ends-with-slice",
+        "message": "Prefer `String#endsWith()` over comparing a string slice.",
+        "line": 1,
+        "column": 13,
+        "endLine": 1,
+        "endColumn": 41,
+        "suggestions": []
+      }
+    ],
+    "output": ["const foo = 'foobaz'.endsWith('baz');"]
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = 'foobaz'.endsWith('baz');",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  },
+  {
+    "group": "documentation examples",
+    "code": "const foo = /^bar/i.test(baz);",
+    "fileName": "file.jsx",
+    "errors": [],
+    "output": []
+  }
+]
