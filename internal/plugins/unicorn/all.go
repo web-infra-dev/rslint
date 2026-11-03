@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_async_promise_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_expression_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_await_in_promise_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_chained_comparison"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_console_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_double_comparison"
@@ -128,6 +129,7 @@ func GetAllRules() []rule.Rule {
 		no_async_promise_finally.NoAsyncPromiseFinallyRule,
 		no_await_expression_member.NoAwaitExpressionMemberRule,
 		no_await_in_promise_methods.NoAwaitInPromiseMethodsRule,
+		no_chained_comparison.NoChainedComparisonRule,
 		no_console_spaces.NoConsoleSpacesRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_double_comparison.NoDoubleComparisonRule,
