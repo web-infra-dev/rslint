@@ -1133,6 +1133,10 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		let loose = 1;
 		let flag;
 		const scalar = 1;
+		const regularExpression = /a/g;
+		const regexpAlias = regularExpression;
+		let mutableRegExp = /a/;
+		const mutableRegExpAlias = mutableRegExp;
 		const array = [1];
 		const literalMember = ({value: "x"}).value;
 		const arrayIndex = [1][0];
@@ -1173,13 +1177,17 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 
 	staticEvaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, sourceFile)
 	for _, test := range []struct {
-		name    string
-		known   bool
-		isArray bool
+		name     string
+		known    bool
+		isArray  bool
+		isRegExp bool
 		// Known for value evaluation, but rejected as a control-flow input.
 		valueOnly bool
 	}{
 		{name: "scalar", known: true},
+		{name: "regularExpression", known: true, isRegExp: true},
+		{name: "regexpAlias", known: true, isRegExp: true},
+		{name: "mutableRegExpAlias", valueOnly: true},
 		{name: "array", known: true, isArray: true},
 		{name: "literalMember", known: true},
 		{name: "arrayIndex", known: true},
@@ -1210,6 +1218,9 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 			isArray, known := staticEvaluator.EvalControlFlowArrayValue(node)
 			assert.Equal(t, known, test.known)
 			assert.Equal(t, isArray, test.isArray)
+			isRegExp, known := staticEvaluator.EvalControlFlowRegExpValue(node)
+			assert.Equal(t, known, test.known)
+			assert.Equal(t, isRegExp, test.isRegExp)
 			_, known = staticEvaluator.EvalControlFlowTruthiness(node)
 			assert.Equal(t, known, test.known)
 			// Merge rules need the same side-effect/member safety, while stable
@@ -1248,6 +1259,8 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		assert.Assert(t, !known)
 		isArray, known := evaluator.EvalControlFlowArrayValue(nil)
 		assert.Assert(t, !known && !isArray)
+		isRegExp, known := evaluator.EvalControlFlowRegExpValue(nil)
+		assert.Assert(t, !known && !isRegExp)
 		truthy, known := evaluator.EvalControlFlowTruthiness(nil)
 		assert.Assert(t, !known && !truthy)
 	}

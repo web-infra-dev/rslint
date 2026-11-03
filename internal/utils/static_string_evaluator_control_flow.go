@@ -48,6 +48,17 @@ func (staticEvaluator *StaticStringEvaluator) EvalControlFlowArrayValue(node *as
 	return isArray, true
 }
 
+// EvalControlFlowRegExpValue classifies a value without exposing the evaluator's
+// private regular-expression representation to rules.
+func (staticEvaluator *StaticStringEvaluator) EvalControlFlowRegExpValue(node *ast.Node) (isRegExp bool, known bool) {
+	value, ok := staticEvaluator.EvalControlFlowValue(node)
+	if !ok {
+		return false, false
+	}
+	_, isRegExp = value.(*staticRegExpNode)
+	return isRegExp, true
+}
+
 // EvalControlFlowTruthiness selects a branch without requiring its value to fold.
 func (staticEvaluator *StaticStringEvaluator) EvalControlFlowTruthiness(node *ast.Node) (truthy bool, known bool) {
 	value, ok := staticEvaluator.EvalControlFlowValue(node)
