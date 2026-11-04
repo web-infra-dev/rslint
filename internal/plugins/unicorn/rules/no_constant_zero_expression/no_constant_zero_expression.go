@@ -45,7 +45,8 @@ var NoConstantZeroExpressionRule = rule.Rule{
 				value, known := evaluator.EvalControlFlowValue(node)
 				number, numeric := value.(jsnum.Number)
 				// Object.is(value, 0) rejects negative zero as well as NaN.
-				if !known || !numeric || number != 0 || math.Signbit(float64(number)) {
+				if !known || !numeric || number != 0 || math.Signbit(float64(number)) ||
+					hasUnknownDiscardedOperand(node, evaluator) {
 					return nil
 				}
 				return []rule.RuleSuggestion{{
@@ -53,7 +54,7 @@ var NoConstantZeroExpressionRule = rule.Rule{
 						Id:          "no-constant-zero-expression/suggestion",
 						Description: "Replace this expression with `0`.",
 					},
-					FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(span, "0")},
+					FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(span, utils.SafeReplacementText(ctx.SourceFile, node, "0"))},
 				}}
 			})
 		}}
@@ -63,4 +64,25 @@ var NoConstantZeroExpressionRule = rule.Rule{
 func isZero(node *ast.Node) bool {
 	node = utils.ESTreeRuntimeExpression(node)
 	return node != nil && node.Kind == ast.KindNumericLiteral && jsnum.FromString(node.Text()) == 0
+}
+
+// A folded result does not prove that discarded operands complete normally.
+// Keep the diagnostic but withhold a suggestion when their values are unknown.
+func hasUnknownDiscardedOperand(node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || ast.IsTypeNode(node) || ast.IsFunctionLike(node) {
+		return false
+	}
+	var discarded *ast.Node
+	if node.Kind == ast.KindVoidExpression {
+		discarded = node.Expression()
+	} else if node.Kind == ast.KindBinaryExpression && node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
+		discarded = node.AsBinaryExpression().Left
+	}
+	if discarded != nil {
+		if _, known := evaluator.EvalValue(discarded); !known {
+			return true
+		}
+	}
+	return node.ForEachChild(func(child *ast.Node) bool { return hasUnknownDiscardedOperand(child, evaluator) })
 }

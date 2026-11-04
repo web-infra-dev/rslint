@@ -265,6 +265,106 @@ func TestNoConstantZeroExpressionExtras(t *testing.T) {
 		{Code: "0 * /** @type {Math} */ (Math).PI;", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 		}},
+		// Suggestion safety: token boundaries and discarded expressions that can throw.
+		{Code: "function f(){return(5)*0} f()", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 20, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function f(){return 0} f()"}}},
+		}},
+		{Code: "function f(){throw(5)*0} f()", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 19, EndLine: 1, EndColumn: 24, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function f(){throw 0} f()"}}},
+		}},
+		{Code: "function* f(){yield(5)*0} [...f()]", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 20, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function* f(){yield 0} [...f()]"}}},
+		}},
+		{Code: "5*(0)in {0:true}", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0 in {0:true}"}}},
+		}},
+		{Code: "0/(5)instanceof Number", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0 instanceof Number"}}},
+		}},
+		{Code: "let count=0;for(const k in(5)*0){count++} count", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 27, EndLine: 1, EndColumn: 32, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "let count=0;for(const k in 0){count++} count"}}},
+		}},
+		{Code: "for(const value of(5)*0){}", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 19, EndLine: 1, EndColumn: 24, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "for(const value of 0){}"}}},
+		}},
+		{Code: "5*(0)as number", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0 as number"}}},
+		}},
+		{Code: "5*(0)satisfies number", FileName: "case.ts", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0 satisfies number"}}},
+		}},
+		{Code: "function f(){return/a/&0} f()", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 20, EndLine: 1, EndColumn: 25, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function f(){return 0} f()"}}},
+		}},
+		{Code: "function f(){return(\n5)*0} f()", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 20, EndLine: 2, EndColumn: 5, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function f(){return 0} f()"}}},
+		}},
+		{Code: "function f(){return\n(5)*0} f()", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 2, Column: 1, EndLine: 2, EndColumn: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "function f(){return\n0} f()"}}},
+		}},
+		{Code: "(1n / 0n, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 17},
+		}},
+		{Code: "0 * (1n / 0n, 5)", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 17},
+		}},
+		{Code: "(1n % 0n, 5) & 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 17},
+		}},
+		{Code: "(1n ** -1n, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+		}},
+		{Code: "(+1n, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 13},
+		}},
+		{Code: "(1n + 1, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+		}},
+		{Code: "(Symbol.iterator + 1, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 29},
+		}},
+		{Code: "(void (1n / 0n)) & 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 21},
+		}},
+		{Code: "(void missing) & 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+		}},
+		{Code: "(void (1n / 0n), 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24},
+		}},
+		{Code: "(1, (1n / 0n, 5)) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
+		}},
+		{Code: "({value: void (1n / 0n)}).value & 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 36},
+		}},
+		{Code: "({first: (1n / 0n, 1), value: 5}).value * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 44},
+		}},
+		{Code: "([void (1n / 0n)], 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+		}},
+		{Code: "(void (class extends 0 {}), 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
+		}},
+		{Code: "(1 in 0, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+		}},
+		{Code: "(1 instanceof null, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
+		}},
+		{Code: "(1, 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 11, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0"}}},
+		}},
+		{Code: "(void 5) & 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 13, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0"}}},
+		}},
+		{Code: "(false && (1n / 0n), 5) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0"}}},
+		}},
+		{Code: "(true ? 5 : (1n / 0n)) * 0", FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0"}}},
+		}},
 	})
 }
 
@@ -275,6 +375,10 @@ func TestNoConstantZeroExpressionSuggestionsFollowDemand(t *testing.T) {
 		{"-5 * 0", ""},
 		{"5 /* keep */ * 0", ""},
 		{"foo() * 0", ""},
+		{"function f(){return(5)*0}", "function f(){return 0}"},
+		{"5*(0)as number", "0 as number"},
+		{"(1n / 0n, 5) * 0", ""},
+		{"(void missing) & 0", ""},
 	} {
 		t.Run(test.code, func(t *testing.T) {
 			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())

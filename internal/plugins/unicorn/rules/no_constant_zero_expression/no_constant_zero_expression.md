@@ -37,6 +37,18 @@ Division by zero (`x / 0`) and other operators are outside this rule's scope.
 
 This rule has no options.
 
+## Differences from upstream
+
+Suggestions preserve spacing next to keywords and TypeScript operators. For
+example, `return(5)*0` becomes `return 0`, and `5*(0)as number` becomes
+`0 as number`.
+
+rslint withholds a suggestion when it cannot establish the value of an operand
+discarded by a comma expression or `void`. For example, `(1n / 0n, 5) * 0`
+and `(void missing) & 0` are reported without a suggestion, preserving their
+`RangeError` and `ReferenceError`. Known operands such as `(1, 5) * 0` and
+`(void 5) & 0` still receive suggestions.
+
 ## Original Documentation
 
 - [Upstream rule documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-constant-zero-expression.md)
