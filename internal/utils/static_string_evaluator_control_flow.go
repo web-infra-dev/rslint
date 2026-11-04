@@ -165,7 +165,7 @@ func (safety *staticControlFlowSafety) safeMember(node *ast.Node) bool {
 	if !ok {
 		return false
 	}
-	object := SkipAssertionsAndParens(AccessExpressionObject(node))
+	object := ESTreeRuntimeExpression(AccessExpressionObject(node))
 	if object == nil {
 		return false
 	}
@@ -208,7 +208,7 @@ func (safety *staticControlFlowSafety) safeMember(node *ast.Node) bool {
 	}
 	// Only literal strings (or const bindings initialized by one) are safe;
 	// aggregate aliases can be mutated or have their properties redefined.
-	if object.Kind != ast.KindStringLiteral {
+	if !ast.IsStringLiteralLike(object) {
 		return false
 	}
 	if key == "length" {
@@ -223,7 +223,7 @@ func safeControlFlowGlobalMember(node, object *ast.Node, key string) bool {
 		return false
 	}
 	if node.Kind == ast.KindElementAccessExpression &&
-		node.AsElementAccessExpression().ArgumentExpression.Kind != ast.KindStringLiteral {
+		!ast.IsStringLiteralLike(ESTreeRuntimeExpression(node.AsElementAccessExpression().ArgumentExpression)) {
 		return false
 	}
 	if _, ok := staticGlobalNumber(object, key); ok {
@@ -317,6 +317,13 @@ func (safety *staticControlFlowSafety) hasMutableBinding(node *ast.Node) bool {
 	case ast.KindIdentifier:
 		if IsNonReferenceIdentifier(node) {
 			return false
+		}
+		switch node.Text() {
+		case "undefined", "Infinity", "NaN":
+			// These immutable globals can resolve to ambient var declarations.
+			if safety.evaluator.isBuiltinIdentifier(node, node.Text()) {
+				return false
+			}
 		}
 		symbol := safety.evaluator.referenceSymbol(node)
 		if symbol == nil || len(symbol.Declarations) != 1 {
