@@ -46,6 +46,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_new_buffer"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_null"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_object_as_default_parameter"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_redundant_comparison"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_single_promise_in_promise_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_static_only_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_thenable"
@@ -148,6 +149,7 @@ func GetAllRules() []rule.Rule {
 		no_nested_ternary.NoNestedTernaryRule,
 		no_null.NoNullRule,
 		no_object_as_default_parameter.NoObjectAsDefaultParameterRule,
+		no_redundant_comparison.NoRedundantComparisonRule,
 		no_single_promise_in_promise_methods.NoSinglePromiseInPromiseMethodsRule,
 		no_static_only_class.NoStaticOnlyClassRule,
 		no_thenable.NoThenableRule,
