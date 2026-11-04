@@ -866,6 +866,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-for-each.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-global-object-property-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-invalid-character-comparison.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-fetch-options.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-lonely-if.test.ts',

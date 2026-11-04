@@ -559,7 +559,10 @@ func stringTypeHasTargetBase(ctx rule.RuleContext, t *checker.Type) bool {
 }
 
 func classifyRequiredStringType(ctx rule.RuleContext, node *ast.Node) TypeClass {
-	t := ctx.TypeChecker.GetTypeAtLocation(node)
+	return classifyRequiredStringCheckerType(ctx, ctx.TypeChecker.GetTypeAtLocation(node))
+}
+
+func classifyRequiredStringCheckerType(ctx rule.RuleContext, t *checker.Type) TypeClass {
 	return ClassifyType(ctx, t, TypeClassifierOptions{
 		HeritageSymbolFlags:          ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
 		NonTargetSymbolLessTypeFlags: checker.TypeFlagsObject,
