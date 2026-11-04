@@ -3,6 +3,7 @@ package utils_test
 import (
 	"fmt"
 	"runtime"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -277,6 +278,61 @@ func TestExportMapReuseAcrossFiles(t *testing.T) {
 			if got[name] != want[name] {
 				t.Fatalf("%s: export %q present=%v, want %v", label, name, got[name], want[name])
 			}
+		}
+	}
+}
+
+func TestExportMapStarMergePreservesModuleOwnership(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{
+		"reuse-leaf.ts": `export const member = 1;`,
+		"reuse-source.ts": `/** @module source
+ * @deprecated source module
+ */
+import * as leaf from './reuse-leaf';
+export { leaf as shared };
+export { member as named, missing as unresolved } from './reuse-leaf';
+export * from './reuse-missing';`,
+		"reuse-forward.ts":          `export * from './reuse-source';`,
+		"reuse-first.ts":            `export * from './reuse-forward'; export const shared = 2; export const extra = 1;`,
+		"reuse-second.ts":           `export * from './reuse-forward'; export const other = 1;`,
+		"reuse-first-consumer.ts":   `import * as all from './reuse-first';`,
+		"reuse-second-consumer.ts":  `import * as all from './reuse-second';`,
+		"reuse-forward-consumer.ts": `import * as all from './reuse-forward';`,
+		"reuse-source-consumer.ts":  `import * as all from './reuse-source';`,
+	}
+	contexts := contextsForFiles(t, files, "reuse-first-consumer.ts", "reuse-second-consumer.ts", "reuse-forward-consumer.ts", "reuse-source-consumer.ts")
+	for i, tc := range []struct {
+		names     []string
+		namespace bool
+		source    bool
+	}{
+		{[]string{"shared", "named", "unresolved", "extra"}, false, false},
+		{[]string{"shared", "named", "unresolved", "other"}, true, false},
+		{[]string{"shared", "named", "unresolved"}, true, false},
+		{[]string{"shared", "named", "unresolved"}, true, true},
+	} {
+		ctx := contexts[i]
+		exports, ok := import_utils.GetExportMap(ctx, modules.SourceFromSpecifier(firstImportSpecifier(t, ctx.SourceFile)))
+		if !ok || !slices.Equal(slices.Collect(exports.Names()), tc.names) {
+			t.Fatalf("%s: export names = %v, want %v", ctx.SourceFile.FileName(), slices.Collect(exports.Names()), tc.names)
+		}
+		if meta := exports.Get("shared"); meta == nil || (meta.Namespace != nil) != tc.namespace {
+			t.Fatalf("%s: namespace metadata changed after a dependent overwrite", ctx.SourceFile.FileName())
+		}
+		if exports.Get("unresolved") == nil || exports.Get("anything") != nil || !exports.Has("anything") || exports.Size() != len(tc.names)+1 || exports.HasDefault() {
+			t.Fatalf("%s: unresolved export state changed", ctx.SourceFile.FileName())
+		}
+		wantSource := ""
+		if tc.source {
+			wantSource = tspath.ResolvePath(fixtures.GetRootDir().Dir, "reuse-leaf.ts")
+		}
+		if got := exports.ReexportSource("named"); got != wantSource {
+			t.Fatalf("%s: re-export source = %q, want %q", ctx.SourceFile.FileName(), got, wantSource)
+		}
+		if dep := exports.Deprecation(ctx); (dep != nil) != tc.source {
+			t.Fatalf("%s: module documentation leaked through a star export", ctx.SourceFile.FileName())
 		}
 	}
 }

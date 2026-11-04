@@ -2,6 +2,7 @@ package utils
 
 import (
 	"iter"
+	"maps"
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -30,8 +31,12 @@ type ExportMeta struct {
 // nothing here that writes is exported — only the builder in this package, which
 // owns a map until it publishes it, may fill one in.
 type ExportMap struct {
-	exports         map[string]*ExportMeta
-	names           []string
+	exports map[string]*ExportMeta
+	names   []string
+	// immutable marks a completed acyclic map. shared means this builder's
+	// names and exports still belong to such a map and must detach on write.
+	immutable       bool
+	shared          bool
 	hasUnknown      bool
 	reexports       map[string]string
 	implicitDefault bool
@@ -107,6 +112,21 @@ func (m *ExportMap) set(name string, meta *ExportMeta) {
 	if m == nil {
 		return
 	}
+	m.detach()
+	m.setOwned(name, meta)
+}
+
+func (m *ExportMap) detach() {
+	if m.shared {
+		m.exports = maps.Clone(m.exports)
+		m.names = slices.Clone(m.names)
+		m.shared = false
+	}
+}
+
+// setOwned inserts into a table this builder owns. Batch merges detach once
+// before their loop so each name retains the small insertion path.
+func (m *ExportMap) setOwned(name string, meta *ExportMeta) {
 	if meta == nil {
 		meta = &ExportMeta{}
 	}
@@ -126,14 +146,27 @@ func (m *ExportMap) mergeFrom(other *ExportMap, includeDefault bool) {
 	if m == nil || other == nil {
 		return
 	}
+	if other.hasUnknown {
+		m.addUnknown()
+	}
+	_, hasDefault := other.exports[defaultExportName]
+	if len(other.exports) == 0 || (!includeDefault && hasDefault && len(other.exports) == 1) {
+		return
+	}
+	if len(m.exports) == 0 && other.immutable && (includeDefault || !hasDefault) {
+		// Completed dependencies cannot change under this builder. Borrow only
+		// the export table; docs, explicit re-exports and interop stay local.
+		m.exports = other.exports
+		m.names = other.names
+		m.shared = true
+		return
+	}
+	m.detach()
 	for name := range other.Names() {
 		if !includeDefault && name == defaultExportName {
 			continue
 		}
-		m.set(name, other.exports[name])
-	}
-	if other.hasUnknown {
-		m.addUnknown()
+		m.setOwned(name, other.exports[name])
 	}
 }
 
@@ -271,6 +304,7 @@ func (builder *exportBuilder) exportMapOf(sourceFile *ast.SourceFile) *ExportMap
 	if builder.sawCycle {
 		builder.unstable[sourceFile] = true
 	} else {
+		exports.immutable = true
 		builder.index.storeExportMap(sourceFile, exports)
 	}
 	builder.sawCycle = enclosing || builder.sawCycle

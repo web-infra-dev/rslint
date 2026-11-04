@@ -2130,6 +2130,10 @@ lint and fix execution still await full config activation.
   ExportMap, preserving its ordering, cycles, interop and documentation rules.
   An already cached full map bypasses the filter. Wide barrels and queries
   from different graph roots therefore do not repeat per-name graph walks.
+  An empty star-export destination can borrow a completed acyclic dependency's
+  names and metadata table when no default needs filtering. Later writes copy
+  those tables; documentation, explicit re-export sources and interop state
+  remain module-local. Partial and cyclic dependencies keep the copying path.
 - **SourceFile-Owned React Pragmas**: the first `@jsx` annotation, including
   its absence, is cached on the exact SourceFile. Hashbang and comment order
   retain their existing precedence. Only the annotation name and presence
