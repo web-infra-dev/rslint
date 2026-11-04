@@ -29,7 +29,7 @@ var NoDoubleComparisonRule = rule.Rule{
 			if unicornutil.IsSameComparisonOperand(first.Left, second.Left) && unicornutil.IsSameComparisonOperand(first.Right, second.Right) {
 				// Keep the first comparison's operand order.
 			} else if unicornutil.IsSameComparisonOperand(first.Left, second.Right) && unicornutil.IsSameComparisonOperand(first.Right, second.Left) {
-				rightOperator = flipOperator(rightOperator)
+				rightOperator = unicornutil.FlipComparisonOperator(rightOperator)
 			} else {
 				return
 			}
@@ -86,30 +86,8 @@ func isComparison(node *ast.Node) bool {
 	if node == nil || node.Kind != ast.KindBinaryExpression {
 		return false
 	}
-	switch node.AsBinaryExpression().OperatorToken.Kind {
-	case ast.KindLessThanToken, ast.KindLessThanEqualsToken, ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
-		ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-		return !containsOptionalChain(node)
-	}
-	return false
-}
-
-func containsOptionalChain(node *ast.Node) bool {
-	return ast.IsOptionalChain(node) || node.ForEachChild(containsOptionalChain)
-}
-
-func flipOperator(operator ast.Kind) ast.Kind {
-	switch operator {
-	case ast.KindLessThanToken:
-		return ast.KindGreaterThanToken
-	case ast.KindLessThanEqualsToken:
-		return ast.KindGreaterThanEqualsToken
-	case ast.KindGreaterThanToken:
-		return ast.KindLessThanToken
-	case ast.KindGreaterThanEqualsToken:
-		return ast.KindLessThanEqualsToken
-	}
-	return operator
+	return unicornutil.IsComparisonOperator(node.AsBinaryExpression().OperatorToken.Kind) &&
+		!unicornutil.ContainsOptionalChain(node)
 }
 
 func combinedOperator(join, first, second ast.Kind) string {
