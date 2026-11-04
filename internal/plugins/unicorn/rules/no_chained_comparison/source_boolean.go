@@ -37,11 +37,34 @@ func booleanAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.N
 		if !utils.IsJSDocSyntaxNode(node) {
 			return false
 		}
-		for _, part := range node.AsIntersectionTypeNode().Types.Nodes {
-			if booleanAnnotation(ctx, part, visiting) {
-				return true
+		found := false
+		members := slices.Clone(node.AsIntersectionTypeNode().Types.Nodes)
+		for index := 0; index < len(members); index++ {
+			part := ast.SkipTypeParentheses(members[index])
+			for part.Kind == ast.KindJSDocNonNullableType {
+				part = ast.SkipTypeParentheses(part.Type())
 			}
+			if part.Kind == ast.KindIntersectionType {
+				members = append(members, part.AsIntersectionTypeNode().Types.Nodes...)
+				continue
+			}
+			// Object-shaped brands do not change the primitive value. Callable
+			// members and unknown types still have to prove a boolean.
+			if part.Kind == ast.KindTypeLiteral && !slices.ContainsFunc(part.Members(), func(member *ast.Node) bool { return member.Kind == ast.KindCallSignature }) {
+				continue
+			}
+			if part.Kind == ast.KindTypeReference {
+				reference := part.AsTypeReferenceNode()
+				if ast.IsIdentifier(reference.TypeName) && reference.TypeName.Text() == "Object" && reference.TypeArguments != nil && len(reference.TypeArguments.Nodes) > 0 {
+					continue
+				}
+			}
+			if !booleanAnnotation(ctx, part, visiting) {
+				return false
+			}
+			found = true
 		}
+		return found
 	case ast.KindTypeReference:
 		if declaration := typeReferenceDeclaration(ctx, node); declaration != nil && declaration.Kind == ast.KindTypeAliasDeclaration {
 			return booleanAnnotation(ctx, declaration.Type(), visiting)
@@ -263,7 +286,7 @@ func sourceFunction(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
 	if ast.IsFunctionDeclaration(declaration) && stableFunctionDeclaration(ctx, declaration) || declaration.Kind == ast.KindFunctionExpression {
 		return declaration
 	}
-	if declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) {
+	if declaration.Kind == ast.KindVariableDeclaration {
 		value := utils.ESTreeRuntimeExpression(declaration.Initializer())
 		for value != nil && (value.Kind == ast.KindSatisfiesExpression || value.Kind == ast.KindNonNullExpression) {
 			value = utils.ESTreeRuntimeExpression(value.Expression())

@@ -65,7 +65,7 @@ func hasConflictingStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator
 			if classifyRequiredStringCheckerType(ctx, ctx.TypeChecker.GetTypeOfSymbol(symbol)) != TypeTarget {
 				return false
 			}
-			if annotation, _ := stringValueAnnotation(ctx, symbol.Declarations[0]); annotation != nil && utils.IsJSDocSyntaxNode(annotation) && !isStringValueType(ctx, annotation) {
+			if annotation, _ := ValueTypeAnnotation(ctx, symbol.Declarations[0]); annotation != nil && utils.IsJSDocSyntaxNode(annotation) && !isStringValueType(ctx, annotation) {
 				return true
 			}
 		}

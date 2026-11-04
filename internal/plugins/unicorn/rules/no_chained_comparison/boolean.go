@@ -50,7 +50,11 @@ func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStri
 		if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
 			annotation, optional := valueTypeAnnotation(ctx, symbol.Declarations[0])
 			if utils.IsJSDocSyntaxNode(annotation) {
-				return (!optional && booleanAnnotation(ctx, annotation, visiting)) || typedBoolean()
+				if !optional && booleanAnnotation(ctx, annotation, visiting) {
+					return true
+				}
+				// Simplifying an annotation cannot establish the value at this use.
+				return ctx.TypeChecker != nil && isBooleanType(ctx, ctx.TypeChecker.GetTypeAtLocation(node)) && typedBoolean()
 			}
 			if !optional && booleanAnnotation(ctx, annotation, visiting) {
 				return true

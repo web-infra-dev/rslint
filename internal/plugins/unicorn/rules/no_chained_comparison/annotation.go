@@ -1,6 +1,8 @@
 package no_chained_comparison
 
 import (
+	"unicode/utf8"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
@@ -8,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func valueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*ast.Node, bool) {
@@ -94,12 +97,23 @@ func closureCallableAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*as
 				optional := ast.HasQuestionToken(declaration)
 				if declaration.Kind == ast.KindParameter {
 					kind := tokens.Scan()
-					if kind == ast.KindOpenBracketToken {
+					bracketed := kind == ast.KindOpenBracketToken
+					if bracketed {
 						optional = true
 						tokens.Scan()
 					}
 					if tokens.TokenValue() != declaration.Name().Text() {
 						continue
+					}
+					if bracketed {
+						if next := tokens.Scan(); next != ast.KindCloseBracketToken && next != ast.KindEqualsToken {
+							continue
+						}
+					} else if end := tokens.TokenEnd(); end < len(text) {
+						next, _ := utf8.DecodeRuneInString(text[end:])
+						if !ecmascript.IsWhiteSpaceOrLineTerminator(next) {
+							continue
+						}
 					}
 				}
 				file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.ts", Path: "/annotation.ts"}, "/** @type {() => "+result+"} */ let value;", core.ScriptKindTS)
