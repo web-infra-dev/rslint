@@ -14,23 +14,20 @@ import (
 //go:embed no_misused_promises.schema.json
 var schemaJSON []byte
 
-// Unknown expressions, spreads and assertions keep the callee-first path.
-// These literal forms usually make checking the arguments cheaper instead.
-func preferArgumentTypeCheck(arguments []*ast.Node) bool {
-	for _, argument := range arguments {
-		argument = ast.SkipParentheses(argument)
-		switch argument.Kind {
-		case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-			ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
-			ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
-			ast.KindObjectLiteralExpression, ast.KindVoidExpression,
-			ast.KindTypeOfExpression, ast.KindDeleteExpression:
-			continue
-		default:
-			return false
-		}
+// Unknown expressions, spreads and assertions keep contextual/callee checks first.
+// These literal forms usually make checking the value cheaper instead.
+func preferValueTypeCheck(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	switch node.Kind {
+	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
+		ast.KindObjectLiteralExpression, ast.KindVoidExpression,
+		ast.KindTypeOfExpression, ast.KindDeleteExpression:
+		return true
+	default:
+		return false
 	}
-	return true
 }
 
 func buildConditionalMessage() rule.RuleMessage {
@@ -376,6 +373,9 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			}
 			expressionContainer := node.Initializer.AsJsxExpression()
 			expression := expressionContainer.Expression
+			if expression != nil && preferValueTypeCheck(expression) && !returnsThenable(expression) {
+				return
+			}
 			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node.Initializer, checker.ContextFlagsNone)
 			if contextualType != nil && isVoidReturningFunctionType(node.Initializer, contextualType) && returnsThenable(expression) {
 				ctx.ReportNode(node.Initializer, buildVoidReturnAttributeMessage())
@@ -464,6 +464,9 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				}
 				for _, signature := range signatures {
 					for index, parameter := range checker.Signature_parameters(signature) {
+						if index >= len(node.Arguments()) {
+							break
+						}
 						decl := parameter.ValueDeclaration
 						t := ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node.Expression())
 
@@ -543,7 +546,7 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 		checkArguments := func(
 			node *ast.Expression,
 		) {
-			if preferArgumentTypeCheck(node.Arguments()) {
+			if utils.Every(node.Arguments(), preferValueTypeCheck) {
 				// Literal forms are usually non-callable, but global primitive
 				// augmentation can add signatures. The checker remains authoritative.
 				possible := false
