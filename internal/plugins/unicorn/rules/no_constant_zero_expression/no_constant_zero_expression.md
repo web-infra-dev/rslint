@@ -49,6 +49,16 @@ and `(void missing) & 0` are reported without a suggestion, preserving their
 `RangeError` and `ReferenceError`. Known operands such as `(1, 5) * 0` and
 `(void 5) & 0` still receive suggestions.
 
+Deeply shared constant dependencies can also receive a diagnostic without a
+suggestion. For example, a long series of constants that each add the previous
+constant to itself is not fully expanded just to produce an editor suggestion.
+
+Built-in function values are reported without suggestions. For example,
+`String.raw & 0`, `0 & String.raw`, and
+`(typeof String.raw === "function" ? 5 : NaN) * 0` receive diagnostics without
+the replacement suggested upstream. This remains conservative when the function
+has been modified, such as by assigning `String.raw[Symbol.toPrimitive]`.
+
 ## Original Documentation
 
 - [Upstream rule documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-constant-zero-expression.md)

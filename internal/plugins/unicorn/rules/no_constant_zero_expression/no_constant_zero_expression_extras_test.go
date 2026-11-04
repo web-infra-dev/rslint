@@ -2,7 +2,9 @@
 package no_constant_zero_expression_test
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -366,6 +368,131 @@ func TestNoConstantZeroExpressionExtras(t *testing.T) {
 			{MessageId: "no-constant-zero-expression/error", Message: "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: "0"}}},
 		}},
 	})
+}
+
+func TestNoConstantZeroExpressionSharedConstants(t *testing.T) {
+	var cases []rule_tester.InvalidTestCase
+	for _, test := range []struct {
+		levels    int
+		fibonacci bool
+		suggest   bool
+	}{
+		{levels: 16},
+		{levels: 24},
+		{levels: 32, fibonacci: true},
+		{levels: 4, suggest: true},
+		{levels: 6, fibonacci: true, suggest: true},
+	} {
+		var source strings.Builder
+		source.WriteString("const a0 = 1;\n")
+		for index := 1; index <= test.levels; index++ {
+			right := index - 1
+			if test.fibonacci && index > 1 {
+				right--
+			}
+			fmt.Fprintf(&source, "const a%d = a%d + a%d;\n", index, index-1, right)
+		}
+		prefix := source.String()
+		fmt.Fprintf(&source, "a%d * 0;", test.levels)
+		expected := rule_tester.InvalidTestCaseError{
+			MessageId: "no-constant-zero-expression/error",
+			Message:   "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.",
+			Line:      test.levels + 2, Column: 1,
+			EndLine: test.levels + 2, EndColumn: len(fmt.Sprintf("a%d * 0", test.levels)) + 1,
+		}
+		if test.suggest {
+			expected.Suggestions = []rule_tester.InvalidTestCaseSuggestion{{MessageId: "no-constant-zero-expression/suggestion", Output: prefix + "0;"}}
+		}
+		cases = append(cases, rule_tester.InvalidTestCase{Code: source.String(), FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"}, Errors: []rule_tester.InvalidTestCaseError{expected}})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_constant_zero_expression.NoConstantZeroExpressionRule, nil, cases)
+}
+
+func TestNoConstantZeroExpressionBuiltinFunctions(t *testing.T) {
+	var cases []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		"String.raw & 0;",
+		"0 & String.raw;",
+		`(typeof String.raw === "function" ? 5 : NaN) * 0;`,
+		"String.raw[Symbol.toPrimitive] = () => { throw new Error(); };\nString.raw & 0;",
+		"String.raw[Symbol.toPrimitive] = () => 1n;\n0 & String.raw;",
+		`String.raw = 5;` + "\n" + `(typeof String.raw === "function" ? 5 : NaN) * 0;`,
+	} {
+		line := strings.Count(code, "\n") + 1
+		expression := code[strings.LastIndex(code, "\n")+1:]
+		cases = append(cases, rule_tester.InvalidTestCase{
+			Code: code, FileName: "case.js", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "no-constant-zero-expression/error",
+				Message:   "This operation always evaluates to `0` (or `-0`/`NaN`), which is likely a mistake.",
+				Line:      line, Column: 1, EndLine: line, EndColumn: len(expression),
+			}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_constant_zero_expression.NoConstantZeroExpressionRule, nil, cases)
+}
+
+func TestNoConstantZeroExpressionEvaluationModes(t *testing.T) {
+	var code strings.Builder
+	code.WriteString("const a0 = 1;\n")
+	for index := 1; index <= 24; index++ {
+		fmt.Fprintf(&code, "const a%d = a%d + a%d;\n", index, index-1, index-1)
+	}
+	code.WriteString("a24 * 0;\nString.raw & 0;\n0 & String.raw;\n")
+	code.WriteString(`(typeof String.raw === "function" ? 5 : NaN) * 0;` + "\n")
+	code.WriteString("String.raw[Symbol.toPrimitive] = () => { throw new Error(); };\nString.raw & 0;\n")
+	code.WriteString("String.raw[Symbol.toPrimitive] = () => 1n;\n0 & String.raw;\n")
+	code.WriteString("String.raw = 5;\n" + `(typeof String.raw === "function" ? 5 : NaN) * 0;` + "\n5 * 0;")
+	program, source, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(code.String(), "modes.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, typed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("checker-%t", typed), func(t *testing.T) {
+			sourceProgram := lintprogram.NewFromCompiler(program)
+			if !typed {
+				sourceProgram, err = lintprogram.NewFromBoundSources(program, []*ast.SourceFile{source})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			var diagnostics []rule.RuleDiagnostic
+			var hasChecker bool
+			linter.LintSingleFile(linter.LintSingleFileOptions{
+				Program: sourceProgram, File: source.FileName(),
+				GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{Name: no_constant_zero_expression.NoConstantZeroExpressionRule.Name, Severity: rule.SeverityError,
+						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+							hasChecker = ctx.TypeChecker != nil
+							return no_constant_zero_expression.NoConstantZeroExpressionRule.Run(ctx, nil)
+						},
+					}}
+				},
+				Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+			})
+			if hasChecker != typed || len(diagnostics) != 8 {
+				t.Fatalf("checker = %t, diagnostics = %d; want %t, 8", hasChecker, len(diagnostics), typed)
+			}
+			for index, diagnostic := range diagnostics {
+				if diagnostic.Message.Id != "no-constant-zero-expression/error" || diagnostic.FixesPtr != nil {
+					t.Fatalf("unexpected diagnostic: %+v", diagnostic)
+				}
+				if index < 7 {
+					if diagnostic.Suggestions != nil {
+						t.Fatalf("unexpected suggestion at index %d", index)
+					}
+					continue
+				}
+				if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
+					t.Fatal("the large dependency graph suppressed an unrelated literal suggestion")
+				}
+				output, _, fixed := linter.ApplyRuleFixes(code.String(), (*diagnostic.Suggestions)[:1])
+				if !fixed || output != strings.TrimSuffix(code.String(), "5 * 0;")+"0;" {
+					t.Fatalf("unexpected suggestion output: %q", output)
+				}
+			}
+		})
+	}
 }
 
 func TestNoConstantZeroExpressionSuggestionsFollowDemand(t *testing.T) {
