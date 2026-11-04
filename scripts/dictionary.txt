@@ -309,7 +309,6 @@ kase
 keycap
 keygen
 keyshortcuts
-keytar
 keyup
 Khmr
 Knda
@@ -459,7 +458,6 @@ Orya
 osvfs
 otherthing
 outputfixes
-ovsx
 oxendict
 packagejson
 pagebreak

@@ -11,7 +11,6 @@ define.fmt({
     'binaries/',
     'internal/**/rules/**/*.md',
     'website/releases.json',
-    'packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/',
   ],
 });
 

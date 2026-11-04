@@ -85,7 +85,7 @@ Rslint is a high-performance JavaScript and TypeScript linter, designed as a dro
 │  │  ┌────────────────────────────────┐  ┌─────────────────────────────────┐ │  │
 │  │  │ WEBSITE / PLAYGROUND           │  │ OTHER PACKAGES / CLIENTS        │ │  │
 │  │  │ website Playground             │  │ packages/rslint                 │ │  │
-│  │  │ packages/rslint-wasm           │  │ packages/vscode-extension       │ │  │
+│  │  │ packages/rslint-wasm           │  │ rstack-editor (external repo)   │ │  │
 │  │  │ packages/rslint-api            │  │ packages/rslint-test-tools      │ │  │
 │  │  │ browser worker / wasm runtime  │  │ packages/rule-tester            │ │  │
 │  │  │ lint path    -> internal/linter│  │ crates/tsgo-client              │ │  │
@@ -138,7 +138,6 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint-wasm/`              | Browser/WASM package for running `rslint --api` in a worker                                                                    | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests through `internal/api` and `internal/api/server` to `internal/linter` and `internal/inspector`                                                                                                                                                                                                                                                                       |
 | `packages/rule-tester/`              | Forked `@typescript-eslint/rule-tester` package used in tests                                                                  | JS-side rule testing support that complements Go-side helpers                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `packages/utils/`                    | Shared JavaScript utilities                                                                                                    | Shared support package for the JS/website tooling layer                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `packages/vscode-extension/`         | VS Code extension for IDE integration                                                                                          | Activation first checks whether an enabled `rstack.rstack` takes over; if so, this extension stands down to a status bar item and an uninstall prompt. Otherwise it resolves the nearest project-local `@rslint/core` per open document, rejects cores outside `^0.9.0`, launches that installation's `cmd/rslint --lsp`, serves reverse config/plugin requests, and routes diagnostics/code actions to the document's selected runtime                         |
 | `packages/tsgo/`                     | `@rslint/tsgo-server` JS wrapper package for the `tsgo` tool                                                                   | JavaScript-facing wrapper around `cmd/tsgo` output; resolves the matching `@rslint/tsgo-server-<platform>-<arch>` binary package                                                                                                                                                                                                                                                                                                                                |
 | `typescript-go/`                     | Git submodule containing TypeScript compiler Go port                                                                           | Provides parser, AST, checker, `Program`, `project.Session`, diagnostics, scanner, and VFS primitives used throughout the backend                                                                                                                                                                                                                                                                                                                               |
 | `shim/`                              | Generated bridge packages exposing ts-go internals                                                                             | Bridge layer between repository Go code and `typescript-go` internals; generated and updated by `tools/`                                                                                                                                                                                                                                                                                                                                                        |
@@ -1116,64 +1115,11 @@ The transport and target phase differ by surface:
   through the same bounded input traversal and Git reader without evaluating
   more modules. Its array base is then the invocation cwd; a discovered module
   retains its own array base. The fallback is not a config owner or candidate.
-- Extension activation makes a one-time stand-down decision through
-  `rstackEditorTakesOver()`: an enabled `rstack.rstack` alone takes over, and
-  `Extension`, `RuntimeManager`, and LSP startup are skipped entirely. The
-  migration status bar item and prompts in `src/migrationNotice.ts` never block
-  activation; the prompts keep their "Don't show again" flags in `globalState`.
-  Standing down prompts to uninstall this extension. Otherwise `RuntimeManager`
-  reports each ready runtime; the first one prompts once to install Rstack
-  unless an unsupported core was reported earlier. A live language client
-  cannot be added or removed safely after activation, so later Rstack state
-  changes only switch the status bar item to a reload prompt. Whichever
-  extension activated the Rslint language server retains ownership of it.
-- The extension owns shared UI, commands, and output channels once. For each
-  open supported file, `CoreResolver` follows normal `node_modules` ancestry or
-  the resource-scoped `rslint.corePath` override to an exact
-  `@rslint/core` package. There is no bundled fallback and no alternate PnP
-  execution path. The final standalone release reads that package's
-  `package.json` version before loading any core module and rejects versions
-  outside `^0.9.0` with an Install Rstack error; no runtime starts for them.
-  That package supplies the Go binary, config-module host, protocol version,
-  and lazily loaded ESLint-plugin worker host as one coherent runtime boundary.
-- LSP tracing has one window-scoped policy and one extension-owned output
-  channel across all runtimes. Each `LanguageClient` uses the same `rslint`
-  client ID, so `vscode-languageclient` is the sole authority that reads
-  `rslint.trace.server`, applies the initial level, and sends live `$/setTrace`
-  updates without restarting a native server. The server accepts that standard
-  notification as a no-op because the protocol trace is rendered client-side.
-  Every `LanguageClient` borrows the same channel directly; only the extension
-  disposes it after all runtimes close.
-- `RuntimeManager` keys a runtime by VS Code workspace-folder URI plus the
-  package directory's normalized physical realpath. Documents resolving through
-  symlinks to the same installation share its process and worker state; distinct
-  physical copies remain isolated even when their version strings match. Only
-  installations selected by currently open documents start. Reference release
-  closes an unused runtime, while a document switch starts and validates the
-  replacement before withdrawing its last-good owner. An unconfirmed close
-  quarantines that exact runtime key so a replacement cannot overlap a possibly
-  live process. Terminal shutdown still attempts every runtime close before
-  releasing shared resources.
-- Each runtime owns its native server children, config watcher, transaction
-  adapter, plugin pool, request handlers, and workspace logger. A process owner
-  covers automatic LanguageClient restarts, terminates any still-live prior
-  child before a restart spawn, blocks new spawns once closing begins, and
-  awaits stdio close after bounded forced termination of any child that survives
-  protocol shutdown. A closing-aware client error handler forbids restart.
-- Every runtime retains a workspace-relative document selector, while
-  `WorkspaceDocumentRouter` is the single authority for the selectors' overlap.
-  The manager assigns each document explicitly to the runtime selected by local
-  package resolution. An assignment change performs an ordered
-  `didClose`/diagnostic-clear/`didOpen` handoff using the document's current
-  in-memory text, without requiring the editor to close. Middleware admits
-  changes, saves, diagnostics, and code actions only for the exact active
-  runtime that currently owns the server-open document. Exact runtime identity
-  rejects diagnostics from a replaced same-key client, while a document epoch
-  rejects code actions that finish after an ownership change. When the
-  LanguageClient automatically restarts a native server, the router invalidates
-  every recorded server-open session for that runtime before LanguageClient
-  replays `didOpen`, so the replacement process receives each still-open owned
-  document exactly once.
+- The editor client is maintained in rstackjs/rstack-editor. It resolves the
+  nearest project-local `@rslint/core` per open document, runs one runtime per
+  workspace folder and physical core installation, and routes each document to
+  its owning runtime; its UI, runtime management, and migration notices live in
+  that repository. rslint owns the package surfaces and the protocol below.
 - Each selected runtime starts `rslint/configRefresh`. With no `configPath`, Go
   scans that process's workspace-folder cwd with a transaction-scoped cached
   VFS. A client may instead repeat one fixed absolute JS/TS `configPath` on
@@ -1187,13 +1133,13 @@ The transport and target phase differ by surface:
   through `rslint/commitConfigs` / `rslint/abortConfigs`. `fresh` loads cache-bust the config entry
   module; static transitive imports retain Node's normal module cache. If the
   first plugin preparation detects a source change between its two fingerprint
-  checks, the extension keeps the language client alive and retries one
-  serialized refresh from the new bytes.
-- If `vscode-languageclient` automatically restarts the native process, its
-  later `Running` transition first aborts any extension-side orphaned
-  transaction, then requests a new initial catalog through the same serialized
-  refresh chain. The previously committed plugin host remains available until
-  the replacement Go process commits its own catalog.
+  checks, the client keeps the session alive and retries one serialized
+  refresh from the new bytes.
+- If the editor client automatically restarts the native process, its later
+  `Running` transition first aborts any client-side orphaned transaction, then
+  requests a new initial catalog through the same serialized refresh chain. The
+  previously committed plugin host remains available until the replacement Go
+  process commits its own catalog.
 - Only a fully committed Go/Node snapshot replaces a usable last-good
   snapshot. All-candidate failure, or a partial failure at an existing
   committed boundary, aborts and preserves that snapshot; a newly broken child
@@ -1205,12 +1151,12 @@ The transport and target phase differ by surface:
   the prior host state and begins normal grace retirement. Open documents remain
   separate per-file targets resolved against the committed catalog.
 
-The LSP config wire exposes one identity, `transactionId`. The extension reuses
-that value internally as the `PluginLintPool` host generation so an in-flight
-plugin request is routed to the exact worker state paired with Go's committed
-catalog. This is a concurrency/lifecycle identity, not a second config-discovery
-model. The independent numeric document generation only rejects stale async
-diagnostics after edits, closes, or config commits.
+The LSP config wire exposes one identity, `transactionId`. The editor client
+reuses that value as its plugin-host generation so an in-flight plugin request
+is routed to the exact worker state paired with Go's committed catalog. This is
+a concurrency/lifecycle identity, not a second config-discovery model. The
+independent numeric document generation only rejects stale async diagnostics
+after edits, closes, or config commits.
 
 LSP keeps config evaluation and project selection as two orthogonal
 generations. A config transaction atomically publishes entries, owner indexes,
@@ -2300,7 +2246,6 @@ The current architecture already leaves room for:
   plugin worker/package integration. Its `go-frame` project builds the producer
   only for source-to-frame tests. Reference parsers and ESLint are test-tools
   dependencies; core keeps the libraries bundled into its runtime.
-- **VS Code Extension Tests**: `packages/vscode-extension/__tests__`
 - **Rust / tsgo Tests**: `crates/tsgo-client/tests` verifies exported semantic data through the matching `cmd/tsgo` binary
 
 ### Rule Testing
@@ -2484,7 +2429,7 @@ Playground inspection is a separate read-only path through `internal/inspector`.
 │                                LSP PATH                                      │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  VS Code Extension (shared UI / channels)                                   │
+│  Editor client (rstackjs/rstack-editor)                                     │
 │     ├── CoreResolver (nearest local core per open document)                  │
 │     ├── RuntimeManager (workspace URI + physical core identity)              │
 │     ├── WorkspaceDocumentRouter (explicit document ownership)                │

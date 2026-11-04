@@ -1,6 +1,6 @@
 ---
 name: prepare-rslint-npm-release
-description: Prepare a stable release PR for the unified rslint npm packages by updating package versions and rule/TypeScript release metadata. Use for release preparation or version bump PRs, not for publishing npm packages, canary releases, VS Code Marketplace releases, or the independent tsgo/Rust release line.
+description: Prepare a stable release PR for the unified rslint npm packages by updating package versions and rule/TypeScript release metadata. Use for release preparation or version bump PRs, not for publishing npm packages, canary releases, or the independent tsgo/Rust release line.
 ---
 
 # Prepare an Rslint npm Release PR
@@ -51,11 +51,10 @@ to repeat the bump.
 
 The version script owns the unified package selection: the root manifest,
 `packages/*/package.json` except `packages/tsgo/package.json`, and
-`npm/rslint/*/package.json`. This includes private workspace packages and the
-VS Code extension manifest; updating that manifest is part of version alignment,
-not a Marketplace release. Derive the current selection from the script rather
-than hardcoding #2080's package count. Preserve `workspace:` dependency ranges.
-The independent tsgo packages and Rust crate versions are outside this workflow.
+`npm/rslint/*/package.json`. This includes private workspace packages. Derive
+the current selection from the script rather than hardcoding #2080's package
+count. Preserve `workspace:` dependency ranges. The independent tsgo packages
+and Rust crate versions are outside this workflow.
 
 The sync writes `website/releases.json` for the new stable version. It reads the
 indexed `typescript-go` gitlink and queries upstream TypeScript tags. Record the

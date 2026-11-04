@@ -22,9 +22,6 @@ export default defineConfig([
     'packages/rslint-test-tools/tests/**',
     'packages/rslint/tests/eslint-plugin/**',
 
-    // VSCode extension test artifacts
-    'packages/vscode-extension/__tests__/**',
-
     // Files that need special handling
     'packages/rslint-wasm/src/worker.ts',
     'packages/rule-tester/src/index.ts',
