@@ -2,26 +2,11 @@
 
 ## Rule Details
 
-Disallows specified syntax. The rule accepts a list of [esquery] selectors;
-any AST node matching one of the listed selectors triggers a diagnostic with
-either a default or user-supplied message.
+Disallows specified syntax. This is useful when a project wants to restrict language features such as `try-catch`, classes, or the `in` operator.
 
-This is the catch-all rule for restricting language constructs (e.g. banning
-`with`, banning `for-in`, requiring named function declarations) without
-having to write a dedicated rule. The core selector grammar follows ESLint's
-esquery-based implementation.
+Restrictions use [ESTree](https://github.com/estree/estree) node names, such as `FunctionDeclaration` and `WithStatement`, or more precise [AST selectors](https://eslint.org/docs/latest/extend/selectors). Any node matching a configured selector is reported.
 
-Examples of **incorrect** code for this rule:
-
-```json
-{
-  "no-restricted-syntax": [
-    "error",
-    "FunctionExpression",
-    "WithStatement"
-  ]
-}
-```
+Examples of **incorrect** code for this rule with `["error", "FunctionExpression", "WithStatement", "BinaryExpression[operator='in']"]`, parsed as a script:
 
 ```javascript
 with (me) {
@@ -29,6 +14,8 @@ with (me) {
 }
 
 const doSomething = function () {};
+
+foo in bar;
 ```
 
 Examples of **correct** code for the same configuration:
@@ -43,80 +30,52 @@ foo instanceof bar;
 
 ## Options
 
-The rule accepts an array of restriction entries. Each entry is either:
+The rule accepts a list of selector strings:
 
-- A bare string — the esquery selector. The diagnostic message is
-  `Using '<selector>' is not allowed.`.
-- An object `{ "selector": <string>, "message"?: <string> }`. When `message`
-  is provided it replaces the default text verbatim.
+```json
+{
+  "no-restricted-syntax": [
+    "error",
+    "FunctionExpression",
+    "WithStatement",
+    "BinaryExpression[operator='in']"
+  ]
+}
+```
+
+Entries can also be objects with a required `selector` and an optional `message`:
 
 ```json
 {
   "no-restricted-syntax": [
     "error",
     {
-      "selector": "CallExpression[callee.name='setTimeout']",
-      "message": "Use the timer service instead of raw setTimeout."
+      "selector": "FunctionExpression",
+      "message": "Function expressions are not allowed."
     },
-    "WithStatement"
+    {
+      "selector": "CallExpression[callee.name='setTimeout'][arguments.length!=2]",
+      "message": "setTimeout must always be invoked with two arguments."
+    }
   ]
 }
 ```
 
-### Supported selector forms
+The custom message replaces the default `Using '<selector>' is not allowed.` diagnostic. String and object entries can be mixed in one configuration.
 
-The implementation follows the esquery 1.7 selector forms used by ESLint
-10.10.0, including the complete upstream `no-restricted-syntax` test suite.
-Malformed selectors are a deliberate compatibility divergence: rslint drops
-the malformed entry so one bad selector does not disable the rest of the
-configuration, while ESLint rejects the whole rule configuration:
+Selectors can also target supported TypeScript syntax. For example, `TSEnumDeclaration[const=true]` selects const enums, while `TSEnumDeclaration` selects all enums. `[const]` only checks whether the attribute exists, so it matches ordinary enums as well.
 
-- ESTree node names (e.g. `Identifier`, `FunctionDeclaration`,
-  `BinaryExpression`) and supported TS-ESTree names such as
-  `TSEnumDeclaration`. ESTree-only wrapper shapes such as `ClassBody`,
-  `JSXEmptyExpression`, `ChainExpression`, and `MethodDefinition.value` are
-  exposed as virtual facades over the tsgo AST. Bodyless class methods expose
-  `TSEmptyBodyFunctionExpression` as their value.
-- Wildcard `*`.
-- Field selectors, including nested fields (e.g. `Literal.key` and
-  `.body.declarations.init`).
-- Attribute selectors with presence (`[label]`), equality
-  (`[name="x"]`, `[kind='using']`), inequality (`!=`), numeric comparisons
-  (`[params.length>2]`), numeric path segments (`[arguments.0.type='Literal']`),
-  `type(...)`, and regex matching (`[regex.flags=/i/]`). Attribute paths may
-  inspect ESLint's `parent` link. BigInt values retain their JavaScript type:
-  `Literal[value=type(bigint)]` selects them, while a string regex equality
-  selector does not. Class-method function fields are available through
-  selectors such as `MethodDefinition[value.body.body.length=0]`.
-- Combinators `>` (direct child), descendant whitespace, `+`
-  (adjacent sibling), `~` (general sibling), including decorator selectors
-  such as `Decorator > CallExpression[callee.name='sealed']`.
-- The `!` subject marker, including its reverse sibling/adjacent matching
-  behavior, and ESLint's `:exit` event suffix.
-- Pseudo-classes `:is()`, `:matches()`, `:not()`, `:has()`,
-  `:first-child`, `:last-child`, `:nth-child(N)`, `:nth-last-child(N)`, and
-  the semantic classes `:statement`, `:expression`, `:declaration`,
-  `:function`, and `:pattern`.
+## When Not To Use It
 
-## AST representation note
+Leave this rule disabled if your project has no syntax restrictions.
 
-tsgo does not allocate separate nodes for every ESTree wrapper. Direct
-selectors and structural relationships for those wrappers are modeled, with
-ESLint-compatible ranges. The bare `*` selector retains the engine's physical
-tsgo traversal, which starts at the program's children and does not emit
-additional diagnostics for virtual wrappers. Other broad selectors evaluate
-each supported ESTree identity separately. `Program` and `Program:exit` can
-select the program itself.
+## Differences from upstream
 
-TS-ESTree coverage is limited to the supported node mappings; the rule does
-not materialize every TypeScript type annotation or type-parameter wrapper.
-Broad selectors on type-only syntax can therefore differ from the TypeScript
-ESLint parser. Runtime receiver attribute paths retain their existing behavior
-of looking through TypeScript assertions, such as `(console as any).log()`.
+- Malformed selectors are ignored instead of rejecting the rule configuration. For example, `["error", "[", "WithStatement"]` still restricts `WithStatement` in rslint; ESLint rejects the malformed `[` selector.
+- TypeScript selectors are limited to the supported AST node mappings. Not every type annotation or type-parameter wrapper is exposed, so broad selectors on type-only syntax can differ from typescript-eslint. Receiver attribute paths also look through TypeScript assertions, such as `(console as any).log()`.
+- The bare `*` selector follows the underlying TypeScript AST traversal, starting at the program's children, and does not report additional ESTree wrappers. Named selectors such as `ClassBody` and `ChainExpression`, and other broad selectors, can match supported wrappers. Use `Program` or `Program:exit` to select the program itself.
 
 ## Original Documentation
 
 - [ESLint: no-restricted-syntax](https://eslint.org/docs/latest/rules/no-restricted-syntax)
-- [Source code](https://github.com/eslint/eslint/blob/v10.10.0/lib/rules/no-restricted-syntax.js)
-
-[esquery]: https://github.com/estools/esquery
+- [Source code](https://github.com/eslint/eslint/blob/v10.14.0/lib/rules/no-restricted-syntax.js)

@@ -213,3 +213,131 @@ func TestNoRestrictedSyntaxValuesRegressions(t *testing.T) {
 			},
 		})
 }
+
+// Expectations checked against ESLint 10.14.0 and @typescript-eslint/parser 8.65.0.
+func TestNoRestrictedSyntaxConstEnumAttribute(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoRestrictedSyntaxRule,
+		[]rule_tester.ValidTestCase{
+			{
+				Code:    "enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=true]"},
+			},
+			{
+				Code:    "declare enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=true]"},
+			},
+			{
+				Code:    "const n = 1; const obj = { const: true };",
+				Options: []any{"[const]"},
+			},
+			{
+				Code:    "const enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=false]"},
+			},
+			{
+				// The modifier belongs to the declaration, not its wrappers or members.
+				Code:    "export const enum E { A }",
+				Options: []any{":matches(TSEnumBody, TSEnumMember, ExportNamedDeclaration)[const]"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    "const enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Using 'TSEnumDeclaration[const=true]' is not allowed.", Line: 1, Column: 1, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code: "export const enum E { A }",
+				Options: []any{map[string]any{
+					"selector": "TSEnumDeclaration[const=true]",
+					"message":  "Do not use const enum.",
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Message: "Do not use const enum.", Line: 1, Column: 8, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "declare const enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
+				},
+			},
+			{
+				Code:     "export declare const enum E { A }",
+				FileName: "enums.d.ts",
+				Options:  []any{"TSEnumDeclaration[const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 34},
+				},
+			},
+			{
+				Code:    "namespace N { export const enum E { A } }",
+				Options: []any{"TSEnumDeclaration[const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 22, EndLine: 1, EndColumn: 40},
+				},
+			},
+			{
+				Code:    "enum E { A }",
+				Options: []any{"TSEnumDeclaration[const=false]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13},
+				},
+			},
+			{
+				// Presence includes false; both enum forms expose a boolean attribute.
+				Code:    "enum E { A } const enum F { B }",
+				Options: []any{"TSEnumDeclaration[const]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 14, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    "enum E { A } const enum F { B }",
+				Options: []any{"TSEnumDeclaration[const=type(boolean)]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13},
+					{MessageId: "restrictedSyntax", Line: 1, Column: 14, EndLine: 1, EndColumn: 32},
+				},
+			},
+			{
+				Code:    "enum E { A } const enum F { B }",
+				Options: []any{"TSEnumDeclaration[const!=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 13},
+				},
+			},
+			{
+				Code:    "export const enum E { A }",
+				Options: []any{"ExportNamedDeclaration[declaration.const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code:    "const enum E { A }",
+				Options: []any{"TSEnumBody[parent.const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 14, EndLine: 1, EndColumn: 19},
+				},
+			},
+			{
+				Code:    "const enum E { A }",
+				Options: []any{"Identifier[parent.const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 12, EndLine: 1, EndColumn: 13},
+				},
+			},
+			{
+				Code:    "export const enum E { A }",
+				Options: []any{"[const=true]"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "restrictedSyntax", Line: 1, Column: 8, EndLine: 1, EndColumn: 26},
+				},
+			},
+		})
+}

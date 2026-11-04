@@ -1761,6 +1761,10 @@ func readNodeAttr(node *ast.Node, name string, mc *matchContext) (interface{}, b
 		return readComputedAttr(node)
 	case "static":
 		return readStaticAttr(node)
+	case "const":
+		if node.Kind == ast.KindEnumDeclaration {
+			return ast.IsEnumConst(node), true
+		}
 	case "shorthand":
 		return readShorthandAttr(node)
 	case "method":
