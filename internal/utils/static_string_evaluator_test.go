@@ -1142,6 +1142,20 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		const arrayIndex = [1][0];
 		const arrayLength = [1]["length"];
 		const globalNumber = Math["PI"];
+		const globalInfinity = 0 / Infinity;
+		const globalNaN = NaN & 0;
+		const template = ` + "`abc`" + `;
+		const templateLength = ` + "`abc`.length" + `;
+		const templateAliasLength = template.length;
+		const templateIndex = ` + "`abc`[1]" + `;
+		const templateGlobalNumber = Math[(` + "`PI`" + `)];
+		const parenthesizedGlobalNumber = Math[("PI")];
+		const assertedGlobalNumber = (Math as typeof Math).PI;
+		const nonNullGlobalNumber = Math!.PI;
+		const assertedObjectMember = ({value: 1} as const).value;
+		const assertedStringMember = ("abc" as string).length;
+		const substitutedGlobalNumber = Math[` + "`P${'I'}`" + `];
+		const substitutedLength = ` + "`a${1}`.length" + `;
 		const frozen = Object.freeze([1]);
 		const instantiatedArray = (Object.freeze<number[]>)([1]);
 		const frozenRegExp = (Object.freeze<RegExp>)(/a/);
@@ -1200,6 +1214,19 @@ func TestStaticStringEvaluatorControlFlowSafety(t *testing.T) {
 		{name: "arrayIndex", known: true},
 		{name: "arrayLength", known: true},
 		{name: "globalNumber", known: true},
+		{name: "globalInfinity", known: true},
+		{name: "globalNaN", known: true},
+		{name: "templateLength", known: true},
+		{name: "templateAliasLength", known: true},
+		{name: "templateIndex", known: true},
+		{name: "templateGlobalNumber", known: true},
+		{name: "parenthesizedGlobalNumber", known: true},
+		{name: "assertedGlobalNumber"},
+		{name: "nonNullGlobalNumber"},
+		{name: "assertedObjectMember"},
+		{name: "assertedStringMember"},
+		{name: "substitutedGlobalNumber"},
+		{name: "substitutedLength"},
 		{name: "frozen", known: true, isArray: true},
 		{name: "instantiatedArray", known: true, isArray: true},
 		{name: "frozenRegExp", known: true, isRegExp: true},

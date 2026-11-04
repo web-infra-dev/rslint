@@ -861,6 +861,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-await-in-promise-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-chained-comparison.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-console-spaces.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-constant-zero-expression.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-empty-file.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-exports-in-scripts.test.ts',
