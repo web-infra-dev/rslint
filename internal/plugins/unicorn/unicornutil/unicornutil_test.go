@@ -619,3 +619,33 @@ func TestIsSameReference(t *testing.T) {
 		t.Fatal("nil references must not match")
 	}
 }
+
+func TestIsSameComparisonOperand(t *testing.T) {
+	for _, test := range []struct {
+		left, right string
+		want        bool
+	}{
+		{`a.b`, `a["b" as string]`, true},
+		{`a["b" + "c"]`, `(a as Box).bc`, true},
+		{`a[key as string]`, `a[key]`, true},
+		{`fn<number>`, `fn<string>`, true},
+		{`(fn<number>).value`, `fn.value`, true},
+		{"`a\\u0062`", `"ab"`, true},
+		{"`ab`", `"cd"`, false},
+		{`a.#value`, `a["#value"]`, false},
+		{`a[key]`, `a[other]`, false},
+		{`get()`, `get()`, false},
+	} {
+		t.Run(test.left+"/"+test.right, func(t *testing.T) {
+			source := parseTestSource("const left = " + test.left + "; const right = " + test.right + ";")
+			left := source.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].AsVariableDeclaration().Initializer
+			right := source.Statements.Nodes[1].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].AsVariableDeclaration().Initializer
+			if got := IsSameComparisonOperand(left, right); got != test.want {
+				t.Fatalf("IsSameComparisonOperand = %v, want %v", got, test.want)
+			}
+		})
+	}
+	if IsSameComparisonOperand(nil, nil) {
+		t.Fatal("nil operands must not match")
+	}
+}

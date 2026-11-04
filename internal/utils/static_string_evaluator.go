@@ -1231,7 +1231,7 @@ func (staticEvaluator *StaticStringEvaluator) objectPassThroughArgument(node *as
 		return nil, false
 	}
 
-	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)
+	callee := ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
 	if callee == nil || !ast.IsAccessExpression(callee) {
 		return nil, false
 	}

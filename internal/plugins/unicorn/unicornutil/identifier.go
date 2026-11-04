@@ -41,18 +41,36 @@ func IsSameIdentifier(left *ast.Node, right *ast.Node) bool {
 // Unicorn additionally equates e.g. object["a" + "b"] with object.ab.
 // All non-member comparisons retain the shared helper's literal semantics.
 func IsSameReference(left, right *ast.Node) bool {
+	return isSameReference(left, right, false)
+}
+
+// IsSameComparisonOperand additionally normalizes computed TypeScript keys and
+// static string literals, matching Unicorn's comparison.isSame operation.
+func IsSameComparisonOperand(left, right *ast.Node) bool {
+	return isSameReference(left, right, true)
+}
+
+func isSameReference(left, right *ast.Node, comparison bool) bool {
 	left, right = utils.SkipAssertionsAndParens(left), utils.SkipAssertionsAndParens(right)
 	if left == nil || right == nil {
 		return false
 	}
+	if comparison {
+		left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
+		right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
+		if value, ok := utils.GetStaticStringLiteralValue(left); ok {
+			other, known := utils.GetStaticStringLiteralValue(right)
+			return known && value == other
+		}
+	}
 	if !ast.IsAccessExpression(left) || !ast.IsAccessExpression(right) {
 		return utils.IsSameReference(left, right, true)
 	}
-	if !IsSameReference(left.Expression(), right.Expression()) {
+	if !isSameReference(left.Expression(), right.Expression(), comparison) {
 		return false
 	}
-	if name, known := referencePropertyName(left); known {
-		other, known := referencePropertyName(right)
+	if name, known := referencePropertyName(left, comparison); known {
+		other, known := referencePropertyName(right, comparison)
 		return known && name == other
 	}
 	if left.Kind != right.Kind {
@@ -60,15 +78,17 @@ func IsSameReference(left, right *ast.Node) bool {
 	}
 	_, leftKey := utils.MemberExpressionParts(left)
 	_, rightKey := utils.MemberExpressionParts(right)
-	return IsSameReference(leftKey, rightKey)
+	return isSameReference(leftKey, rightKey, comparison)
 }
 
-func referencePropertyName(node *ast.Node) (string, bool) {
+func referencePropertyName(node *ast.Node, comparison bool) (string, bool) {
 	if node.Kind == ast.KindPropertyAccessExpression {
 		return utils.AccessExpressionStaticName(node)
 	}
 	key := utils.ESTreeRuntimeExpression(node.AsElementAccessExpression().ArgumentExpression)
-	if _, wrapped := utils.TransparentExpression(key); wrapped {
+	if comparison {
+		key = ast.SkipOuterExpressions(key, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
+	} else if _, wrapped := utils.TransparentExpression(key); wrapped {
 		return "", false
 	}
 	return utils.NewStaticStringEvaluatorWithoutScope().EvalToString(key)
