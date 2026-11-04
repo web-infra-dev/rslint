@@ -10,7 +10,7 @@ import (
 
 // The native checker supplies type information; syntax still proves booleans
 // through any/unknown assertions and other expressions the checker cannot type.
-func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool) bool {
+func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool, completed map[*ast.Node]bool) (result bool) {
 	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || visiting[node] {
 		return false
@@ -26,23 +26,42 @@ func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStri
 			return true
 		}
 	}
+	cacheable := ast.IsIdentifier(node) || ast.IsCallExpression(node)
+	if cacheable {
+		if result, known := completed[node]; known {
+			return result
+		}
+	}
 	if visiting == nil {
 		visiting = make(map[*ast.Node]bool)
 	}
 	visiting[node] = true
-	defer delete(visiting, node)
+	defer func() {
+		delete(visiting, node)
+		// Bindings and calls revisit shared initializers or function bodies.
+		// Ordinary expression trees do not need an entry for every node.
+		if cacheable {
+			completed[node] = result
+		}
+	}()
 	typedBoolean := func() bool { return isBooleanType(ctx, expressionType(ctx, node, evaluator, make(map[*ast.Node]bool))) }
-	recur := func(child *ast.Node) bool { return isBoolean(ctx, child, evaluator, visiting) }
+	recur := func(child *ast.Node) bool { return isBoolean(ctx, child, evaluator, visiting, completed) }
 	if ast.IsIdentifier(node) && ctx.Refs != nil {
 		if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
-			annotation, optional := unicornutil.ValueTypeAnnotation(ctx, symbol.Declarations[0])
+			annotation, optional := valueTypeAnnotation(ctx, symbol.Declarations[0])
 			if utils.IsJSDocSyntaxNode(annotation) {
 				return (!optional && booleanAnnotation(ctx, annotation, visiting)) || typedBoolean()
 			}
 			if !optional && booleanAnnotation(ctx, annotation, visiting) {
 				return true
 			}
+			if declaration := symbol.Declarations[0]; declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) && recur(declaration.Initializer()) {
+				return true
+			}
 		}
+	}
+	if ast.IsCallExpression(node) && booleanCall(ctx, node, evaluator, visiting, completed) {
+		return true
 	}
 	// A successful syntax proof avoids repeatedly folding each subtree of a
 	// long logical expression. A failed proof must still allow static results
@@ -90,7 +109,7 @@ func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStri
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
 		return booleanAnnotation(ctx, node.Type(), visiting) || typedBoolean() || ((node.Type().Kind == ast.KindAnyKeyword || node.Type().Kind == ast.KindUnknownKeyword) && recur(node.Expression()))
 	case ast.KindCallExpression:
-		return booleanCall(ctx, node, evaluator, visiting) || typedBoolean()
+		return typedBoolean()
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		if !ast.IsOptionalChain(node) {
 			name, known := memberName(node, evaluator)
@@ -102,15 +121,6 @@ func isBoolean(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStri
 			}
 		}
 		return typedBoolean()
-	case ast.KindIdentifier:
-		if ctx.Refs != nil {
-			if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
-				declaration := symbol.Declarations[0]
-				if declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) {
-					return recur(declaration.AsVariableDeclaration().Initializer) || typedBoolean()
-				}
-			}
-		}
 	}
 	return typedBoolean()
 }
@@ -156,7 +166,7 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 				if declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
 					return actual
 				}
-				if annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration); annotation != nil && !ast.IsFunctionLike(declaration) {
+				if annotation, optional := valueTypeAnnotation(ctx, declaration); annotation != nil && !ast.IsFunctionLike(declaration) {
 					if optional {
 						return actual
 					}
@@ -176,7 +186,7 @@ func expressionType(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Stati
 					if overridesJSDocCallable(declaration) || callableHasWrites(ctx, symbol) {
 						return actual
 					}
-					if annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration); utils.IsJSDocSyntaxNode(annotation) && !optional {
+					if annotation, optional := valueTypeAnnotation(ctx, declaration); utils.IsJSDocSyntaxNode(annotation) && !optional {
 						if ast.IsFunctionLike(declaration) && ast.GetFunctionFlags(declaration)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
 							return ctx.TypeChecker.GetTypeFromTypeNode(annotation)
 						}

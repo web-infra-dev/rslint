@@ -1,7 +1,9 @@
 package no_chained_comparison_test
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -465,4 +467,144 @@ func TestNoChainedComparisonBuiltinsWithoutTypeInfo(t *testing.T) {
 			{MessageId: "no-chained-comparison/error", Message: comparisonMessage, Line: 1, Column: 61, EndLine: 1, EndColumn: 86, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
 	})
+}
+
+// Checked against Unicorn v79.0.0 in each mode. Shadowed built-ins retain their
+// local declarations' behavior (see the documented upstream difference).
+func TestNoChainedComparisonReviewRegressions(t *testing.T) {
+	cases := []struct {
+		name, code              string
+		sourceValid, typedValid bool
+	}{
+		{"parameter default", "function f(read = () => true) { return (a < b) === read(); } f(() => 0);", false, true},
+		{"parameter callback annotation", "function f(read: () => boolean = () => true) { return (a < b) === read(); }", true, true},
+		{"parameter JSDoc callback", "/** @param {() => boolean} read */ function f(read = () => true) { return (a < b) === read(); }", true, true},
+		{"stable variable callback", "const read = () => true; (a < b) === read();", true, true},
+		{"JSDoc native number assertion", "/** @type {boolean} */ const flag = 1 as number; (a < b) === flag;", false, false},
+		{"JSDoc native boolean assertion", "/** @type {number} */ const flag = true as boolean; (a < b) === flag;", true, true},
+		{"JSDoc native number alias", "/** @type {boolean} */ const flag = 1 as number; const alias = flag; (a < b) === alias;", false, false},
+		{"JSDoc native boolean alias", "/** @type {number} */ const flag = true as boolean; const alias = flag; (a < b) === alias;", true, true},
+		{"JSDoc native angle number", "/** @type {boolean} */ const flag = <number>1; (a < b) === flag;", false, false},
+		{"JSDoc native angle boolean", "/** @type {number} */ const flag = <boolean>true; (a < b) === flag;", true, true},
+		{"JSDoc non-nullable boolean", "/** @param {!boolean} flag */ function f(flag) { return (a < b) === flag; }", true, true},
+		{"JSDoc non-nullable number", "/** @param {!number} flag */ function f(flag) { return (a < b) === flag; }", false, false},
+		{"JSDoc boolean intersection", "/** @param {boolean & {brand: string}} flag */ function f(flag) { return (a < b) === flag; }", true, true},
+		{"native boolean intersection", "function f(flag: boolean & {brand: string}) { return (a < b) === flag; }", false, false},
+		{"JSDoc number intersection", "/** @param {number & {brand: string}} flag */ function f(flag) { return (a < b) === flag; }", false, false},
+		{"JSDoc nullable boolean", "/** @param {?boolean} flag */ function f(flag) { return (a < b) === flag; }", false, false},
+		{"Closure boolean callback", "/** @param {function():boolean} read */ function f(read) { return (a < b) === read(); }", true, true},
+		{"Closure number callback", "/** @param {function():number} read */ function f(read) { return (a < b) === read(); }", false, false},
+		{"Closure boolean variable", "/** @type {function():boolean} */ const read = value; (a < b) === read();", true, true},
+		{"Closure number variable", "/** @type {function():number} */ const read = value; (a < b) === read();", false, false},
+		{"Closure unknown return", "/** @param {function():*} read */ function f(read) { return (a < b) === read(); }", false, false},
+		{"Closure function return", "/** @param {function():function():boolean} read */ function f(read) { return (a < b) === read(); }", false, false},
+		{"Closure boolean argument", "/** @param {function(string):boolean} read */ function f(read) { return (a < b) === read(\"x\"); }", true, true},
+		{"Closure union return", "/** @param {function():(boolean|number)} read */ function f(read) { return (a < b) === read(); }", false, false},
+		{"regexp arrow factory", "const f = (): RegExp => /x/; (a < b) === f().global;", true, true},
+		{"regexp function factory", "const f = function(): RegExp { return /x/; }; (a < b) === f().global;", true, true},
+		{"set arrow factory", "const f = (): Set<number> => new Set(); (a < b) === f().has(1);", true, true},
+		{"map arrow factory", "const f = (): Map<number, number> => new Map(); (a < b) === f().has(1);", true, true},
+		{"regexp async factory", "const f = async (): Promise<RegExp> => /x/; (a < b) === f().global;", false, false},
+		{"regexp generator factory", "const f = function*(): Generator<RegExp> { yield /x/; }; (a < b) === f().global;", false, false},
+		{"regexp factory write", "let f = (): RegExp => /x/; f = () => value; (a < b) === f().global;", false, true},
+		{"regexp parameter default", "function f(read = (): RegExp => /x/) { return (a < b) === read().global; }", false, true},
+		{"regexp function declaration", "function f(): RegExp { return /x/; } (a < b) === f().global;", true, true},
+		{"regexp callback parameter", "function f(read: () => RegExp) { return (a < b) === read().global; }", false, true},
+		{"URLSearchParams direct has", "(a < b) === new URLSearchParams().has(\"x\");", true, true},
+		{"URLSearchParams alias has", "const value = new URLSearchParams(); const alias = value; (a < b) === alias.has(\"x\");", true, true},
+		{"URLSearchParams parameter has", "function f(value: URLSearchParams) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"URLSearchParams JSDoc parameter has", "/** @param {URLSearchParams} value */ function f(value) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"URLSearchParams shadow has", "function f() { class URLSearchParams { has() { return 0; } } (a < b) === new URLSearchParams().has(\"x\"); }", false, false},
+		{"URLSearchParams delete control", "(a < b) === new URLSearchParams().delete(\"x\");", false, false},
+		{"Headers direct has", "(a < b) === new Headers().has(\"x\");", true, true},
+		{"Headers alias has", "const value = new Headers(); const alias = value; (a < b) === alias.has(\"x\");", true, true},
+		{"Headers parameter has", "function f(value: Headers) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"Headers JSDoc parameter has", "/** @param {Headers} value */ function f(value) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"Headers shadow has", "function f() { class Headers { has() { return 0; } } (a < b) === new Headers().has(\"x\"); }", false, false},
+		{"Headers delete control", "(a < b) === new Headers().delete(\"x\");", false, false},
+		{"FormData direct has", "(a < b) === new FormData().has(\"x\");", true, true},
+		{"FormData alias has", "const value = new FormData(); const alias = value; (a < b) === alias.has(\"x\");", true, true},
+		{"FormData parameter has", "function f(value: FormData) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"FormData JSDoc parameter has", "/** @param {FormData} value */ function f(value) { return (a < b) === value.has(\"x\"); }", true, true},
+		{"FormData shadow has", "function f() { class FormData { has() { return 0; } } (a < b) === new FormData().has(\"x\"); }", false, false},
+		{"FormData delete control", "(a < b) === new FormData().delete(\"x\");", false, false},
+		{"Closure spaced callback", "/** @param {function (string): boolean} read */ function f(read) { return (a < b) === read(\"x\"); }", true, true},
+		{"Closure optional callback", "/** @param {function():boolean} [read] */ function f(read) { return (a < b) === read(); }", false, false},
+		{"Closure multiple parameters", "/** @param {function():number} wrong\n * @param {function():boolean} read */ function f(wrong, read) { return (a < b) === read(); }", true, true},
+		{"Closure alias result", "type Flag = boolean; /** @param {function():Flag} read */ function f(read) { return (a < b) === read(); }", false, false},
+		{"Closure non-nullable result", "/** @param {function():!boolean} read */ function f(read) { return (a < b) === read(); }", true, true},
+		{"Closure native precedence", "/** @param {function():boolean} read */ function f(read: () => number) { return (a < b) === read(); }", false, false},
+		{"Closure mutable callback", "/** @type {function():boolean} */ let read = value; read = () => 0; (a < b) === read();", false, false},
+		{"JSDoc number static assertion", "/** @type {boolean} */ const flag = true as number; (a < b) === flag;", true, true},
+		{"JSDoc boolean satisfies assertion", "/** @type {number} */ const flag = (true as boolean) satisfies boolean; (a < b) === flag;", true, true},
+		{"regexp factory assertion", "const f = (((): RegExp => /x/)) as () => number; (a < b) === f().global;", false, false},
+		{"boolean callback assertion", "const f = (() => 0) as () => boolean; (a < b) === f();", false, true},
+		{"numeric callback assertion", "const f = (((): boolean => true)) as () => number; (a < b) === f();", false, false},
+		{"shadowed annotated receiver", "function run() { class Headers { has() { return 0; } } /** @param {Headers} value */ function f(value) { return (a < b) === value.has(\"x\"); } }", false, false},
+		{"shadowed exported receiver", "export class Headers { has() { return 0; } } (a < b) === new Headers().has(\"x\");", false, false},
+	}
+	for _, typed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("type-information-%t", typed), func(t *testing.T) {
+			testedRule := no_chained_comparison.NoChainedComparisonRule
+			testedRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+				if !typed {
+					ctx.TypeChecker = nil
+				}
+				return no_chained_comparison.NoChainedComparisonRule.Run(ctx, options)
+			}
+			for _, testCase := range cases {
+				t.Run(testCase.name, func(t *testing.T) {
+					valid := testCase.sourceValid
+					if typed {
+						valid = testCase.typedValid
+					}
+					if valid {
+						rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule,
+							[]rule_tester.ValidTestCase{{Code: testCase.code, FileName: "case.ts"}}, nil)
+					} else {
+						rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule, nil,
+							[]rule_tester.InvalidTestCase{{Code: testCase.code, FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+								{MessageId: "no-chained-comparison/error", Message: comparisonMessage, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+							}}})
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestNoChainedComparisonRepeatedAliases(t *testing.T) {
+	for _, callable := range []bool{false, true} {
+		var source strings.Builder
+		source.WriteString("const b0 = x > 0;\n")
+		if callable {
+			source.Reset()
+			source.WriteString("const b0 = () => x > 0;\n")
+		}
+		call := ""
+		if callable {
+			call = "()"
+		}
+		for index := 1; index <= 64; index++ {
+			body := fmt.Sprintf("b%d%s && b%d%s", index-1, call, index-1, call)
+			if callable {
+				body = "() => " + body
+			}
+			fmt.Fprintf(&source, "const b%d = %s;\n", index, body)
+		}
+		fmt.Fprintf(&source, "(a < b) === b64%s; (c < d) === b64%s;", call, call)
+		for _, typed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("callable-%t-type-information-%t", callable, typed), func(t *testing.T) {
+				testedRule := no_chained_comparison.NoChainedComparisonRule
+				testedRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+					if !typed {
+						ctx.TypeChecker = nil
+					}
+					return no_chained_comparison.NoChainedComparisonRule.Run(ctx, options)
+				}
+				rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule,
+					[]rule_tester.ValidTestCase{{Code: source.String(), FileName: "case.ts"}}, nil)
+			})
+		}
+	}
 }

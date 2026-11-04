@@ -56,6 +56,21 @@ const middle = tag`value`;
 a < middle && middle < c;
 ```
 
+rslint distinguishes local classes from browser built-ins with the same name.
+It reports the following comparison because the local `Headers.has()` returns
+a number. Unicorn v79.0.0 can accept it with TypeScript type information or a
+JSDoc annotation based on the class name:
+
+```javascript
+export class Headers {
+  has() {
+    return 0;
+  }
+}
+
+(a < b) === new Headers().has('x');
+```
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-chained-comparison](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-chained-comparison.md)

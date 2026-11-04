@@ -12,6 +12,7 @@ var NoChainedComparisonRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		var evaluator *utils.StaticStringEvaluator
+		var completed map[*ast.Node]bool
 		return rule.RuleListeners{ast.KindBinaryExpression: func(node *ast.Node) {
 			if !isComparison(node) {
 				return
@@ -29,8 +30,13 @@ var NoChainedComparisonRule = rule.Rule{
 				evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 			}
 			operator := binary.OperatorToken.Kind
-			if !isOrdering(operator) && isBoolean(ctx, sibling, evaluator, nil) {
-				return
+			if !isOrdering(operator) {
+				if completed == nil {
+					completed = make(map[*ast.Node]bool)
+				}
+				if isBoolean(ctx, sibling, evaluator, nil, completed) {
+					return
+				}
 			}
 			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 				Id:          "no-chained-comparison/error",

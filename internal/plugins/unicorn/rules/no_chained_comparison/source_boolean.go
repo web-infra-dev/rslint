@@ -24,7 +24,7 @@ func booleanAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.N
 		return ast.IsBooleanLiteral(node.AsLiteralTypeNode().Literal)
 	case ast.KindTypePredicate:
 		return node.AsTypePredicateNode().AssertsModifier == nil
-	case ast.KindParenthesizedType:
+	case ast.KindParenthesizedType, ast.KindJSDocNonNullableType:
 		return booleanAnnotation(ctx, node.Type(), visiting)
 	case ast.KindUnionType:
 		for _, part := range node.AsUnionTypeNode().Types.Nodes {
@@ -33,6 +33,15 @@ func booleanAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.N
 			}
 		}
 		return true
+	case ast.KindIntersectionType:
+		if !utils.IsJSDocSyntaxNode(node) {
+			return false
+		}
+		for _, part := range node.AsIntersectionTypeNode().Types.Nodes {
+			if booleanAnnotation(ctx, part, visiting) {
+				return true
+			}
+		}
 	case ast.KindTypeReference:
 		if declaration := typeReferenceDeclaration(ctx, node); declaration != nil && declaration.Kind == ast.KindTypeAliasDeclaration {
 			return booleanAnnotation(ctx, declaration.Type(), visiting)
@@ -48,7 +57,7 @@ func booleanCallableAnnotation(ctx rule.RuleContext, node *ast.Node, visiting ma
 	visiting[node] = true
 	defer delete(visiting, node)
 	switch node.Kind {
-	case ast.KindParenthesizedType:
+	case ast.KindParenthesizedType, ast.KindJSDocNonNullableType:
 		return booleanCallableAnnotation(ctx, node.Type(), visiting)
 	case ast.KindFunctionType:
 		return booleanAnnotation(ctx, node.Type(), visiting)
@@ -124,7 +133,7 @@ func overridesJSDocCallable(declaration *ast.Node) bool {
 	return declaration.Kind == ast.KindParameter && raw != nil && (raw.Kind == ast.KindAsExpression || raw.Kind == ast.KindTypeAssertionExpression)
 }
 
-func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool) bool {
+func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool, completed map[*ast.Node]bool) bool {
 	if ast.IsOptionalChain(node) {
 		return false
 	}
@@ -155,7 +164,7 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 		case "test":
 			return regexpReceiver(ctx, receiver, visiting)
 		case "has":
-			return builtinReceiver(ctx, receiver, visiting, "Map", "ReadonlyMap", "WeakMap") ||
+			return builtinReceiver(ctx, receiver, visiting, "Map", "ReadonlyMap", "WeakMap", "URLSearchParams", "Headers", "FormData") ||
 				builtinReceiver(ctx, receiver, visiting, "Set", "ReadonlySet") ||
 				builtinReceiver(ctx, receiver, visiting, "WeakSet")
 		case "delete":
@@ -189,7 +198,7 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 			}
 			if declaration.Body() == nil {
 				found = true
-				annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration)
+				annotation, _ := valueTypeAnnotation(ctx, declaration)
 				if !booleanAnnotation(ctx, annotation, visiting) {
 					return false
 				}
@@ -198,29 +207,19 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 		return found
 	}
 	declaration := symbol.Declarations[0]
-	annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration)
+	annotation, optional := valueTypeAnnotation(ctx, declaration)
 	if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) && !ast.IsFunctionLike(declaration) {
 		return booleanCallableAnnotation(ctx, annotation, visiting)
 	}
 	if callableHasWrites(ctx, symbol) || overridesJSDocCallable(declaration) {
 		return false
 	}
-	var function *ast.Node
-	if ast.IsFunctionDeclaration(declaration) {
-		if !stableFunctionDeclaration(ctx, declaration) {
-			return false
-		}
-		function = declaration
-	} else if declaration.Kind == ast.KindFunctionExpression {
-		function = declaration
-	} else if ast.HasInitializer(declaration) {
-		function = utils.SkipAssertionsAndParens(declaration.Initializer())
-	}
+	function := sourceFunction(ctx, declaration)
 	if function != nil && ast.IsFunctionLike(function) {
 		if ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
 			return false
 		}
-		if result, _ := unicornutil.ValueTypeAnnotation(ctx, function); result != nil {
+		if result, _ := valueTypeAnnotation(ctx, function); result != nil {
 			return booleanAnnotation(ctx, result, visiting)
 		}
 		if annotation == nil {
@@ -232,7 +231,7 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 				}
 				body = statements[0].Expression()
 			}
-			return isBoolean(ctx, body, evaluator, visiting)
+			return isBoolean(ctx, body, evaluator, visiting, completed)
 		}
 	}
 	if optional {
@@ -259,6 +258,21 @@ func stableFunctionDeclaration(ctx rule.RuleContext, declaration *ast.Node) bool
 		utils.IsInStrictModeWithSourceType(declaration, ctx.SourceFile, sourceType)
 }
 
+// Parameter defaults do not describe callbacks supplied by the caller.
+func sourceFunction(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
+	if ast.IsFunctionDeclaration(declaration) && stableFunctionDeclaration(ctx, declaration) || declaration.Kind == ast.KindFunctionExpression {
+		return declaration
+	}
+	if declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) {
+		value := utils.ESTreeRuntimeExpression(declaration.Initializer())
+		for value != nil && (value.Kind == ast.KindSatisfiesExpression || value.Kind == ast.KindNonNullExpression) {
+			value = utils.ESTreeRuntimeExpression(value.Expression())
+		}
+		return value
+	}
+	return nil
+}
+
 func builtinReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Node]bool, names ...string) bool {
 	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil || visiting[node] {
@@ -278,7 +292,7 @@ func builtinReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Nod
 		if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
 			declaration := symbol.Declarations[0]
 			var optional bool
-			annotation, optional = unicornutil.ValueTypeAnnotation(ctx, declaration)
+			annotation, optional = valueTypeAnnotation(ctx, declaration)
 			if optional {
 				return false
 			}
@@ -291,8 +305,8 @@ func builtinReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Nod
 		if callee != nil && ast.IsIdentifier(callee) {
 			if symbol := ctx.Refs.ResolveInFile(callee); symbol != nil && len(symbol.Declarations) == 1 && !callableHasWrites(ctx, symbol) {
 				declaration := symbol.Declarations[0]
-				if ast.IsFunctionDeclaration(declaration) && ast.GetFunctionFlags(declaration)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
-					annotation, _ = unicornutil.ValueTypeAnnotation(ctx, declaration)
+				if function := sourceFunction(ctx, declaration); function != nil && ast.IsFunctionLike(function) && ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
+					annotation, _ = valueTypeAnnotation(ctx, function)
 				}
 			}
 		}
@@ -307,7 +321,7 @@ func builtinAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.N
 	visiting[node] = true
 	defer delete(visiting, node)
 	switch node.Kind {
-	case ast.KindParenthesizedType:
+	case ast.KindParenthesizedType, ast.KindJSDocNonNullableType:
 		return builtinAnnotation(ctx, node.Type(), visiting, names)
 	case ast.KindUnionType:
 		for _, part := range node.AsUnionTypeNode().Types.Nodes {
