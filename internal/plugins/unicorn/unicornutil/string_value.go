@@ -65,7 +65,7 @@ func hasConflictingStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator
 			if classifyRequiredStringCheckerType(ctx, ctx.TypeChecker.GetTypeOfSymbol(symbol)) != TypeTarget {
 				return false
 			}
-			if annotation, _ := stringValueAnnotation(ctx, symbol.Declarations[0]); annotation != nil && utils.IsJSDocSyntaxNode(annotation) && !isStringValueType(ctx, annotation) {
+			if annotation, _ := ValueTypeAnnotation(ctx, symbol.Declarations[0]); annotation != nil && utils.IsJSDocSyntaxNode(annotation) && !isStringValueType(ctx, annotation) {
 				return true
 			}
 		}
@@ -153,7 +153,7 @@ func isString(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStrin
 	}
 	value, known := evaluator.EvalValueIfNoSideEffects(node)
 	_, stringValue := value.(string)
-	return known && stringValue && !hasStringJSDocReference(ctx, node, make(map[*ast.Symbol]bool))
+	return known && stringValue && !HasJSDocTypeReference(ctx, node, make(map[*ast.Symbol]bool))
 }
 
 func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, state *stringReceiverWalkState) (stringResult bool) {
@@ -213,7 +213,7 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 				}()
 				declaration := symbol.Declarations[0]
 
-				annotation, optional := stringValueAnnotation(ctx, declaration)
+				annotation, optional := ValueTypeAnnotation(ctx, declaration)
 				if optional {
 					return false
 				}
@@ -282,7 +282,7 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 	}
 	value, known := evaluator.EvalControlFlowValue(node)
 	_, stringValue := value.(string)
-	return known && stringValue && !hasStringJSDocReference(ctx, node, make(map[*ast.Symbol]bool))
+	return known && stringValue && !HasJSDocTypeReference(ctx, node, make(map[*ast.Symbol]bool))
 }
 
 // These built-ins have string-valued members even without type services.
@@ -310,7 +310,7 @@ func isStringBuiltinValue(ctx rule.RuleContext, node *ast.Node, name string, vis
 	visiting[symbol] = true
 	defer delete(visiting, symbol)
 	declaration := symbol.Declarations[0]
-	annotation, optional := stringValueAnnotation(ctx, declaration)
+	annotation, optional := ValueTypeAnnotation(ctx, declaration)
 	if optional {
 		return false
 	}
@@ -324,53 +324,6 @@ func isStringBuiltinValue(ctx rule.RuleContext, node *ast.Node, name string, vis
 	}
 	return declaration.Kind == ast.KindVariableDeclaration && ast.IsVarConst(declaration.Parent) &&
 		isStringBuiltinValue(ctx, declaration.AsVariableDeclaration().Initializer, name, visiting)
-}
-
-// Read authored annotations through tsgo's AST, retaining JSDoc unknown types
-// and optional parameter metadata so static folding cannot bypass them.
-func stringValueAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotation *ast.Node, optional bool) {
-	annotation = ast.GetTypeAnnotationNode(declaration)
-	optional = ast.HasQuestionToken(declaration)
-	if annotation != nil && (declaration.Kind != ast.KindParameter || !utils.IsJSDocSyntaxNode(annotation)) {
-		return annotation, optional
-	}
-	host := declaration
-	if declaration.Kind == ast.KindParameter {
-		host = declaration.Parent
-	}
-	for host != nil {
-		for _, doc := range host.JSDoc(ctx.SourceFile) {
-			if tags := doc.AsJSDoc().Tags; tags != nil {
-				for _, tag := range tags.Nodes {
-					var expression *ast.Node
-					switch tag.Kind {
-					case ast.KindJSDocParameterTag:
-						parameter := tag.AsJSDocParameterOrPropertyTag()
-						if declaration.Kind == ast.KindParameter && ast.IsIdentifier(declaration.Name()) && parameter.Name().Text() == declaration.Name().Text() {
-							expression = parameter.TypeExpression
-							optional = optional || parameter.IsBracketed
-						}
-					case ast.KindJSDocTypeTag:
-						if declaration.Kind == ast.KindVariableDeclaration {
-							expression = tag.AsJSDocTypeTag().TypeExpression
-						}
-					case ast.KindJSDocReturnTag:
-						if ast.IsFunctionLike(declaration) {
-							expression = tag.AsJSDocReturnTag().TypeExpression
-						}
-					}
-					if expression != nil {
-						if annotation == nil {
-							annotation = expression.Type()
-						}
-						return annotation, optional
-					}
-				}
-			}
-		}
-		host = ast.GetNextJSDocCommentLocation(host)
-	}
-	return annotation, optional
 }
 
 func classifyStringCallReturnType(ctx rule.RuleContext, annotation *ast.Node) TypeClass {
@@ -491,11 +444,11 @@ func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class
 			(function.Kind == ast.KindFunctionExpression && function.AsFunctionExpression().AsteriskToken != nil) {
 			return TypeUnknown
 		}
-		if annotation, _ := stringValueAnnotation(ctx, function); annotation != nil {
+		if annotation, _ := ValueTypeAnnotation(ctx, function); annotation != nil {
 			return classifyStringValueType(ctx, annotation)
 		}
 	}
-	annotation, optional := stringValueAnnotation(ctx, declaration)
+	annotation, optional := ValueTypeAnnotation(ctx, declaration)
 	if optional {
 		return TypeUnknown
 	}
@@ -508,33 +461,4 @@ func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class
 		}
 	}
 	return classifyStringCallReturnType(ctx, annotation)
-}
-
-// Static folding must not bypass an authored JSDoc type through an alias or a
-// larger expression. Traverse runtime children using tsgo and the reference
-// store, excluding property names, type syntax, and unevaluated function bodies.
-func hasStringJSDocReference(ctx rule.RuleContext, node *ast.Node, visited map[*ast.Symbol]bool) bool {
-	node = utils.SkipAssertionsAndParens(node)
-	if node == nil || ast.IsTypeNode(node) || ast.IsFunctionLike(node) || ast.IsClassLike(node) {
-		return false
-	}
-	if ast.IsIdentifier(node) {
-		if ctx.Refs == nil || utils.IsNonReferenceIdentifier(node) {
-			return false
-		}
-		symbol := ctx.Refs.ResolveInFile(node)
-		if symbol == nil || len(symbol.Declarations) != 1 {
-			return false
-		}
-		declaration := symbol.Declarations[0]
-		if annotation, _ := stringValueAnnotation(ctx, declaration); annotation != nil && utils.IsJSDocSyntaxNode(annotation) {
-			return true
-		}
-		if visited[symbol] {
-			return false
-		}
-		visited[symbol] = true
-		return declaration.Kind == ast.KindVariableDeclaration && hasStringJSDocReference(ctx, declaration.AsVariableDeclaration().Initializer, visited)
-	}
-	return node.ForEachChild(func(child *ast.Node) bool { return hasStringJSDocReference(ctx, child, visited) })
 }

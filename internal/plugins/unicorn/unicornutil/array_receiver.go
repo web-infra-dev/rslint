@@ -61,6 +61,16 @@ func IsArray(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassTarget
 }
 
+// IsIndexedCollection reports a proven Array, ReadonlyArray, tuple, or typed
+// array, using the same receiver classification as the negative predicate.
+func IsIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
+	return classifyArrayReceiverInner(ctx, node, indexedCollectionTargets, keyedCollectionNames, &arrayReceiverWalkState{
+		useTypeInformation: true,
+		readJSDoc:          true,
+		visiting:           map[*ast.Symbol]bool{},
+	}) == arrayClassTarget
+}
+
 // arrayClass is the array-receiver spelling of the shared TypeClass. It is an
 // alias rather than its own type so the syntactic path below and the shared
 // type-checker classifier can hand values to each other directly.
@@ -116,6 +126,7 @@ type sourceOnlyArrayReceiverCacheKey struct {
 type arrayReceiverWalkState struct {
 	options            ArrayReceiverOptions
 	useTypeInformation bool
+	readJSDoc          bool
 	visiting           map[*ast.Symbol]bool
 	memo               map[*ast.Symbol]arrayClass
 	depth              int
@@ -543,6 +554,13 @@ func classifyArrayIdentifier(
 	}
 	if state.useTypeInformation {
 		annotation := arrayBindingTypeAnnotation(declaration)
+		if state.readJSDoc && (declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter) {
+			var optional bool
+			annotation, optional = ValueTypeAnnotation(ctx, declaration)
+			if optional {
+				return arrayClassUnknown
+			}
+		}
 		if class := classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
 			return class
 		}
