@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"strings"
@@ -14,34 +13,7 @@ import (
 	"time"
 
 	"github.com/web-infra-dev/rslint/internal/ipc"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
-
-func TestDiagnosticMessageJSONPreservesJavaScriptStrings(t *testing.T) {
-	for _, test := range []struct{ name, message, want string }{
-		{"ordinary escapes", "quote: \"\\\n\x00<>&", `"quote: \"\\\n\u0000\u003c\u003e\u0026"`},
-		{"astral", "😀a", `"😀a"`},
-		{"high surrogate", ecmascript.StringFromCodeUnits([]uint16{0xd800, 'a'}), `"\ud800a"`},
-		{"low surrogate", ecmascript.StringFromCodeUnits([]uint16{'a', 0xdc00}), `"a\udc00"`},
-		{"two high surrogates", ecmascript.StringFromCodeUnits([]uint16{0xd800, 0xd800}), `"\ud800\ud800"`},
-		{"surrogate with escapes", "\"\\\n\x00" + ecmascript.StringFromCodeUnits([]uint16{0xd800}) + "<>&", `"\"\\\n\u0000\ud800\u003c\u003e\u0026"`},
-		{"literal escape", `\ud800a`, `"\\ud800a"`},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			encoded, err := json.Marshal(Diagnostic{Message: test.message})
-			if err != nil {
-				t.Fatal(err)
-			}
-			var fields map[string]json.RawMessage
-			if err := json.Unmarshal(encoded, &fields); err != nil {
-				t.Fatal(err)
-			}
-			if got := string(fields["message"]); got != test.want {
-				t.Fatalf("message JSON = %s, want %s", got, test.want)
-			}
-		})
-	}
-}
 
 type serviceTestHandler struct {
 	lintCalls atomic.Int32

@@ -58,6 +58,12 @@ function String() {
 String().at(0) === 'ab';
 ```
 
+Strings containing an unpaired UTF-16 surrogate are still checked, but the quoted
+value in rslint's JavaScript API diagnostic message uses replacement characters.
+For example, for `"x"[0] === "\uD800a"`, rslint's message quotes `���a`, while
+Unicorn preserves the unpaired surrogate followed by `a`. The diagnostic range
+and comparison result are the same.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-invalid-character-comparison](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-invalid-character-comparison.md)
