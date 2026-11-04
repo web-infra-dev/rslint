@@ -47,6 +47,9 @@ var NoRedundantComparisonRule = rule.Rule{
 				Id: "no-redundant-comparison", Description: "This comparison is redundant because it is already implied by the other conditions.",
 			}
 			buildFixes := func() []rule.RuleFix {
+				if !canRemoveComparison(ctx, node, operands, redundant, evaluator) {
+					return nil
+				}
 				parentNode := utils.ESTreeParent(redundant)
 				parent := parentNode.AsBinaryExpression()
 				isLeft := utils.ESTreeRuntimeExpression(parent.Left) == redundant
@@ -65,8 +68,8 @@ var NoRedundantComparisonRule = rule.Rule{
 				}
 				return []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(start, end), replacement)}
 			}
-			// Every ordering predicate has a reference operand, so dropping it can
-			// drop an implicit coercion. Strict comparisons only need getter checks.
+			// Retain upstream's suggestion category for ordering comparisons.
+			// The builder applies the same safety checks to both edit categories.
 			operator := ast.SkipOuterExpressions(redundant, expressionWrappers).AsBinaryExpression().OperatorToken.Kind
 			if isOrdering(operator) || evaluator.HasSideEffect(redundant, true) {
 				ctx.ReportNodeWithDeferredSuggestions(redundant, message, func() []rule.RuleSuggestion {
@@ -120,6 +123,106 @@ func collectOperands(node *ast.Node, operands *[]*ast.Node) {
 	// TypeScript wrappers stop flattening, as they do in the upstream ESTree.
 	collectOperands(node.AsBinaryExpression().Left, operands)
 	collectOperands(node.AsBinaryExpression().Right, operands)
+}
+
+func canRemoveComparison(ctx rule.RuleContext, chain *ast.Node, operands []*ast.Node, redundant *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	// A with environment can invoke getters even for plain identifier reads.
+	if ast.FindAncestorKind(chain, ast.KindWithStatement) != nil {
+		return false
+	}
+	index := slices.Index(operands, redundant)
+	prefix := classifyOperands(operands[:index+1])
+	for _, operand := range prefix.analyzedOperands {
+		if !hasStableEvaluation(ctx, operand, evaluator) {
+			return false
+		}
+	}
+	// Future conditions cannot justify removing an earlier guard: reaching
+	// them may change side effects, exceptions and the first falsy value.
+	if findRedundantComparison(prefix, evaluator) != redundant {
+		value, known := evaluator.EvalControlFlowValue(redundant)
+		if boolean, ok := value.(bool); !known || !ok || !boolean {
+			return false
+		}
+	}
+	if index < len(operands)-1 ||
+		(index > 0 && hasBooleanValue(operands[index-1], evaluator)) ||
+		unicornutil.IsControlFlowTest(chain) {
+		return true
+	}
+	// A logical expression below ! is also consumed only for truthiness.
+	// Calls named Boolean may have been replaced, so do not infer this for calls.
+	for parent := utils.ESTreeParent(chain); parent != nil; parent = utils.ESTreeParent(parent) {
+		if unicornutil.IsLogicalNot(parent) {
+			return true
+		}
+		if !unicornutil.IsLogicalExpression(parent) {
+			break
+		}
+	}
+	return false
+}
+
+func hasBooleanValue(node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	node = ast.SkipOuterExpressions(node, expressionWrappers)
+	if node.Kind == ast.KindTrueKeyword || node.Kind == ast.KindFalseKeyword || unicornutil.IsLogicalNot(node) ||
+		(node.Kind == ast.KindBinaryExpression && (ast.IsEqualityOperator(node.AsBinaryExpression().OperatorToken.Kind) || ast.IsRelationalOperator(node.AsBinaryExpression().OperatorToken.Kind))) {
+		return true
+	}
+	value, known := evaluator.EvalControlFlowValue(node)
+	_, boolean := value.(bool)
+	return known && boolean
+}
+
+// Only known primitive coercions and evaluation without user-defined hooks
+// may support an edit. Other expressions still receive the upstream diagnostic.
+func hasStableEvaluation(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	node = ast.SkipOuterExpressions(node, expressionWrappers)
+	if ast.IsIdentifier(node) {
+		// Unresolved globals can be accessor-backed properties. Resolve through
+		// the file's reference service rather than assuming a pure name lookup.
+		symbol := ctx.Refs.ResolveInFile(node)
+		if symbol == nil {
+			return false
+		}
+		if !ctx.Refs.HasNonGlobalProgramScope() && symbol.Flags&(ast.SymbolFlagsFunctionScopedVariable|ast.SymbolFlagsFunction) != 0 {
+			for _, declaration := range symbol.Declarations {
+				if scope := utils.FindEnclosingScope(declaration); scope != nil && scope.Kind == ast.KindSourceFile {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	if ast.IsLiteralExpression(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindThisKeyword, ast.KindSuperKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
+		ast.KindFunctionExpression, ast.KindArrowFunction:
+		return true
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken,
+			ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken, ast.KindCommaToken:
+			return hasStableEvaluation(ctx, binary.Left, evaluator) && hasStableEvaluation(ctx, binary.Right, evaluator)
+		case ast.KindInKeyword, ast.KindInstanceOfKeyword:
+			return false
+		}
+		return hasStableEvaluation(ctx, binary.Left, evaluator) && hasStableEvaluation(ctx, binary.Right, evaluator) &&
+			unicornutil.IsStaticPrimitiveArgument(evaluator, binary.Left) && unicornutil.IsStaticPrimitiveArgument(evaluator, binary.Right)
+	case ast.KindPrefixUnaryExpression:
+		unary := node.AsPrefixUnaryExpression()
+		return hasStableEvaluation(ctx, unary.Operand, evaluator) &&
+			(unary.Operator == ast.KindExclamationToken || unicornutil.IsStaticPrimitiveArgument(evaluator, unary.Operand))
+	case ast.KindTypeOfExpression, ast.KindVoidExpression:
+		return hasStableEvaluation(ctx, node.Expression(), evaluator)
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return hasStableEvaluation(ctx, conditional.Condition, evaluator) && hasStableEvaluation(ctx, conditional.WhenTrue, evaluator) && hasStableEvaluation(ctx, conditional.WhenFalse, evaluator)
+	}
+	return false
 }
 
 func isReference(node *ast.Node) bool {
@@ -272,7 +375,7 @@ func getNumericBound(node *ast.Node, evaluator *utils.StaticStringEvaluator, cac
 	if bound, ok := (*cache)[node]; ok {
 		return bound
 	}
-	value, _ := evaluator.EvalValueIfNoSideEffects(ast.SkipOuterExpressions(node, expressionWrappers))
+	value, _ := evalNumericBoundValue(node, evaluator)
 	number, numeric := value.(jsnum.Number)
 	bound := numericBound{value: number, valid: numeric && !number.IsNaN()}
 	if *cache == nil {
@@ -280,6 +383,38 @@ func getNumericBound(node *ast.Node, evaluator *utils.StaticStringEvaluator, cac
 	}
 	(*cache)[node] = bound
 	return bound
+}
+
+func evalNumericBoundValue(node *ast.Node, evaluator *utils.StaticStringEvaluator) (any, bool) {
+	node = ast.SkipOuterExpressions(node, expressionWrappers)
+	if value, known := evaluator.EvalValueIfNoSideEffects(node); known {
+		return value, true
+	}
+	// The shared safety check accepts quoted keys/receivers but rejects their
+	// static template equivalents. Adapt only these known data reads here.
+	if !ast.IsAccessExpression(node) || ast.IsOptionalChain(node) {
+		return nil, false
+	}
+	key, known := utils.AccessExpressionStaticName(node)
+	if !known {
+		return nil, false
+	}
+	object := ast.SkipOuterExpressions(node.Expression(), expressionWrappers)
+	if ast.IsIdentifier(object) && (object.Text() == "Math" || object.Text() == "Number") && !utils.IsShadowed(object, object.Text()) {
+		if node.Kind == ast.KindElementAccessExpression {
+			property := utils.ESTreeRuntimeExpression(node.AsElementAccessExpression().ArgumentExpression)
+			if property.Kind == ast.KindNoSubstitutionTemplateLiteral {
+				return evaluator.EvalValue(node)
+			}
+		}
+	}
+	if key == "length" {
+		value, known := evaluator.EvalControlFlowValue(object)
+		if _, text := value.(string); known && text {
+			return evaluator.EvalValue(node)
+		}
+	}
+	return nil, false
 }
 
 func entails(first, second predicate, evaluator *utils.StaticStringEvaluator, numericBounds *map[*ast.Node]numericBound) bool {
