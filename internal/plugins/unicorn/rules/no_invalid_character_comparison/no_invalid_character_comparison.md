@@ -36,9 +36,10 @@ index. Astral characters such as emoji contain two UTF-16 code units and are
 reported even though they appear as a single character.
 
 When TypeScript project information is available, the rule also checks strings
-returned through callable types or stored in typed properties. Without project
-information, use a direct string annotation or assertion for values whose types
-cannot otherwise be determined.
+returned through callable types, stored in typed properties, or narrowed by
+checks such as `typeof value === 'string'`. This includes values with JSDoc
+types. Without project information, use a direct string annotation or assertion
+for values whose types cannot otherwise be determined.
 
 ## Options
 
@@ -46,7 +47,8 @@ This rule has no options.
 
 ## Differences from upstream
 
-Locally declared functions named `String` are not assumed to return strings.
+Locally declared functions or objects named `String` or `Date` are not assumed
+to produce strings.
 For example, this array comparison is allowed by rslint but reported by Unicorn
 v79.0.0:
 

@@ -20,8 +20,8 @@ func IsString(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStrin
 	})
 }
 
-// IsStringWithTypeInformation retains source annotations and mutation guards,
-// then uses an available project checker to prove otherwise unknown strings.
+// IsStringWithTypeInformation extends source proofs with project types,
+// preserving local runtime bindings and the checker's flow narrowing.
 func IsStringWithTypeInformation(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
 	node = utils.ESTreeRuntimeExpression(node)
 	if IsString(ctx, node, evaluator) {
@@ -30,14 +30,13 @@ func IsStringWithTypeInformation(ctx rule.RuleContext, node *ast.Node, evaluator
 	if ctx.TypeChecker == nil || node == nil || classifyRequiredStringType(ctx, node) != TypeTarget {
 		return false
 	}
-	sourceContext := ctx
-	sourceContext.TypeChecker = nil
-	return !IsKnownNonStringSyntax(sourceContext, node) &&
-		!hasStringJSDocReference(sourceContext, node, make(map[*ast.Symbol]bool)) &&
-		!hasModifiedStringBinding(sourceContext, node, evaluator, &stringReceiverWalkState{visiting: make(map[*ast.Symbol]bool)})
+	return !IsKnownNonStringSyntax(ctx, node) &&
+		!hasConflictingStringBinding(ctx, node, evaluator, &stringReceiverWalkState{
+			visiting: make(map[*ast.Symbol]bool), memo: make(map[*ast.Symbol]TypeClass),
+		})
 }
 
-func hasModifiedStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, state *stringReceiverWalkState) bool {
+func hasConflictingStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, state *stringReceiverWalkState) (conflicting bool) {
 	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil {
 		return false
@@ -48,17 +47,42 @@ func hasModifiedStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator *u
 	state.depth++
 	state.steps++
 	defer func() { state.depth-- }()
-	recur := func(child *ast.Node) bool { return hasModifiedStringBinding(ctx, child, evaluator, state) }
+	recur := func(child *ast.Node) bool { return hasConflictingStringBinding(ctx, child, evaluator, state) }
 	if ast.IsIdentifier(node) && ctx.Refs != nil {
 		symbol := ctx.Refs.ResolveInFile(node)
 		if symbol == nil || len(symbol.Declarations) != 1 {
 			return false
 		}
+		// Script declarations can collide with lib globals. A proof about the
+		// ambient constructor must not override the local runtime binding.
+		resolved := ctx.TypeChecker.GetSymbolAtLocation(node)
+		if resolved == nil || (resolved != symbol && resolved != symbol.ExportSymbol) {
+			return true
+		}
+		if classifyRequiredStringType(ctx, node) == TypeTarget {
+			// The checker has a stronger proof at this reference than at the
+			// declaration. Initializer writes and JSDoc do not invalidate it.
+			if classifyRequiredStringCheckerType(ctx, ctx.TypeChecker.GetTypeOfSymbol(symbol)) != TypeTarget {
+				return false
+			}
+			if annotation, _ := stringValueAnnotation(ctx, symbol.Declarations[0]); annotation != nil && utils.IsJSDocSyntaxNode(annotation) && !isStringValueType(ctx, annotation) {
+				return true
+			}
+		}
+		if cached, known := state.memo[symbol]; known {
+			return cached == TypeNonTarget
+		}
 		if state.visiting[symbol] {
 			return true
 		}
 		state.visiting[symbol] = true
-		defer delete(state.visiting, symbol)
+		defer func() {
+			delete(state.visiting, symbol)
+			state.memo[symbol] = TypeTarget
+			if conflicting {
+				state.memo[symbol] = TypeNonTarget
+			}
+		}()
 		declaration := symbol.Declarations[0]
 		if ast.IsVariableDeclaration(declaration) && declaration.AsVariableDeclaration().Initializer != nil {
 			if !ast.IsVarConst(declaration.Parent) {
@@ -81,6 +105,9 @@ func hasModifiedStringBinding(ctx rule.RuleContext, node *ast.Node, evaluator *u
 				}
 			}
 		}
+		return recur(callee)
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return recur(node.Expression())
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
 		return recur(conditional.WhenTrue) || recur(conditional.WhenFalse)
