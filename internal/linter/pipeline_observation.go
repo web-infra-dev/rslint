@@ -23,9 +23,19 @@ type observationExecution struct {
 type preparedObservation struct {
 	native              *nativeObservationWork
 	plugin              pluginTask
+	programs            []preparedProgramObservation
 	lease               *releaseLease
 	readFixText         sourceTextReader
 	targetSyntaxBlocked bool
+}
+
+func (p *preparedObservation) close() {
+	for index := range p.programs {
+		p.programs[index].native.close()
+		p.programs[index] = preparedProgramObservation{}
+	}
+	p.native.close()
+	p.lease.close()
 }
 
 func prepareObservation(
@@ -129,9 +139,11 @@ func executePreparedObservation(
 ) (observationExecution, error) {
 	var err error
 	lease := prepared.lease
-	defer lease.close()
+	defer prepared.close()
+	if len(prepared.programs) != 0 {
+		return executePreparedPrograms(ctx, &prepared, dispatcher, index)
+	}
 	nativeWork := prepared.native
-	defer nativeWork.close()
 	pluginWork := prepared.plugin
 	prepared.plugin = pluginTask{}
 	targetSyntaxBlocked := prepared.targetSyntaxBlocked

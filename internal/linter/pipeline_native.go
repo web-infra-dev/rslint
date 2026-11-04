@@ -20,8 +20,14 @@ type nativeObservationWork struct {
 }
 
 func (work *nativeObservationWork) close() {
-	if work.execution != nil {
+	if work != nil && work.execution != nil {
 		work.execution.close()
+	}
+}
+
+func (work *nativeObservationWork) projectDiagnosticPaths(diagnostics []rule.RuleDiagnostic) {
+	for index := range diagnostics {
+		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)
 	}
 }
 
@@ -113,9 +119,7 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 	lintResult := work.execution.run(consumer)
 	finish()
 
-	for index := range diagnostics {
-		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)
-	}
+	work.projectDiagnosticPaths(diagnostics)
 	result := NativeObservation{
 		Diagnostics:           diagnostics,
 		Lint:                  lintResult,

@@ -971,3 +971,92 @@ func TestPipelineJoinsAcquiredUnitsAfterLoadFailure(t *testing.T) {
 		t.Fatalf("failed partial observation escaped: error=%v result=%+v released=%d", err, result, released.Load())
 	}
 }
+
+func TestPipelinePreparedProgramsRetainAdmissionAndOneProducerLease(t *testing.T) {
+	previous := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previous)
+	root := tspath.NormalizePath(t.TempDir())
+	paths := []string{tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts")}
+	pluginStarted := make(chan struct{})
+	nativeStarted := make(chan struct{})
+	releasePlugin := make(chan struct{})
+	releaseNative := make(chan struct{})
+	var pluginOnce, nativeOnce sync.Once
+	unblock := func() {
+		pluginOnce.Do(func() { close(releasePlugin) })
+		nativeOnce.Do(func() { close(releaseNative) })
+	}
+	var releases atomic.Int32
+	generation := Generation{
+		Native: NativeGeneration{
+			Programs: []*program.Program{
+				pipelineTestProgram(t, root, tspath.ResolvePath(root, "unselected.ts"), ""),
+				pipelineTestProgram(t, root, paths[0], "const first = 1;"),
+				pipelineTestProgram(t, root, paths[1], "const second = 2;"),
+			},
+			TargetsByProgram: [][]string{nil, {paths[0]}, {paths[1]}},
+			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
+				if source.FileName() == paths[0] {
+					return []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}
+				}
+				return []rule.ConfiguredRule{{Name: "native/wait", Run: func(rule.RuleContext) rule.RuleListeners {
+					close(nativeStarted)
+					<-releaseNative
+					return nil
+				}}}
+			},
+		},
+		Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
+		Plugin: &PluginGeneration{},
+	}
+	type outcome struct {
+		result PipelineResult
+		err    error
+	}
+	done := make(chan outcome, 1)
+	t.Cleanup(func() { unblock(); <-done })
+	go func() {
+		defer close(done)
+		result, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelineTestProvider(generation, func() { releases.Add(1) }),
+			ObservationPolicy{Demand: ArtifactDemand{SourceFiles: true}},
+			EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				close(pluginStarted)
+				<-releasePlugin
+				return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: paths[0]}}}, nil
+			})))
+		done <- outcome{result, err}
+	}()
+	select {
+	case <-pluginStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("plugin did not start")
+	}
+	select {
+	case <-nativeStarted:
+		t.Fatal("next Program started while the previous plugin still borrowed admission")
+	case <-time.After(20 * time.Millisecond):
+	}
+	pluginOnce.Do(func() { close(releasePlugin) })
+	select {
+	case <-nativeStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("joined plugin did not return Program admission")
+	}
+	if releases.Load() != 0 {
+		t.Fatal("producer lease ended before the last native borrower joined")
+	}
+	unblock()
+	got := <-done
+	if got.err != nil || releases.Load() != 1 || got.result.Observation.Native.Lint.LintedFileCount != 2 {
+		t.Fatalf("error/releases/observation = %v/%d/%+v", got.err, releases.Load(), got.result.Observation.Native)
+	}
+	if len(got.result.Observation.Native.Files) != 2 {
+		t.Fatal("requested AST output lost selected targets")
+	}
+	for i, file := range got.result.Observation.Native.Files {
+		if file.Path != paths[i] || file.SourceFile != generation.Native.Programs[i+1].GetSourceFile(paths[i]) {
+			t.Fatal("requested AST output lost its original target or source generation")
+		}
+	}
+}

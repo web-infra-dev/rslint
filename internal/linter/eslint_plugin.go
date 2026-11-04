@@ -166,6 +166,9 @@ var errPluginWindowFull = errors.New("plugin ESTree window is full")
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
 	Path string
+	// programIndex records this input's prepared-plan owner without retaining
+	// a Program. It is execution metadata and never enters the wire projection.
+	programIndex int
 	// Text is the complete generation snapshot, including its original BOM.
 	// It stays Go-local for projection validation and detached diagnostics.
 	Text *string
@@ -233,7 +236,7 @@ func BuildEslintPluginFileInputs(
 		return nil
 	}
 	var inputs []EslintPluginFileInput
-	for _, programPlan := range plan.programs {
+	for programIndex, programPlan := range plan.programs {
 		for _, filePlan := range programPlan.files {
 			if filePlan.rules == nil || len(filePlan.rules.plugins) == 0 {
 				continue
@@ -243,7 +246,7 @@ func BuildEslintPluginFileInputs(
 			if resolveConfig != nil {
 				fileConfig = resolveConfig(filePath)
 			}
-			inputs = append(inputs, buildEslintPluginFileInput(
+			input := buildEslintPluginFileInput(
 				filePath,
 				fileConfig.ConfigKey,
 				filePlan.rules,
@@ -251,7 +254,9 @@ func BuildEslintPluginFileInputs(
 				fileConfig.Settings,
 				nil,
 				filePlan.file,
-			))
+			)
+			input.programIndex = programIndex
+			inputs = append(inputs, input)
 		}
 	}
 	return inputs

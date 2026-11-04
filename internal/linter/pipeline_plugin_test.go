@@ -418,49 +418,75 @@ func TestPipelineRejectsDuplicateProjectedTargetBeforeExecution(t *testing.T) {
 }
 
 func TestPipelinePluginFailureAppliesToAllLoadedUnits(t *testing.T) {
-	for _, failure := range []PluginFailurePolicy{PluginKeepPartialWithSynthetic, PluginDiscardOnFailure} {
-		t.Run(fmt.Sprint(failure), func(t *testing.T) {
-			root := tspath.NormalizePath(t.TempDir())
-			loads := make([]GenerationLoad, 3)
-			for i := range loads {
-				path := tspath.ResolvePath(root, fmt.Sprintf("%d.ts", i))
-				configKey := "first"
-				if i == 1 {
-					configKey = "second"
+	for _, wholeBinding := range []bool{false, true} {
+		for _, failure := range []PluginFailurePolicy{PluginKeepPartialWithSynthetic, PluginDiscardOnFailure} {
+			t.Run(fmt.Sprintf("whole-%t-failure-%d", wholeBinding, failure), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				loads := make([]GenerationLoad, 3)
+				for i := range loads {
+					path := tspath.ResolvePath(root, fmt.Sprintf("%d.ts", i))
+					configKey := "first"
+					if i == 1 {
+						configKey = "second"
+					}
+					loads[i] = GenerationLoad{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+						return pipelineTestGeneration(t, root, path, "a", []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true, Severity: rule.SeverityError}}, &EslintPluginFileConfig{ConfigKey: configKey}), nil, nil
+					}}
 				}
-				loads[i] = GenerationLoad{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
-					return pipelineTestGeneration(t, root, path, "a", []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true, Severity: rule.SeverityError}}, &EslintPluginFileConfig{ConfigKey: configKey}), nil, nil
-				}}
-			}
-			wantErr := errors.New("transport failed")
-			result, err := RunPipeline(context.Background(), NewLintRequest(pipelinePlanProvider{GenerationPlan{Loads: loads}}, ObservationPolicy{PluginFailure: failure},
-				EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
-					path := request.Files[0].Path
-					if strings.HasSuffix(path, "/1.ts") {
-						return nil, errors.New("second config group failed")
-					}
-					if !strings.HasSuffix(path, "/0.ts") {
-						return nil, wantErr
-					}
-					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "success"}}}}}, nil
-				})))
-			if err != nil {
-				t.Fatal(err)
-			}
-			outcome, ok := result.Observation.JoinedPluginOutcome()
-			if !ok || !errors.Is(outcome.DispatchError, wantErr) {
-				t.Fatalf("lost dispatch failure: %+v", outcome)
-			}
-			want := 2
-			if failure == PluginDiscardOnFailure {
-				want = 0
-			}
-			if len(outcome.Diagnostics) != want {
-				t.Fatalf("diagnostics = %+v, want %d", outcome.Diagnostics, want)
-			}
-			if want != 0 && outcome.Diagnostics[1].FilePath != tspath.ResolvePath(root, "0.ts") {
-				t.Fatal("synthetic failure lost whole-observation target")
-			}
-		})
+				var provider GenerationProvider = pipelinePlanProvider{GenerationPlan{Loads: loads}}
+				if wholeBinding {
+					provider = GenerationProviderFunc(func(ctx context.Context, _ SourceSnapshot) (Generation, ReleaseFunc, error) {
+						var combined Generation
+						for _, load := range loads {
+							generation, _, err := load.Acquire(ctx)
+							if err != nil {
+								return Generation{}, nil, err
+							}
+							combined.Native.Programs = append(combined.Native.Programs, generation.Native.Programs...)
+							combined.Native.TargetsByProgram = append(combined.Native.TargetsByProgram, generation.Native.TargetsByProgram...)
+							combined.Native.RulesForFile = generation.Native.RulesForFile
+							combined.Target.ReadText = generation.Target.ReadText
+						}
+						combined.Plugin = &PluginGeneration{ConfigForFile: func(path string) EslintPluginFileConfig {
+							key := "first"
+							if strings.HasSuffix(path, "/1.ts") {
+								key = "second"
+							}
+							return EslintPluginFileConfig{ConfigKey: key}
+						}}
+						return combined, nil, nil
+					})
+				}
+				wantErr := errors.New("transport failed")
+				result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{PluginFailure: failure},
+					EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+						path := request.Files[0].Path
+						if strings.HasSuffix(path, "/1.ts") {
+							return nil, errors.New("second config group failed")
+						}
+						if !strings.HasSuffix(path, "/0.ts") {
+							return nil, wantErr
+						}
+						return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", Message: "success"}}}}}, nil
+					})))
+				if err != nil {
+					t.Fatal(err)
+				}
+				outcome, ok := result.Observation.JoinedPluginOutcome()
+				if !ok || !errors.Is(outcome.DispatchError, wantErr) {
+					t.Fatalf("lost dispatch failure: %+v", outcome)
+				}
+				want := 2
+				if failure == PluginDiscardOnFailure {
+					want = 0
+				}
+				if len(outcome.Diagnostics) != want {
+					t.Fatalf("diagnostics = %+v, want %d", outcome.Diagnostics, want)
+				}
+				if want != 0 && outcome.Diagnostics[1].FilePath != tspath.ResolvePath(root, "0.ts") {
+					t.Fatal("synthetic failure lost whole-observation target")
+				}
+			})
+		}
 	}
 }

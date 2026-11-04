@@ -35,14 +35,30 @@ func executeObservation(
 		loads[i] = GenerationLoad{}
 		prepared, err := prepareObservation(ctx, load.Acquire, snapshot, policy, dispatcher,
 			planChanges, stopOnTargetSyntaxErrors, reservation)
+		transferred := false
+		defer func() {
+			if !transferred {
+				prepared.close()
+			}
+		}()
 		if err == nil {
+			// Independent loads already own admission slots. A single complete
+			// binding can instead transfer its fully prepared work to Program
+			// tasks, without nesting admission or splitting its producer lease.
+			if len(loads) == 1 {
+				prepared.partitionPrograms(policy.Plugin, planChanges, stopOnTargetSyntaxErrors)
+			}
 			prepared.plugin.resources = resources
+			for index := range prepared.programs {
+				prepared.programs[index].plugin.resources = resources
+			}
 			if len(prepared.plugin.inputs) != 0 {
 				// Projection is another AST consumer. Native shard completion
 				// alone must not return all of this binding's admission capacity.
 				reservation.retainUntilClose(1)
 			}
 		}
+		transferred = true
 		return prepared, err
 	}
 	// Syntax-gated operations decide whether any plugin work may run only
@@ -52,10 +68,7 @@ func executeObservation(
 		prepared = make([]preparedObservation, len(loads))
 		defer func() {
 			for _, work := range prepared {
-				if work.lease != nil {
-					work.native.close()
-					work.lease.close()
-				}
+				work.close()
 			}
 		}()
 		blocked := false

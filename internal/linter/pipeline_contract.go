@@ -63,7 +63,7 @@ func (s SourceSnapshot) Empty() bool { return len(s.files) == 0 }
 // advances fix rounds and must not persist the snapshot.
 //
 // Planning does not construct Programs. The pipeline acquires and releases
-// each planned unit; a provider only decides how to construct or borrow it.
+// each complete binding, and prepares it fully before creating execution tasks.
 type GenerationProvider interface {
 	PlanGeneration(ctx context.Context, snapshot SourceSnapshot) (GenerationPlan, error)
 }
