@@ -6,6 +6,7 @@ package rule
 type FileCache struct {
 	values                  map[any]any
 	processCurrentDirectory string
+	generation              *GenerationScope
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one
@@ -19,6 +20,12 @@ func NewFileCache() *FileCache {
 // instead of copying its string into every rule context.
 func NewFileCacheWithProcessCurrentDirectory(currentDirectory string) *FileCache {
 	return &FileCache{processCurrentDirectory: currentDirectory}
+}
+
+// NewLintFileCache creates the per-file shared state of a lint pass. generation
+// is the pass-wide scope, or nil when the pass provides no project analysis.
+func NewLintFileCache(currentDirectory string, generation *GenerationScope) *FileCache {
+	return &FileCache{processCurrentDirectory: currentDirectory, generation: generation}
 }
 
 // WithFileCache returns a context attached to cache. This is a linter assembly

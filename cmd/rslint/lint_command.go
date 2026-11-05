@@ -463,6 +463,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				TypeCheck:        typeCheck,
 				SingleThreaded:   singleThreaded,
 				Timing:           timingCollector,
+				ProjectAnalysis:  true,
 			},
 			Target: linter.TargetProjection{
 				Path: targetPath,
