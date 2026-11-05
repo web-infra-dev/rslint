@@ -132,49 +132,78 @@ func TestNewDiagnosticSourceValidatesStructuralLineStarts(t *testing.T) {
 }
 
 func TestRenderDefaultAcceptsStructurallySafeProducerMap(t *testing.T) {
-	rendered := renderDefaultLineBreakFixture(t, "a\nb", []int{0, 3}, 0, 0)
-	if !strings.Contains(rendered, "test message") {
+	rendered := renderDefaultLineBreakFixture(t, "ab", []int{0, 1}, Diagnostic{
+		Range: TextRange{Start: 1, End: 2},
+		Start: Position{Line: 1}, End: Position{Line: 1, Column: 1},
+	}, false)
+	if !strings.Contains(rendered, "  │ 1 │  a\n  │ 2 │  b\n") {
 		t.Fatalf("rendered output = %q", rendered)
 	}
 }
 
-func TestRenderDefaultPreservesLegacyLineBreakRendering(t *testing.T) {
-	tests := []struct {
-		name           string
-		separator      string
-		legacyCombined bool
-	}{
-		{name: "LF", separator: "\n"},
-		{name: "CRLF", separator: "\r\n"},
-		{name: "CR", separator: "\r", legacyCombined: true},
-		{name: "line separator", separator: "\u2028", legacyCombined: true},
-		{name: "paragraph separator", separator: "\u2029", legacyCombined: true},
-	}
-	for _, test := range tests {
+func TestRenderDefaultLineBreaks(t *testing.T) {
+	for _, test := range []struct{ name, separator string }{
+		{"LF", "\n"}, {"CRLF", "\r\n"}, {"CR", "\r"},
+		{"line separator", "\u2028"}, {"paragraph separator", "\u2029"},
+	} {
 		t.Run(test.name, func(t *testing.T) {
 			text := "a" + test.separator + "b\n"
 			secondLineStart := 1 + len(test.separator)
-			rendered := renderDefaultLineBreakFixture(
-				t,
-				text,
-				[]int{0, secondLineStart, len(text)},
-				secondLineStart,
-				1,
-			)
+			rendered := renderDefaultLineBreakFixture(t, text, []int{0, secondLineStart, len(text)}, Diagnostic{
+				Range: TextRange{Start: secondLineStart, End: secondLineStart + 1},
+				Start: Position{Line: 1}, End: Position{Line: 1, Column: 1},
+			}, false)
+			if !strings.Contains(rendered, "  │ 1 │  a\n  │ 2 │  b\n  │ 3 │  \n") {
+				t.Fatalf("code frame = %q", rendered)
+			}
+		})
+	}
+}
 
-			if test.legacyCombined {
-				if !strings.Contains(rendered, "  │ 1 │  a"+test.separator+"b\n") ||
-					!strings.Contains(rendered, "  │ 2 │  \n") {
-					t.Fatalf("legacy combined line rendering changed: %q", rendered)
-				}
-				return
+func TestRenderDefaultCodeFrameRows(t *testing.T) {
+	const functionLine = "function f(){\r"
+	const functionText = functionLine + ";\n}"
+	const unicodeLine = " 😀x\u2028"
+	const unicodeText = unicodeLine + "\u3000🍎y\r\n z"
+	colors := newColorScheme(true)
+	for _, test := range []struct {
+		name, text string
+		lineStarts []int
+		diagnostic Diagnostic
+		rows       []string
+	}{
+		{
+			name: "bare CR and LF", text: functionText,
+			lineStarts: []int{0, len(functionLine), len(functionLine + ";\n")},
+			diagnostic: Diagnostic{Range: TextRange{End: len(functionText)}, End: Position{Line: 2, Column: 1}},
+			rows:       []string{colors.ErrorText("function f(){"), colors.ErrorText(";"), colors.ErrorText("}")},
+		},
+		{
+			name: "UTF-16 columns and mixed indentation", text: unicodeText,
+			lineStarts: []int{0, len(unicodeLine), len(unicodeLine + "\u3000🍎y\r\n")},
+			diagnostic: Diagnostic{
+				Range: TextRange{Start: len(" 😀"), End: len(unicodeLine + "\u3000🍎")},
+				Start: Position{Column: 3}, End: Position{Line: 1, Column: 3},
+			},
+			rows: []string{"😀" + colors.ErrorText("x"), "\u3000" + colors.ErrorText("🍎") + "y", "z"},
+		},
+		{
+			name: "invalid byte after indentation", text: " \x80x",
+			lineStarts: []int{0},
+			diagnostic: Diagnostic{Range: TextRange{Start: 2, End: 3}, Start: Position{Column: 2}, End: Position{Column: 3}},
+			rows:       []string{"\x80" + colors.ErrorText("x")},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			rendered := renderDefaultLineBreakFixture(t, test.text, test.lineStarts, test.diagnostic, true)
+			location := colors.FileName("test.ts:%d:%d", test.diagnostic.Start.Line+1, test.diagnostic.Start.Column+1)
+			var frame strings.Builder
+			for i, row := range test.rows {
+				frame.WriteString("  " + colors.BorderText("│ ") + colors.DimText("%d", i+1) +
+					colors.BorderText(" │") + "  " + row + "\n")
 			}
-			if !strings.Contains(rendered, "  │ 1 │  a\n") ||
-				!strings.Contains(rendered, "  │ 2 │  b\n") {
-				t.Fatalf("legacy LF line rendering changed: %q", rendered)
-			}
-			if strings.Contains(rendered, "\r") {
-				t.Fatalf("CRLF terminator leaked into rendered content: %q", rendered)
+			if !strings.Contains(rendered, location) || !strings.Contains(rendered, frame.String()) {
+				t.Fatalf("wrong location or code frame: %q", rendered)
 			}
 		})
 	}
@@ -184,37 +213,24 @@ func renderDefaultLineBreakFixture(
 	t *testing.T,
 	text string,
 	lineStarts []int,
-	rangeStart int,
-	line int,
+	diagnostic Diagnostic,
+	colorEnabled bool,
 ) string {
 	t.Helper()
 	source, err := NewDiagnosticSource(text, lineStarts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	diagnostic := Diagnostic{
-		FilePath: "/repo/test.ts",
-		RuleName: "test-rule",
-		Message:  "test message",
-		Range: TextRange{
-			Start: rangeStart,
-			End:   rangeStart + 1,
-		},
-		Start:    Position{Line: line},
-		End:      Position{Line: line, Column: 1},
-		Source:   source,
-		Severity: SeverityError,
-	}
-	report := NewReport(
-		ModeLint,
-		[]Diagnostic{diagnostic},
-		Counts{Errors: 1, LintErrors: 1},
-		&Summary{Files: 1, Rules: 1, Threads: 1},
-		Outcome{Kind: OutcomeDiagnosticsFailed},
-	)
+	diagnostic.FilePath = "/repo/test.ts"
+	diagnostic.RuleName = "test-rule"
+	diagnostic.Message = "test message"
+	diagnostic.Source = source
+	diagnostic.Severity = SeverityError
+	report := newTestReport([]Diagnostic{diagnostic}, Summary{})
 	var rendered bytes.Buffer
 	if err := Render(&rendered, report, Options{
-		Format: FormatDefault,
+		Format:       FormatDefault,
+		ColorEnabled: colorEnabled,
 		ComparePaths: tspath.ComparePathsOptions{
 			CurrentDirectory:          "/repo",
 			UseCaseSensitiveFileNames: true,
@@ -680,13 +696,16 @@ func TestGitHubEscapesEveryWorkflowCommandField(t *testing.T) {
 
 func TestJSONLineProtocol(t *testing.T) {
 	diagnostic, paths := createOutputTestDiagnostic(t, SeverityWarning)
+	escaped := diagnostic
+	escaped.Message = "<>&\u2028"
 	var buf bytes.Buffer
-	if err := renderTest(&buf, newTestReport([]Diagnostic{diagnostic}, Summary{}), Outcome{Kind: OutcomePassed}, Options{
+	if err := renderTest(&buf, newTestReport([]Diagnostic{escaped, diagnostic}, Summary{}), Outcome{Kind: OutcomePassed}, Options{
 		Format: FormatJSONLine, ComparePaths: paths,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	want := "{\"ruleName\":\"test-rule\",\"message\":\"test message\",\"filePath\":\"index.ts\",\"range\":{\"start\":{\"line\":1,\"column\":7},\"end\":{\"line\":1,\"column\":12}},\"severity\":\"warn\"}\n"
+	want := `{"ruleName":"test-rule","message":"\u003c\u003e\u0026\u2028","filePath":"index.ts","range":{"start":{"line":1,"column":7},"end":{"line":1,"column":12}},"severity":"warn"}` + "\n" +
+		`{"ruleName":"test-rule","message":"test message","filePath":"index.ts","range":{"start":{"line":1,"column":7},"end":{"line":1,"column":12}},"severity":"warn"}` + "\n"
 	if got := buf.String(); got != want {
 		t.Fatalf("JSON line output:\n got: %q\nwant: %q", got, want)
 	}
@@ -755,22 +774,16 @@ func TestGitLabEmptyAndFingerprintCollisions(t *testing.T) {
 		t.Fatalf("empty GitLab report = %q", empty.String())
 	}
 
-	sequence := func() []string {
-		state := newGitLabFingerprintState()
-		return []string{
-			state.fingerprint("f.ts", "rule", "msg", 1, 1, 1, 5),
-			state.fingerprint("f.ts", "rule", "msg", 1, 1, 1, 5),
-			// Its unsalted tuple equals the previous diagnostic's historical
-			// colon-salted tuple. All emitted fingerprints must still be unique.
-			state.fingerprint("f.ts", "rule", "msg:1", 1, 1, 5, 1),
-		}
+	state := newGitLabFingerprintState()
+	fingerprints := []string{
+		state.fingerprint("f.ts", "rule", "msg", 1, 1, 1, 5),
+		state.fingerprint("f.ts", "rule", "msg", 1, 1, 1, 5),
+		// Its unsalted tuple equals the previous diagnostic's salted tuple.
+		state.fingerprint("f.ts", "rule", "msg:1", 1, 1, 5, 1),
 	}
-	fingerprints := sequence()
-	if fingerprints[0] == fingerprints[1] || fingerprints[0] == fingerprints[2] || fingerprints[1] == fingerprints[2] {
-		t.Fatalf("fingerprints are not unique: %q", fingerprints)
-	}
-	if fresh := sequence(); !slices.Equal(fresh, fingerprints) {
-		t.Fatalf("fingerprints are not deterministic: first=%q fresh=%q", fingerprints, fresh)
+	want := []string{"6053c2252e310355d31d08bc4b068081", "585b6c04ab8cfae5c5c8f555dd3a4dfc", "b503faaac9b2f02ffc8ac07908fdd4d2"}
+	if !slices.Equal(fingerprints, want) {
+		t.Fatalf("fingerprints = %q, want %q", fingerprints, want)
 	}
 
 	diagnostic, paths := createOutputTestDiagnostic(t, SeverityError)

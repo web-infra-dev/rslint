@@ -19,7 +19,7 @@ type Options struct {
 
 type formatter interface {
 	begin(w *bufio.Writer, report Report, hasVisibleDiagnostics bool) error
-	diagnostic(w *bufio.Writer, view diagnosticView) error
+	diagnostic(w *bufio.Writer, diagnostic *Diagnostic, relativePath string) error
 	finish(w *bufio.Writer, report Report) error
 }
 
@@ -32,32 +32,38 @@ func Render(dst io.Writer, report Report, options Options) error {
 		return err
 	}
 
-	// Build and validate every visible view before writing anything. A malformed
+	// Validate every visible diagnostic before writing anything. A malformed
 	// diagnostic must not leave a partial machine-readable report (for example,
 	// an unterminated GitLab JSON array) in the destination.
-	views := make([]diagnosticView, 0, len(report.diagnostics))
-	for _, diagnostic := range report.diagnostics {
+	hasVisible := false
+	for i := range report.diagnostics {
+		diagnostic := &report.diagnostics[i]
 		if !isVisible(diagnostic, options.Quiet) {
 			continue
 		}
-		view, err := newDiagnosticView(
-			diagnostic,
-			options.ComparePaths,
-			options.Format == FormatDefault,
-		)
-		if err != nil {
+		if err := validateDiagnostic(diagnostic, options.Format == FormatDefault); err != nil {
 			return err
 		}
-		views = append(views, view)
+		hasVisible = true
 	}
 
 	w := bufio.NewWriterSize(dst, outputBufferSize)
-	if err := selected.begin(w, report, len(views) > 0); err != nil {
+	if err := selected.begin(w, report, hasVisible); err != nil {
 		return errors.Join(err, w.Flush())
 	}
 
-	for _, view := range views {
-		if err := selected.diagnostic(w, view); err != nil {
+	var lastPath, relativePath string
+	for i := range report.diagnostics {
+		diagnostic := &report.diagnostics[i]
+		if !isVisible(diagnostic, options.Quiet) {
+			continue
+		}
+		if diagnostic.FilePath != lastPath {
+			lastPath = diagnostic.FilePath
+			relativePath = tspath.ConvertToRelativePath(lastPath, options.ComparePaths)
+		}
+
+		if err := selected.diagnostic(w, diagnostic, relativePath); err != nil {
 			return errors.Join(err, w.Flush())
 		}
 		if w.Available() < 4096 {
@@ -73,7 +79,7 @@ func Render(dst io.Writer, report Report, options Options) error {
 	return w.Flush()
 }
 
-func isVisible(diagnostic Diagnostic, quiet bool) bool {
+func isVisible(diagnostic *Diagnostic, quiet bool) bool {
 	return !quiet || diagnostic.Severity == SeverityError
 }
 
@@ -82,7 +88,7 @@ func newFormatter(options Options) (formatter, error) {
 	case FormatDefault:
 		return &defaultFormatter{colors: newColorScheme(options.ColorEnabled)}, nil
 	case FormatJSONLine:
-		return jsonLineFormatter{}, nil
+		return &jsonLineFormatter{}, nil
 	case FormatGitHub:
 		return githubFormatter{}, nil
 	case FormatGitLab:

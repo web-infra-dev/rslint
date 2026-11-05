@@ -22,7 +22,7 @@ func (f *gitlabFormatter) begin(w *bufio.Writer, _ Report, _ bool) error {
 	return w.WriteByte('[')
 }
 
-func (f *gitlabFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
+func (f *gitlabFormatter) diagnostic(w *bufio.Writer, diagnostic *Diagnostic, relativePath string) error {
 	type gitlabPosition struct {
 		Line   int `json:"line"`
 		Column int `json:"column"`
@@ -49,22 +49,22 @@ func (f *gitlabFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error
 	}
 
 	severity := "info"
-	switch view.raw.Severity {
+	switch diagnostic.Severity {
 	case SeverityError:
 		severity = "major"
 	case SeverityWarning:
 		severity = "minor"
 	}
 
-	beginLine, beginColumn := view.start.line+1, view.start.column+1
-	endLine, endColumn := view.end.line+1, view.end.column+1
+	beginLine, beginColumn := diagnostic.Start.Line+1, diagnostic.Start.Column+1
+	endLine, endColumn := diagnostic.End.Line+1, diagnostic.End.Column+1
 	issue := gitlabIssue{
-		Description: view.raw.Message,
-		CheckName:   view.raw.RuleName,
-		Fingerprint: f.fingerprints.fingerprint(view.relativePath, view.raw.RuleName, view.raw.Message, beginLine, beginColumn, endLine, endColumn),
+		Description: diagnostic.Message,
+		CheckName:   diagnostic.RuleName,
+		Fingerprint: f.fingerprints.fingerprint(relativePath, diagnostic.RuleName, diagnostic.Message, beginLine, beginColumn, endLine, endColumn),
 		Severity:    severity,
 		Location: gitlabLocation{
-			Path:  view.relativePath,
+			Path:  relativePath,
 			Lines: gitlabLines{Begin: beginLine, End: endLine},
 			Positions: gitlabPositions{
 				Begin: gitlabPosition{Line: beginLine, Column: beginColumn},
@@ -92,42 +92,36 @@ func (f *gitlabFormatter) finish(w *bufio.Writer, _ Report) error {
 
 type gitlabFingerprintState struct {
 	nextSalt map[string]int
-	emitted  map[string]struct{}
+	emitted  map[[md5.Size]byte]struct{}
 }
 
 func newGitLabFingerprintState() gitlabFingerprintState {
 	return gitlabFingerprintState{
-		nextSalt: make(map[string]int),
-		emitted:  make(map[string]struct{}),
+		emitted: make(map[[md5.Size]byte]struct{}),
 	}
 }
 
 func (s *gitlabFingerprintState) fingerprint(filePath, ruleName, message string, startLine, startColumn, endLine, endColumn int) string {
 	input := fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d", filePath, ruleName, message, startLine, startColumn, endLine, endColumn)
-	digest := func(value string) string {
-		sum := md5.Sum([]byte(value)) //nolint:gosec // opaque identifier, not a security boundary
-		return hex.EncodeToString(sum[:])
-	}
-
-	// Preserve the historical hash for the first ordinary occurrence and the
-	// historical :1, :2, ... salts for duplicates. Track every fingerprint that
-	// was actually emitted as well: a salted fingerprint can otherwise collide
-	// with another diagnostic whose unsalted tuple contains the same colon-
-	// separated suffix.
-	salt := s.nextSalt[input]
-	for {
+	// An ordinary first occurrence needs only its emitted digest. The first
+	// duplicate rediscovers that digest and starts at the same historical :1
+	// salt. Every candidate, including a salted one, checks all emitted IDs.
+	for salt := s.nextSalt[input]; ; salt++ {
 		value := input
 		if salt > 0 {
 			value += ":" + strconv.Itoa(salt)
 		}
-		salt++
-		s.nextSalt[input] = salt
-
-		fingerprint := digest(value)
-		if _, exists := s.emitted[fingerprint]; exists {
+		sum := md5.Sum([]byte(value)) //nolint:gosec // opaque identifier, not a security boundary
+		if _, exists := s.emitted[sum]; exists {
 			continue
 		}
-		s.emitted[fingerprint] = struct{}{}
-		return fingerprint
+		s.emitted[sum] = struct{}{}
+		if salt > 0 {
+			if s.nextSalt == nil {
+				s.nextSalt = make(map[string]int)
+			}
+			s.nextSalt[input] = salt + 1
+		}
+		return hex.EncodeToString(sum[:])
 	}
 }
