@@ -175,6 +175,41 @@ const widened = nullable as number | null | undefined;
 const enumValue = numeric as Mode;
 (value as unknown as number) === -1;
 `},
+			{Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+const values = Array.of(mode as number);
+values.includes(-1);
+declare const optionalWrap: (<T>(value: T) => T) | undefined;
+const optional = optionalWrap?.(mode as number);
+optional === -1;
+declare function wrap<T>(value: T): T;
+const wrapped = wrap(mode as number);
+wrapped === -1;
+const nested = wrap({ mode: mode as number });
+nested.mode === -1;
+declare class Box<T> { constructor(value: T); value: T; }
+const box = new Box(mode as number);
+box.value === -1;
+declare const item: { mode: Mode };
+declare function apply<T>(input: { value: T; run: (value: T) => void }): void;
+apply({ value: mode as number, run(value) { value = -1; } });
+apply({ value: item as { mode: number }, run(value) { value.mode = -1; } });
+declare function choose(value: Mode): 'mode';
+declare function choose(value: number): 'number';
+const selected: 'number' = choose(mode as number);
+declare function chooseShape(value: { mode: Mode; label: string }): 'mode';
+declare function chooseShape(value: { mode: number; label: string }): 'number';
+const selectedShape: 'number' = chooseShape({ mode: mode as number, label: 'value' });
+const isAuto = (value: Mode) => value === Mode.Auto;
+declare const overloadedCheck: typeof isAuto & ((value: number) => boolean);
+if (overloadedCheck(mode as number)) { mode === Mode.Manual; }
+const widened = item as { mode: number };
+widened.mode === -1;
+declare const factory: () => Mode;
+const widenedFactory = factory as () => number;
+widenedFactory() === -1;
+`},
 			{Code: `const value = 5 as any;`},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
@@ -248,19 +283,28 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 enum Mode { Auto = 1, Manual = 2 }
 declare const value: Mode;
 declare const nullable: Mode | null | undefined;
+type First = Mode | null;
+type Second = Mode | null;
+declare const alias: First;
 const same = value as Mode;
 const sameNullable = nullable as Mode | null | undefined;
 const sameDouble = value as unknown as Mode;
+const sameAlias = alias as Second;
 `,
 				Output: []string{`
 enum Mode { Auto = 1, Manual = 2 }
 declare const value: Mode;
 declare const nullable: Mode | null | undefined;
+type First = Mode | null;
+type Second = Mode | null;
+declare const alias: First;
 const same = value;
 const sameNullable = nullable;
 const sameDouble = value;
+const sameAlias = alias;
 `},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
 					{MessageId: "unnecessaryAssertion"},
 					{MessageId: "unnecessaryAssertion"},
 					{MessageId: "unnecessaryAssertion"},
@@ -270,6 +314,28 @@ const sameDouble = value;
 				Code:   `enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value as number);`,
 				Output: []string{`enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
+				Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+Array.of<number>(mode as number).includes(-1);
+declare function choose(value: number, flag: string): 'string';
+declare function choose(value: number, flag: boolean): 'boolean';
+choose(mode as number, 'value');
+`,
+				Output: []string{`
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+Array.of<number>(mode).includes(-1);
+declare function choose(value: number, flag: string): 'string';
+declare function choose(value: number, flag: boolean): 'boolean';
+choose(mode, 'value');
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+				},
 			},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
@@ -491,6 +557,12 @@ func TestNoUnnecessaryTypeAssertionIndexSignatures(t *testing.T) {
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `
+interface Config { field?: boolean; [key: string]: unknown }
+declare const config: Config | undefined;
+export const value = (config as Record<string, unknown> | undefined)?.field;
+const unknownType: unknown extends typeof value ? true : false = true;
+`},
+			{Code: `
 declare const config: { field?: boolean } | undefined;
 export const value = (config as Record<string, unknown> | undefined)?.field;
 `},
@@ -525,19 +597,6 @@ const result = identity(config as Record<string, unknown> | undefined);
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			{
-				Code: `
-interface Config { field?: boolean; [key: string]: unknown }
-declare const config: Config | undefined;
-export const value = (config as Record<string, unknown> | undefined)?.field;
-`,
-				Output: []string{`
-interface Config { field?: boolean; [key: string]: unknown }
-declare const config: Config | undefined;
-export const value = (config)?.field;
-`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
-			},
 			{
 				Code:   `declare const value: Record<string, unknown> | null; const result = <Record<string, unknown> | null>value;`,
 				Output: []string{`declare const value: Record<string, unknown> | null; const result = value;`},
@@ -580,6 +639,10 @@ func TestNoUnnecessaryTypeAssertionInferenceGuards(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `
+const values = [].map(() => ({ a: false, b: false } as { a: false; b: false }));
+const proof: false = values[0].a;
+`},
 			// A cast can supply return-type inference for a generic call. The
 			// operand's type inside the cast is not its type after removing it.
 			{Code: `
@@ -591,6 +654,19 @@ const value: string = check('value');
 declare function makeCheck<T = any>(): (value: T) => T;
 export const check = makeCheck() as (value: string) => string;
 const value: string = check('value');
+`},
+			{Code: `
+declare function make<T>(): T;
+export const value = (() => make())() as string;
+value.toUpperCase();
+`},
+			{Code: `
+declare function make<T>(): T;
+export const value = { *items() { yield make(); } } as { items(): Generator<string, void, unknown> };
+for (const item of value.items()) { item.toUpperCase(); }
+`},
+			{Code: `
+export const value = { *items() { const reply = yield 1; reply.toUpperCase(); } } as { items(): Generator<number, void, string> };
 `},
 			{Code: `
 type Fields = { name: string };
@@ -717,6 +793,11 @@ test.options.parameters.potato;
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `const value = { *items(): Generator<string, void, unknown> { yield 'value'; } } as { items(): Generator<string, void, unknown> };`,
+				Output: []string{`const value = { *items(): Generator<string, void, unknown> { yield 'value'; } };`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
 			{
 				Code: `
 declare function makeCheck<T, U = T>(): (value: T) => U;

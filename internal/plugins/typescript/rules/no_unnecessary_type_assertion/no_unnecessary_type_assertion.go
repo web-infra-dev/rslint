@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -286,26 +285,6 @@ func assertionHasIndexSignature(typeChecker *checker.Checker, t *checker.Type) b
 	return false
 }
 
-func assertionHasSameProperties(typeChecker *checker.Checker, uncast, cast *checker.Type) bool {
-	uncastProperties := typeChecker.GetPropertiesOfType(uncast)
-	castProperties := typeChecker.GetPropertiesOfType(cast)
-	if len(uncastProperties) != len(castProperties) {
-		return false
-	}
-	castPropertyNames := make(map[string]struct{}, len(castProperties))
-	for _, property := range castProperties {
-		castPropertyNames[property.Name] = struct{}{}
-	}
-	for _, property := range uncastProperties {
-		if _, ok := castPropertyNames[property.Name]; !ok ||
-			typescriptutil.IsPropertyReadonlyInType(typeChecker, uncast, property.Name) !=
-				typescriptutil.IsPropertyReadonlyInType(typeChecker, cast, property.Name) {
-			return false
-		}
-	}
-	return true
-}
-
 func assertionHasSameTypeArguments(typeChecker *checker.Checker, uncast, cast *checker.Type) bool {
 	uncastArguments := assertionTypeArguments(typeChecker, uncast)
 	castArguments := assertionTypeArguments(typeChecker, cast)
@@ -320,8 +299,8 @@ func assertionHasSameTypeArguments(typeChecker *checker.Checker, uncast, cast *c
 	return true
 }
 
-func assertionHasGenericCallSignature(typeChecker *checker.Checker, t *checker.Type) bool {
-	for _, signature := range utils.GetCallSignatures(typeChecker, t) {
+func assertionHasGenericSignature(typeChecker *checker.Checker, t *checker.Type, kind checker.SignatureKind) bool {
+	for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, t, kind) {
 		if len(signature.TypeParameters()) > 0 {
 			return true
 		}
@@ -329,40 +308,40 @@ func assertionHasGenericCallSignature(typeChecker *checker.Checker, t *checker.T
 	return false
 }
 
-func assertionIsInGenericContext(ctx rule.RuleContext, node *ast.Node) bool {
+func assertionGenericCall(ctx rule.RuleContext, node *ast.Node) *ast.Node {
 	seenFunction := false
 	for child := assertionWalkUpParentheses(node); child.Parent != nil; child = child.Parent {
 		current := child.Parent
 		switch current.Kind {
 		case ast.KindFunctionDeclaration:
-			return false
+			return nil
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 			// ESTree wraps method parameters and bodies in a function expression.
 			// Computed names and decorators remain in the enclosing context.
 			if child == current.Body() || ast.IsParameterDeclaration(child) {
-				return false
+				return nil
 			}
 		case ast.KindFunctionExpression, ast.KindArrowFunction:
-			if ast.IsBlock(current.Body()) || seenFunction {
-				return false
+			body := current.Body()
+			if (body != nil && ast.IsBlock(body)) || seenFunction {
+				return nil
 			}
 			seenFunction = true
 		case ast.KindCallExpression, ast.KindNewExpression:
 			if current.TypeArguments() != nil {
 				continue
 			}
-			if current.Kind == ast.KindCallExpression && ast.IsAccessExpression(ast.SkipParentheses(current.Expression())) {
-				if _, ok := assertionArgumentIndex(current, node); ok {
-					continue
-				}
+			calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(current.Expression()))
+			kind := checker.SignatureKindCall
+			if ast.IsNewExpression(current) {
+				kind = checker.SignatureKindConstruct
 			}
-			calleeType := ctx.TypeChecker.GetTypeAtLocation(current.Expression())
-			if assertionHasGenericCallSignature(ctx.TypeChecker, calleeType) {
-				return true
+			if assertionHasGenericSignature(ctx.TypeChecker, calleeType, kind) {
+				return current
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 func assertionIsConceptuallyLiteral(node *ast.Node) bool {
@@ -417,10 +396,7 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 			return assertionMayAffectInference(ctx, expression.Expression())
 		}
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
-		// Explicit type arguments, including trailing defaults, use
-		// checkTypeArguments rather than contextual return-type inference.
-		if len(expression.TypeArguments()) != 0 ||
-			checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone) == nil {
+		if checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone) == nil {
 			return false
 		}
 		var callee *ast.Node
@@ -432,6 +408,16 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 			if expression.Kind == ast.KindNewExpression {
 				kind = checker.SignatureKindConstruct
 			}
+		}
+		callee = ast.SkipParentheses(callee)
+		if expression.Kind == ast.KindCallExpression && ast.IsFunctionExpressionOrArrowFunction(callee) &&
+			assertionMayAffectInference(ctx, callee) {
+			return true
+		}
+		// Explicit type arguments, including trailing defaults, fix this
+		// call's type parameters, but not inference inside an IIFE's body.
+		if len(expression.TypeArguments()) != 0 {
+			return false
 		}
 		calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(callee))
 		// Removing the contextual type can change overload selection, so the
@@ -485,6 +471,11 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 		}
 		if expression.Type() != nil {
 			return false
+		}
+		// Both yielded values and the value of a yield expression (TNext)
+		// can be inferred from the assertion's contextual generator type.
+		if ast.GetFunctionFlags(expression)&ast.FunctionFlagsGenerator != 0 {
+			return true
 		}
 		body := expression.Body()
 		if body != nil && ast.IsBlock(body) {
@@ -586,17 +577,16 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 }
 
 func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsCallExpression(parent) && !ast.IsNewExpression(parent) {
-		return false
-	}
-	argumentIndex, ok := assertionArgumentIndex(parent, node)
-	if !ok {
+	parent, argumentIndex, _ := assertionCallArgument(node)
+	if parent == nil {
 		return false
 	}
 	calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(parent.Expression()))
-	signatures := utils.GetCallSignatures(ctx.TypeChecker, calleeType)
+	kind := checker.SignatureKindCall
+	if ast.IsNewExpression(parent) {
+		kind = checker.SignatureKindConstruct
+	}
+	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind)
 	if len(signatures) <= 1 {
 		return false
 	}
@@ -619,7 +609,7 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 	first := parameterTypes[0]
 	allSame := true
 	for _, parameterType := range parameterTypes[1:] {
-		if parameterType != first {
+		if !checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, parameterType, first) {
 			allSame = false
 			break
 		}
@@ -627,9 +617,19 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 	if allSame {
 		return false
 	}
-	uncastType := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
-	for _, parameterType := range parameterTypes {
-		if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, parameterType) {
+	// Selecting a different overload is harmless only when this is the
+	// sole argument and all non-generic candidates accept it and expose
+	// the same result. Type predicates can affect later control flow.
+	if len(parent.Arguments()) != 1 || ast.SkipParentheses(parent.Arguments()[0]) != node {
+		return true
+	}
+	uncastType := ctx.TypeChecker.GetTypeAtLocation(assertionOriginalExpression(node))
+	returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
+	for index, signature := range signatures {
+		if len(signature.TypeParameters()) != 0 || signature.ThisParameter() != nil ||
+			ctx.TypeChecker.GetTypePredicateOfSignature(signature) != nil ||
+			!checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, returnType, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) ||
+			!checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, parameterTypes[index]) {
 			return true
 		}
 	}
@@ -639,13 +639,14 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 func assertionGenericsMismatch(ctx rule.RuleContext, uncastType, contextualType *checker.Type) bool {
 	for _, property := range ctx.TypeChecker.GetPropertiesOfType(contextualType) {
 		propertyType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, property)
-		if !assertionHasGenericCallSignature(ctx.TypeChecker, propertyType) {
+		if !assertionHasGenericSignature(ctx.TypeChecker, propertyType, checker.SignatureKindCall) {
 			continue
 		}
 		uncastProperty := ctx.TypeChecker.GetPropertyOfType(uncastType, property.Name)
-		if uncastProperty == nil || !assertionHasGenericCallSignature(
+		if uncastProperty == nil || !assertionHasGenericSignature(
 			ctx.TypeChecker,
 			checker.Checker_getTypeOfSymbol(ctx.TypeChecker, uncastProperty),
+			checker.SignatureKindCall,
 		) {
 			return true
 		}
@@ -667,7 +668,7 @@ func assertionHasPhantomTypeArguments(typeChecker *checker.Checker, t *checker.T
 }
 
 func assertionHasPhantomTypeArgumentMismatch(ctx rule.RuleContext, node *ast.Node, uncastType, contextualType *checker.Type) bool {
-	if !assertionIsInGenericContext(ctx, node) ||
+	if assertionGenericCall(ctx, node) == nil ||
 		(!assertionHasPhantomTypeArguments(ctx.TypeChecker, uncastType) &&
 			!assertionHasPhantomTypeArguments(ctx.TypeChecker, contextualType)) {
 		return false
@@ -685,6 +686,44 @@ func assertionHasPhantomTypeArgumentMismatch(ctx rule.RuleContext, node *ast.Nod
 	return false
 }
 
+// Find the nearest argument that can receive contextual types through these
+// containers. The final result also identifies a sole inference path, without
+// sibling properties, elements, arguments, or callback parameters.
+func assertionCallArgument(node *ast.Node) (*ast.Node, int, bool) {
+	independent := true
+	for current := node; ; current = current.Parent {
+		parent := current.Parent
+		if parent == nil {
+			return nil, 0, false
+		}
+		switch parent.Kind {
+		case ast.KindCallExpression, ast.KindNewExpression:
+			for index, argument := range parent.Arguments() {
+				if current == argument {
+					return parent, index, independent && len(parent.Arguments()) == 1
+				}
+			}
+			return nil, 0, false
+		case ast.KindParenthesizedExpression:
+		case ast.KindPropertyAssignment:
+			if parent.Initializer() != current || ast.IsComputedPropertyName(parent.Name()) {
+				return nil, 0, false
+			}
+		case ast.KindObjectLiteralExpression:
+			independent = independent && len(parent.Properties()) == 1
+		case ast.KindArrayLiteralExpression:
+			independent = independent && len(parent.Elements()) == 1
+		case ast.KindArrowFunction:
+			if parent.Body() != current {
+				return nil, 0, false
+			}
+			independent = independent && len(parent.Parameters()) == 0
+		default:
+			return nil, 0, false
+		}
+	}
+}
+
 func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
@@ -692,7 +731,7 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 		return true
 	}
 	if castIsAny {
-		return ast.IsLogicalOrCoalescingBinaryExpression(parent) || assertionIsInGenericContext(ctx, node)
+		return ast.IsLogicalOrCoalescingBinaryExpression(parent) || assertionGenericCall(ctx, node) != nil
 	}
 	if ast.IsTemplateExpression(ast.SkipParentheses(node.Expression())) {
 		return true
@@ -713,8 +752,15 @@ func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.N
 		assertionIsArgumentToOverloadedFunction(ctx, node) {
 		return true
 	}
-	if assertionIsInGenericContext(ctx, node) {
-		return !assertionIsConceptuallyLiteral(assertionOriginalExpression(node)) && !ast.IsPropertyAssignment(parent)
+	if genericCall := assertionGenericCall(ctx, node); genericCall != nil {
+		original := assertionOriginalExpression(node)
+		argumentCall, _, independent := assertionCallArgument(node)
+		if utils.IsTypeFlagSetWithUnion(ctx.TypeChecker.GetTypeAtLocation(original), checker.TypeFlagsEnumLike) ||
+			!ast.IsExpressionStatement(assertionWalkUpParentheses(genericCall).Parent) ||
+			argumentCall != genericCall || !independent {
+			return true
+		}
+		return !assertionIsConceptuallyLiteral(original) && !ast.IsPropertyAssignment(parent)
 	}
 	return false
 }
@@ -918,14 +964,6 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return areUnionPartsEquivalentIgnoringUndefined(uncast, cast)
 			}
 
-			// Numeric enums and number can be mutually assignable without
-			// being identical. Do not erase enum distinctions through the
-			// structural assignability fallback below.
-			if utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsEnumLike) ||
-				utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsEnumLike) {
-				return false
-			}
-
 			if (utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsNonPrimitive)) ||
 				assertionHasIndexSignature(ctx.TypeChecker, uncast) != assertionHasIndexSignature(ctx.TypeChecker, cast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, uncast) ||
@@ -970,12 +1008,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			if !assertionHasSameProperties(ctx.TypeChecker, uncast, cast) ||
-				!assertionHasSameTypeArguments(ctx.TypeChecker, uncast, cast) {
-				return false
-			}
-			return checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncast, cast) &&
-				checker.Checker_isTypeAssignableTo(ctx.TypeChecker, cast, uncast)
+			return assertionHasSameTypeArguments(ctx.TypeChecker, uncast, cast) &&
+				checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, uncast, cast)
 		}
 
 		getUncastType := func(node *ast.Node) *checker.Type {

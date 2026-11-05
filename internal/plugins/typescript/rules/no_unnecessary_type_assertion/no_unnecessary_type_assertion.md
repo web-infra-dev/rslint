@@ -39,9 +39,11 @@ export const check = makeCheck() as (value: string) => string;
 // Without the assertion, check accepts and returns unknown.
 ```
 
-This check is conservative: it can retain a redundant assertion when a generic return type could contain type variables, even if other arguments determine those variables. The rule still checks non-generic calls, calls with explicit type arguments (including trailing defaults), and generic calls whose return type is known not to contain type variables. Assertions that may provide contextual types to function parameters are also preserved.
+This check follows return inference through immediately invoked functions. It also preserves generators without an explicit return type: both yielded values and the result of a `yield` expression can receive contextual types.
 
-When deciding whether a type is unchanged, Rslint does not equate enums with their primitive base types merely because assignment works in both directions. An assertion from an enum to `number` can intentionally widen the static type to allow comparisons outside the enum's members. Identical enum assertions can still be reported, as can assertions whose receiving context accepts the original type.
+The check is conservative: it can retain a redundant assertion when a generic return type could contain type variables, even if other arguments determine those variables. Contextual fixes in inferred generic calls require an unused result and a single input path, without competing properties, elements, arguments, or callback parameters. The rule still checks calls with explicit type arguments (including trailing defaults) and receivers with a shared parameter type. Overloads with a single accepted argument and identical return types can also be checked when they have no type predicates or explicit `this` parameters. Assertions that may provide contextual types to function parameters are preserved.
+
+When deciding whether a type is unchanged, Rslint uses the compiler's type identity relation instead of treating mutual assignability as equality. This preserves distinctions between enums and their primitive base types, including within object properties and function signatures, while reporting redundant assertions between equivalent aliases. An assertion from an enum to `number` can intentionally widen the static type to allow comparisons outside the enum's members. Assertions whose receiving context safely accepts the original type can still be reported.
 
 ## Original Documentation
 
