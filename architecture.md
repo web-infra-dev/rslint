@@ -786,9 +786,12 @@ These are semantic ports rather than generic pre/post hooks:
   claiming inputs for that binding and joins outstanding reads to preserve error order.
   Single-threaded bindings and batches with at most two pending reads run inline
   under the same budget. Source preparation preserves input order, and frames
-  are projected while the generation is leased. For disk-backed text, BOM
-  probes retry a descriptor-limit error once after other BOM probes close
-  their files. A persistent error aborts plugin input preparation.
+  are projected while the generation is leased. Disk BOM probes open files
+  independently. A probe that exhausts file descriptors retries when a peer
+  closes a file and periodically checks for descriptors released elsewhere.
+  Once no peer can free a descriptor, it makes a final open attempt. Missing
+  files and short headers without a mark are valid unmarked inputs. Other
+  open, read, or close errors abort the affected plugin task before dispatch.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It
   is independent from generation construction, confirms complete file
   replacements, and is never called after an unsuccessful observation or

@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
@@ -35,8 +36,7 @@ func SourceHasBOM(fileSystem vfs.FS, path string) bool {
 
 // ReadSourceBOM asks the VFS layer that supplied the text, or probes the
 // original file when its text came from disk. Missing files and headers too
-// short to contain a mark return false. Descriptor exhaustion after an
-// exclusive retry returns an error.
+// short to contain a mark return false. Other file errors reach the caller.
 func ReadSourceBOM(fileSystem vfs.FS, path string) (bool, error) {
 	if source, ok := fileSystem.(BOMSource); ok {
 		return source.ReadSourceBOM(path)
@@ -44,26 +44,89 @@ func ReadSourceBOM(fileSystem vfs.FS, path string) (bool, error) {
 	if source, ok := fileSystem.(interface{ SourceHasBOM(path string) bool }); ok {
 		return source.SourceHasBOM(path), nil
 	}
-	return readDiskBOM(path, fileBytesStartWithBOM)
+	return diskBOMReads.read(path, os.Open)
 }
 
-var diskBOMReads sync.RWMutex
+// active counts opens in flight and files held until close. closed lets a
+// failed opener notice a file released during its own open attempt.
+type bomFileReads struct {
+	mu      sync.Mutex
+	active  int
+	closed  uint64
+	changed chan struct{} // allocated only when a failed open needs to wait
+}
 
-func readDiskBOM(path string, probe func(string) (bool, error)) (bool, error) {
-	diskBOMReads.RLock()
-	has, err := probe(path)
-	diskBOMReads.RUnlock()
-	if isFileDescriptorLimit(err) {
-		// The writer waits for every active probe to close its file and
-		// prevents new probes from borrowing the available descriptor.
-		diskBOMReads.Lock()
-		has, err = probe(path)
-		diskBOMReads.Unlock()
-		if isFileDescriptorLimit(err) {
-			return false, err
+var diskBOMReads bomFileReads
+
+func (r *bomFileReads) read(path string, openFile func(string) (*os.File, error)) (bool, error) {
+	file, err := r.open(path, openFile)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
 		}
+		return false, err
 	}
-	return has, nil
+	has, readErr := readBOMHeader(file)
+	closeErr := file.Close()
+	r.mu.Lock()
+	r.finish(closeErr == nil)
+	r.mu.Unlock()
+	if readErr != nil {
+		return false, readErr
+	}
+	return has && closeErr == nil, closeErr
+}
+
+func (r *bomFileReads) open(path string, openFile func(string) (*os.File, error)) (*os.File, error) {
+	finalTry := false
+	r.mu.Lock()
+	for {
+		before := r.closed
+		r.active++
+		r.mu.Unlock()
+		file, err := openFile(path)
+		if err == nil {
+			return file, nil
+		}
+		r.mu.Lock()
+		r.finish(false)
+		if !isFileDescriptorLimit(err) || (finalTry && r.closed == before && r.active == 0) {
+			r.mu.Unlock()
+			return nil, err
+		}
+		woke := false
+		if r.closed == before && r.active != 0 {
+			if r.changed == nil {
+				r.changed = make(chan struct{})
+			}
+			changed := r.changed
+			r.mu.Unlock()
+			select {
+			case <-changed:
+				woke = true
+			case <-time.After(time.Second):
+				// Descriptors released outside BOM probes have no notification.
+				// Recheck even if a peer is still blocked in I/O.
+			}
+			r.mu.Lock()
+		}
+		// A notification without a close means the active probes drained.
+		// Give the OS one last chance when no probe could release a file.
+		finalTry = r.closed == before && (woke || r.active == 0)
+	}
+}
+
+// finish unregisters an attempt under mu. A failed open wakes peers only when
+// it was the last attempt, so an exhausted batch can return the OS error.
+func (r *bomFileReads) finish(closed bool) {
+	r.active--
+	if closed {
+		r.closed++
+	}
+	if r.changed != nil && (closed || r.active == 0) {
+		close(r.changed)
+		r.changed = nil
+	}
 }
 
 func isFileDescriptorLimit(err error) bool {
@@ -89,21 +152,15 @@ func RestoreSourceBOM(fileSystem vfs.FS, path string, text string) (string, erro
 	return text, nil
 }
 
-// fileBytesStartWithBOM reports whether the bytes of path begin with a byte
-// order mark. UTF-16 marks count: those files are decoded to UTF-8 and lose
-// their mark exactly as UTF-8 ones do. A path with no bytes to read — a
-// virtual file, a bundled lib — has nothing to speak for it.
-func fileBytesStartWithBOM(path string) (bool, error) {
-	file, err := os.Open(path)
-	if err != nil {
+// A short file can still consist of a complete two-byte UTF-16 mark.
+func readBOMHeader(reader io.Reader) (bool, error) {
+	var head [3]byte
+	n, err := io.ReadFull(reader, head[:])
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return false, err
 	}
-	defer file.Close()
-
-	var head [3]byte
-	n, err := io.ReadFull(file, head[:])
-	if n >= 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF {
+	if n == 3 && head == [3]byte{0xEF, 0xBB, 0xBF} {
 		return true, nil
 	}
-	return n >= 2 && ((head[0] == 0xFF && head[1] == 0xFE) || (head[0] == 0xFE && head[1] == 0xFF)), err
+	return n >= 2 && ((head[0] == 0xFF && head[1] == 0xFE) || (head[0] == 0xFE && head[1] == 0xFF)), nil
 }
