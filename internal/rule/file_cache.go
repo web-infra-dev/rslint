@@ -6,6 +6,8 @@ package rule
 type FileCache struct {
 	values                  map[any]any
 	processCurrentDirectory string
+	// usage is mutable lint-pass state, separate from source-derived cache values.
+	usage *variableUsageState
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one

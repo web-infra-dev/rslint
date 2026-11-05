@@ -764,3 +764,136 @@ func TestRunLinterCachesOncePerFileAcrossRules(t *testing.T) {
 		t.Fatal("different files shared a cached value")
 	}
 }
+
+func TestVariableUsageAcrossRulesAndPasses(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"first.tsx":  "const React={}; export const view=<div/>;",
+		"second.tsx": "const React={}; export const view=<span/>;",
+		"empty.ts":   "",
+	})
+	programs := wrapTestPrograms(program)
+	for _, reverse := range []bool{false, true} {
+		for _, enabled := range []bool{true, false, true} {
+			observed := map[string]int{}
+			marker := rule.ConfiguredRule{Name: "usage-producer", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				return rule.RuleListeners{
+					ast.KindSourceFile: func(node *ast.Node) {
+						if enabled && !ctx.MarkVariableAsUsed("Math", node) {
+							t.Error("missing global")
+						}
+					},
+					ast.KindJsxSelfClosingElement: func(node *ast.Node) {
+						if enabled && !ctx.MarkVariableAsUsed("React", node) {
+							t.Error("missing React binding")
+						}
+					},
+				}
+			}}
+			consumer := rule.ConfiguredRule{Name: "usage-consumer", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+				usage := ctx.VariableUsage()
+				if usage.IsGlobalUsed("Math") {
+					t.Error("marks leaked into a new pass")
+				}
+				var identifier *ast.Node
+				if statements := ctx.SourceFile.Statements; statements != nil && len(statements.Nodes) != 0 {
+					identifier = statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Name()
+					if usage.IsDeclarationUsed(identifier) {
+						t.Error("declaration mark leaked into a new pass")
+					}
+				}
+				return rule.RuleListeners{rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
+					if node != ctx.SourceFile.AsNode() {
+						t.Error("incorrect root node")
+					}
+					observed[ctx.SourceFile.FileName()]++
+					if usage.IsGlobalUsed("Math") != enabled {
+						t.Error("file exit did not see global producer")
+					}
+					if identifier != nil && usage.IsDeclarationUsed(identifier) != enabled {
+						t.Error("file exit did not see JSX producer")
+					}
+				}}
+			}}
+			ordered := []rule.ConfiguredRule{marker, consumer}
+			if reverse {
+				ordered = []rule.ConfiguredRule{consumer, marker}
+			}
+			plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+				Programs: programs, SingleThreaded: true,
+				TargetsByProgram: [][]string{{paths["first.tsx"], paths["second.tsx"], paths["empty.ts"]}},
+				GetRulesForFile:  func(*ast.SourceFile) []rule.ConfiguredRule { return ordered },
+			})
+			if _, err := RunLinter(RunLinterOptions{SingleThreaded: true, LintPlan: plan, Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}}}); err != nil {
+				t.Fatal(err)
+			}
+			for _, path := range paths {
+				if observed[path] != 1 {
+					t.Errorf("root exit count for %s = %d", path, observed[path])
+				}
+			}
+		}
+	}
+}
+
+func TestSourceFileListenersBracketChildrenInRuleOrder(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{"empty.ts": "", "one.ts": "let x;"})
+	events := map[string][]string{}
+	makeRule := func(name string) rule.ConfiguredRule {
+		return rule.ConfiguredRule{Name: name, Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			record := func(event string) {
+				events[ctx.SourceFile.FileName()] = append(events[ctx.SourceFile.FileName()], name+":"+event)
+			}
+			return rule.RuleListeners{
+				ast.KindSourceFile:                      func(*ast.Node) { record("enter") },
+				ast.KindIdentifier:                      func(*ast.Node) { record("child") },
+				rule.ListenerOnExit(ast.KindSourceFile): func(*ast.Node) { record("exit") },
+			}
+		}}
+	}
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs: wrapTestPrograms(program), SingleThreaded: true,
+		TargetsByProgram: [][]string{{paths["empty.ts"], paths["one.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{makeRule("first"), makeRule("second")}
+		},
+	})
+	if _, err := RunLinter(RunLinterOptions{SingleThreaded: true, LintPlan: plan, Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}}}); err != nil {
+		t.Fatal(err)
+	}
+	for name, path := range paths {
+		want := []string{"first:enter", "second:enter"}
+		if name == "one.ts" {
+			want = append(want, "first:child", "second:child")
+		}
+		want = append(want, "first:exit", "second:exit")
+		if !reflect.DeepEqual(events[path], want) {
+			t.Errorf("%s: got %v, want %v", name, events[path], want)
+		}
+	}
+}
+
+func TestVariableUsageSameEventObservesRegistrationOrder(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{"file.ts": "let x;"})
+	for _, producerFirst := range []bool{false, true} {
+		var observed bool
+		marker := rule.ConfiguredRule{Name: "marker", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			return rule.RuleListeners{rule.ListenerOnExit(ast.KindSourceFile): func(*ast.Node) { ctx.MarkVariableAsUsed("x", nil) }}
+		}}
+		consumer := rule.ConfiguredRule{Name: "consumer", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			usage := ctx.VariableUsage()
+			id := ctx.SourceFile.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Name()
+			return rule.RuleListeners{rule.ListenerOnExit(ast.KindSourceFile): func(*ast.Node) { observed = usage.IsDeclarationUsed(id) }}
+		}}
+		ordered := []rule.ConfiguredRule{consumer, marker}
+		if producerFirst {
+			ordered = []rule.ConfiguredRule{marker, consumer}
+		}
+		plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{Programs: wrapTestPrograms(program), SingleThreaded: true, TargetsByProgram: [][]string{{paths["file.ts"]}}, GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return ordered }})
+		if _, err := RunLinter(RunLinterOptions{SingleThreaded: true, LintPlan: plan, Consumer: rule.DiagnosticConsumer{Report: func(rule.RuleDiagnostic) {}}}); err != nil {
+			t.Fatal(err)
+		}
+		if observed != producerFirst {
+			t.Errorf("same-event visibility=%v, producerFirst=%v", observed, producerFirst)
+		}
+	}
+}

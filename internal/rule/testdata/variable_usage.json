@@ -1,0 +1,2012 @@
+{
+  "versions": {
+    "node": "v22.18.0",
+    "eslint": "10.12.0",
+    "parser": "8.71.0"
+  },
+  "cases": [
+    {
+      "name": "basic",
+      "source": "const a=1; probe(\"a\"); probe(\"missing\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 11,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 23,
+          "name": "missing",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "hoisting",
+      "source": "probe(\"a\"); var a; probe(\"f\"); function f(){}",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 0,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 19,
+          "name": "f",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "f",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "block",
+      "source": "let x=0; { probe(\"x\"); let x=1; } probe(\"x\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 11,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 27,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 34,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nested-var",
+      "source": "let x=0; function f(){if(true){var x=1;} probe(\"x\");} probe(\"x\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 41,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 35,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 54,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "defaults-body",
+      "source": "const x=0; function f(p=probe(\"x\")){var x=1;} probe(\"x\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 24,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 46,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "defaults-let",
+      "source": "const x=0; function f(p=probe(\"x\")){let x=1;} probe(\"x\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 24,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 46,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "parameter-merge",
+      "source": "function f(x=probe(\"x\")){var x; probe(\"x\");}",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 13,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 11,
+              "name": "x",
+              "inner": false
+            },
+            {
+              "pos": 29,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 32,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 11,
+              "name": "x",
+              "inner": false
+            },
+            {
+              "pos": 29,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "destructuring",
+      "source": "const {a,b:renamed}=obj; probe(\"a\"); probe(\"renamed\"); function f({c,d}={}){probe(\"c\");probe(\"d\");}",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 25,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 7,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 37,
+          "name": "renamed",
+          "found": true,
+          "ids": [
+            {
+              "pos": 11,
+              "name": "renamed",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 76,
+          "name": "c",
+          "found": true,
+          "ids": [
+            {
+              "pos": 67,
+              "name": "c",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 87,
+          "name": "d",
+          "found": true,
+          "ids": [
+            {
+              "pos": 69,
+              "name": "d",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "function-expression",
+      "source": "const f=function self(){probe(\"self\");}; probe(\"self\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 24,
+          "name": "self",
+          "found": true,
+          "ids": [
+            {
+              "pos": 17,
+              "name": "self",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 41,
+          "name": "self",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "function-expression-shadow",
+      "source": "const f=function self(self=probe(\"self\")){probe(\"self\");};",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 27,
+          "name": "self",
+          "found": true,
+          "ids": [
+            {
+              "pos": 22,
+              "name": "self",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 42,
+          "name": "self",
+          "found": true,
+          "ids": [
+            {
+              "pos": 22,
+              "name": "self",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "arguments",
+      "source": "function a(){probe(\"arguments\"); const b=()=>probe(\"arguments\");} function b(){probe(\"arguments\");} probe(\"arguments\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 13,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 45,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 79,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 100,
+          "name": "arguments",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "catch",
+      "source": "let e=0;try{}catch(e){probe(\"e\"); {let e=1;probe(\"e\");}}probe(\"e\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 22,
+          "name": "e",
+          "found": true,
+          "ids": [
+            {
+              "pos": 19,
+              "name": "e",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 43,
+          "name": "e",
+          "found": true,
+          "ids": [
+            {
+              "pos": 39,
+              "name": "e",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 56,
+          "name": "e",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "e",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "for",
+      "source": "let i=0;for(let i=probe(\"i\");i<1;i++){probe(\"i\");}probe(\"i\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 18,
+          "name": "i",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "i",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 38,
+          "name": "i",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "i",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 50,
+          "name": "i",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "i",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "switch",
+      "source": "let x=0;switch(probe(\"x\")){case 0:let x=1;probe(\"x\");}",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 15,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 38,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 42,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 38,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "class",
+      "source": "class C{field=probe(\"C\"); method(){probe(\"C\");} static {probe(\"C\");}} probe(\"C\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 14,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 35,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 56,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 70,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "class-expression",
+      "source": "const C=1;const c=class C{field=probe(\"C\");};probe(\"C\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 32,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 24,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 45,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "computed-method",
+      "source": "const x=1; class C{[probe(\"x\")](x=probe(\"x\")){probe(\"x\");}}",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 20,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 34,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 32,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 46,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 32,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "static-var",
+      "source": "let x=0;class C{static{var x=1;probe(\"x\");} field=probe(\"x\");}probe(\"x\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 31,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 27,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 50,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 62,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "imports",
+      "source": "import first,{a as second,b as third} from \"m\"; import * as ns from \"n\";probe(\"first\");probe(\"second\");probe(\"third\");probe(\"ns\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 72,
+          "name": "first",
+          "found": true,
+          "ids": [
+            {
+              "pos": 7,
+              "name": "first",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 87,
+          "name": "second",
+          "found": true,
+          "ids": [
+            {
+              "pos": 19,
+              "name": "second",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 103,
+          "name": "third",
+          "found": true,
+          "ids": [
+            {
+              "pos": 31,
+              "name": "third",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 118,
+          "name": "ns",
+          "found": true,
+          "ids": [
+            {
+              "pos": 60,
+              "name": "ns",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "exports",
+      "source": "export const {a,b}=obj;export default function named(){probe(\"named\");}probe(\"a\");probe(\"b\");probe(\"named\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 55,
+          "name": "named",
+          "found": true,
+          "ids": [
+            {
+              "pos": 47,
+              "name": "named",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 71,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 14,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 82,
+          "name": "b",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "b",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 93,
+          "name": "named",
+          "found": true,
+          "ids": [
+            {
+              "pos": 47,
+              "name": "named",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "types",
+      "source": "type X=number;interface Y{};probe(\"X\");probe(\"Y\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 28,
+          "name": "X",
+          "found": true,
+          "ids": [
+            {
+              "pos": 5,
+              "name": "X",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 39,
+          "name": "Y",
+          "found": true,
+          "ids": [
+            {
+              "pos": 24,
+              "name": "Y",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "type-value-merge",
+      "source": "interface X{};const X=1;probe(\"X\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 24,
+          "name": "X",
+          "found": true,
+          "ids": [
+            {
+              "pos": 10,
+              "name": "X",
+              "inner": false
+            },
+            {
+              "pos": 20,
+              "name": "X",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "type-shadow",
+      "source": "const X=1;function f(){type X=number;probe(\"X\");}probe(\"X\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 37,
+          "name": "X",
+          "found": true,
+          "ids": [
+            {
+              "pos": 28,
+              "name": "X",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 49,
+          "name": "X",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "X",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "type-import",
+      "source": "import type {A,B} from \"m\";probe(\"A\");probe(\"B\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 27,
+          "name": "A",
+          "found": true,
+          "ids": [
+            {
+              "pos": 13,
+              "name": "A",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 38,
+          "name": "B",
+          "found": true,
+          "ids": [
+            {
+              "pos": 15,
+              "name": "B",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "namespace",
+      "source": "namespace N{export const x=1;probe(\"x\");}probe(\"N\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 29,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 25,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 41,
+          "name": "N",
+          "found": true,
+          "ids": [
+            {
+              "pos": 10,
+              "name": "N",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "namespace-merged",
+      "source": "namespace N{export const x=1;probe(\"x\");}namespace N{probe(\"x\");}",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 29,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 25,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 53,
+          "name": "x",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "namespace-dotted",
+      "source": "const B=1;namespace A.B.C{const x=1;probe(\"x\");probe(\"B\");}probe(\"A\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 36,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 32,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 47,
+          "name": "B",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "B",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 59,
+          "name": "A",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "namespace-reexport",
+      "source": "const x=1;namespace N{export {x} from \"m\";probe(\"x\");}",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 42,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "enum",
+      "source": "const A=10;enum E{A=1,B=probe(\"A\")}probe(\"E\");probe(\"A\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 24,
+          "name": "A",
+          "found": true,
+          "ids": [
+            {
+              "pos": 18,
+              "name": "A",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 35,
+          "name": "E",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "E",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 46,
+          "name": "A",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "A",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "class-generic",
+      "source": "class C<T>{field=probe(\"T\");method<U>(){probe(\"T\");probe(\"U\");}}",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 17,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 8,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 40,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 8,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 51,
+          "name": "U",
+          "found": true,
+          "ids": [
+            {
+              "pos": 35,
+              "name": "U",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "decorators",
+      "source": "const x=1;@probe(\"x\") class C{@probe(\"x\") method(x=probe(\"x\")){probe(\"x\");}}",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 11,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 31,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 51,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 49,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 63,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 49,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "generic-types",
+      "source": "type Box<T>=Probe<\"T\">;type F=<T>(x:Probe<\"T\">)=>Probe<\"x\">;",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 12,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 9,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 36,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 31,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 49,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 34,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "conditional",
+      "source": "type T=number;type X<A>=A extends infer T ? Probe<\"T\"> : Probe<\"T\">;",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 44,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 57,
+          "name": "T",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "T",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "mapped",
+      "source": "type K=number;type M<T>={[K in keyof T]:Probe<\"K\">};",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 40,
+          "name": "K",
+          "found": true,
+          "ids": [
+            {
+              "pos": 26,
+              "name": "K",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "signatures",
+      "source": "interface I<T>{method<U>(x:Probe<\"U\">):Probe<\"x\">; [key: string]:Probe<\"key\">;}",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 27,
+          "name": "U",
+          "found": true,
+          "ids": [
+            {
+              "pos": 22,
+              "name": "U",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 39,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 25,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 65,
+          "name": "key",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "decorator-own-class",
+      "source": "@probe(\"C\") class C { @probe(\"C\") method(){} } probe(\"C\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 1,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 18,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 23,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 18,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 47,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 18,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "function-own-name-vs-local",
+      "source": "const f=function self(){var self=1;probe(\"self\");};probe(\"f\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 35,
+          "name": "self",
+          "found": true,
+          "ids": [
+            {
+              "pos": 28,
+              "name": "self",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 51,
+          "name": "f",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "f",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "default-class",
+      "source": "export default class Named{field=probe(\"Named\");}probe(\"Named\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 33,
+          "name": "Named",
+          "found": true,
+          "ids": [
+            {
+              "pos": 21,
+              "name": "Named",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 49,
+          "name": "Named",
+          "found": true,
+          "ids": [
+            {
+              "pos": 21,
+              "name": "Named",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "type-namespace-merge",
+      "source": "class N{} namespace N{export const x=1;probe(\"N\");}probe(\"N\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 39,
+          "name": "N",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "N",
+              "inner": false
+            },
+            {
+              "pos": 20,
+              "name": "N",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 51,
+          "name": "N",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "N",
+              "inner": false
+            },
+            {
+              "pos": 20,
+              "name": "N",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "jsdoc-only",
+      "source": "/** @typedef {number} X */\nconst y=0;probe(\"X\");",
+      "ts": false,
+      "probes": [
+        {
+          "pos": 37,
+          "name": "X",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "merged-class-inner",
+      "source": "class N{method(){probe(\"N\");}} namespace N{export const x=1;} probe(\"N\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 17,
+          "name": "N",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "N",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 62,
+          "name": "N",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "N",
+              "inner": false
+            },
+            {
+              "pos": 41,
+              "name": "N",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "interface-class-inner",
+      "source": "interface C{} class C{method(){probe(\"C\");}} probe(\"C\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 31,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 20,
+              "name": "C",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 45,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 10,
+              "name": "C",
+              "inner": false
+            },
+            {
+              "pos": 20,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "script-globals",
+      "source": "/* global enabled, disabled:off */ probe(\"enabled\"); probe(\"disabled\"); probe(\"Array\"); probe(\"unknown\");",
+      "sourceType": "script",
+      "probes": [
+        {
+          "pos": 35,
+          "name": "enabled",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 53,
+          "name": "disabled",
+          "found": false,
+          "ids": []
+        },
+        {
+          "pos": 72,
+          "name": "Array",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 88,
+          "name": "unknown",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "module-shadow-global",
+      "source": "/* global x */ let x; function f(){ let x; probe(\"x\"); } probe(\"x\");",
+      "probes": [
+        {
+          "pos": 43,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 40,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 57,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 19,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "global-off-local",
+      "source": "/* global x:off, Array:off */ var x; probe(\"x\"); probe(\"Array\");",
+      "sourceType": "script",
+      "probes": [
+        {
+          "pos": 37,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 34,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 49,
+          "name": "Array",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "configured-globals",
+      "source": "probe(\"configOnly\"); probe(\"off\");",
+      "globals": {
+        "configOnly": "readonly",
+        "off": "off"
+      },
+      "probes": [
+        {
+          "pos": 0,
+          "name": "configOnly",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 21,
+          "name": "off",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "commonjs-arguments",
+      "source": "probe(\"arguments\"); (()=>probe(\"arguments\"))(); function f(){probe(\"arguments\");}",
+      "sourceType": "commonjs",
+      "probes": [
+        {
+          "pos": 0,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 25,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 61,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "typescript-commonjs-arguments",
+      "source": "probe(\"arguments\"); (()=>probe(\"arguments\"))(); function f(){probe(\"arguments\");}",
+      "sourceType": "commonjs",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 0,
+          "name": "arguments",
+          "found": false,
+          "ids": []
+        },
+        {
+          "pos": 25,
+          "name": "arguments",
+          "found": false,
+          "ids": []
+        },
+        {
+          "pos": 61,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "arguments-shadow",
+      "source": "function f(arguments){probe(\"arguments\"); (()=>probe(\"arguments\"))();} function g(){ {let arguments; probe(\"arguments\");} probe(\"arguments\");}",
+      "sourceType": "script",
+      "probes": [
+        {
+          "pos": 22,
+          "name": "arguments",
+          "found": true,
+          "ids": [
+            {
+              "pos": 11,
+              "name": "arguments",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 47,
+          "name": "arguments",
+          "found": true,
+          "ids": [
+            {
+              "pos": 11,
+              "name": "arguments",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 101,
+          "name": "arguments",
+          "found": true,
+          "ids": [
+            {
+              "pos": 90,
+              "name": "arguments",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 122,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "arguments-function-name",
+      "source": "const f = function arguments(){ probe(\"arguments\"); };",
+      "sourceType": "script",
+      "probes": [
+        {
+          "pos": 32,
+          "name": "arguments",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "function-type-arguments",
+      "source": "type F = (a: typeof arguments) => typeof arguments; probe(\"F\"); probe(\"arguments\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 52,
+          "name": "F",
+          "found": true,
+          "ids": [
+            {
+              "pos": 5,
+              "name": "F",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 64,
+          "name": "arguments",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "unicode-escaped",
+      "source": "let \\u0061; let 名字; probe(\"a\"); probe(\"名字\");",
+      "probes": [
+        {
+          "pos": 20,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 32,
+          "name": "名字",
+          "found": true,
+          "ids": [
+            {
+              "pos": 16,
+              "name": "名字",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "class-shadow-type-parameter",
+      "source": "class C<C> { x = probe(\"C\"); } probe(\"C\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 17,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": true
+            },
+            {
+              "pos": 8,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 31,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 6,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "class-decorator",
+      "source": "let C; @probe(\"C\") class D { x = probe(\"D\"); } probe(\"D\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 8,
+          "name": "C",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "C",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 33,
+          "name": "D",
+          "found": true,
+          "ids": [
+            {
+              "pos": 25,
+              "name": "D",
+              "inner": true
+            }
+          ]
+        },
+        {
+          "pos": 47,
+          "name": "D",
+          "found": true,
+          "ids": [
+            {
+              "pos": 25,
+              "name": "D",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "object-method-computed",
+      "source": "let a; ({ [probe(\"a\")](a = probe(\"a\")){probe(\"a\");} });",
+      "probes": [
+        {
+          "pos": 11,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 27,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 23,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 39,
+          "name": "a",
+          "found": true,
+          "ids": [
+            {
+              "pos": 23,
+              "name": "a",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "with-mark",
+      "source": "let x; with (obj) { probe(\"x\"); probe(\"missing\"); }",
+      "sourceType": "script",
+      "probes": [
+        {
+          "pos": 20,
+          "name": "x",
+          "found": true,
+          "ids": [
+            {
+              "pos": 4,
+              "name": "x",
+              "inner": false
+            }
+          ]
+        },
+        {
+          "pos": 32,
+          "name": "missing",
+          "found": false,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "default-library-types",
+      "source": "probe(\"Record\"); probe(\"Array\"); probe(\"const\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 0,
+          "name": "Record",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 17,
+          "name": "Array",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 33,
+          "name": "const",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "default-library-off",
+      "source": "/* global Array:off, Record:off */ probe(\"Array\"); probe(\"Record\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 35,
+          "name": "Array",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 51,
+          "name": "Record",
+          "found": true,
+          "ids": []
+        }
+      ]
+    },
+    {
+      "name": "enum-anonymous",
+      "source": "enum E { \"A\" = probe(\"A\"), B = probe(\"B\") }",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 15,
+          "name": "A",
+          "found": true,
+          "ids": []
+        },
+        {
+          "pos": 31,
+          "name": "B",
+          "found": true,
+          "ids": [
+            {
+              "pos": 27,
+              "name": "B",
+              "inner": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "declaration-global",
+      "source": "export {}; declare global { var X: number; interface I {} } probe(\"X\"); probe(\"I\");",
+      "ts": true,
+      "probes": [
+        {
+          "pos": 60,
+          "name": "X",
+          "found": false,
+          "ids": []
+        },
+        {
+          "pos": 72,
+          "name": "I",
+          "found": false,
+          "ids": []
+        }
+      ]
+    }
+  ]
+}
