@@ -165,6 +165,16 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+declare const numeric: number;
+(value as number) === -1;
+const widened = nullable as number | null | undefined;
+const enumValue = numeric as Mode;
+(value as unknown as number) === -1;
+`},
 			{Code: `const value = 5 as any;`},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
@@ -233,6 +243,34 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+const same = value as Mode;
+const sameNullable = nullable as Mode | null | undefined;
+const sameDouble = value as unknown as Mode;
+`,
+				Output: []string{`
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+const same = value;
+const sameNullable = nullable;
+const sameDouble = value;
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+			{
+				Code:   `enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value as number);`,
+				Output: []string{`enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
 				Output:  []string{`declare const x: number; x;`},

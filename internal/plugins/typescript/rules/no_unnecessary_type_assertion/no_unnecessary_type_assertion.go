@@ -918,6 +918,14 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return areUnionPartsEquivalentIgnoringUndefined(uncast, cast)
 			}
 
+			// Numeric enums and number can be mutually assignable without
+			// being identical. Do not erase enum distinctions through the
+			// structural assignability fallback below.
+			if utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsEnumLike) ||
+				utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsEnumLike) {
+				return false
+			}
+
 			if (utils.IsTypeFlagSetWithUnion(uncast, checker.TypeFlagsNonPrimitive) && !utils.IsTypeFlagSetWithUnion(cast, checker.TypeFlagsNonPrimitive)) ||
 				assertionHasIndexSignature(ctx.TypeChecker, uncast) != assertionHasIndexSignature(ctx.TypeChecker, cast) ||
 				assertionTypeContainsAny(ctx.TypeChecker, uncast) ||
