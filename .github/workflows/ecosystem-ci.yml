@@ -1,5 +1,5 @@
 name: Ecosystem CI
-# cspell:ignore precoded
+# cspell:ignore precoded modernjs
 
 on:
   push:
@@ -45,6 +45,13 @@ on:
           - rsbuild
           - rslib
           - rstest
+          - rstack-editor
+          - rspress
+          - rsdoctor
+          - rspack
+          - rstack-cli
+          - modernjs
+          - examples
 
 permissions: {}
 
@@ -91,7 +98,19 @@ jobs:
               throw new Error('pr-number must be a positive integer');
             }
             const suite = process.env.SUITE;
-            if (!['-', 'rsbuild', 'rslib', 'rstest'].includes(suite)) {
+            if (![
+              '-',
+              'rsbuild',
+              'rslib',
+              'rstest',
+              'rstack-editor',
+              'rspress',
+              'rsdoctor',
+              'rspack',
+              'rstack-cli',
+              'modernjs',
+              'examples',
+            ].includes(suite)) {
               throw new Error(`Invalid consumer suite: ${suite}`);
             }
             const pr = context.payload.pull_request ??
