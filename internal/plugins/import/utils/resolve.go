@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
@@ -36,7 +37,10 @@ type importResolverConfig struct {
 // generation; the instance keeps the current file and request context.
 type ImportResolver struct {
 	*importResolverConfig
-	ctx      rule.RuleContext
+	ctx      *rule.RuleContext
+	program  *program.Program
+	importer *ast.SourceFile
+	owned    bool
 	patterns *module.ParsedPatterns
 }
 
@@ -68,7 +72,22 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 		// incomplete identity.
 		return build()
 	})
-	return &ImportResolver{ctx: ctx, importResolverConfig: config}
+	return &ImportResolver{ctx: &ctx, program: ctx.Program(), importer: ctx.SourceFile, owned: true, importResolverConfig: config}
+}
+
+// NewImportResolverForFile resolves requests written in importer with the same
+// import/ settings as a rule on another file. owned states whether sourceProgram
+// owns importer: only then do its compiler options, such as tsconfig paths,
+// describe the importer, so only then is TypeScript project resolution used.
+// An unowned importer still gets Node resolution and the TypeScript resolver's
+// filesystem lookup, without any project's paths.
+func NewImportResolverForFile(sourceProgram *program.Program, importer *ast.SourceFile, owned bool, settings map[string]any, cwd string) *ImportResolver {
+	return &ImportResolver{
+		program:              sourceProgram,
+		importer:             importer,
+		owned:                owned,
+		importResolverConfig: compileImportResolverConfig(settings, cwd),
+	}
 }
 
 // Common option-free configurations have a fixed identity. Direct Go callers
@@ -298,14 +317,14 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			fileName := r.ctx.SourceFile.FileName()
+			fileName := r.importer.FileName()
 			if !resolver.options.PreserveSymlinks() {
 				// Node resolves from the real importer directory as well as
 				// returning the real target when symlink preservation is off.
-				directory := r.ctx.Program().FS().Realpath(tspath.GetDirectoryPath(fileName))
+				directory := r.program.FS().Realpath(tspath.GetDirectoryPath(fileName))
 				fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
 			}
-			result := resolver.options.Resolve(r.ctx.Program(), name, fileName)
+			result := resolver.options.Resolve(r.program, name, fileName)
 			if result.Error == "" {
 				return result.Path, true, ""
 			}
@@ -313,8 +332,10 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source); ok {
-				return path, true, ""
+			if r.owned {
+				if path, _, ok := r.program.ResolveModuleNameAt(r.importer, name, source); ok {
+					return path, true, ""
+				}
 			}
 			if path, ok := r.resolveTypeScriptFallback(name); ok {
 				return path, true, ""
@@ -369,8 +390,8 @@ func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 	if i := strings.IndexAny(name[start:], "?#"); i >= 0 {
 		name = name[:start+i]
 	}
-	p := r.ctx.Program()
-	fileName := r.ctx.SourceFile.FileName()
+	p := r.program
+	fileName := r.importer.FileName()
 	directory := p.FS().Realpath(tspath.GetDirectoryPath(fileName))
 	fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
 	resolve := func(request string) (string, bool) {
@@ -378,7 +399,7 @@ func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 		return result.Path, result.Error == "" && result.Path != ""
 	}
 	options := p.Options()
-	if options != nil && options.Paths.Size() > 0 && !tspath.IsExternalModuleNameRelative(name) {
+	if r.owned && options != nil && options.Paths.Size() > 0 && !tspath.IsExternalModuleNameRelative(name) {
 		if r.patterns == nil {
 			r.patterns = module.TryParsePatterns(options.Paths)
 		}
@@ -428,6 +449,9 @@ func nodeResolveOptions(cwd string, config map[string]any) moduleresolver.Option
 // Node resolution, independently of the legacy import resolver's exports-blind
 // lookup. Unknown runtime policy is a reason to omit a suggestion, not to guess.
 func (r *ImportResolver) EquivalentNodeCandidate(source modules.Source, candidate, packageRoot string) bool {
+	if r.ctx == nil {
+		return false
+	}
 	configured := r.ctx.Settings["import/resolver"]
 	// The implicit TypeScript fallback does not alter this independent Node
 	// runtime check. Explicit resolver chains retain their unknown policy.

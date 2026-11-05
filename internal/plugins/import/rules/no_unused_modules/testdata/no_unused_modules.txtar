@@ -1,0 +1,385 @@
+Fixtures copied from eslint-plugin-import v2.32.0 tests/files/no-unused-modules and
+tests/files/unused-modules-reexport-crash, plus the tsconfig.json the Go tests use.
+txtar ends every file with a newline.
+-- no-unused-modules/arbitrary-module-namespace-identifier-name-a.js --
+const foo = 333
+export { foo as "foo" }
+-- no-unused-modules/arbitrary-module-namespace-identifier-name-b.js --
+import { "foo" as foo } from "./arbitrary-module-namespace-identifier-name-a.js"
+-- no-unused-modules/arbitrary-module-namespace-identifier-name-c.js --
+const foo = 333
+export { foo as "foo" }
+-- no-unused-modules/bin.js --
+export const bin = 'bin'
+-- no-unused-modules/binObject/index.js --
+export const binObject = 'binObject'
+-- no-unused-modules/binObject/package.json --
+{
+  "bin": {
+    "binObject": "./index.js"
+  },
+  "private": false
+}
+-- no-unused-modules/browser.js --
+export const browser = 'browser'
+-- no-unused-modules/browserObject/index.js --
+export const browserObject = 'browserObject'
+-- no-unused-modules/browserObject/package.json --
+{
+  "browser": {
+    "browserObject": "./index.js",
+    "an-ignored-module": false
+  }
+}
+-- no-unused-modules/cjs.js --
+// Simple import extracted from 'redux-starter-kit' compiled file
+
+function isPlain(val) {
+  return true;
+}
+
+exports.isPlain = isPlain;
+-- no-unused-modules/destructuring-a.js --
+import {a, b} from "./destructuring-b";
+-- no-unused-modules/destructuring-b.js --
+const obj = {a: 1, dummy: {b: 2}};
+export const {a, dummy: {b}} = obj;
+-- no-unused-modules/dynamic-import-js-2.js --
+const importPath = './exports-for-dynamic-js';
+class A {
+    method() {
+        const c = import(importPath)
+    }
+}
+
+
+class B {
+    method() {
+        const c = import('i-do-not-exist')
+    }
+}
+-- no-unused-modules/dynamic-import-js.js --
+class A {
+    method() {
+        const c = import('./exports-for-dynamic-js')
+    }
+}
+-- no-unused-modules/empty_file.js --
+-- no-unused-modules/exports-for-dynamic-js-2.js --
+export const a = 10;
+export const b = 20;
+export const c = 30;
+const d = 40;
+export default d;
+-- no-unused-modules/exports-for-dynamic-js.js --
+export const a = 10
+export const b = 20
+export const c = 30
+const d = 40
+export default d
+-- no-unused-modules/file-0.js --
+import eslint from 'eslint'
+import fileA from './file-a'
+import { b } from './file-b'
+import { c1, c2 } from './file-c'
+import { d } from './file-d'
+import { e } from './file-e'
+import { e2 } from './file-e'
+import { h2 } from './file-h'
+import * as l from './file-l'
+import {q} from './file-q'
+export * from './file-n'
+export { default, o0, o3 } from './file-o'
+export { p } from './file-p'
+import s from './file-s'
+-- no-unused-modules/file-a.js --
+import { o2 } from './file-o'
+export default () => 1
+-- no-unused-modules/file-b.js --
+export const b = 2
+-- no-unused-modules/file-c.js --
+const c1 = 3
+
+function c2() {
+  return 3
+}
+
+export { c1, c2 }
+-- no-unused-modules/file-d.js --
+export function d() {
+  return 4
+}
+-- no-unused-modules/file-destructured-1.js --
+export const { destructured } = {};
+export const { destructured2 } = {};
+-- no-unused-modules/file-destructured-2.js --
+import { destructured } from './file-destructured-1';
+-- no-unused-modules/file-e.js --
+const e0 = 5
+
+export { e0 as e }
+-- no-unused-modules/file-f.js --
+export default () => 1
+-- no-unused-modules/file-g.js --
+export const g = 2
+-- no-unused-modules/file-h.js --
+const h1 = 3
+
+function h2() {
+  return 3
+}
+
+const h3 = true
+
+export { h1, h2, h3 }
+-- no-unused-modules/file-i.js --
+const i1 = 3
+
+function i2() {
+  return 3
+}
+
+export { i1, i2 }
+-- no-unused-modules/file-ignored-a.js --
+export default () => 1
+-- no-unused-modules/file-ignored-b.js --
+export const b = 2
+-- no-unused-modules/file-ignored-c.js --
+const c1 = 3
+
+function c2() {
+  return 3
+}
+
+export { c1, c2 }
+-- no-unused-modules/file-ignored-d.js --
+export function d() {
+  return 4
+}
+-- no-unused-modules/file-ignored-e.js --
+const e0 = 5
+
+export { e0 as e }
+-- no-unused-modules/file-ignored-l.js --
+const l0 = 5
+const l = 10
+
+export { l0 as l1, l }
+
+export default () => {}
+-- no-unused-modules/file-j.js --
+export function j() {
+  return 4
+}
+-- no-unused-modules/file-k.js --
+const k0 = 5
+
+export { k0 as k }
+-- no-unused-modules/file-l.js --
+const l0 = 5
+const l = 10
+
+export { l0 as l1, l }
+
+export default () => {}
+-- no-unused-modules/file-m.js --
+const m0 = 5
+const m = 10
+
+export { m0 as m1, m }
+
+export default () => {}
+-- no-unused-modules/file-n.js --
+const n0 = 'n0'
+const n1 = 42
+
+export { n0, n1 }
+
+export default () => {}
+-- no-unused-modules/file-o.js --
+const o0 = 0
+const o1 = 1
+
+export { o0, o1 as o2 }
+
+export default () => {}
+-- no-unused-modules/file-p.js --
+import { h3 as h0 } from './file-h'
+-- no-unused-modules/file-q.js --
+export class q {
+  q0() {}
+}
+-- no-unused-modules/file-s.js --
+export { default } from './file-o'
+-- no-unused-modules/filte-r.js --
+export * from './cjs'
+-- no-unused-modules/flow/flow-0.js --
+import { type FooType, type FooInterface } from './flow-2';
+-- no-unused-modules/flow/flow-1.js --
+// @flow strict
+export type Bar = number;
+export interface BarInterface {};
+-- no-unused-modules/flow/flow-2.js --
+// @flow strict
+export type FooType = string;
+export interface FooInterface {};
+-- no-unused-modules/flow/flow-3.js --
+import type { FooType, FooInterface } from './flow-4';
+-- no-unused-modules/flow/flow-4.js --
+// @flow strict
+export type FooType = string;
+export interface FooInterface {};
+-- no-unused-modules/import-export-1.js --
+export const a = 5;
+export const b = 'b';
+-- no-unused-modules/import-export-2.js --
+import { a } from './import-export-1';
+export { b } from './import-export-1';
+-- no-unused-modules/jsx/file-jsx-a.jsx --
+import {b} from './file-jsx-b';
+
+export const a = b + 1;
+-- no-unused-modules/jsx/file-jsx-b.jsx --
+export const b = 2;
+-- no-unused-modules/main/index.js --
+export const main = 'main'
+-- no-unused-modules/node_modules.js --
+-- no-unused-modules/package.json --
+{
+  "bin": "./bin.js",
+  "browser": "./browser.js",
+  "main": "./main/index.js"
+}
+-- no-unused-modules/prefix-child.js --
+export const foo = 1;
+-- no-unused-modules/prefix-parent-bom.js --
+﻿import {foo} from './prefix-child.js';
+-- no-unused-modules/prefix-parent-bomhashbang.js --
+﻿#!/usr/bin/env node
+import {foo} from './prefix-child.js';
+-- no-unused-modules/prefix-parent-hashbang.js --
+#!/usr/bin/env node
+import {foo} from './prefix-child.js';
+-- no-unused-modules/prefix-parent.js --
+﻿#!/usr/bin/env node
+import {foo} from './prefix-child.js';
+-- no-unused-modules/privatePkg/index.js --
+export const privatePkg = 'privatePkg'
+-- no-unused-modules/privatePkg/package.json --
+{
+  "main": "./index.js",
+  "private": true
+}
+-- no-unused-modules/renameDefault-2/ComponentA.js --
+export default function ComponentA() {}
+-- no-unused-modules/renameDefault-2/ComponentB.js --
+export default function ComponentB() {}
+-- no-unused-modules/renameDefault-2/components.js --
+export { default as ComponentA } from "./ComponentA";
+export { default as ComponentB } from "./ComponentB";
+-- no-unused-modules/renameDefault-2/usage.js --
+import { ComponentA, ComponentB } from './components'
+-- no-unused-modules/renameDefault/Component.js --
+export default function Component() {}
+-- no-unused-modules/renameDefault/components.js --
+export { default as Component } from './Component'
+-- no-unused-modules/renameDefault/usage.js --
+import { Component } from './components'
+-- no-unused-modules/typescript/dynamic-import-ts.ts --
+class A {
+    method() {
+        const c = import('./exports-for-dynamic-ts')
+    }
+}
+
+-- no-unused-modules/typescript/exports-for-dynamic-ts.ts --
+export const ts_a = 10
+export const ts_b = 20
+export const ts_c = 30
+const ts_d = 40
+export default ts_d
+-- no-unused-modules/typescript/file-ts-a-import-type.ts --
+import type {b} from './file-ts-b-used-as-type';
+import type {c} from './file-ts-c-used-as-type';
+import type {d} from './file-ts-d-used-as-type';
+import type {e} from './file-ts-e-used-as-type';
+
+const a: typeof b = 2;
+const a2: c = {};
+const a3: d = {};
+const a4: typeof e = undefined;
+-- no-unused-modules/typescript/file-ts-a.ts --
+import {b} from './file-ts-b';
+import {c} from './file-ts-c';
+import {d} from './file-ts-d';
+import {e} from './file-ts-e';
+
+const a = b + 1 + e.f;
+const a2: c = {};
+const a3: d = {};
+-- no-unused-modules/typescript/file-ts-b-unused.ts --
+export const b = 2;
+-- no-unused-modules/typescript/file-ts-b-used-as-type.ts --
+export const b = 2;
+-- no-unused-modules/typescript/file-ts-b.ts --
+export const b = 2;
+-- no-unused-modules/typescript/file-ts-c-unused.ts --
+export interface c {};
+-- no-unused-modules/typescript/file-ts-c-used-as-type.ts --
+export interface c {};
+-- no-unused-modules/typescript/file-ts-c.ts --
+export interface c {};
+-- no-unused-modules/typescript/file-ts-d-unused.ts --
+export type d = {};
+-- no-unused-modules/typescript/file-ts-d-used-as-type.ts --
+export type d = {};
+-- no-unused-modules/typescript/file-ts-d.ts --
+export type d = {};
+-- no-unused-modules/typescript/file-ts-e-unused.ts --
+export enum e { f };
+-- no-unused-modules/typescript/file-ts-e-used-as-type.ts --
+export enum e { f };
+-- no-unused-modules/typescript/file-ts-e.ts --
+export enum e { f };
+-- no-unused-modules/typescript/file-ts-f-import-type.ts --
+import type {g} from './file-ts-g-used-as-type'
+-- no-unused-modules/typescript/file-ts-f.ts --
+import {g} from './file-ts-g';
+-- no-unused-modules/typescript/file-ts-g-used-as-type.ts --
+export interface g {}
+-- no-unused-modules/typescript/file-ts-g.ts --
+export interface g {}
+-- tsconfig.json --
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "preserve",
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true
+  },
+  "include": ["**/*"],
+  "exclude": ["no-unused-modules/flow"]
+}
+-- unused-modules-reexport-crash/src/App.tsx --
+import { hello } from './magic/test'
+
+hello();
+
+export default function App() {};
+-- unused-modules-reexport-crash/src/index.tsx --
+import App from './App';
+
+export const x = App
+-- unused-modules-reexport-crash/src/magic/index.js --
+export * from './test'
+-- unused-modules-reexport-crash/src/magic/test.js --
+export function hello() {
+	console.log('hello!!');
+}
+
+export function unused() {
+	console.log('im unused!!');
+}

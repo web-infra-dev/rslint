@@ -18,8 +18,13 @@ import (
 func TestCachedByEnvironmentSharesFilesAndSeparatesInputs(t *testing.T) {
 	p := lintprogram.NewFromCompiler(programCacheTestProgram(t))
 	environment := &RuleEnvironment{}
+	scope := NewGenerationScope([]*lintprogram.Program{p}, true)
 	context := func(environment *RuleEnvironment) RuleContext {
-		return (RuleContext{}).WithProgram(p).WithFileCache(NewFileCacheWithEnvironment("/repo", environment))
+		ctx := (RuleContext{}).WithProgram(p).WithFileCache(NewLintFileCache("/repo", scope, environment))
+		if ctx.GenerationScope() != scope {
+			t.Error("binding the rule environment lost the generation scope")
+		}
+		return ctx
 	}
 	var builds atomic.Int32
 	build := func() *int {
