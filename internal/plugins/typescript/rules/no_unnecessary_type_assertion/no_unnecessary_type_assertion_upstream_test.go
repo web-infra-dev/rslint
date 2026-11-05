@@ -799,24 +799,94 @@ enum E {
 }
 const x: E | undefined = o?.fn(n => n | 0, 0 as E);
     `},
-		},
-		[]rule_tester.InvalidTestCase{
-			{Code: `const foo = <3>3;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1, Column: 13}}, Output: []string{`const foo = 3;`}},
-			{Code: `const foo = 3 as 3;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1, Column: 13}}, Output: []string{`const foo = 3;`}},
-			{Code: `
+
+			// Intentional safety divergence: removing these assertions restores fresh
+			// literal widening when const/readonly values are later copied to let.
+			// Retain the upstream inputs and options while expecting no report.
+			{
+				Code: `const foo = <3>3;`,
+			},
+			{
+				Code: `const foo = 3 as 3;`,
+			},
+			{
+				Code: `
 type Foo = 3;
 const foo = <Foo>3;
-      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 3, Column: 13}}, Output: []string{`
-type Foo = 3;
-const foo = 3;
-      `}},
-			{Code: `
+      `,
+			},
+			{
+				Code: `
 type Foo = 3;
 const foo = 3 as Foo;
-      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 3, Column: 13}}, Output: []string{`
-type Foo = 3;
-const foo = 3;
-      `}},
+      `,
+			},
+			{
+				Code: `
+class T {
+  readonly a = 3 as 3;
+}
+      `,
+			},
+			{
+				Code: `
+type S = 10;
+
+class T {
+  readonly a = 10 as S;
+}
+      `,
+			},
+			{
+				Code:    `const a = true as const;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = <const>true;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = 1 as const;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = <const>1;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = 1n as const;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = <const>1n;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    "const a = `a` as const;",
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = 'a' as const;`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code:    `const a = <const>'a';`,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code: `
+class T {
+  readonly a = 'a' as const;
+}
+      `,
+				Options: []any{map[string]any{`checkLiteralConstAssertions`: true}},
+			},
+			{
+				Code: `const x = 5 as any as 5;`,
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+
 			{Code: `
 const foo = 3;
 const bar = foo!;
@@ -1138,28 +1208,7 @@ var x = 1;
   x;
 }
       `}},
-			{Code: `
-class T {
-  readonly a = 3 as 3;
-}
-      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 3}}, Output: []string{`
-class T {
-  readonly a = 3;
-}
-      `}},
-			{Code: `
-type S = 10;
 
-class T {
-  readonly a = 10 as S;
-}
-      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 5}}, Output: []string{`
-type S = 10;
-
-class T {
-  readonly a = 10;
-}
-      `}},
 			{Code: `
 class T {
   readonly a = (3 + 5) as number;
@@ -1209,24 +1258,7 @@ function foo(bar: unknown) {}
 const baz: unknown = {};
 foo(baz);
       `}},
-			{Code: `const a = true as const;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = true;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = <const>true;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = true;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = 1 as const;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 1;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = <const>1;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 1;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = 1n as const;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 1n;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = <const>1n;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 1n;`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: "const a = `a` as const;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{"const a = `a`;"}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = 'a' as const;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 'a';`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `const a = <const>'a';`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 1}}, Output: []string{`const a = 'a';`}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
-			{Code: `
-class T {
-  readonly a = 'a' as const;
-}
-      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`, Line: 3}}, Output: []string{`
-class T {
-  readonly a = 'a';
-}
-      `}, Options: []any{map[string]any{`checkLiteralConstAssertions`: true}}},
+
 			{Code: `
 enum T {
   Value1,
@@ -1291,7 +1323,7 @@ interface A {
 function doThing(a: A) {}
 doThing({ required: 'yes', alsoRequired: 1 });
       `}},
-			{Code: `const x = 5 as any as 5;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`}}, Output: []string{`const x = 5;`}},
+
 			{Code: `
 const v: number = 5;
 const x = v as unknown as number;

@@ -81,6 +81,8 @@ const CheckModeTypeOnly = checker.CheckModeTypeOnly
 type Checker = checker.Checker
 //go:linkname Checker_getIterationTypeOfIterable github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getIterationTypeOfIterable
 func Checker_getIterationTypeOfIterable(recv *checker.Checker, use checker.IterationUse, typeKind checker.IterationTypeKind, inputType *checker.Type, errorNode *ast.Node) *checker.Type
+//go:linkname Checker_getTypeOfExpression github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfExpression
+func Checker_getTypeOfExpression(recv *checker.Checker, node *ast.Node) *checker.Type
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol

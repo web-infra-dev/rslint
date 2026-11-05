@@ -165,6 +165,8 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `const x = ((1 as 1));`},
+			{Code: `class C { readonly x = (1 as 1); }`},
 			{Code: `
 enum Mode { Auto = 1, Manual = 2 }
 declare const value: Mode;
@@ -409,16 +411,6 @@ choose(mode, 'value');
 				Code:   `declare const value: 'a'; function f(parameter: string = value as string): void {}`,
 				Output: []string{`declare const value: 'a'; function f(parameter: string = value): void {}`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
-			},
-			{
-				Code:   `const x = ((1 as 1));`,
-				Output: []string{`const x = ((1));`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
-			},
-			{
-				Code:   `class C { readonly x = (1 as 1); }`,
-				Output: []string{`class C { readonly x = (1); }`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
 			},
 			{
 				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
@@ -884,6 +876,103 @@ declare function inferred<T extends Test<never>[]>(input: { addons?: T }): void;
 inferred({ addons: [{}] });
 `},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+		},
+	)
+}
+
+func TestNoUnnecessaryTypeAssertionLiteralInference(t *testing.T) {
+	const declarations = `
+enum Mode { A, B, C }
+declare const flag: boolean;
+type Pair = Mode.A | Mode.B;
+`
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: declarations + `let value = (flag ? Mode.A : Mode.B) as Pair; function read(): Pair { return value; }`},
+			{Code: declarations + `const key = (flag ? Mode.A : Mode.B) as Pair; let value = key; function read(): Pair { return value; }`},
+			{Code: declarations + `const key = flag ? Mode.A : Mode.B; let value = key as Pair; function read(): Pair { return value; }`},
+			{Code: declarations + `const values = [(flag ? Mode.A : Mode.B) as Pair]; function read(): Pair { return values[0]; }`},
+			{Code: declarations + `const key = (flag ? Mode.A : Mode.B) as unknown as Pair; let value = key; function read(): Pair { return value; }`},
+			{Code: declarations + `
+type NullablePair = Mode.A | null;
+let value = (flag ? Mode.A : null) as NullablePair;
+const key = (flag ? Mode.A : null) as NullablePair;
+let copied = key;
+const values = [(flag ? Mode.A : null) as NullablePair];
+function read(): NullablePair { return value; }
+function readCopied(): NullablePair { return copied; }
+function readArray(): NullablePair { return values[0]; }
+`},
+			{Code: `declare const flag: boolean; const key = (flag ? 'a' : 'b') as 'a' | 'b'; let value = key; function read(): 'a' | 'b' { return value; }`},
+			{Code: `
+const key = 1 as 1;
+let value = key;
+function read(): 1 { return value; }
+const fresh = 1;
+let copied = fresh as 1;
+function readCopied(): 1 { return copied; }
+const values = [1 as 1];
+function readArray(): 1 { return values[0]; }
+const pinned = 1 as unknown as 1;
+let throughDouble = pinned;
+function readDouble(): 1 { return throughDouble; }
+`},
+			{Code: declarations + `
+const key = Mode.A as Mode.A;
+let value = key;
+function read(): Mode.A { return value; }
+const fresh = Mode.A;
+const pinned = fresh as Mode.A;
+let copied = pinned;
+function readCopied(): Mode.A { return copied; }
+class Holder { readonly value = Mode.A as Mode.A; }
+let fromMember = new Holder().value;
+function readMember(): Mode.A { return fromMember; }
+`},
+			{Code: `enum Status { A = 'a', B = 'b' } const key = Status.A as Status.A; let value = key; function read(): Status.A { return value; }`},
+			{Code: `const value = { pos: [1, 2] } as { pos: [number, number] }; const tuple: [number, number] = value.pos;`},
+			{Code: `const value = (() => 'x')() as 'x'; const literal: 'x' = value;`},
+			{Code: `const value = (() => ({ tag: 'x' }))() as { tag: 'x' }; const literal: 'x' = value.tag;`},
+			{Code: `const fn = (() => 'x') as () => 'x'; const literal: 'x' = fn();`},
+			{Code: `const fn = ((value): number => value * 2) as (value: number) => number;`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    `const fixed: 1 = 1 as const; let mutable: 1 = 1 as const; class Holder { readonly value: 1 = 1 as const; }`,
+				Output:  []string{`const fixed: 1 = 1; let mutable: 1 = 1; class Holder { readonly value: 1 = 1; }`},
+				Options: []any{map[string]any{"checkLiteralConstAssertions": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+			{
+				Code:   declarations + `type Same = Mode | null; declare const value: Mode | null; const copied = value as Same; const double = value as unknown as Same;`,
+				Output: []string{declarations + `type Same = Mode | null; declare const value: Mode | null; const copied = value; const double = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+const first = ((value): number => value * 2)(3) as number;
+const second = ((value: number) => value * 2)(3) as number;
+const third = ((value) => value * 2)(3) as number;
+`,
+				Output: []string{`
+const first = ((value): number => value * 2)(3);
+const second = ((value: number) => value * 2)(3);
+const third = ((value) => value * 2)(3);
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
 			},
 		},
 	)

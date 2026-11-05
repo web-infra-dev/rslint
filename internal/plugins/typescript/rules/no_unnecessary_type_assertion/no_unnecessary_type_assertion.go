@@ -380,6 +380,70 @@ func assertionOriginalExpression(node *ast.Node) *ast.Node {
 	return expression
 }
 
+func assertionPreservesWidening(typeChecker *checker.Checker, original, asserted *checker.Type) bool {
+	widenedOriginal := typeChecker.GetWidenedLiteralType(original)
+	widenedAsserted := typeChecker.GetWidenedLiteralType(asserted)
+	return (widenedOriginal == original && widenedAsserted == asserted) ||
+		checker.Checker_isTypeIdenticalTo(typeChecker, widenedOriginal, widenedAsserted)
+}
+
+func assertionHasExplicitLiteralType(ctx rule.RuleContext, node *ast.Node, asserted *checker.Type) bool {
+	if !assertionIsTypeLiteral(asserted) {
+		return false
+	}
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	if parent == nil || (!ast.IsVariableDeclaration(parent) && !ast.IsPropertyDeclaration(parent)) ||
+		parent.Type() == nil || parent.Initializer() != semanticNode {
+		return false
+	}
+	return checker.Checker_isTypeIdenticalTo(ctx.TypeChecker,
+		checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, parent.Type()), asserted)
+}
+
+func assertionReturnMayAffectInference(ctx rule.RuleContext, expression *ast.Node) bool {
+	if assertionMayAffectInference(ctx, expression) {
+		return true
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == nil || ast.IsFunctionLike(node) || ast.IsAssertionExpression(node) ||
+			ast.IsSatisfiesExpression(node) || ast.IsPartOfTypeNode(node) {
+			return false
+		}
+		if ast.IsExpressionNode(node) && !ast.IsDeclarationName(node) {
+			contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone)
+			if contextualType != nil && !assertionPreservesWidening(ctx.TypeChecker,
+				checker.Checker_getTypeOfExpression(ctx.TypeChecker, ast.GetReparsedNodeForNode(node)), contextualType) {
+				return true
+			}
+		}
+		return node.ForEachChild(visit)
+	}
+	return visit(expression)
+}
+
+func assertionFunctionMayAffectInference(ctx rule.RuleContext, expression *ast.Node, contextualParameters bool) bool {
+	if contextualParameters && ast.HasContextSensitiveParameters(expression) {
+		return true
+	}
+	if expression.Type() != nil {
+		return false
+	}
+	// Both yielded values and the value of a yield expression (TNext)
+	// can be inferred from the assertion's contextual generator type.
+	if ast.GetFunctionFlags(expression)&ast.FunctionFlagsGenerator != 0 {
+		return true
+	}
+	body := expression.Body()
+	if body != nil && ast.IsBlock(body) {
+		return ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+			return assertionReturnMayAffectInference(ctx, statement.Expression())
+		})
+	}
+	return assertionReturnMayAffectInference(ctx, body)
+}
+
 // A call's type inside an assertion may already include return-type inferences
 // supplied by that assertion. Comparing those types cannot prove that removing
 // the assertion preserves the type inferred for the expression.
@@ -410,8 +474,10 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 			}
 		}
 		callee = ast.SkipParentheses(callee)
+		// An IIFE's parameters are inferred from its arguments, while its
+		// return expression can still depend on the assertion's context.
 		if expression.Kind == ast.KindCallExpression && ast.IsFunctionExpressionOrArrowFunction(callee) &&
-			assertionMayAffectInference(ctx, callee) {
+			assertionFunctionMayAffectInference(ctx, callee, false) {
 			return true
 		}
 		// Explicit type arguments, including trailing defaults, fix this
@@ -446,6 +512,12 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 			}
 		}
 	case ast.KindArrayLiteralExpression:
+		arrayType := ctx.TypeChecker.GetTypeAtLocation(expression)
+		// A mutable tuple inferred for an array literal depends on its
+		// contextual type; removing that context can produce an array.
+		if checker.IsTupleType(arrayType) && !arrayType.TargetTupleType().IsReadonly() {
+			return true
+		}
 		for _, element := range expression.Elements() {
 			if element.Kind == ast.KindSpreadElement {
 				element = element.Expression()
@@ -466,24 +538,7 @@ func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) boo
 			return assertionMayAffectInference(ctx, binary.Right)
 		}
 	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		if ast.HasContextSensitiveParameters(expression) {
-			return true
-		}
-		if expression.Type() != nil {
-			return false
-		}
-		// Both yielded values and the value of a yield expression (TNext)
-		// can be inferred from the assertion's contextual generator type.
-		if ast.GetFunctionFlags(expression)&ast.FunctionFlagsGenerator != 0 {
-			return true
-		}
-		body := expression.Body()
-		if body != nil && ast.IsBlock(body) {
-			return ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
-				return assertionMayAffectInference(ctx, statement.Expression())
-			})
-		}
-		return assertionMayAffectInference(ctx, body)
+		return assertionFunctionMayAffectInference(ctx, expression, true)
 	case ast.KindAwaitExpression, ast.KindNonNullExpression:
 		return assertionMayAffectInference(ctx, expression.Expression())
 	}
@@ -950,6 +1005,14 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 		}
 
 		isTypeUnchanged := func(node, expression *ast.Node, uncast, cast *checker.Type) bool {
+			if assertionHasExplicitLiteralType(ctx, node, cast) {
+				return checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, uncast, cast)
+			}
+			// Fresh literals can be identical to an asserted regular type
+			// while widening differently in later assignments or arrays.
+			if !assertionPreservesWidening(ctx.TypeChecker, uncast, cast) {
+				return false
+			}
 			if uncast == cast {
 				return true
 			}
@@ -1028,7 +1091,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					}
 				}
 			}
-			return ctx.TypeChecker.GetTypeAtLocation(expression)
+			// GetTypeAtLocation regularizes literal types. Keep the expression's
+			// actual freshness so later widening is part of the comparison.
+			return checker.Checker_getTypeOfExpression(ctx.TypeChecker, ast.GetReparsedNodeForNode(expression))
 		}
 
 		checkTypeAssertion := func(node *ast.Node) {
@@ -1054,7 +1119,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			expression := node.Expression()
 			uncastType := getUncastType(node)
 			reportAssertion := func(msg rule.RuleMessage) {
-				if assertionMayAffectInference(ctx, expression) {
+				if assertionMayAffectInference(ctx, expression) ||
+					(!assertionPreservesWidening(ctx.TypeChecker, uncastType, castType) &&
+						checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone) == nil) {
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
@@ -1089,7 +1156,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				originalExpression := assertionOriginalExpression(node)
-				originalType := ctx.TypeChecker.GetTypeAtLocation(originalExpression)
+				originalType := checker.Checker_getTypeOfExpression(ctx.TypeChecker, ast.GetReparsedNodeForNode(originalExpression))
 				msg := rule.RuleMessage{}
 				if isTypeUnchanged(node, innerExpression, originalType, castType) && !utils.IsTypeAnyType(castType) {
 					msg = buildUnnecessaryAssertionMessage()
@@ -1100,7 +1167,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						msg = buildContextuallyUnnecessaryMessage()
 					}
 				}
-				if msg.Id == "" || assertionMayAffectInference(ctx, originalExpression) {
+				if msg.Id == "" || assertionMayAffectInference(ctx, originalExpression) ||
+					(!assertionPreservesWidening(ctx.TypeChecker, originalType, castType) &&
+						checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone) == nil) {
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
@@ -1119,7 +1188,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			typeIsUnchanged := isTypeUnchanged(node, expression, uncastType, castType)
 			wouldSameTypeBeInferred := !typeAnnotationIsConstAssertion
 			if castTypeIsLiteral {
-				wouldSameTypeBeInferred = isImplicitlyNarrowedLiteralDeclaration(node)
+				wouldSameTypeBeInferred = assertionHasExplicitLiteralType(ctx, node, castType) || isImplicitlyNarrowedLiteralDeclaration(node)
 			}
 			if typeIsUnchanged && wouldSameTypeBeInferred {
 				reportAssertion(buildUnnecessaryAssertionMessage())
