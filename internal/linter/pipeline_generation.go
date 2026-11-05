@@ -115,6 +115,10 @@ func readTargetText(
 	if text, changed := snapshot.Text(targetPath); changed {
 		return text, nil
 	}
+	return readGenerationText(readText, targetPath, source)
+}
+
+func readGenerationText(readText sourceTextReader, targetPath string, source ast.SourceFileLike) (string, error) {
 	if readText == nil {
 		return "", errors.New("target text reader is not configured")
 	}

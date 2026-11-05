@@ -782,6 +782,8 @@ These are semantic ports rather than generic pre/post hooks:
   exposes the exact complete text of that generation. Core validation, frozen
   fix text, and inline plugin input all consume this same view. The pipeline
   shares up to eight plugin source reads across an observation's bindings.
+  Snapshot hits bypass this budget. After a read failure, the pipeline stops
+  claiming inputs for that binding and joins outstanding reads to preserve error order.
   Single-threaded bindings read each input inline. Source preparation
   preserves input order, and frames are projected while the generation is leased.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It
