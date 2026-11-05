@@ -90,8 +90,8 @@ func newCachedLintQueryFS(sourceFS vfs.FS) *cachedLintQueryFS {
 	return &cachedLintQueryFS{FS: cachedvfs.From(sourceFS), sourceFS: sourceFS}
 }
 
-func (fs *cachedLintQueryFS) SourceHasBOM(filePath string) bool {
-	return utils.SourceHasBOM(fs.sourceFS, filePath)
+func (fs *cachedLintQueryFS) ReadSourceBOM(filePath string) (bool, error) {
+	return utils.ReadSourceBOM(fs.sourceFS, filePath)
 }
 
 func newCachedLintTargetOverlayFS(baseFS vfs.FS, files map[string]string, target target.File) vfs.FS {
@@ -206,11 +206,11 @@ func (fs *frozenLintTargetOverlayFS) GetAccessibleEntries(directory string) vfs.
 	return entries
 }
 
-func (fs *frozenLintTargetOverlayFS) SourceHasBOM(filePath string) bool {
+func (fs *frozenLintTargetOverlayFS) ReadSourceBOM(filePath string) (bool, error) {
 	if canonical, overlay := fs.overlayPath(filePath); overlay {
-		return utils.SourceHasBOM(fs.FS, canonical)
+		return utils.ReadSourceBOM(fs.FS, canonical)
 	}
-	return utils.SourceHasBOM(fs.FS, filePath)
+	return utils.ReadSourceBOM(fs.FS, filePath)
 }
 
 func (fs *frozenLintTargetOverlayFS) overlayPath(filePath string) (string, bool) {

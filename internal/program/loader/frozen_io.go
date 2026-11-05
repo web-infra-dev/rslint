@@ -261,8 +261,8 @@ func (f *frozenFileSystem) FileExists(path string) bool { return f.FS.FileExists
 
 func (f *frozenFileSystem) ReadFile(path string) (string, bool) { return f.FS.ReadFile(f.ioPath(path)) }
 
-func (f *frozenFileSystem) SourceHasBOM(path string) bool {
-	return utils.SourceHasBOM(f.FS, f.ioPath(path))
+func (f *frozenFileSystem) ReadSourceBOM(path string) (bool, error) {
+	return utils.ReadSourceBOM(f.FS, f.ioPath(path))
 }
 
 func (f *frozenFileSystem) DirectoryExists(path string) bool {

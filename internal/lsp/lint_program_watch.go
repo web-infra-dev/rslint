@@ -62,9 +62,9 @@ func (fs *lintTrackingFS) ReadFile(path string) (string, bool) {
 }
 
 // Source metadata must come from the same editor layer as ReadFile.
-func (fs *lintTrackingFS) SourceHasBOM(path string) bool {
+func (fs *lintTrackingFS) ReadSourceBOM(path string) (bool, error) {
 	fs.SeenFiles.Add(path)
-	return utils.SourceHasBOM(fs.Inner, path)
+	return utils.ReadSourceBOM(fs.Inner, path)
 }
 
 func (fs *lintTrackingFS) FileExists(path string) bool {

@@ -1,8 +1,12 @@
 package utils
 
 import (
+	"errors"
 	"io"
 	"os"
+	"runtime"
+	"sync"
+	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 )
@@ -20,49 +24,86 @@ const BOM = "\uFEFF"
 // interface, and interface embedding promotes only that interface's own
 // methods.
 type BOMSource interface {
-	SourceHasBOM(path string) bool
+	ReadSourceBOM(path string) (bool, error)
 }
 
-// SourceHasBOM reports whether the source text for path began with a byte
-// order mark. A VFS that tracks the mark answers directly; anything else falls
-// back to the file's own bytes, which is the right answer for every path whose
-// text came off disk unchanged.
+// SourceHasBOM supplies native rules with their boolean view of the source.
 func SourceHasBOM(fileSystem vfs.FS, path string) bool {
+	has, err := ReadSourceBOM(fileSystem, path)
+	return err == nil && has
+}
+
+// ReadSourceBOM asks the VFS layer that supplied the text, or probes the
+// original file when its text came from disk. Missing files and headers too
+// short to contain a mark return false. Descriptor exhaustion after an
+// exclusive retry returns an error.
+func ReadSourceBOM(fileSystem vfs.FS, path string) (bool, error) {
 	if source, ok := fileSystem.(BOMSource); ok {
-		return source.SourceHasBOM(path)
+		return source.ReadSourceBOM(path)
 	}
-	return fileBytesStartWithBOM(path)
+	if source, ok := fileSystem.(interface{ SourceHasBOM(path string) bool }); ok {
+		return source.SourceHasBOM(path), nil
+	}
+	return readDiskBOM(path, fileBytesStartWithBOM)
+}
+
+var diskBOMReads sync.RWMutex
+
+func readDiskBOM(path string, probe func(string) (bool, error)) (bool, error) {
+	diskBOMReads.RLock()
+	has, err := probe(path)
+	diskBOMReads.RUnlock()
+	if isFileDescriptorLimit(err) {
+		// The writer waits for every active probe to close its file and
+		// prevents new probes from borrowing the available descriptor.
+		diskBOMReads.Lock()
+		has, err = probe(path)
+		diskBOMReads.Unlock()
+		if isFileDescriptorLimit(err) {
+			return false, err
+		}
+	}
+	return has, nil
+}
+
+func isFileDescriptorLimit(err error) bool {
+	// CreateFile returns the native Windows ERROR_TOO_MANY_OPEN_FILES (4).
+	// syscall.EMFILE on Windows is a separate, synthetic errno.
+	const windowsTooManyOpenFiles = syscall.Errno(4)
+	return errors.Is(err, syscall.EMFILE) || errors.Is(err, syscall.ENFILE) ||
+		runtime.GOOS == "windows" && errors.Is(err, windowsTooManyOpenFiles)
 }
 
 // RestoreSourceBOM reconstructs the complete source text after a VFS or parser
 // has removed its encoding byte order mark. It deliberately does not inspect
 // text for a leading U+FEFF: a source can contain both an encoding mark and a
 // real U+FEFF as its first character, in which case both must be preserved.
-func RestoreSourceBOM(fileSystem vfs.FS, path string, text string) string {
-	if SourceHasBOM(fileSystem, path) {
-		return BOM + text
+func RestoreSourceBOM(fileSystem vfs.FS, path string, text string) (string, error) {
+	has, err := ReadSourceBOM(fileSystem, path)
+	if err != nil {
+		return "", err
 	}
-	return text
+	if has {
+		return BOM + text, nil
+	}
+	return text, nil
 }
 
 // fileBytesStartWithBOM reports whether the bytes of path begin with a byte
 // order mark. UTF-16 marks count: those files are decoded to UTF-8 and lose
 // their mark exactly as UTF-8 ones do. A path with no bytes to read — a
 // virtual file, a bundled lib — has nothing to speak for it.
-func fileBytesStartWithBOM(path string) bool {
+func fileBytesStartWithBOM(path string) (bool, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer file.Close()
 
 	var head [3]byte
 	n, err := io.ReadFull(file, head[:])
-	if err != nil && n < 2 {
-		return false
-	}
 	if n >= 3 && head[0] == 0xEF && head[1] == 0xBB && head[2] == 0xBF {
-		return true
+		return true, nil
 	}
-	return (head[0] == 0xFF && head[1] == 0xFE) || (head[0] == 0xFE && head[1] == 0xFF)
+	return n >= 2 && ((head[0] == 0xFF && head[1] == 0xFE) || (head[0] == 0xFE && head[1] == 0xFF)), err
 }

@@ -784,8 +784,11 @@ These are semantic ports rather than generic pre/post hooks:
   shares up to eight plugin source reads across an observation's bindings.
   Snapshot hits bypass this budget. After a read failure, the pipeline stops
   claiming inputs for that binding and joins outstanding reads to preserve error order.
-  Single-threaded bindings read each input inline. Source preparation
-  preserves input order, and frames are projected while the generation is leased.
+  Single-threaded bindings and batches with at most two pending reads run inline
+  under the same budget. Source preparation preserves input order, and frames
+  are projected while the generation is leased. For disk-backed text, BOM
+  probes retry a descriptor-limit error once after other BOM probes close
+  their files. A persistent error aborts plugin input preparation.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It
   is independent from generation construction, confirms complete file
   replacements, and is never called after an unsuccessful observation or

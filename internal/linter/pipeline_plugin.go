@@ -169,47 +169,32 @@ func materializePluginTask(
 		input.Text = &text
 		return nil
 	}
-	ready, readErr := sourceReads.prefetch(ctx, missing, len(inputs), generation.Native.SingleThreaded, read)
 	var builder estree.Builder
-	for index := range inputs[:ready] {
-		input := &inputs[index]
-		if input.Text == nil {
-			if err := sourceReads.withSlot(ctx, func() error { return read(index) }); err != nil {
+	workers := min(cap(sourceReads), len(missing))
+	// Keep tiny batches inline: scheduling workers can dominate a small
+	// in-memory request. Inline reads still share the observation's slots.
+	if generation.Native.SingleThreaded || workers <= 2 {
+		for i := range inputs {
+			input := &inputs[i]
+			if input.Text == nil {
+				if err := sourceReads.withSlot(ctx, func() error { return read(i) }); err != nil {
+					return pluginTask{}, err
+				}
+			}
+			if err := finishPluginInput(ctx, &builder, input, detached); err != nil {
 				return pluginTask{}, err
 			}
 		}
-		if detached {
-			frame, projectErr := projectPluginFrame(ctx, &builder, *input, nil)
-			if projectErr != nil {
-				if ctx.Err() != nil {
-					return pluginTask{}, ctx.Err()
-				}
-				input.FrameError = projectErr.Error()
-			} else {
-				input.Frame = frame
+	} else {
+		ready, readErr := sourceReads.prefetch(ctx, missing, len(inputs), workers, read)
+		for i := range ready {
+			if err := finishPluginInput(ctx, &builder, &inputs[i], detached); err != nil {
+				return pluginTask{}, err
 			}
-			frozen, err := detachPluginInput(*input)
-			if err != nil {
-				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin input %q: %w", input.Path, err)
-			}
-			inputs[index] = frozen
-		} else {
-			// Joined wire tasks also need only rule identity, options and
-			// severity. Never retain native Run closures or rule environments.
-			rules := make([]rule.ConfiguredRule, len(input.Rules))
-			for ruleIndex, configured := range input.Rules {
-				rules[ruleIndex] = rule.ConfiguredRule{
-					Name:               configured.Name,
-					Severity:           configured.Severity,
-					IsEslintPluginRule: true,
-					Options:            configured.Options,
-				}
-			}
-			input.Rules = rules
 		}
-	}
-	if readErr != nil {
-		return pluginTask{}, readErr
+		if readErr != nil {
+			return pluginTask{}, readErr
+		}
 	}
 	suggestionsMode := SuggestionsModeOff
 	if policy.Demand.Plugin&rule.EditDemandSuggestion != 0 {
@@ -232,6 +217,41 @@ func materializePluginTask(
 	}, nil
 }
 
+// finishPluginInput projects a detached frame while its generation is leased,
+// or retains just the rule data required by a joined plugin task.
+func finishPluginInput(ctx context.Context, builder *estree.Builder, input *EslintPluginFileInput, detached bool) error {
+	if detached {
+		frame, projectErr := projectPluginFrame(ctx, builder, *input, nil)
+		if projectErr != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			input.FrameError = projectErr.Error()
+		} else {
+			input.Frame = frame
+		}
+		frozen, err := detachPluginInput(*input)
+		if err != nil {
+			return fmt.Errorf("linter pipeline: freeze plugin input %q: %w", input.Path, err)
+		}
+		*input = frozen
+		return nil
+	}
+	// Joined wire tasks also need only rule identity, options and
+	// severity. Never retain native Run closures or rule environments.
+	rules := make([]rule.ConfiguredRule, len(input.Rules))
+	for ruleIndex, configured := range input.Rules {
+		rules[ruleIndex] = rule.ConfiguredRule{
+			Name:               configured.Name,
+			Severity:           configured.Severity,
+			IsEslintPluginRule: true,
+			Options:            configured.Options,
+		}
+	}
+	input.Rules = rules
+	return nil
+}
+
 // All bindings in an observation share these slots. Only source reads hold
 // a slot; frame projection and JavaScript dispatch have their own lifetimes.
 type pluginSourceReadSlots chan struct{}
@@ -252,11 +272,7 @@ func (slots pluginSourceReadSlots) withSlot(ctx context.Context, run func() erro
 // Claim missing inputs in order, after acquiring a slot. When a reader fails,
 // every earlier input is already claimed. Join those reads so the earliest
 // error wins, and leave later unclaimed inputs alone.
-func (slots pluginSourceReadSlots) prefetch(ctx context.Context, missing []int, count int, singleThreaded bool, read func(int) error) (int, error) {
-	workers := min(cap(slots), len(missing))
-	if singleThreaded || workers < 2 {
-		return count, nil
-	}
+func (slots pluginSourceReadSlots) prefetch(ctx context.Context, missing []int, count, workers int, read func(int) error) (int, error) {
 	// Stop waiting for slots as soon as the last input is claimed or a read
 	// fails. Reads already in flight still finish under the generation lease.
 	admission, stop := context.WithCancel(ctx)

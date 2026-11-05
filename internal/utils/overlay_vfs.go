@@ -40,13 +40,13 @@ func (vfs *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
 	return vfs.fs.ReadFile(path)
 }
 
-// SourceHasBOM answers for content this overlay supplies; anything else is the
+// ReadSourceBOM answers for content this overlay supplies; anything else is the
 // underlying file system's to answer. See [BOMSource].
-func (vfs *OverlayVFS) SourceHasBOM(path string) bool {
+func (vfs *OverlayVFS) ReadSourceBOM(path string) (bool, error) {
 	if src, ok := vfs.virtualFile(path); ok {
-		return strings.HasPrefix(src, BOM)
+		return strings.HasPrefix(src, BOM), nil
 	}
-	return SourceHasBOM(vfs.fs, path)
+	return ReadSourceBOM(vfs.fs, path)
 }
 
 func (vfs *OverlayVFS) DirectoryExists(path string) bool {

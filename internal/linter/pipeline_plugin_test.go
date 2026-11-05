@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,7 +36,7 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 		gate := make(chan struct{})
 		release := sync.OnceFunc(func() { close(gate) })
 		defer release()
-		var acquired, active, calls atomic.Int32
+		var active, calls atomic.Int32
 		texts := make(map[string]string)
 		target := TargetProjection{
 			Path: func(path string) string { return "target:" + path },
@@ -81,7 +80,6 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 				},
 			}
 			loads = append(loads, GenerationLoad{TargetCount: count, CheckerCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
-				acquired.Add(1)
 				return Generation{Native: native, Target: target, Plugin: plugin}, nil, nil
 			}})
 		}
@@ -101,20 +99,22 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 			defer close(done)
 			result, err = RunPipeline(t.Context(), NewLintRequest(pipelinePlanProvider{GenerationPlan{Loads: loads}}, ObservationPolicy{}, dispatch))
 		}()
-		synctest.Wait() // Every admitted reader is waiting at the gate or for a read slot.
-		if want := min(len(loads), runtime.GOMAXPROCS(0)); int(acquired.Load()) != want {
-			t.Errorf("acquired %d bindings before releasing reads, want %d", acquired.Load(), want)
+		synctest.Wait()
+		if active.Load() == 1 {
+			// The single-file binding may be admitted first on its own.
+			gate <- struct{}{}
+			synctest.Wait()
 		}
-		if got := active.Load(); got != 8 {
-			t.Errorf("%d reads blocked across admitted bindings, want 8", got)
+		if got := active.Load(); got < 2 {
+			t.Errorf("expected overlapping plugin reads, got %d", got)
 		}
 		release()
 		<-done
 		if err != nil {
 			t.Fatal(err)
 		}
-		if int(acquired.Load()) != len(loads) || int(calls.Load()) != len(paths) {
-			t.Fatalf("acquired %d bindings and read %d inputs, want %d and %d", acquired.Load(), calls.Load(), len(loads), len(paths))
+		if got := int(calls.Load()); got != len(paths) {
+			t.Fatalf("read %d plugin inputs, want %d", got, len(paths))
 		}
 		diagnostics, complete := result.Observation.CompleteDiagnostics()
 		if !complete || len(diagnostics) != len(paths) {
@@ -129,11 +129,18 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 }
 
 func TestPluginSourceReadsPreserveFirstInputError(t *testing.T) {
-	plan := pluginTextTestPlan(2)
-	for _, singleThreaded := range []bool{false, true} {
+	for _, tc := range []struct {
+		files          int
+		singleThreaded bool
+		inline         bool
+	}{
+		{files: 4},
+		{files: 4, singleThreaded: true, inline: true},
+		{files: 2, inline: true},
+	} {
 		var reads atomic.Int32
 		generation := Generation{
-			Native: NativeGeneration{SingleThreaded: singleThreaded},
+			Native: NativeGeneration{SingleThreaded: tc.singleThreaded},
 			Target: TargetProjection{ReadText: func(path string, source ast.SourceFileLike) (string, error) {
 				reads.Add(1)
 				if path == "/src/1.ts" {
@@ -145,12 +152,12 @@ func TestPluginSourceReadsPreserveFirstInputError(t *testing.T) {
 				return EslintPluginFileConfig{Settings: map[string]any{"invalid": make(chan int)}}
 			}},
 		}
-		_, err := materializePluginTask(t.Context(), plan, generation, SourceSnapshot{}, ObservationPolicy{}, true, false, make(pluginSourceReadSlots, 8))
+		_, err := materializePluginTask(t.Context(), pluginTextTestPlan(tc.files), generation, SourceSnapshot{}, ObservationPolicy{}, true, false, make(pluginSourceReadSlots, 8))
 		if err == nil || !strings.Contains(err.Error(), `freeze plugin input "/src/0.ts": clone settings`) {
-			t.Fatalf("single-threaded %v: first input error = %v", singleThreaded, err)
+			t.Fatalf("%d files, single-threaded %v: first input error = %v", tc.files, tc.singleThreaded, err)
 		}
-		if singleThreaded && reads.Load() != 1 {
-			t.Fatal("single-threaded preparation read past its first error")
+		if tc.inline && reads.Load() != 1 {
+			t.Fatal("inline preparation read past its first error")
 		}
 	}
 }
