@@ -1,12 +1,17 @@
 package linter
 
+// cspell:ignore synctest
+
 import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -16,6 +21,55 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		resources := newPluginDispatchResources()
+		gate := make(chan struct{})
+		release := sync.OnceFunc(func() { close(gate) })
+		defer release()
+		var calls atomic.Int32
+		readText := func(path string, _ ast.SourceFileLike) (string, error) {
+			calls.Add(1)
+			<-gate
+			return path, nil
+		}
+		inputs := make([]EslintPluginFileInput, 16)
+		paths := make([]string, len(inputs))
+		for index := range inputs {
+			inputs[index].Path = fmt.Sprintf("wire:%d", index)
+			paths[index] = fmt.Sprintf("/target/%d.ts", index)
+		}
+		done := make(chan error, 2)
+		go func() { done <- resources.readPluginSources(context.Background(), readText, inputs, paths) }()
+		synctest.Wait()
+		if got := calls.Load(); got != 8 {
+			t.Fatalf("large binding started %d reads, want 8", got)
+		}
+		single := []EslintPluginFileInput{{Path: "wire:single"}}
+		go func() {
+			done <- resources.readPluginSources(context.Background(), readText, single, []string{"/single.ts"})
+		}()
+		synctest.Wait()
+		if got := calls.Load(); got != 8 {
+			t.Fatalf("single-file binding exceeded the shared read budget: %d", got)
+		}
+		release()
+		for range 2 {
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+		}
+		for index, input := range inputs {
+			if input.Path != fmt.Sprintf("wire:%d", index) || input.Text == nil || *input.Text != paths[index] {
+				t.Fatalf("plugin input %d changed path, text or order: %+v", index, input)
+			}
+		}
+		if single[0].Text == nil || *single[0].Text != "/single.ts" || calls.Load() != 17 {
+			t.Fatalf("single-file text/read count = %v/%d", single[0].Text, calls.Load())
+		}
+	})
+}
 
 func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())

@@ -34,14 +34,11 @@ func executeObservation(
 		load := loads[i]
 		loads[i] = GenerationLoad{}
 		prepared, err := prepareObservation(ctx, load.Acquire, snapshot, policy, dispatcher,
-			planChanges, stopOnTargetSyntaxErrors, reservation)
-		if err == nil {
-			prepared.plugin.resources = resources
-			if len(prepared.plugin.inputs) != 0 {
-				// Projection is another AST consumer. Native shard completion
-				// alone must not return all of this binding's admission capacity.
-				reservation.retainUntilClose(1)
-			}
+			planChanges, stopOnTargetSyntaxErrors, reservation, resources)
+		if err == nil && len(prepared.plugin.inputs) != 0 {
+			// Projection is another AST consumer. Native shard completion
+			// alone must not return all of this binding's admission capacity.
+			reservation.retainUntilClose(1)
 		}
 		return prepared, err
 	}

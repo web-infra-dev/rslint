@@ -781,7 +781,10 @@ These are semantic ports rather than generic pre/post hooks:
   corresponding immutable generation, but it cannot advance fix state.
 - `TargetProjection` maps Program source paths to stable target identities and
   exposes the exact complete text of that generation. Core validation, frozen
-  fix text, and inline plugin input all consume this same view.
+  fix text, and inline plugin input all consume this same view. Ordinary disk
+  CLI lint opts into a shared limit of eight concurrent plugin text reads.
+  Other text readers, fix observations, in-memory snapshots, and explicit
+  single-threaded execution retain serial reads.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It
   is independent from generation construction, confirms complete file
   replacements, and is never called after an unsuccessful observation or

@@ -153,6 +153,11 @@ type NativeGeneration struct {
 type TargetProjection struct {
 	Path     func(sourcePath string) string
 	ReadText func(targetPath string, source ast.SourceFileLike) (string, error)
+	// ReadTextConcurrent allows read-only joined plugin observations to call
+	// ReadText concurrently under the observation's shared IO budget. Other
+	// observations continue to read serially. The default keeps custom readers
+	// serial, including those with generation-local mutable state.
+	ReadTextConcurrent bool
 }
 
 // PluginGeneration is the generation-local projection needed to materialize

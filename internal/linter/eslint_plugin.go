@@ -321,17 +321,22 @@ func dispatchEslintPluginRules(
 	return newPluginDispatchResources().dispatch(ctx, dispatch, files, collectFixes, suggestionsMode, timing, onDiagnostic, nil)
 }
 
-// One observation owns one bounded set of projection and transport windows.
-// Program units share both admission and reusable buffers; splitting loading
-// must never multiply ESTree capacity or Node requests.
+// One observation owns bounded plugin source reads, projection and transport
+// windows. Program units share admission and reusable buffers; splitting
+// loading must never multiply IO, ESTree capacity or Node requests.
 type pluginDispatchResources struct {
-	slots    chan struct{}
-	builders chan *pluginProjectionBuffers
+	slots           chan struct{}
+	builders        chan *pluginProjectionBuffers
+	sourceReadSlots chan struct{}
 }
 
 func newPluginDispatchResources() *pluginDispatchResources {
 	limit := dispatchConcurrency()
-	return &pluginDispatchResources{slots: make(chan struct{}, limit), builders: make(chan *pluginProjectionBuffers, limit)}
+	return &pluginDispatchResources{
+		slots:           make(chan struct{}, limit),
+		builders:        make(chan *pluginProjectionBuffers, limit),
+		sourceReadSlots: make(chan struct{}, 8),
+	}
 }
 
 func (resources *pluginDispatchResources) dispatch(
