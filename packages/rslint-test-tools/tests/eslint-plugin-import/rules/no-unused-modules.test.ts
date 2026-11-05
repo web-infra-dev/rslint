@@ -305,14 +305,19 @@ describe('import/no-unused-modules', () => {
 
   group('test for export from', [
     js('file-s.js', `export { default } from './file-o'`),
-    js('file-j.js', `export { k } from '${fixture('file-k.js')}'`, [
-      unused('k', 1, 10),
-    ]),
+    js(
+      'file-j.js',
+      `export { k } from '${fixture('file-k.js').replace(/\\/g, '/')}'`,
+      [unused('k', 1, 10)],
+    ),
   ]);
   group(
     'export from usage',
     [js('file-k.js', 'const k0 = 5; export { k0 as k }')],
-    { [fixture('file-j.js')]: `export { k } from '${fixture('file-k.js')}'` },
+    {
+      [fixture('file-j.js')]:
+        `export { k } from '${fixture('file-k.js').replace(/\\/g, '/')}'`,
+    },
   );
 
   group('test for ignored files', [
@@ -345,42 +350,42 @@ describe('import/no-unused-modules', () => {
 
   importerGroup(
     'add named import for file with default export',
-    `import { f } from '${fileF}'`,
+    `import { f } from '${fileF.replace(/\\/g, '/')}'`,
     [js('file-f.js', 'export default () => 15', [unused('default', 1, 1)])],
   );
   importerGroup(
     'add default import for file with default export',
-    `import f from '${fileF}'`,
+    `import f from '${fileF.replace(/\\/g, '/')}'`,
     [js('file-f.js', 'export default () => 16')],
   );
   importerGroup(
     'add default import for file with named export',
-    `import g from '${fileG}';import {h} from '${fixture('file-gg.js')}'`,
+    `import g from '${fileG.replace(/\\/g, '/')}';import {h} from '${fixture('file-gg.js').replace(/\\/g, '/')}'`,
     [js('file-g.js', 'export const g = 2', [unused('g', 1, 1)])],
   );
   importerGroup(
     'add named import for file with named export',
-    `import { g } from '${fileG}'; import eslint from 'eslint'`,
+    `import { g } from '${fileG.replace(/\\/g, '/')}'; import eslint from 'eslint'`,
     [js('file-g.js', 'export const g = 2')],
   );
   importerGroup(
     'add different named import for file with named export',
-    `import { c } from '${fixture('file-b.js')}'`,
+    `import { c } from '${fixture('file-b.js').replace(/\\/g, '/')}'`,
     [js('file-b.js', 'export const b = 2', [unused('b', 1, 1)])],
   );
   importerGroup(
     'add renamed named import for file with named export',
-    `import { g as g1 } from '${fileG}'; import eslint from 'eslint'`,
+    `import { g as g1 } from '${fileG.replace(/\\/g, '/')}'; import eslint from 'eslint'`,
     [js('file-g.js', 'export const g = 2')],
   );
   importerGroup(
     'add different renamed named import for file with named export',
-    `import { g1 as g } from '${fileG}'`,
+    `import { g1 as g } from '${fileG.replace(/\\/g, '/')}'`,
     [js('file-g.js', 'export const g = 2', [unused('g', 1, 1)])],
   );
   importerGroup(
     'remove default import for file with default export',
-    `import { a1, a2 } from '${fixture('file-a.js')}'`,
+    `import { a1, a2 } from '${fixture('file-a.js').replace(/\\/g, '/')}'`,
     [js('file-a.js', 'export default () => 17', [unused('default', 1, 1)])],
   );
   group('add namespace import for file with unused exports', [
@@ -388,37 +393,42 @@ describe('import/no-unused-modules', () => {
   ]);
   importerGroup(
     'namespace import',
-    `import * as m from '${fileM}'; import unknown from 'unknown-module'`,
+    `import * as m from '${fileM.replace(/\\/g, '/')}'; import unknown from 'unknown-module'`,
     [js('file-m.js', fileMCode)],
   );
-  importerGroup('remove all exports', `/* import * as m from '${fileM}' */`, [
-    js('file-m.js', fileMCode, allMUnused),
-  ]);
-  importerGroup('export star', `export * from '${fileM}';`, [
-    js('file-m.js', fileMCode, [unused('default', 1, 53)]),
-  ]);
+  importerGroup(
+    'remove all exports',
+    `/* import * as m from '${fileM.replace(/\\/g, '/')}' */`,
+    [js('file-m.js', fileMCode, allMUnused)],
+  );
+  importerGroup(
+    'export star',
+    `export * from '${fileM.replace(/\\/g, '/')}';`,
+    [js('file-m.js', fileMCode, [unused('default', 1, 53)])],
+  );
   group(
     'named re-export',
     [
-      js('file-0.js', `export { m1, m} from '${fileM}';`, [
+      js('file-0.js', `export { m1, m} from '${fileM.replace(/\\/g, '/')}';`, [
         unused('m1', 1, 10),
         unused('m', 1, 14),
       ]),
       js('file-m.js', fileMCode, [unused('default', 1, 53)]),
     ],
-    { [file0]: `export { m1, m} from '${fileM}';` },
+    { [file0]: `export { m1, m} from '${fileM.replace(/\\/g, '/')}';` },
   );
   // The upstream TODO valid case for this re-export is commented out upstream.
   group(
     'default re-export',
     [
-      js('file-0.js', `export { default, m1 } from '${fileM}';`, [
-        unused('default', 1, 10),
-        unused('m1', 1, 19),
-      ]),
+      js(
+        'file-0.js',
+        `export { default, m1 } from '${fileM.replace(/\\/g, '/')}';`,
+        [unused('default', 1, 10), unused('m1', 1, 19)],
+      ),
       js('file-m.js', fileMCode, [unused('m', 1, 48)]),
     ],
-    { [file0]: `export { default, m1 } from '${fileM}';` },
+    { [file0]: `export { default, m1 } from '${fileM.replace(/\\/g, '/')}';` },
   );
 
   group('import and export in the same file both count as usage', [
@@ -446,10 +456,13 @@ describe('import/no-unused-modules', () => {
   group(
     'add import in newly created file',
     [
-      js('file-added-0.js', `import * as m from '${fileM}'`),
+      js(
+        'file-added-0.js',
+        `import * as m from '${fileM.replace(/\\/g, '/')}'`,
+      ),
       js('file-m.js', fileMCode),
     ],
-    { [added('0')]: `import * as m from '${fileM}'` },
+    { [added('0')]: `import * as m from '${fileM.replace(/\\/g, '/')}'` },
   );
   group('add export for newly created file', [
     js('file-added-0.js', 'export default () => {2}', [
@@ -459,29 +472,29 @@ describe('import/no-unused-modules', () => {
   group(
     'default import of newly created file',
     [
-      js('file-0.js', `import def from '${added('0')}'`),
+      js('file-0.js', `import def from '${added('0').replace(/\\/g, '/')}'`),
       js('file-added-0.js', 'export default () => {}'),
     ],
-    { [file0]: `import def from '${added('0')}'` },
+    { [file0]: `import def from '${added('0').replace(/\\/g, '/')}'` },
   );
   // export * only considers named imports. default imports still need to be reported
   group(
     'export star of newly created file',
     [
-      js('file-0.js', `export * from '${added('0')}'`),
+      js('file-0.js', `export * from '${added('0').replace(/\\/g, '/')}'`),
       js('file-r.js', `export * from 'external-compiled-library'`),
       js('file-added-0.js', `export const z = 'z';export default () => {}`, [
         unused('default', 1, 22),
       ]),
       js('file-added-0.js', 'export const a = 2'),
     ],
-    { [file0]: `export * from '${added('0')}'` },
+    { [file0]: `export * from '${added('0').replace(/\\/g, '/')}'` },
   );
   // remove export *. all exports need to be reported
   group(
     'remove export star',
     [
-      js('file-0.js', `export { a } from '${added('0')}'`, [
+      js('file-0.js', `export { a } from '${added('0').replace(/\\/g, '/')}'`, [
         unused('a', 1, 10),
       ]),
       js('file-added-0.js', `export const z = 'z';export default () => {}`, [
@@ -490,40 +503,48 @@ describe('import/no-unused-modules', () => {
       ]),
     ],
     {
-      [file0]: `export { a } from '${added('0')}'`,
+      [file0]: `export { a } from '${added('0').replace(/\\/g, '/')}'`,
       [added('0')]: 'export const a = 2',
     },
   );
   group(
     'export star of second newly created file',
     [
-      js('file-0.js', `export * from '${added('1')}'`),
+      js('file-0.js', `export * from '${added('1').replace(/\\/g, '/')}'`),
       js('file-added-1.js', `export const z = 'z';export default () => {}`, [
         unused('default', 1, 22),
       ]),
     ],
-    { [file0]: `export * from '${added('1')}'` },
+    { [file0]: `export * from '${added('1').replace(/\\/g, '/')}'` },
   );
   group(
     'default import between newly created files',
     [
-      js('file-added-1.js', `import added from '${added('2')}'`),
+      js(
+        'file-added-1.js',
+        `import added from '${added('2').replace(/\\/g, '/')}'`,
+      ),
       js('file-added-2.js', 'export default () => {}'),
     ],
-    { [added('1')]: `import added from '${added('2')}'` },
+    { [added('1')]: `import added from '${added('2').replace(/\\/g, '/')}'` },
   );
   group(
     'named import between newly created files',
     [
-      js('file-added-1.js', `import { added } from '${added('3')}'`),
+      js(
+        'file-added-1.js',
+        `import { added } from '${added('3').replace(/\\/g, '/')}'`,
+      ),
       js('file-added-3.js', 'export const added = () => {}'),
     ],
-    { [added('1')]: `import { added } from '${added('3')}'` },
+    {
+      [added('1')]: `import { added } from '${added('3').replace(/\\/g, '/')}'`,
+    },
   );
   group('test behavior for destructured exports', [
     js(
       'file-destructured-2.js',
-      `import { destructured } from '${fixture('file-destructured-1.js')}'`,
+      `import { destructured } from '${fixture('file-destructured-1.js').replace(/\\/g, '/')}'`,
     ),
     js('file-destructured-1.js', 'export const { destructured } = {};'),
     js('file-destructured-1.js', 'export const { destructured2 } = {};', [
@@ -535,7 +556,7 @@ describe('import/no-unused-modules', () => {
     [
       js(
         'file-added-1.js',
-        `import * as added from '${fixture('file-added-4.js.js')}'`,
+        `import * as added from '${fixture('file-added-4.js.js').replace(/\\/g, '/')}'`,
       ),
       js(
         'file-added-4.js.js',
@@ -543,7 +564,8 @@ describe('import/no-unused-modules', () => {
       ),
     ],
     {
-      [added('1')]: `import * as added from '${fixture('file-added-4.js.js')}'`,
+      [added('1')]:
+        `import * as added from '${fixture('file-added-4.js.js').replace(/\\/g, '/')}'`,
     },
   );
 
@@ -579,7 +601,10 @@ describe('import/no-unused-modules', () => {
     ]),
   ]);
   group('avoid errors if re-export all from umd compiled library', [
-    js('main/index.js', `export * from '${fixture('bin.js')}'`),
+    js(
+      'main/index.js',
+      `export * from '${fixture('bin.js').replace(/\\/g, '/')}'`,
+    ),
   ]);
 
   const ts = (
