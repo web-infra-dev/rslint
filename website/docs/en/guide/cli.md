@@ -153,3 +153,5 @@ The table is written to stderr, so machine-readable output formats such as `json
 | `0`  | No errors (warnings may be present)               |
 | `1`  | Errors found, or warnings exceed `--max-warnings` |
 | `2`  | Invalid command-line usage or flag combinations   |
+
+With the default signal handling, Ctrl+C interrupts the CLI even when a terminal or pipe stops reading output. POSIX shells report status `130`. If a Node.js host has already installed a SIGINT handler, `runCLI()` sets `process.exitCode` to `130` after the interrupted run, and the host decides when to exit.

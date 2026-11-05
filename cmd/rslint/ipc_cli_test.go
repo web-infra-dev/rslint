@@ -233,22 +233,6 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 	}
 }
 
-func TestMarkCLIInterruptedUsesCanceledDiscoveryContext(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	state := &runCLIState{}
-	if !markCLIInterrupted(ctx, state) {
-		t.Fatal("canceled discovery context was not classified as an interrupt")
-	}
-	if !state.signalled.Load() {
-		t.Fatal("canceled discovery context did not publish the signal state")
-	}
-
-	if markCLIInterrupted(context.Background(), &runCLIState{}) {
-		t.Fatal("live discovery context was classified as an interrupt")
-	}
-}
-
 func TestShutdownPeerWaitsForAcknowledgement(t *testing.T) {
 	cli, peer := newCLIChannelPair(t)
 	requestSeen := make(chan struct{})
@@ -270,7 +254,7 @@ func TestShutdownPeerWaitsForAcknowledgement(t *testing.T) {
 
 	shutdownDone := make(chan bool, 1)
 	go func() {
-		shutdownDone <- shutdownPeer(cli, &runCLIState{})
+		shutdownDone <- shutdownPeer(context.Background(), cli)
 	}()
 
 	select {

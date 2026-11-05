@@ -16,7 +16,7 @@
 //	│  forwards `output` requests/notifications to real stdout  │
 //	└───────────────────────────────────────────────────────────┘
 //
-// Pipeline: parseLintFlags → start ipc.Channel on the real stdin/stdout →
+// Pipeline: start ipc.Channel on the real stdin/stdout → parseLintFlags →
 // wait `init` (or signal) → redirect stdout through `output` frames →
 // dispatch on intent (--help / --init / lint) → run the shared
 // handleLintCommand with a typed Go-discovered catalog → drain output, send
@@ -41,7 +41,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -160,62 +159,48 @@ type runtimePayload struct {
 	SingleThreaded bool `json:"singleThreaded,omitempty"`
 }
 
-// runCLIState carries the init-handshake outcome from the inbound handler
-// (which runs on the channel's read-loop goroutine) to the runCLI main
-// goroutine, and tracks whether a termination signal fired.
+// initDelivery carries the request and its acknowledgement to the command.
 type initDelivery struct {
 	payload *initPayload
 	reply   *ipc.ResponseReceipt
 }
 
-type runCLIState struct {
-	payloadCh chan initDelivery // 1-buffered; receives at most one result
-	once      sync.Once
-	signalled atomic.Bool // set on SIGINT/SIGTERM/SIGHUP
-}
-
-// runCLI is the unified IPC mode entry point — the default for every
-// user-facing CLI run. Returns the process exit code.
+// runCLI owns the native CLI process and the connection to its Node host.
 func runCLI(args []string) int {
-	baseArgs, help, parseFatal := parseLintFlags(args)
-	if parseFatal != 0 {
-		return parseFatal // parseLintFlags already printed to stderr
-	}
-
-	// Two signal registrations: sigChInit aborts the init-handshake select
-	// before we have a lint context; lintCtx (NotifyContext) cancels the lint
-	// file-loop at its per-file boundary. SIGHUP guards against a closed
-	// controlling terminal truncating profiling output. On Windows SIGHUP is
-	// defined but never delivered, so this stays portable.
-	sigChInit := make(chan os.Signal, 1)
-	signal.Notify(sigChInit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-	defer signal.Stop(sigChInit)
-	lintCtx, lintCtxStop := signal.NotifyContext(
+	interrupt, stopSignals := signal.NotifyContext(
 		context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP,
 	)
-	defer lintCtxStop()
+	defer stopSignals()
+	ctx, cancel := context.WithCancel(interrupt)
+	defer cancel()
+	ch := ipc.NewChannel(os.Stdin, os.Stdout)
+	defer ch.Close()
 
-	// Capture stdout before redirecting lint output through `output` frames.
-	// The channel keeps the original file handles for its entire lifetime.
-	origStdout := os.Stdout
-	ch := ipc.NewChannel(os.Stdin, origStdout)
+	finished := make(chan int, 1)
+	go func() { finished <- runIPCCommand(ctx, ch, args) }()
 
-	state := &runCLIState{payloadCh: make(chan initDelivery, 1)}
-
-	// Mirror lintCtx cancellation onto state.signalled so the final exit-code
-	// mapping (130 when set) works even when the signal arrives after the
-	// init-select released sigChInit.
-	sigDrainStop := make(chan struct{})
-	go func() {
+	var code int
+	select {
+	case code = <-finished:
+	case <-ch.Done():
+		cancel()
+		// Give active fixes and profiles time to finish after losing their
+		// host. A write to inherited stderr can block even after cancellation.
 		select {
-		case <-lintCtx.Done():
-			state.signalled.Store(true)
-		case <-sigDrainStop:
+		case code = <-finished:
+		case <-time.After(5 * time.Second):
+			code = 2
 		}
-	}()
-	defer close(sigDrainStop)
+	}
+	if interrupt.Err() != nil {
+		return 130
+	}
+	return code
+}
 
-	// Inbound `init` request → hand the payload to the main goroutine.
+func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
+	initCh := make(chan initDelivery, 1)
+	var initOnce sync.Once
 	ch.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
 		switch msg.Kind {
 		case kindInit:
@@ -225,8 +210,8 @@ func runCLI(args []string) int {
 			}
 			response, receipt := ipc.TrackResponse(map[string]any{"ok": true})
 			// Exactly-once: engine.ts sends one init; defensive vs a buggy peer.
-			state.once.Do(func() {
-				state.payloadCh <- initDelivery{payload: &p, reply: receipt}
+			initOnce.Do(func() {
+				initCh <- initDelivery{payload: &p, reply: receipt}
 			})
 			return response, nil
 		default:
@@ -236,73 +221,36 @@ func runCLI(args []string) int {
 
 	ch.Start()
 
-	// Disconnect watcher: if the channel closes (peer closed its end) before
-	// init arrives, push nil so the init-select sees a disconnect instead of
-	// hanging until initTimeout. once.Do guards the normal-init path.
-	go func() {
-		<-ch.Done()
-		state.once.Do(func() {
-			select {
-			case state.payloadCh <- initDelivery{}:
-			default:
-			}
-		})
-	}()
+	baseArgs, help, parseFatal := parseLintFlags(args)
+	if parseFatal != 0 {
+		return parseFatal // parseLintFlags already printed to stderr
+	}
 
-	// Wait for the init handshake or a signal. The 60s ceiling guards against
-	// a peer that crashes before sending init (signal.Notify alone won't fire
-	// on parent EOF; the disconnect watcher covers a clean EOF).
 	const initTimeout = 60 * time.Second
 	initTimer := time.NewTimer(initTimeout)
 	defer initTimer.Stop()
 
 	var delivery initDelivery
 	select {
-	case delivery = <-state.payloadCh:
-	case <-sigChInit:
-		state.signalled.Store(true)
-		_ = ch.Close()
-		return 130
+	case delivery = <-initCh:
+	case <-ctx.Done():
+		return 2
 	case <-initTimer.C:
 		fmt.Fprintf(os.Stderr, "rslint: timed out waiting for init after %s\n", initTimeout)
-		_ = ch.Close()
-		return 2
-	}
-	if delivery.payload == nil {
-		_ = ch.Close() // peer disconnected before init
 		return 2
 	}
 
-	// The handler has decoded and reserved this init, but the application may
-	// not observe it until the complete response frame has reached stdout.
-	// Keep the original signal/timeout progress guarantees while waiting.
+	// Do not act on init until its complete response frame reached the host.
 	select {
 	case <-delivery.reply.Done():
 		if delivery.reply.Err() != nil {
-			_ = ch.Close()
 			return 2
 		}
-	case <-sigChInit:
-		state.signalled.Store(true)
-		_ = ch.Close()
-		return 130
+	case <-ctx.Done():
+		return 2
 	case <-initTimer.C:
 		fmt.Fprintf(os.Stderr, "rslint: timed out waiting for init after %s\n", initTimeout)
-		_ = ch.Close()
 		return 2
-	case <-ch.Done():
-		// A successful receipt may race a peer EOF. Prefer the committed reply
-		// when both are ready; otherwise the transport ended before the ACK.
-		select {
-		case <-delivery.reply.Done():
-		default:
-			_ = ch.Close()
-			return 2
-		}
-		if delivery.reply.Err() != nil {
-			_ = ch.Close()
-			return 2
-		}
 	}
 	payload := delivery.payload
 
@@ -314,7 +262,6 @@ func runCLI(args []string) int {
 		// silently lint the wrong files.
 		if err := os.Chdir(payload.WorkingDirectory); err != nil {
 			fmt.Fprintf(os.Stderr, "rslint: chdir to %q failed: %v\n", payload.WorkingDirectory, err)
-			_ = ch.Close()
 			return 2
 		}
 	}
@@ -339,7 +286,6 @@ func runCLI(args []string) int {
 	if !help && !baseArgs.Init {
 		if _, err := output.ParseFormat(baseArgs.Format); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			_ = ch.Close()
 			return 2
 		}
 	}
@@ -351,28 +297,17 @@ func runCLI(args []string) int {
 	if !help && !baseArgs.Init {
 		if payload.ConfigDiscovery == nil {
 			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
-			_ = ch.Close()
 			return 2
 		}
-		prepareErr := prepareCLIInputs(lintCtx, &baseArgs)
+		prepareErr := prepareCLIInputs(ctx, &baseArgs)
 		if prepareErr == nil {
-			prepareErr = discoverCLIConfigCatalog(lintCtx, &baseArgs, payload, ch)
+			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
 		}
 		if err := prepareErr; err != nil {
-			// Discovery now includes the potentially long Go walk and reverse
-			// Node loads. A signal can cancel either before the mirror goroutine
-			// publishes state.signalled, so consult the source context as well.
-			// Interrupts keep the CLI's documented 130 exit and are not reported
-			// as ordinary configuration failures.
-			interrupted := markCLIInterrupted(lintCtx, state)
-			if !interrupted {
+			if ctx.Err() == nil {
 				fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			}
-			shutdownPeer(ch, state)
-			_ = ch.Close()
-			if interrupted {
-				return 130
-			}
+			shutdownPeer(ctx, ch)
 			return 1
 		}
 	}
@@ -387,12 +322,12 @@ func runCLI(args []string) int {
 	// waits for Node's shutdown acknowledgement as before.
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
-		_ = ch.Close()
 		fmt.Fprintf(os.Stderr, "rslint: stdout pipe: %v\n", err)
 		return 2
 	}
 	stdoutDrainDone := make(chan struct{})
 	go drainStdoutToIPC(stdoutR, ch, stdoutDrainDone)
+	origStdout := os.Stdout
 	os.Stdout = stdoutW
 	// finalizeStdout flushes + restores stdout before the shutdown handshake.
 	finalizeStdout := func() {
@@ -408,8 +343,7 @@ func runCLI(args []string) int {
 		// uniformity.
 		fmt.Fprint(os.Stderr, usage)
 		finalizeStdout()
-		shutdownPeer(ch, state)
-		_ = ch.Close()
+		shutdownPeer(ctx, ch)
 		return 0
 	}
 
@@ -423,47 +357,22 @@ func runCLI(args []string) int {
 	// sufficient ordering edge because Node's Writable writes are asynchronous.
 	var timingTable string
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
-	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: lintCtx, channel: ch}
+	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: ctx, channel: ch}
 
-	exitCode := handleLintCommand(baseArgs, lintCtx, dispatch)
+	exitCode := handleLintCommand(baseArgs, ctx, dispatch)
 
 	finalizeStdout()
-	// Publish cancellation synchronously before deciding whether to perform the
-	// shutdown handshake. The signal-mirroring goroutine may not have run yet.
-	markCLIInterrupted(lintCtx, state)
-	stdoutFlushed := shutdownPeer(ch, state)
-	if stdoutFlushed && !state.signalled.Load() && timingTable != "" {
+	stdoutFlushed := shutdownPeer(ctx, ch)
+	if stdoutFlushed && ctx.Err() == nil && timingTable != "" {
 		fmt.Fprint(os.Stderr, timingTable)
 	}
-	_ = ch.Close()
 
-	if state.signalled.Load() {
-		return 130
-	}
 	return exitCode
 }
 
-func markCLIInterrupted(ctx context.Context, state *runCLIState) bool {
-	interrupted := state != nil && state.signalled.Load()
-	if !interrupted && ctx != nil {
-		interrupted = ctx.Err() != nil
-	}
-	if interrupted && state != nil {
-		state.signalled.Store(true)
-	}
-	return interrupted
-}
-
-// shutdownPeer tells the peer we're done and waits for its acknowledgement.
-// The Node peer sends that acknowledgement only after forwarded stdout has
-// flushed, so a true result is the ordering barrier for deferred stderr.
-// Skipped if a signal already fired: the peer sees its own stdin disconnect
-// anyway, and pushing another frame races the closing pipe.
-func shutdownPeer(ch *ipc.Channel, state *runCLIState) bool {
-	if state != nil && state.signalled.Load() {
-		return false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// shutdownPeer waits for the host's stdout flush before deferred stderr.
+func shutdownPeer(ctx context.Context, ch *ipc.Channel) bool {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	_, err := ch.SendRequest(ctx, kindShutdown, struct{}{})
 	return err == nil
@@ -630,13 +539,8 @@ func drainStdoutToIPC(r io.Reader, ch *ipc.Channel, done chan<- struct{}) {
 			"stream": "stdout",
 			"text":   string(pending),
 		}); err != nil {
-			// The transport fails SendNotification only once it has closed
-			// (peer gone) — there is no transient state to retry past, so stop
-			// forwarding and drop the rest. Surface it ONCE (we set discard
-			// next, so flush never re-enters this branch) so a truncated run is
-			// diagnosable on stderr instead of silently losing lint output.
-			fmt.Fprintf(os.Stderr,
-				"rslint: stopped forwarding stdout to peer (channel closed): %v\n", err)
+			// The host is gone. Its stderr can be the same paused destination;
+			// keep draining our producer without writing to that device again.
 			discard = true
 		}
 		pending = pending[:0]

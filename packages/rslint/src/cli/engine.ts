@@ -283,12 +283,13 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // Attached BEFORE any await so an immediate spawn error (ENOENT/EACCES) or
   // instant exit is observed rather than crashing the process as 'unhandled'.
   type ChildExit = { code: number };
+  let interrupted = false;
   const childExit = new Promise<ChildExit>((resolve) => {
     let resolved = false;
     const settle = (code: number) => {
       if (!resolved) {
         resolved = true;
-        resolve({ code });
+        resolve({ code: interrupted ? SIGNAL_EXIT_CODES.SIGINT : code });
       }
     };
     child.once('error', (err) => {
@@ -498,13 +499,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     return configActivation;
   };
 
-  // Without our own SIGINT handler Node's default action _exit(130)s
-  // immediately, leaving the Go child to discover the disconnect via stdin EOF
-  // — which a wedged child can't. Intercept and force it down first.
   const onSignal = () => {
-    // No log: a user Ctrl-C (SIGINT) or a normal SIGTERM/SIGHUP teardown is the
-    // expected path, not an error — forward the kill to the Go child and tear
-    // the worker pool down so its threads don't outlive us.
     shuttingDown = true;
     configAbort.abort();
     safeKillGo(child);
@@ -513,11 +508,17 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       ...[...stagedPluginHosts].map(shutdownPluginHost),
     ]);
   };
-  process.on('SIGINT', onSignal);
+  const onInterrupt = () => {
+    interrupted = true;
+    onSignal();
+  };
+  // Preserve Node's default Ctrl+C action, which works even during a
+  // synchronous stdout write. Only join a host that already handles SIGINT.
+  if (process.listenerCount('SIGINT') > 0) process.once('SIGINT', onInterrupt);
   process.on('SIGTERM', onSignal);
   process.on('SIGHUP', onSignal);
   const removeSignalHandlers = () => {
-    process.off('SIGINT', onSignal);
+    process.off('SIGINT', onInterrupt);
     process.off('SIGTERM', onSignal);
     process.off('SIGHUP', onSignal);
   };
