@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "lib": ["esnext", "DOM"]
+  },
+  "include": ["src/virtual.ts", "files/**/*"]
+}

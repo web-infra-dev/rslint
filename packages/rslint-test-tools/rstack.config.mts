@@ -813,6 +813,9 @@ const ecosystemTests = {
     './tests/rstest/rules/valid-title.test.ts',
     './tests/rstest/rules/warn-todo.test.ts',
 
+    // eslint-plugin-effector
+    './tests/eslint-plugin-effector/rules/no-watch.test.ts',
+
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
     './tests/eslint-plugin-promise/rules/avoid-new.test.ts',
