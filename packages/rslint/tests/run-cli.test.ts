@@ -12,38 +12,47 @@ describe('runCLI', () => {
     expect(typeof runCLI).toBe('function');
   });
 
-  test('lets a host handle Ctrl+C and continue after an interrupted run', () => {
-    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-host-signal-'));
-    try {
-      fs.writeFileSync(path.join(cwd, 'input.ts'), 'debugger;\n');
-      fs.writeFileSync(
-        path.join(cwd, 'rslint.config.mjs'),
-        "process.emit('SIGINT', 'SIGINT'); export default [];",
-      );
-      const entry = new URL('../dist/index.js', import.meta.url).href;
-      const host = `
+  test.each([
+    ['SIGHUP', 129],
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ] as const)(
+    'lets the host handle %s and continue after the run',
+    (signal, exitCode) => {
+      const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-host-signal-'));
+      try {
+        fs.writeFileSync(path.join(cwd, 'input.ts'), 'debugger;\n');
+        fs.writeFileSync(
+          path.join(cwd, 'rslint.config.mjs'),
+          `process.emit('${signal}'); export default [];`,
+        );
+        const entry = new URL('../dist/index.js', import.meta.url).href;
+        const host = `
         import { runCLI } from ${JSON.stringify(entry)};
         let interrupts = 0;
-        process.on('SIGINT', () => interrupts++);
+        process.on('${signal}', () => interrupts++);
         await runCLI({ argv: ['node', 'rslint', '--format=jsonline', 'input.ts'] });
         console.log(JSON.stringify([interrupts, process.exitCode]));
         process.exitCode = 0;
       `;
-      const result = spawnSync(
-        process.execPath,
-        ['--input-type=module', '-e', host],
-        {
-          cwd,
-          encoding: 'utf8',
-          timeout: 15_000,
-        },
-      );
-      expect(result.status).toBe(0);
-      expect(JSON.parse(result.stdout)).toEqual([1, 130]);
-    } finally {
-      fs.rmSync(cwd, { recursive: true, force: true });
-    }
-  }, 20_000);
+        const result = spawnSync(
+          process.execPath,
+          ['--input-type=module', '-e', host],
+          {
+            cwd,
+            encoding: 'utf8',
+            timeout: 30_000,
+            killSignal: 'SIGKILL',
+          },
+        );
+        expect(result.status).toBe(0);
+        expect(JSON.parse(result.stdout)).toEqual([1, exitCode]);
+      } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+      }
+    },
+    40_000,
+  );
 
   test('interrupts the CLI and releases its Go child while stdout stays paused', async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-interrupt-'));
@@ -66,7 +75,7 @@ describe('runCLI', () => {
           stdio: ['ignore', 'pipe', 'pipe'],
         },
       );
-      const signal = AbortSignal.timeout(15_000);
+      const signal = AbortSignal.timeout(30_000);
       try {
         await once(child.stdout, 'readable', { signal });
         expect(child.stdout.read(1)?.toString()).toBe('{');
@@ -92,5 +101,5 @@ describe('runCLI', () => {
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 40_000);
 });

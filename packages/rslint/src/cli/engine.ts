@@ -283,13 +283,13 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // Attached BEFORE any await so an immediate spawn error (ENOENT/EACCES) or
   // instant exit is observed rather than crashing the process as 'unhandled'.
   type ChildExit = { code: number };
-  let interrupted = false;
+  let signalExitCode: number | undefined;
   const childExit = new Promise<ChildExit>((resolve) => {
     let resolved = false;
     const settle = (code: number) => {
       if (!resolved) {
         resolved = true;
-        resolve({ code: interrupted ? SIGNAL_EXIT_CODES.SIGINT : code });
+        resolve({ code: signalExitCode ?? code });
       }
     };
     child.once('error', (err) => {
@@ -333,7 +333,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       );
       safeKillGo(child);
       await childExit;
-      return { code: 2 };
+      return { code: signalExitCode ?? 2 };
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -499,29 +499,24 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     return configActivation;
   };
 
-  const onSignal = () => {
-    shuttingDown = true;
-    configAbort.abort();
-    safeKillGo(child);
-    void Promise.allSettled([
-      shutdownPluginHost(pluginHost),
-      ...[...stagedPluginHosts].map(shutdownPluginHost),
-    ]);
-  };
-  const onInterrupt = () => {
-    interrupted = true;
-    onSignal();
-  };
-  // Preserve Node's default Ctrl+C action, which works even during a
-  // synchronous stdout write. Only join a host that already handles SIGINT.
-  if (process.listenerCount('SIGINT') > 0) process.once('SIGINT', onInterrupt);
-  process.on('SIGTERM', onSignal);
-  process.on('SIGHUP', onSignal);
-  const removeSignalHandlers = () => {
-    process.off('SIGINT', onInterrupt);
-    process.off('SIGTERM', onSignal);
-    process.off('SIGHUP', onSignal);
-  };
+  // A native default action works even during a synchronous stdout write.
+  // Only join termination signals that this host has chosen to handle itself.
+  const hostSignalHandlers = [];
+  for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as const) {
+    if (process.listenerCount(signal) === 0) continue;
+    const handle = () => {
+      signalExitCode ??= SIGNAL_EXIT_CODES[signal];
+      shuttingDown = true;
+      configAbort.abort();
+      safeKillGo(child);
+      void Promise.allSettled([
+        shutdownPluginHost(pluginHost),
+        ...[...stagedPluginHosts].map(shutdownPluginHost),
+      ]);
+    };
+    process.once(signal, handle);
+    hostSignalHandlers.push({ signal, handle });
+  }
   const forwardedStdout = new StdoutWriteBarrier(stdout);
 
   // try/finally so the worker pool is always drained — every exit path
@@ -657,12 +652,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     const finalExit = await waitForExit();
     return finalExit.code;
   } finally {
-    // Single cleanup site for every return above: drop the process-level
-    // signal listeners and drain the plugin worker pool. Both are no-ops
-    // when already done (removeSignalHandlers off()s detached listeners;
-    // pluginHost?.shutdown() is null-safe + idempotent), so this is safe
-    // even on the normal path and after the signal handler already fired.
-    removeSignalHandlers();
+    for (const { signal, handle } of hostSignalHandlers) {
+      process.off(signal, handle);
+    }
     shuttingDown = true;
     configAbort.abort();
     await Promise.allSettled([...pendingPluginHostBuilds]);

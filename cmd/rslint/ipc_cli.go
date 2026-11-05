@@ -23,7 +23,7 @@
 // `shutdown`, exit.
 //
 // Exit codes: 0 clean · 1 lint/config errors · 2 IPC failure (peer
-// disconnect, init/transport error) · 130 interrupted.
+// disconnect, init/transport error) · 128 + signal number on interruption.
 //
 // Excluded from the js/wasm build: signal handling needs syscall.SIGHUP,
 // undefined there, and there is no Node IPC parent. ipc_cli_js.go provides a
@@ -167,11 +167,10 @@ type initDelivery struct {
 
 // runCLI owns the native CLI process and the connection to its Node host.
 func runCLI(args []string) int {
-	interrupt, stopSignals := signal.NotifyContext(
-		context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP,
-	)
-	defer stopSignals()
-	ctx, cancel := context.WithCancel(interrupt)
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(signals)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ch := ipc.NewChannel(os.Stdin, os.Stdout)
 	defer ch.Close()
@@ -179,23 +178,23 @@ func runCLI(args []string) int {
 	finished := make(chan int, 1)
 	go func() { finished <- runIPCCommand(ctx, ch, args) }()
 
-	var code int
+	var exitCode int
 	select {
-	case code = <-finished:
+	case code := <-finished:
+		return code
+	case sig := <-signals:
+		exitCode = 128 + int(sig.(syscall.Signal)) //nolint:forcetypeassert // Notify only subscribes to syscall.Signal values.
 	case <-ch.Done():
-		cancel()
-		// Give active fixes and profiles time to finish after losing their
-		// host. A write to inherited stderr can block even after cancellation.
-		select {
-		case code = <-finished:
-		case <-time.After(5 * time.Second):
-			code = 2
-		}
+		exitCode = 2
 	}
-	if interrupt.Err() != nil {
-		return 130
+	cancel()
+	// Give active fixes and profiles time to finish. A write to inherited
+	// stderr can still block after the command context is canceled.
+	select {
+	case <-finished:
+	case <-time.After(5 * time.Second):
 	}
-	return code
+	return exitCode
 }
 
 func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
