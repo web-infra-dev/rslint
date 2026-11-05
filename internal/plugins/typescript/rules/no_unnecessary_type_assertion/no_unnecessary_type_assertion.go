@@ -401,6 +401,104 @@ func assertionOriginalExpression(node *ast.Node) *ast.Node {
 	return expression
 }
 
+// A call's type inside an assertion may already include return-type inferences
+// supplied by that assertion. Comparing those types cannot prove that removing
+// the assertion preserves the type inferred for the expression.
+func assertionMayAffectInference(ctx rule.RuleContext, expression *ast.Node) bool {
+	if expression == nil {
+		return false
+	}
+	expression = ast.SkipParentheses(expression)
+	switch expression.Kind {
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		// Const assertions inherit the surrounding contextual type, while
+		// ordinary assertions supply their own context to the operand.
+		if ast.IsConstAssertion(expression) {
+			return assertionMayAffectInference(ctx, expression.Expression())
+		}
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+		// Explicit type arguments, including trailing defaults, use
+		// checkTypeArguments rather than contextual return-type inference.
+		if len(expression.TypeArguments()) != 0 ||
+			checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone) == nil {
+			return false
+		}
+		var callee *ast.Node
+		kind := checker.SignatureKindCall
+		if expression.Kind == ast.KindTaggedTemplateExpression {
+			callee = expression.AsTaggedTemplateExpression().Tag
+		} else {
+			callee = expression.Expression()
+			if expression.Kind == ast.KindNewExpression {
+				kind = checker.SignatureKindConstruct
+			}
+		}
+		calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(callee))
+		// Removing the contextual type can change overload selection, so the
+		// currently resolved signature alone cannot establish safety.
+		for _, signature := range checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind) {
+			if len(signature.TypeParameters()) != 0 &&
+				checker.Checker_couldContainTypeVariables(ctx.TypeChecker)(checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) {
+				return true
+			}
+		}
+	case ast.KindObjectLiteralExpression:
+		for _, property := range expression.Properties() {
+			switch property.Kind {
+			case ast.KindPropertyAssignment:
+				if assertionMayAffectInference(ctx, property.Initializer()) {
+					return true
+				}
+			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+				if assertionMayAffectInference(ctx, property) {
+					return true
+				}
+			case ast.KindSpreadAssignment:
+				if assertionMayAffectInference(ctx, property.Expression()) {
+					return true
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		for _, element := range expression.Elements() {
+			if element.Kind == ast.KindSpreadElement {
+				element = element.Expression()
+			}
+			if assertionMayAffectInference(ctx, element) {
+				return true
+			}
+		}
+	case ast.KindConditionalExpression:
+		conditional := expression.AsConditionalExpression()
+		return assertionMayAffectInference(ctx, conditional.WhenTrue) || assertionMayAffectInference(ctx, conditional.WhenFalse)
+	case ast.KindBinaryExpression:
+		binary := expression.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return assertionMayAffectInference(ctx, binary.Left) || assertionMayAffectInference(ctx, binary.Right)
+		case ast.KindAmpersandAmpersandToken, ast.KindCommaToken:
+			return assertionMayAffectInference(ctx, binary.Right)
+		}
+	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		if ast.HasContextSensitiveParameters(expression) {
+			return true
+		}
+		if expression.Type() != nil {
+			return false
+		}
+		body := expression.Body()
+		if body != nil && ast.IsBlock(body) {
+			return ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+				return assertionMayAffectInference(ctx, statement.Expression())
+			})
+		}
+		return assertionMayAffectInference(ctx, body)
+	case ast.KindAwaitExpression, ast.KindNonNullExpression:
+		return assertionMayAffectInference(ctx, expression.Expression())
+	}
+	return false
+}
+
 func assertionIsInDestructuringDeclaration(node *ast.Node) bool {
 	semanticNode := assertionWalkUpParentheses(node)
 	parent := semanticNode.Parent
@@ -914,6 +1012,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			expression := node.Expression()
 			uncastType := getUncastType(node)
 			reportAssertion := func(msg rule.RuleMessage) {
+				if assertionMayAffectInference(ctx, expression) {
+					return
+				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
 					if node.Kind == ast.KindAsExpression {
 						asKeywordRange := getTokenRange(expression.End())
@@ -957,7 +1058,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						msg = buildContextuallyUnnecessaryMessage()
 					}
 				}
-				if msg.Id == "" {
+				if msg.Id == "" || assertionMayAffectInference(ctx, originalExpression) {
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {

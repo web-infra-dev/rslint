@@ -44,7 +44,12 @@
     "TupleType": ["combinedFlags"],
     "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],
-    "Checker": ["numberType", "booleanType", "globalRegExpType"],
+    "Checker": [
+      "numberType",
+      "booleanType",
+      "globalRegExpType",
+      "couldContainTypeVariables"
+    ],
     "InterfaceType": ["thisType"]
   }
 }

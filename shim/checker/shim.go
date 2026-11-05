@@ -473,6 +473,9 @@ func Checker_booleanType(v *checker.Checker) *checker.Type {
 func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).globalRegExpType
 }
+func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) bool {
+  return ((*extra_Checker)(unsafe.Pointer(v))).couldContainTypeVariables
+}
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
 func CompareTypes(t1 *checker.Type, t2 *checker.Type) int
 type CompositeSignature = checker.CompositeSignature

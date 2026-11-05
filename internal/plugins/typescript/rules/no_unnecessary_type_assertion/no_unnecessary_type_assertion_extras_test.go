@@ -542,6 +542,50 @@ func TestNoUnnecessaryTypeAssertionInferenceGuards(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			// A cast can supply return-type inference for a generic call. The
+			// operand's type inside the cast is not its type after removing it.
+			{Code: `
+declare function makeCheck<T>(): (value: T) => T;
+export const check = makeCheck() as (value: string) => string;
+const value: string = check('value');
+`},
+			{Code: `
+declare function makeCheck<T = any>(): (value: T) => T;
+export const check = makeCheck() as (value: string) => string;
+const value: string = check('value');
+`},
+			{Code: `
+type Fields = { name: string };
+type Checks<T> = { [K in keyof T]: { value: T[K] } };
+declare function makeChecks<T extends Record<string, unknown>, R>(options: { rules: R }): (state: object) => Checks<T>;
+const rules = { name: {} };
+export const check = makeChecks({ rules }) as (state: object) => Checks<Fields>;
+const value: string = check({}).name.value;
+`},
+			{Code: `
+declare class Box<T = unknown> { value: T; }
+export const box = new Box() as Box<string>;
+const value: string = box.value;
+`},
+			{Code: "declare function tag<T>(parts: TemplateStringsArray): (value: T) => T;\nexport const check = tag`value` as (value: string) => string;"},
+			{Code: `
+declare function makeCheck<T>(): (value: T) => T;
+export const checks = { check: makeCheck() } as { check: (value: string) => string };
+const value: string = checks.check('value');
+`},
+			{Code: `
+declare function make<T = any>(): (value: T) => T;
+export const value = ({ f: make() } as const) as { readonly f: (value: string) => string };
+`},
+			{Code: `
+declare function f<T>(fn: (x: T) => string): T;
+declare function f(fn: (x: string) => number): string;
+const value = f(x => x.length) as string;
+`},
+			{Code: `
+declare function consume(value: unknown): void;
+consume((value => value) as (value: string) => string);
+`},
 			{Code: `
 namespace N { export type R = any }
 type R = () => N.R;
@@ -635,6 +679,52 @@ test.options.parameters.potato;
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare function makeCheck<T, U = T>(): (value: T) => U;
+export const check = makeCheck<string>() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck<T, U = T>(): (value: T) => U;
+export const check = makeCheck<string>();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function makeCheck<T>(): (value: T) => T;
+const makeStringCheck = makeCheck<string>;
+export const check = makeStringCheck() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck<T>(): (value: T) => T;
+const makeStringCheck = makeCheck<string>;
+export const check = makeStringCheck();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function makeCheck(): (value: string) => string;
+export const check = makeCheck() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck(): (value: string) => string;
+export const check = makeCheck();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function count<T>(value: T): number;
+export const value = count('value') as number;
+`,
+				Output: []string{`
+declare function count<T>(value: T): number;
+export const value = count('value');
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
 			{
 				Code: `
 type Wrapper<T> = () => T;
