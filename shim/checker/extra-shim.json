@@ -28,6 +28,7 @@
       "getContextualTypeForArgumentAtIndex",
       "getResolvedSignature",
       "getBaseTypeOfLiteralType",
+      "getWidenedLiteralLikeTypeForContextualType",
       "getWidenedType",
       "isTypeAssignableTo",
       "isTypeIdenticalTo",

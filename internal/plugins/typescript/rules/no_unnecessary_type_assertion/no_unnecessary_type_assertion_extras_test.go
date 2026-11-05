@@ -1046,6 +1046,55 @@ const reused = held;
 	)
 }
 
+func TestNoUnnecessaryTypeAssertionContextualValueWidening(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "declare function fmt(n: 1): number; type Path = `id:${number}`;\n" +
+				"const scalar = (() => `id:${fmt(1)}`)() as Path; const scalarProof: Path = scalar;\n" +
+				"declare function digit(): 1 | 2; type Finite = `id:${1 | 2}`;\n" +
+				"const finite = { paths: [`id:${digit()}`] } as { paths: Finite[] }; const finiteProof: Finite = finite.paths[0];"},
+			{Code: `
+declare const tag: unique symbol;
+declare const other: unique symbol;
+declare const flag: boolean;
+type Both = typeof tag | typeof other;
+const nested = { values: [tag] } as { values: Array<typeof tag> }; const arrayProof: typeof tag = nested.values[0];
+const either = { tag: flag ? tag : other } as { tag: Both }; const conditionalProof: Both = either.tag;
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare const tag: unique symbol;
+const fixed: { tag: typeof tag } = ({ tag } as { tag: typeof tag });
+`,
+				Output: []string{`
+declare const tag: unique symbol;
+const fixed: { tag: typeof tag } = ({ tag });
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+				},
+			},
+			{
+				Code: "declare const n: number; type Path = `id:${number}`;\n" +
+					"const returned = ((): Path => `id:${n}`)() as Path;\n" +
+					"const pinned = ({ path: `id:${n}` } as const) as { readonly path: Path };\n" +
+					"const fixed: 'id:1' = `id:${1}` as 'id:1';",
+				Output: []string{"declare const n: number; type Path = `id:${number}`;\n" +
+					"const returned = ((): Path => `id:${n}`)();\n" +
+					"const pinned = ({ path: `id:${n}` } as const);\n" +
+					"const fixed: 'id:1' = `id:${1}`;"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {
 	const declarations = `enum Mode { Auto = 1, Manual = 2 } declare const mode: Mode;`
 	var valid []rule_tester.ValidTestCase

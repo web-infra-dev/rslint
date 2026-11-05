@@ -388,7 +388,9 @@ func assertionExpressionType(typeChecker *checker.Checker, expression *ast.Node)
 }
 
 func assertionPreservesWidening(typeChecker *checker.Checker, original, asserted *checker.Type) bool {
-	widenedOriginal := typeChecker.GetWidenedLiteralType(original)
+	// Mutable locations and implicit returns also widen unique symbols,
+	// independently of the fresh-literal metadata.
+	widenedOriginal := checker.Checker_getWidenedLiteralLikeTypeForContextualType(typeChecker, original, nil)
 	widenedAsserted := typeChecker.GetWidenedLiteralType(asserted)
 	return (widenedOriginal == original && widenedAsserted == asserted) ||
 		checker.Checker_isTypeIdenticalTo(typeChecker, widenedOriginal, widenedAsserted)
@@ -465,15 +467,17 @@ func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node
 		return false
 	}
 	expression = ast.SkipParentheses(expression)
+	var expressionType *checker.Type
+	explicitLiteral := false
 	if memberWrites {
-		original := assertionExpressionType(ctx.TypeChecker, expression)
+		expressionType = assertionExpressionType(ctx.TypeChecker, expression)
 		contextual := checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone)
 		parent := assertionWalkUpParentheses(expression).Parent
 		// A declaration that explicitly fixes this literal keeps it pinned;
 		// its operand still needs the inference checks below.
-		explicitLiteral := contextual != nil && parent != nil && ast.IsAssertionExpression(parent) &&
+		explicitLiteral = contextual != nil && parent != nil && ast.IsAssertionExpression(parent) &&
 			assertionHasExplicitLiteralType(ctx, parent, contextual)
-		if contextual != nil && !explicitLiteral && assertionMemberWriteMayWiden(ctx, expression, original, contextual, retainedConst) {
+		if contextual != nil && !explicitLiteral && assertionMemberWriteMayWiden(ctx, expression, expressionType, contextual, retainedConst) {
 			return true
 		}
 	}
@@ -486,6 +490,12 @@ func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node
 		}
 	case ast.KindSatisfiesExpression:
 		return assertionValueMayAffectInference(ctx, expression.Expression(), false, memberWrites)
+	case ast.KindTemplateExpression:
+		// Context can produce a template type or regular string literals;
+		// type-only widening cannot recover the string otherwise produced.
+		// A retained const context fixes that independently.
+		return memberWrites && !explicitLiteral && !utils.IsTypeFlagSet(expressionType, checker.TypeFlagsString) &&
+			(!retainedConst || !checker.Checker_isConstContext(ctx.TypeChecker, expression))
 	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
 		if !memberWrites && checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone) == nil {
 			return false
@@ -522,9 +532,8 @@ func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node
 			}
 		}
 	case ast.KindObjectLiteralExpression:
-		var objectType *checker.Type
+		objectType := expressionType
 		if memberWrites {
-			objectType = assertionExpressionType(ctx.TypeChecker, expression)
 			if assertionAggregateMayWiden(ctx.TypeChecker, objectType, false) {
 				return true
 			}
@@ -585,7 +594,10 @@ func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node
 			}
 		}
 	case ast.KindArrayLiteralExpression:
-		arrayType := assertionExpressionType(ctx.TypeChecker, expression)
+		arrayType := expressionType
+		if arrayType == nil {
+			arrayType = assertionExpressionType(ctx.TypeChecker, expression)
+		}
 		if memberWrites && assertionAggregateMayWiden(ctx.TypeChecker, arrayType, false) {
 			return true
 		}
