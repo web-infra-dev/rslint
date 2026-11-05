@@ -978,6 +978,74 @@ const third = ((value) => value * 2)(3);
 	)
 }
 
+func TestNoUnnecessaryTypeAssertionAggregateInference(t *testing.T) {
+	const declarations = `
+enum Mode { A, B, C }
+type Pair = Mode.A | Mode.B;
+declare const flag: boolean;
+const raw = flag ? Mode.A : Mode.B;
+`
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const row = ((n) => ({ ...{ n, value: 1 } } as const))(0) as { readonly n: number; readonly value: 1 }; const one: 1 = row.value;`},
+			{Code: declarations + `
+const direct = { mode: flag ? Mode.A : Mode.B } as { mode: Pair };
+let first = direct.mode;
+function readFirst(): Pair { return first; }
+const shorthand = { raw } as { raw: Pair };
+let second = shorthand.raw;
+function readSecond(): Pair { return second; }
+const nested = { members: [{ ...{ value: raw } }] } as { members: Array<{ value: Pair }> };
+let third = nested.members[0].value;
+function readThird(): Pair { return third; }
+`},
+			{Code: `
+declare const flag: boolean;
+const raw = flag ? 'a' : 'b';
+const row = (() => ({ ...{ value: raw } } as const))() as { readonly value: 'a' | 'b' };
+let copied = row.value;
+function read(): 'a' | 'b' { return copied; }
+`},
+			{Code: `
+declare function make<T = any>(): T;
+type Model = { name: string };
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type IsFalse<T extends false> = T;
+const row = ((n) => ({ ...{ n, data: make() } } as const))(0) as { readonly n: number; readonly data: Model };
+type TypedMember = IsFalse<IsAny<typeof row.data>>;
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare const ready: { value: number };
+declare const count: number;
+const stored = ready as { value: number };
+const built = { value: count } as { value: number };
+const annotated = ((n): { readonly value: 1 } => ({ value: 1 }))(3) as { readonly value: 1 };
+const held = { nested: { n: Math.random() } };
+const reused = held as typeof held;
+`,
+				Output: []string{`
+declare const ready: { value: number };
+declare const count: number;
+const stored = ready;
+const built = { value: count };
+const annotated = ((n): { readonly value: 1 } => ({ value: 1 }))(3);
+const held = { nested: { n: Math.random() } };
+const reused = held;
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+		},
+	)
+}
+
 func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {
 	const declarations = `enum Mode { Auto = 1, Manual = 2 } declare const mode: Mode;`
 	var valid []rule_tester.ValidTestCase
