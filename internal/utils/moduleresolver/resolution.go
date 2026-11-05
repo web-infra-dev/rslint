@@ -47,6 +47,9 @@ type Options struct {
 	// Local imports disable directory lookup unless entry options enable it.
 	// Require callers retain the ordinary Node directory lookup.
 	NoDirectory bool `json:"noDirectory"`
+	// NodeMain stops configured main targets from following another package's
+	// main field. Node tries the target as a file, then its directory index.
+	NodeMain bool `json:"nodeMain,omitempty"`
 	// NodeExports applies Node's own `exports`/`imports` target rules instead
 	// of enhanced-resolve's: a target must name an existing file exactly, with
 	// no extension or directory lookup, and is read as a URL after any pattern

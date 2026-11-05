@@ -31,6 +31,53 @@ func programForResolution(t testing.TB, files map[string]string, fileName string
 	return programForResolutionFS(t, files, fileName, osvfs.FS())
 }
 
+func TestResolverNodeMain(t *testing.T) {
+	archive := txtarfs.MustParseFile(t, "testdata/resolution_entries.txtar")
+	names, err := archive.FileNames("node-main")
+	if err != nil || len(names) == 0 {
+		t.Fatalf("empty or invalid Node main fixtures: %v", err)
+	}
+	files := map[string]string{}
+	for _, name := range names {
+		data, err := archive.ReadFile("node-main/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[tspath.ResolvePath("/node-main", name)] = string(data)
+	}
+	fileName := "/node-main/input.js"
+	p := programForResolution(t, files, fileName)
+	for _, tc := range []struct {
+		request, want string
+		nodeMain      bool
+	}{
+		{"./b", "b/sub/tool.js", false},
+		{"./b", "b/sub/index.js", true},
+		{"./b/sub", "b/sub/tool.js", true},
+		{"./missing-index", "missing-index/index.js", true},
+		{"./file-first", "file-first/sub.js", true},
+		{"./malformed-main", "malformed-main/sub/index.js", true},
+		{"./missing-entry", "", true},
+	} {
+		t.Run(fmt.Sprintf("%s/nodeMain=%t", tc.request, tc.nodeMain), func(t *testing.T) {
+			options := moduleresolver.Options{
+				Extensions: []string{".js", ".json", ".node"},
+				Conditions: []string{"node", "require"},
+				MainFields: []moduleresolver.MainField{{Name: []string{"main"}, ForceRelative: true}},
+				MainFiles:  []string{"index"}, NodeExports: true, NodeMain: tc.nodeMain, LiteralPaths: true,
+			}
+			want := tc.want
+			if want != "" {
+				want = tspath.ResolvePath("/node-main", want)
+			}
+			got := moduleresolver.Resolve(p, tc.request, fileName, options)
+			if got.Path != want || got.ResourceSuffix != "" || (got.Error != "") != (want == "") {
+				t.Errorf("resolve %s = %+v, want %q", tc.request, got, want)
+			}
+		})
+	}
+}
+
 func TestResolverCachePreservesRecursiveErrorIdentity(t *testing.T) {
 	files := map[string]string{
 		"/cycle/package.json":  `{"browser":{"x":"y","y":"x"}}`,

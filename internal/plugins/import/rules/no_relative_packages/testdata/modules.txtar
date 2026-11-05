@@ -1,0 +1,44 @@
+-- tsconfig.json --
+{"compilerOptions":{"allowJs":true,"jsx":"preserve"},"include":["**/*"]}
+-- package.json --
+{"name":"eslint-plugin-import"}
+-- tests/files/bar.js --
+export const value = 1;
+-- tests/files/package/package.json --
+{"main":"index.js"}
+-- tests/files/package/index.js --
+export const value = 1;
+-- tests/files/package-named/package.json --
+{"name":"package-named","main":"index.js"}
+-- tests/files/package-named/index.js --
+export const value = 1;
+-- tests/files/package-scoped/package.json --
+{"name":"@scope/package-named","main":"index.js"}
+-- tests/files/package-scoped/index.js --
+export const value = 1;
+-- tests/files/package-named/deep/a.js --
+export const value = 1;
+-- tests/files/same/package.json --
+{"name":"package-named"}
+-- tests/files/same/index.js --
+export const value = 1;
+-- tests/files/bad/package.json --
+{invalid
+-- tests/files/bad/index.js --
+export const value = 1;
+-- my-project/package.json --
+{"name":"my-project"}
+-- my-project/entry.js --
+export default 1;
+-- my-project/packages/foo/package.json --
+{"name":"foo"}
+-- my-project/packages/foo/index.js --
+export default 1;
+-- my-project/packages/bar/package.json --
+{"name":"bar"}
+-- my-project/packages/bar/index.js --
+export default 1;
+-- tests/files/array/package.json --
+[]
+-- tests/files/array/index.js --
+export default 1;
