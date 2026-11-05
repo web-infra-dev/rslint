@@ -705,9 +705,9 @@ func (c *Channel) closeWith(cause error) {
 	c.published = make(map[int][]MemoryBatch)
 	memory := c.memory
 	c.memory = nil
-	c.mu.Unlock()
-
+	// Once a request can observe closeErr, its session must already be canceled.
 	c.inCancel()
+	c.mu.Unlock()
 	close(c.done)
 	if memory != nil {
 		// Wait for any copy/publication before releasing the mapping. An in-flight native

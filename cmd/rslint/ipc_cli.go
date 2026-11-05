@@ -163,6 +163,7 @@ type runtimePayload struct {
 type initDelivery struct {
 	payload *initPayload
 	reply   *ipc.ResponseReceipt
+	session context.Context
 }
 
 // runCLI owns the native CLI process and the connection to its Node host.
@@ -170,13 +171,16 @@ func runCLI(args []string) int {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(signals)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Stdout is the IPC transport. A broken pipe must return EPIPE so the
+	// channel can cancel the run and deferred cleanup can finish profiling.
+	brokenPipe := make(chan os.Signal, 1)
+	signal.Notify(brokenPipe, syscall.SIGPIPE)
+	defer signal.Stop(brokenPipe)
 	ch := ipc.NewChannel(os.Stdin, os.Stdout)
 	defer ch.Close()
 
 	finished := make(chan int, 1)
-	go func() { finished <- runIPCCommand(ctx, ch, args) }()
+	go func() { finished <- runIPCCommand(ch, args) }()
 
 	var exitCode int
 	select {
@@ -184,10 +188,10 @@ func runCLI(args []string) int {
 		return code
 	case sig := <-signals:
 		exitCode = 128 + int(sig.(syscall.Signal)) //nolint:forcetypeassert // Notify only subscribes to syscall.Signal values.
+		_ = ch.Close()
 	case <-ch.Done():
 		exitCode = 2
 	}
-	cancel()
 	// Give active fixes and profiles time to finish. A write to inherited
 	// stderr can still block after the command context is canceled.
 	select {
@@ -197,10 +201,10 @@ func runCLI(args []string) int {
 	return exitCode
 }
 
-func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
+func runIPCCommand(ch *ipc.Channel, args []string) int {
 	initCh := make(chan initDelivery, 1)
 	var initOnce sync.Once
-	ch.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+	ch.SetInboundHandler(func(session context.Context, msg *ipc.Message) (any, error) {
 		switch msg.Kind {
 		case kindInit:
 			var p initPayload
@@ -210,7 +214,7 @@ func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
 			response, receipt := ipc.TrackResponse(map[string]any{"ok": true})
 			// Exactly-once: engine.ts sends one init; defensive vs a buggy peer.
 			initOnce.Do(func() {
-				initCh <- initDelivery{payload: &p, reply: receipt}
+				initCh <- initDelivery{payload: &p, reply: receipt, session: session}
 			})
 			return response, nil
 		default:
@@ -232,7 +236,7 @@ func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
 	var delivery initDelivery
 	select {
 	case delivery = <-initCh:
-	case <-ctx.Done():
+	case <-ch.Done():
 		return 2
 	case <-initTimer.C:
 		fmt.Fprintf(os.Stderr, "rslint: timed out waiting for init after %s\n", initTimeout)
@@ -240,6 +244,7 @@ func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
 	}
 
 	// Do not act on init until its complete response frame reached the host.
+	ctx := delivery.session
 	select {
 	case <-delivery.reply.Done():
 		if delivery.reply.Err() != nil {
@@ -303,9 +308,10 @@ func runIPCCommand(ctx context.Context, ch *ipc.Channel, args []string) int {
 			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
 		}
 		if err := prepareErr; err != nil {
-			if ctx.Err() == nil {
-				fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			if ctx.Err() != nil {
+				return 2
 			}
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			shutdownPeer(ctx, ch)
 			return 1
 		}

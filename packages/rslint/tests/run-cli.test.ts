@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, test } from 'rstack/test';
 import { runCLI } from '../src/index.js';
 
@@ -47,6 +48,7 @@ describe('runCLI', () => {
         );
         expect(result.status).toBe(0);
         expect(JSON.parse(result.stdout)).toEqual([1, exitCode]);
+        expect(result.stderr).not.toContain('error: ipc: channel closed');
       } finally {
         fs.rmSync(cwd, { recursive: true, force: true });
       }
@@ -69,7 +71,7 @@ describe('runCLI', () => {
       const bin = fileURLToPath(new URL('../bin/rslint.js', import.meta.url));
       const child = spawn(
         process.execPath,
-        [bin, '--format=jsonline', 'input.ts'],
+        [bin, '--format=jsonline', '--cpuprof=cpu.prof', 'input.ts'],
         {
           cwd,
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -90,6 +92,8 @@ describe('runCLI', () => {
         child.kill('SIGINT');
         const [exit] = await done;
         expect(exit).toEqual([null, 'SIGINT']);
+        const profile = fs.readFileSync(path.join(cwd, 'cpu.prof'));
+        expect(gunzipSync(profile).length).toBeGreaterThan(0);
       } finally {
         child.stdout.destroy();
         if (child.exitCode === null && child.signalCode === null) {
