@@ -92,8 +92,12 @@ describe('runCLI', () => {
         child.kill('SIGINT');
         const [exit] = await done;
         expect(exit).toEqual([null, 'SIGINT']);
-        const profile = fs.readFileSync(path.join(cwd, 'cpu.prof'));
-        expect(gunzipSync(profile).length).toBeGreaterThan(0);
+        // Windows child.kill() forcibly terminates Node and can kill its
+        // entire job. On POSIX only Node gets SIGINT, so Go can flush on EOF.
+        if (process.platform !== 'win32') {
+          const profile = fs.readFileSync(path.join(cwd, 'cpu.prof'));
+          expect(gunzipSync(profile).length).toBeGreaterThan(0);
+        }
       } finally {
         child.stdout.destroy();
         if (child.exitCode === null && child.signalCode === null) {
