@@ -2004,7 +2004,7 @@ const x = (1 + 1) as any as number;
         },
       ],
       output: `
-const x = 1 + 1;
+const x = (1 + 1);
       `,
     },
     {
@@ -2017,7 +2017,7 @@ const x = 2 * ((1 + 1) as any as number);
         },
       ],
       output: `
-const x = 2 * (1 + 1);
+const x = 2 * ((1 + 1));
       `,
     },
     {

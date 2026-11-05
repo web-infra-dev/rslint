@@ -1903,7 +1903,7 @@ const x = (1 + 1) as any as number;
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-const x = 1 + 1;
+const x = (1 + 1);
       ",
   "ruleCount": 1,
 }
@@ -1934,7 +1934,7 @@ const x = 2 * ((1 + 1) as any as number);
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-const x = 2 * (1 + 1);
+const x = 2 * ((1 + 1));
       ",
   "ruleCount": 1,
 }

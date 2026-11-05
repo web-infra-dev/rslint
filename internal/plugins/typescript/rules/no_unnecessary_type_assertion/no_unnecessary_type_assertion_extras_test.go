@@ -1095,6 +1095,63 @@ const fixed: { tag: typeof tag } = ({ tag });
 	)
 }
 
+func TestNoUnnecessaryTypeAssertionRetainedTypeBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const row = ({ value: 1 } satisfies { value: number }) as { value: 1 }; const one: 1 = row.value;`},
+			{Code: `declare const n: number; const tuple = ([n] satisfies number[]) as [number]; const one: [number] = tuple;`},
+			{Code: `declare const n: number; const value = n as MissingType as number;`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `const x: number = 2, y: number = 3; const value = 10 * <number><unknown>(x + y);`,
+				Output: []string{`const x: number = 2, y: number = 3; const value = 10 * (x + y);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function call(value: string): number; <{ a: number; b: number }><unknown>{ a: call('a'), b: call('b') };`,
+				Output: []string{`declare function call(value: string): number; ({ a: call('a'), b: call('b') });`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function a(): number; declare function b(): number; declare function pick(value: number): void; pick(<number><unknown>(a(), /* keep */ b()));`,
+				Output: []string{`declare function a(): number; declare function b(): number; declare function pick(value: number): void; pick((a(), /* keep */ b()));`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const getBox = () => <{ readonly n: number }>({ n } as const as unknown);`,
+				Output: []string{`declare const n: number; const getBox = () => ({ n } as const);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const value = n as unknown as unknown as number;`,
+				Output: []string{`declare const n: number; const value = n as unknown as number;`, `declare const n: number; const value = n;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function make<T>(): T; const value = (make() satisfies string) as string;`,
+				Output: []string{`declare function make<T>(): T; const value = (make() satisfies string);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const value = ([n, n] satisfies [number, number]) as [number, number];`,
+				Output: []string{`declare const n: number; const value = ([n, n] satisfies [number, number]);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const out = { v: [n] } as const as unknown as { readonly v: readonly [number] }; const tuple: readonly [number] = out.v;`,
+				Output: []string{`declare const n: number; const out = { v: [n] } as const; const tuple: readonly [number] = out.v;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const out = { n } as const as unknown as { readonly n: number }; type Same<X, Y> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? true : false; const proof: Same<typeof out, { readonly n: number }> = true;`,
+				Output: []string{`declare const n: number; const out = { n } as const; type Same<X, Y> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? true : false; const proof: Same<typeof out, { readonly n: number }> = true;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+		},
+	)
+}
+
 func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {
 	const declarations = `enum Mode { Auto = 1, Manual = 2 } declare const mode: Mode;`
 	var valid []rule_tester.ValidTestCase

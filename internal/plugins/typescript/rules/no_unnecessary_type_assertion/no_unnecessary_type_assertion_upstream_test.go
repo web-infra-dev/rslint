@@ -1341,12 +1341,12 @@ const x = v;
 			{Code: `
 const x = (1 + 1) as any as number;
       `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`}}, Output: []string{`
-const x = 1 + 1;
+const x = (1 + 1);
       `}},
 			{Code: `
 const x = 2 * ((1 + 1) as any as number);
       `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`}}, Output: []string{`
-const x = 2 * (1 + 1);
+const x = 2 * ((1 + 1));
       `}},
 			{Code: `
 const v: number = 5;

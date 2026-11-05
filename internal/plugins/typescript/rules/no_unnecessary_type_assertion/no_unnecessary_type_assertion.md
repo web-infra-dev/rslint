@@ -49,9 +49,11 @@ const values = Array.of(mode as number);
 values.includes(-1);
 ```
 
-An assertion on an object can also keep a property narrow. In `const row = { ...{ value: 1 } } as { value: 1 }`, `row.value` has type `1`. Removing the assertion widens it to `number`.
+An assertion on an object can also keep a property narrow. In `const row = { ...{ value: 1 } } as { value: 1 }`, `row.value` has type `1`. Removing the assertion widens it to `number`. Similarly, if `tag` is a unique symbol, `const row = { tag } as { tag: typeof tag }` keeps `row.tag` specific to that symbol. Removing the assertion would widen the property to `symbol`.
 
 With `checkLiteralConstAssertions` enabled, `--fix` can simplify `const count: 1 = 1 as const` to `const count: 1 = 1`. In `const count = 1 as const`, it keeps the assertion. A later `let copy = count` has type `1`. Removing `as const` would give `copy` the type `number`.
+
+If `make<T>(): T` is a generic function, `(make() satisfies string) as string` simplifies to `(make() satisfies string)`. The `satisfies string` clause already gives the call its `string` type.
 
 `--fix` may leave a redundant assertion in place when its effect on a generic call or a generator's inferred type is uncertain. If `A` and `B` are both aliases for `Mode | null`, `--fix` can remove `as B` from a value of type `A`.
 

@@ -489,7 +489,9 @@ func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node
 			return assertionValueMayAffectInference(ctx, expression.Expression(), true, memberWrites)
 		}
 	case ast.KindSatisfiesExpression:
-		return assertionValueMayAffectInference(ctx, expression.Expression(), false, memberWrites)
+		// The constraint supplies the operand's context. The value still
+		// has the operand's inferred type, including its member freshness.
+		return memberWrites && assertionAggregateMayWiden(ctx.TypeChecker, expressionType, true)
 	case ast.KindTemplateExpression:
 		// Context can produce a template type or regular string literals;
 		// type-only widening cannot recover the string otherwise produced.
@@ -1053,6 +1055,17 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			tokenScanner.Scan()
 			return tokenScanner.TokenRange()
 		}
+		needsParenthesesAfterRemoval := func(assertion, operand *ast.Node) bool {
+			first := getTokenRange(operand.Pos())
+			switch sourceText[first.Pos():first.End()] {
+			case "{":
+				return utils.IsStartOfExpressionStatement(ctx.SourceFile, assertion) ||
+					assertionIsStartOfArrowFunctionBody(ctx.SourceFile, assertion)
+			case "function", "class":
+				return utils.IsStartOfExpressionStatement(ctx.SourceFile, assertion)
+			}
+			return false
+		}
 
 		compilerOptions := ctx.Program().Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
@@ -1344,12 +1357,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					openingAngleBracket := getTokenRange(node.Pos())
 					fixRange := openingAngleBracket.WithEnd(expression.Pos())
 					fixes := []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
-					firstOperandRange := getTokenRange(expression.Pos())
-					firstOperandText := sourceText[firstOperandRange.Pos():firstOperandRange.End()]
-					breaksExpressionStatement := (firstOperandText == "{" || firstOperandText == "function" || firstOperandText == "class") &&
-						utils.IsStartOfExpressionStatement(ctx.SourceFile, node)
-					breaksArrowFunctionBody := firstOperandText == "{" && assertionIsStartOfArrowFunctionBody(ctx.SourceFile, node)
-					if breaksExpressionStatement || breaksArrowFunctionBody {
+					if needsParenthesesAfterRemoval(node, expression) {
 						fixes = append(fixes,
 							rule.RuleFixInsertBefore(ctx.SourceFile, node, "("),
 							rule.RuleFixInsertAfter(node, ")"),
@@ -1360,21 +1368,25 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 			reportDoubleAssertionIfUnnecessary := func(contextualType *checker.Type) {
 				innerExpression := ast.SkipParentheses(expression)
-				if innerExpression == nil || (innerExpression.Kind != ast.KindAsExpression && innerExpression.Kind != ast.KindTypeAssertionExpression) {
+				if !ast.IsAssertionExpression(innerExpression) || ast.IsConstAssertion(innerExpression) {
 					return
 				}
-				originalExpression := assertionOriginalExpression(node)
-				originalType := assertionExpressionType(ctx.TypeChecker, originalExpression)
+				intermediateType := ctx.TypeChecker.GetTypeAtLocation(innerExpression)
+				if !utils.IsTypeFlagSet(intermediateType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) || utils.IsIntrinsicErrorType(intermediateType) {
+					return
+				}
+				// Only consume this bridge. Earlier assertions, especially as const,
+				// must remain in the expression used by both the proof and the fix.
+				retainedExpression := innerExpression.Expression()
+				retainedType := assertionExpressionType(ctx.TypeChecker, retainedExpression)
 				msg := rule.RuleMessage{}
-				if isTypeUnchanged(node, originalExpression, originalType, castType) && !utils.IsTypeAnyType(castType) &&
-					canRemove(originalExpression, originalType, true) {
+				if isTypeUnchanged(node, retainedExpression, retainedType, castType) && !utils.IsTypeAnyType(castType) &&
+					canRemove(retainedExpression, retainedType, true) {
 					msg = buildUnnecessaryAssertionMessage()
-				} else if contextualType != nil && !assertionTypeContainsAny(ctx.TypeChecker, originalType) &&
+				} else if contextualType != nil && !assertionTypeContainsAny(ctx.TypeChecker, retainedType) &&
 					!assertionTypeContainsAny(ctx.TypeChecker, contextualType) {
-					intermediateType := ctx.TypeChecker.GetTypeAtLocation(innerExpression)
-					if utils.IsTypeFlagSet(intermediateType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) &&
-						checker.Checker_isTypeAssignableTo(ctx.TypeChecker, originalType, contextualType) &&
-						canRemove(originalExpression, originalType, false) {
+					if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, retainedType, contextualType) &&
+						canRemove(retainedExpression, retainedType, false) {
 						msg = buildContextuallyUnnecessaryMessage()
 					}
 				}
@@ -1382,12 +1394,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
-					originalRange := utils.TrimNodeTextRange(ctx.SourceFile, originalExpression)
-					replacement := sourceText[originalRange.Pos():originalRange.End()]
-					semanticNode := assertionWalkUpParentheses(node)
-					if originalExpression.Kind == ast.KindObjectLiteralExpression &&
-						semanticNode.Parent != nil && ast.IsArrowFunction(semanticNode.Parent) &&
-						semanticNode.Parent.AsArrowFunction().Body == semanticNode {
+					retainedRange := utils.TrimNodeTextRange(ctx.SourceFile, retainedExpression)
+					replacement := sourceText[retainedRange.Pos():retainedRange.End()]
+					if needsParenthesesAfterRemoval(node, retainedExpression) {
 						replacement = "(" + replacement + ")"
 					}
 					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)}
