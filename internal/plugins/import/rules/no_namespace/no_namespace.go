@@ -35,6 +35,11 @@ var NoNamespaceRule = rule.Rule{
 		generated := map[string]bool{}
 		return rule.RuleListeners{
 			ast.KindNamespaceImport: func(node *ast.Node) {
+				// A deferred import must use a namespace binding, so there is
+				// no default or named form to prefer.
+				if node.Parent.AsImportClause().PhaseModifier == ast.KindDeferKeyword {
+					return
+				}
 				source := node.Parent.Parent.AsImportDeclaration().ModuleSpecifier.Text()
 				for index, pattern := range ignored {
 					if pattern.Match(source) {
