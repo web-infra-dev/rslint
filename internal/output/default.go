@@ -9,11 +9,16 @@ import (
 	"strings"
 	"time"
 	"unicode"
-	"unicode/utf8"
 )
 
 type defaultFormatter struct {
 	colors colorScheme
+
+	// These spans are fixed for the lifetime of one render.
+	messageBar, frameHeading, frameHeadingEnd string
+	lineLeft, lineRight, frameBottom          string
+
+	lastRule, ruleLabel string
 }
 
 const statusLabelWidth = 7
@@ -41,15 +46,16 @@ func RenderAbort(dst io.Writer, mode Mode, startedAt time.Time, reason string, o
 }
 
 func (f *defaultFormatter) begin(w *bufio.Writer, _ Report, hasVisibleDiagnostics bool) error {
-	if hasVisibleDiagnostics {
-		return w.WriteByte('\n')
+	if !hasVisibleDiagnostics {
+		return nil
 	}
-	return nil
-}
-
-func (f *defaultFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
-	renderDefaultDiagnostic(w, view, f.colors)
-	return nil
+	f.messageBar = f.colors.BorderText("│")
+	f.frameHeading = f.colors.BorderText("╭─┴──────────(")
+	f.frameHeadingEnd = f.colors.BorderText(")─────")
+	f.lineLeft = f.colors.BorderText("│ ")
+	f.lineRight = f.colors.BorderText(" │")
+	f.frameBottom = f.colors.BorderText("╰────────────────────────────────")
+	return w.WriteByte('\n')
 }
 
 func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
@@ -254,27 +260,26 @@ func pluralize(count int, singular, plural string) string {
 	return plural
 }
 
-func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorScheme) {
-	diagnostic := view.raw
+func (f *defaultFormatter) diagnostic(w *bufio.Writer, diagnostic *Diagnostic, relativePath string) error {
+	colors := &f.colors
 	diagnosticStart := diagnostic.Range.Start
 	diagnosticEnd := diagnostic.Range.End
-	diagnosticStartLine := view.start.line
-	diagnosticStartColumn := view.start.column
-	diagnosticEndLine := view.end.line
+	diagnosticStartLine := diagnostic.Start.Line
+	diagnosticStartColumn := diagnostic.Start.Column
+	diagnosticEndLine := diagnostic.End.Line
 
 	lineMap := diagnostic.Source.lineStarts
 	text := diagnostic.Source.text
 
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndLine+1, len(lineMap)-1)
-	codeboxStart := lineMap[codeboxStartLine]
-	codeboxEnd := len(text)
-	if codeboxEndLine != len(lineMap)-1 {
-		codeboxEnd = lineMap[codeboxEndLine+1] - 1
-	}
 
 	w.WriteByte(' ')
-	w.WriteString(colors.RuleName(" %s ", diagnostic.RuleName))
+	if f.ruleLabel == "" || f.lastRule != diagnostic.RuleName {
+		f.lastRule = diagnostic.RuleName
+		f.ruleLabel = colors.RuleName(" %s ", diagnostic.RuleName)
+	}
+	w.WriteString(f.ruleLabel)
 	w.WriteString(" — ")
 
 	severityColor := colors.WarnText
@@ -292,7 +297,7 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 				w.WriteString("  ")
 			} else {
 				w.WriteString("    ")
-				w.WriteString(colors.BorderText("│"))
+				w.WriteString(f.messageBar)
 				w.WriteString(strings.Repeat(" ", len(diagnostic.RuleName)+1))
 			}
 		}
@@ -302,118 +307,86 @@ func renderDefaultDiagnostic(w *bufio.Writer, view diagnosticView, colors colorS
 	}
 
 	w.WriteString("\n  ")
-	w.WriteString(colors.BorderText("╭─┴──────────("))
+	w.WriteString(f.frameHeading)
 	w.WriteByte(' ')
-	location := fmt.Sprintf("%s:%d:%d", view.relativePath, diagnosticStartLine+1, diagnosticStartColumn+1)
-	w.WriteString(colors.FileName("%s", location))
+	location := relativePath + ":" + strconv.Itoa(diagnosticStartLine+1) + ":" + strconv.Itoa(diagnosticStartColumn+1)
+	w.WriteString(colors.textSpan(colors.FileName, location))
 	w.WriteByte(' ')
-	w.WriteString(colors.BorderText(")─────"))
+	w.WriteString(f.frameHeadingEnd)
 	w.WriteByte('\n')
 
+	// Use the same source boundaries as the projected diagnostic positions.
+	lineText := func(line int) string {
+		if line+1 < len(lineMap) {
+			return text[lineMap[line]:lineMap[line+1]]
+		}
+		return text[lineMap[line]:]
+	}
 	indentSize := math.MaxInt
-	line := codeboxStartLine
-	lineIndentCalculated := false
-	lastNonSpaceByteIndex := -1
-
-	numLines := codeboxEndLine - codeboxStartLine + 1
-	lineStarts := make([]int, numLines)
-	lineEnds := make([]int, numLines)
-
-	// Preserve the established code-frame rendering contract: source locations
-	// follow the producer's ECMAScript line map, while displayed content advances
-	// only at LF. This intentionally retains legacy CR/U+2028/U+2029 behavior.
-	codeboxText := text[codeboxStart:codeboxEnd]
-	for offset := 0; offset < len(codeboxText); {
-		char, size := utf8.DecodeRuneInString(codeboxText[offset:])
-		current := codeboxStart + offset
-		next := current + size
-		offset += size
-
-		if char == '\n' {
-			if line != codeboxEndLine {
-				lineIndentCalculated = false
-				lineEnds[line-codeboxStartLine] = max(lastNonSpaceByteIndex-lineMap[line], 0)
-				lastNonSpaceByteIndex = -1
-				line++
-			}
-			continue
-		}
-
-		if !lineIndentCalculated && !unicode.IsSpace(char) {
-			lineIndentCalculated = true
-			lineStarts[line-codeboxStartLine] = max(current-lineMap[line], 0)
-			indentSize = min(indentSize, lineStarts[line-codeboxStartLine])
-		}
-		if lineIndentCalculated && !unicode.IsSpace(char) {
-			lastNonSpaceByteIndex = next
+	for line := codeboxStartLine; line <= codeboxEndLine && indentSize != 0; line++ {
+		raw := lineText(line)
+		if content := strings.TrimLeftFunc(raw, unicode.IsSpace); content != "" {
+			indentSize = min(indentSize, len(raw)-len(content))
 		}
 	}
-	if line == codeboxEndLine {
-		lineEnds[line-codeboxStartLine] = max(lastNonSpaceByteIndex-lineMap[line], 0)
-	}
-	if indentSize == math.MaxInt {
-		indentSize = 0
-	}
-
-	diagnosticHighlightActive := false
 	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
 	shouldFold := codeboxEndLine-codeboxStartLine >= 4
 
 	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
 		if shouldFold && codeboxStartLine+1 < line && line < codeboxEndLine-1 {
 			w.WriteString("  ")
-			w.WriteString(colors.BorderText("│ "))
+			w.WriteString(f.lineLeft)
 			foldDots := strings.Repeat(".", len(lastLineNumber))
-			w.WriteString(colors.DimText("%s", foldDots))
-			w.WriteString(colors.BorderText(" │"))
+			w.WriteString(colors.textSpan(colors.DimText, foldDots))
+			w.WriteString(f.lineRight)
 			w.WriteByte('\n')
 
 			line = codeboxEndLine - 1
-			diagnosticHighlightActive = diagnosticStart < lineMap[line] && diagnosticEnd >= lineMap[line]
 		}
 
 		w.WriteString("  ")
-		w.WriteString(colors.BorderText("│ "))
+		w.WriteString(f.lineLeft)
 		if line == codeboxEndLine {
-			w.WriteString(colors.DimText("%s", lastLineNumber))
+			w.WriteString(colors.textSpan(colors.DimText, lastLineNumber))
 		} else {
 			number := strconv.Itoa(line + 1)
 			if len(number) < len(lastLineNumber) {
 				w.WriteByte(' ')
 			}
-			w.WriteString(colors.DimText("%s", number))
+			w.WriteString(colors.textSpan(colors.DimText, number))
 		}
-		w.WriteString(colors.BorderText(" │"))
+		w.WriteString(f.lineRight)
 		w.WriteString("  ")
 
-		lineTextStart := lineMap[line] + indentSize
-		underlineStart := max(lineTextStart, lineMap[line]+lineStarts[line-codeboxStartLine])
-		underlineEnd := underlineStart
-		lineTextEnd := max(lineMap[line]+lineEnds[line-codeboxStartLine], lineTextStart)
-
-		if diagnosticHighlightActive {
-			underlineEnd = lineTextEnd
-		} else if lineMap[line] <= diagnosticStart && (line == len(lineMap)-1 || diagnosticStart < lineMap[line+1]) {
-			underlineStart = min(max(lineTextStart, diagnosticStart), lineTextEnd)
-			underlineEnd = lineTextEnd
-			diagnosticHighlightActive = true
-		}
-		if lineMap[line] <= diagnosticEnd && (line == len(lineMap)-1 || diagnosticEnd < lineMap[line+1]) {
-			underlineEnd = min(max(underlineStart, diagnosticEnd), lineTextEnd)
-			diagnosticHighlightActive = false
-		}
-
-		if underlineStart != underlineEnd {
-			w.WriteString(text[lineTextStart:underlineStart])
-			w.WriteString(severityColor("%s", text[underlineStart:underlineEnd]))
-			w.WriteString(text[underlineEnd:lineTextEnd])
-		} else if lineTextStart != lineTextEnd {
-			w.WriteString(text[lineTextStart:lineTextEnd])
+		if content := strings.TrimRightFunc(lineText(line), unicode.IsSpace); content != "" {
+			// Cut only at a decoded character boundary. An invalid byte occupies
+			// one position, just as it does when scanning the indentation.
+			lineTextStart := lineMap[line]
+			for offset := range content {
+				if offset > indentSize {
+					break
+				}
+				lineTextStart = lineMap[line] + offset
+			}
+			lineTextEnd := lineMap[line] + len(content)
+			underlineStart := max(lineTextStart, diagnosticStart)
+			if diagnosticStartLine < line {
+				underlineStart = lineTextEnd - len(strings.TrimLeftFunc(content, unicode.IsSpace))
+			}
+			underlineEnd := min(lineTextEnd, diagnosticEnd)
+			if underlineStart < underlineEnd {
+				w.WriteString(text[lineTextStart:underlineStart])
+				w.WriteString(colors.textSpan(severityColor, text[underlineStart:underlineEnd]))
+				w.WriteString(text[underlineEnd:lineTextEnd])
+			} else {
+				w.WriteString(text[lineTextStart:lineTextEnd])
+			}
 		}
 
 		w.WriteByte('\n')
 	}
 	w.WriteString("  ")
-	w.WriteString(colors.BorderText("╰────────────────────────────────"))
+	w.WriteString(f.frameBottom)
 	w.WriteString("\n\n")
+	return nil
 }

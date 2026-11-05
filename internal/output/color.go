@@ -3,6 +3,7 @@ package output
 import "github.com/fatih/color"
 
 type colorScheme struct {
+	enabled     bool
 	RuleName    func(format string, a ...interface{}) string
 	FileName    func(format string, a ...interface{}) string
 	StartText   func(format string, a ...interface{}) string
@@ -11,6 +12,14 @@ type colorScheme struct {
 	DimText     func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
 	WarnText    func(format string, a ...interface{}) string
+}
+
+// With colors disabled, a single string span can go directly to the writer.
+func (c *colorScheme) textSpan(style func(string, ...interface{}) string, value string) string {
+	if c.enabled {
+		return style("%s", value)
+	}
+	return value
 }
 
 func newPinnedColor(enabled bool, attrs ...color.Attribute) *color.Color {
@@ -25,6 +34,7 @@ func newPinnedColor(enabled bool, attrs ...color.Attribute) *color.Color {
 
 func newColorScheme(enabled bool) colorScheme {
 	return colorScheme{
+		enabled:     enabled,
 		RuleName:    newPinnedColor(enabled, color.FgHiGreen).SprintfFunc(),
 		FileName:    newPinnedColor(enabled, color.FgCyan, color.Italic).SprintfFunc(),
 		StartText:   newPinnedColor(enabled, color.FgCyan, color.Bold).SprintfFunc(),

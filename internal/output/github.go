@@ -10,9 +10,9 @@ type githubFormatter struct{}
 
 func (githubFormatter) begin(_ *bufio.Writer, _ Report, _ bool) error { return nil }
 
-func (githubFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
+func (githubFormatter) diagnostic(w *bufio.Writer, diagnostic *Diagnostic, relativePath string) error {
 	severity := "notice"
-	switch view.raw.Severity {
+	switch diagnostic.Severity {
 	case SeverityError:
 		severity = "error"
 	case SeverityWarning:
@@ -22,13 +22,13 @@ func (githubFormatter) diagnostic(w *bufio.Writer, view diagnosticView) error {
 	fmt.Fprintf(w,
 		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
 		severity,
-		escapeProperty(view.relativePath),
-		view.start.line+1,
-		view.end.line+1,
-		view.start.column+1,
-		view.end.column+1,
-		escapeProperty(view.raw.RuleName),
-		escapeData(view.raw.Message),
+		escapeProperty(relativePath),
+		diagnostic.Start.Line+1,
+		diagnostic.End.Line+1,
+		diagnostic.Start.Column+1,
+		diagnostic.End.Column+1,
+		escapeProperty(diagnostic.RuleName),
+		escapeData(diagnostic.Message),
 	)
 	return nil
 }
