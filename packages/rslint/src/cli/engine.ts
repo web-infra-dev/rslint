@@ -328,9 +328,11 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         }),
       ]);
       if (naturalExit) return naturalExit;
-      stderr.write(
-        'rslint: Go IPC closed without process exit; terminating Go process\n',
-      );
+      if (signalExitCode === undefined) {
+        stderr.write(
+          'rslint: Go IPC closed without process exit; terminating Go process\n',
+        );
+      }
       safeKillGo(child);
       await childExit;
       return { code: signalExitCode ?? 2 };
@@ -508,7 +510,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       signalExitCode ??= SIGNAL_EXIT_CODES[signal];
       shuttingDown = true;
       configAbort.abort();
-      safeKillGo(child);
+      // Let Go observe the same disconnect as a host exit on every platform.
+      ipc.close();
+      child.stdin?.destroy();
       void Promise.allSettled([
         shutdownPluginHost(pluginHost),
         ...[...stagedPluginHosts].map(shutdownPluginHost),
@@ -624,8 +628,9 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         // Fast paths can close stdout without an init acknowledgement. Their
         // natural exit remains authoritative within the disconnect grace.
         const state = await waitForExit();
-        if (state.code === 0) return 0;
-        stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
+        if (state.code !== 0 && signalExitCode === undefined) {
+          stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
+        }
         return state.code;
       }
       if (outcome.kind === 'exit') {
