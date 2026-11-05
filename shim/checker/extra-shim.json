@@ -19,6 +19,7 @@
       "isArrayType",
       "getTypeArguments",
       "getContextualType",
+      "getApparentTypeOfContextualType",
       "getAwaitedType",
       "getTypeOfSymbol",
       "getReturnTypeOfSignature",

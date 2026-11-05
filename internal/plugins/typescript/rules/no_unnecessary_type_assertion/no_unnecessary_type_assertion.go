@@ -592,31 +592,6 @@ func assertionIsPropertyInProblematicContext(ctx rule.RuleContext, node *ast.Nod
 		assertionWalkUpParentheses(objectParent).Parent.Kind == ast.KindSatisfiesExpression
 }
 
-func assertionIsAssignmentInNonStatementContext(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsBinaryExpression(parent) {
-		return false
-	}
-	binary := parent.AsBinaryExpression()
-	if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Right != semanticNode {
-		return false
-	}
-	assignment := assertionWalkUpParentheses(parent)
-	return assignment.Parent == nil || !ast.IsExpressionStatement(assignment.Parent)
-}
-
-func assertionIsRightHandSideOfLogicalAssignment(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsBinaryExpression(parent) {
-		return false
-	}
-	binary := parent.AsBinaryExpression()
-	return binary.Right == semanticNode && binary.OperatorToken != nil &&
-		ast.IsLogicalOrCoalescingAssignmentOperator(binary.OperatorToken.Kind)
-}
-
 func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type {
 	if contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone); contextualType != nil {
 		return contextualType
@@ -779,43 +754,165 @@ func assertionCallArgument(node *ast.Node) (*ast.Node, int, bool) {
 	}
 }
 
-func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if parent == nil {
+func assertionHasFixedCallContext(ctx rule.RuleContext, node, call *ast.Node, castIsAny bool) bool {
+	if genericCall := assertionGenericCall(ctx, node); genericCall != nil && genericCall != call {
+		return false
+	}
+	calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(call.Expression()))
+	if utils.IsTypeAnyType(calleeType) {
 		return true
 	}
-	if castIsAny {
-		return ast.IsLogicalOrCoalescingBinaryExpression(parent) || assertionGenericCall(ctx, node) != nil
+	kind := checker.SignatureKindCall
+	if ast.IsNewExpression(call) {
+		kind = checker.SignatureKindConstruct
 	}
-	if ast.IsTemplateExpression(ast.SkipParentheses(node.Expression())) {
-		return true
+	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind)
+	if len(signatures) == 0 {
+		return false
 	}
-	switch parent.Kind {
-	case ast.KindAsExpression,
-		ast.KindTypeAssertionExpression,
-		ast.KindSpreadElement,
-		ast.KindSpreadAssignment,
-		ast.KindSatisfiesExpression:
-		return true
-	}
-	if ast.IsArrayLiteralExpression(ast.SkipParentheses(node.Expression())) ||
-		assertionIsInDestructuringDeclaration(node) ||
-		assertionIsPropertyInProblematicContext(ctx, node) ||
-		assertionIsAssignmentInNonStatementContext(node) ||
-		assertionIsRightHandSideOfLogicalAssignment(node) ||
-		assertionIsArgumentToOverloadedFunction(ctx, node) {
-		return true
-	}
-	if genericCall := assertionGenericCall(ctx, node); genericCall != nil {
-		original := assertionOriginalExpression(node)
-		argumentCall, _, independent := assertionCallArgument(node)
-		if utils.IsTypeFlagSetWithUnion(ctx.TypeChecker.GetTypeAtLocation(original), checker.TypeFlagsEnumLike) ||
-			!ast.IsExpressionStatement(assertionWalkUpParentheses(genericCall).Parent) ||
-			argumentCall != genericCall || !independent {
-			return true
+	for _, signature := range signatures {
+		// Predicates and this parameters can propagate an argument's inferred
+		// type even when the call's result is discarded.
+		if signature.ThisParameter() != nil || ctx.TypeChecker.GetTypePredicateOfSignature(signature) != nil {
+			return false
 		}
-		return !assertionIsConceptuallyLiteral(original) && !ast.IsPropertyAssignment(parent)
+		if len(signature.TypeParameters()) == 0 || call.TypeArguments() != nil {
+			continue
+		}
+		argumentCall, _, independent := assertionCallArgument(node)
+		original := assertionOriginalExpression(node)
+		if castIsAny || len(signatures) != 1 || argumentCall != call || !independent ||
+			!ast.IsExpressionStatement(assertionWalkUpParentheses(call).Parent) ||
+			utils.IsTypeFlagSetWithUnion(ctx.TypeChecker.GetTypeAtLocation(original), checker.TypeFlagsEnumLike) ||
+			(!assertionIsConceptuallyLiteral(original) && !ast.IsPropertyAssignment(assertionWalkUpParentheses(node).Parent)) {
+			return false
+		}
+	}
+	if len(signatures) > 1 {
+		argumentCall, _, _ := assertionCallArgument(node)
+		return argumentCall == call && !assertionIsArgumentToOverloadedFunction(ctx, node)
+	}
+	return true
+}
+
+func assertionHasFixedDeclarationContext(ctx rule.RuleContext, node, value, declaration *ast.Node) bool {
+	if declaration.Initializer() != value || declaration.Type() == nil {
+		return false
+	}
+	declaredType := checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, declaration.Type())
+	if !declaredType.IsUnion() {
+		return true
+	}
+	property := assertionWalkUpParentheses(node).Parent
+	if !ast.IsPropertyAssignment(property) || property.Parent != value || !ast.IsObjectLiteralExpression(value) {
+		return false
+	}
+	// An assertion is not a discriminant value in the compiler. A single
+	// constituent here was therefore selected by other, unchanged members.
+	selected := checker.Checker_getApparentTypeOfContextualType(ctx.TypeChecker, value, checker.ContextFlagsNone)
+	return selected != nil && !selected.IsUnion() && slices.Contains(declaredType.Types(), selected)
+}
+
+// Contextual assignability is only a removal proof at a type boundary. In
+// particular, a contextual callback return type can still participate in the
+// inference of its caller, including through a block-bodied return statement.
+func assertionHasStableContext(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
+	original := assertionOriginalExpression(node)
+	if ast.IsTemplateExpression(original) ||
+		(!castIsAny && ast.IsArrayLiteralExpression(original)) ||
+		assertionIsInDestructuringDeclaration(node) || assertionIsPropertyInProblematicContext(ctx, node) {
+		return false
+	}
+	for current := assertionWalkUpParentheses(node); current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindPropertyAssignment:
+			if parent.Initializer() != current || ast.IsComputedPropertyName(parent.Name()) {
+				return false
+			}
+		case ast.KindObjectLiteralExpression:
+			contextual := checker.Checker_getContextualType(ctx.TypeChecker, parent, checker.ContextFlagsNone)
+			if contextual != nil && contextual.IsUnion() {
+				selected := checker.Checker_getApparentTypeOfContextualType(ctx.TypeChecker, parent, checker.ContextFlagsNone)
+				if selected == nil || selected.IsUnion() {
+					return false
+				}
+			}
+		case ast.KindArrayLiteralExpression:
+		case ast.KindConditionalExpression:
+			if parent.AsConditionalExpression().Condition == current {
+				return false
+			}
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Right == current {
+				// Assignment flow only preserves a non-union declared type. The
+				// assignment's own value must not feed another inference.
+				if !ast.IsExpressionStatement(assertionWalkUpParentheses(parent).Parent) {
+					return false
+				}
+				symbol := ctx.TypeChecker.GetSymbolAtLocation(binary.Left)
+				if symbol == nil {
+					return false
+				}
+				target := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, symbol)
+				return !target.IsUnion() && !utils.IsTypeAnyType(target)
+			}
+			if castIsAny || !ast.IsLogicalOrCoalescingBinaryExpression(parent) {
+				return false
+			}
+			// A left operand also controls flow in the right operand. A literal
+			// has no references whose narrowed types could change.
+			if binary.Left == current && !ast.IsLiteralExpression(binary.Right) &&
+				binary.Right.Kind != ast.KindNullKeyword && binary.Right.Kind != ast.KindTrueKeyword && binary.Right.Kind != ast.KindFalseKeyword {
+				return false
+			}
+		case ast.KindVariableDeclaration, ast.KindParameter, ast.KindPropertyDeclaration:
+			return assertionHasFixedDeclarationContext(ctx, node, current, parent)
+		case ast.KindArrowFunction:
+			if parent.Body() != current {
+				return false
+			}
+			if parent.Type() != nil {
+				return true
+			}
+			if len(parent.Parameters()) != 0 {
+				return false
+			}
+		case ast.KindReturnStatement:
+			function := ast.GetContainingFunction(parent)
+			return function != nil && function.Type() != nil
+		case ast.KindCallExpression, ast.KindNewExpression:
+			for _, argument := range parent.Arguments() {
+				if argument == current {
+					return assertionHasFixedCallContext(ctx, node, parent, castIsAny)
+				}
+			}
+			return false
+		case ast.KindJsxExpression:
+			attribute := parent.Parent
+			if !ast.IsJsxAttribute(attribute) || attribute.Initializer() != parent {
+				return false
+			}
+			opening := attribute.Parent.Parent
+			var tag *ast.Node
+			var attributes *ast.Node
+			if ast.IsJsxOpeningElement(opening) {
+				tag = opening.AsJsxOpeningElement().TagName
+				attributes = opening.AsJsxOpeningElement().Attributes
+			} else if ast.IsJsxSelfClosingElement(opening) {
+				tag = opening.AsJsxSelfClosingElement().TagName
+				attributes = opening.AsJsxSelfClosingElement().Attributes
+			}
+			if !ast.IsIdentifier(tag) || !scanner.IsIntrinsicJsxName(tag.Text()) {
+				return false
+			}
+			props := checker.Checker_getContextualType(ctx.TypeChecker, attributes, checker.ContextFlagsNone)
+			return props != nil && !props.IsUnion()
+		default:
+			return false
+		}
+		current = assertionWalkUpParentheses(parent)
 	}
 	return false
 }
@@ -1160,7 +1257,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				msg := rule.RuleMessage{}
 				if isTypeUnchanged(node, innerExpression, originalType, castType) && !utils.IsTypeAnyType(castType) {
 					msg = buildUnnecessaryAssertionMessage()
-				} else if contextualType != nil {
+				} else if contextualType != nil && !assertionTypeContainsAny(ctx.TypeChecker, originalType) &&
+					!assertionTypeContainsAny(ctx.TypeChecker, contextualType) {
 					intermediateType := ctx.TypeChecker.GetTypeAtLocation(innerExpression)
 					if utils.IsTypeFlagSet(intermediateType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) &&
 						checker.Checker_isTypeAssignableTo(ctx.TypeChecker, originalType, contextualType) {
@@ -1197,14 +1295,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 			semanticNode := assertionWalkUpParentheses(node)
 			parent := semanticNode.Parent
-			parentSkipsAnyFallback := parent != nil && (parent.Kind == ast.KindAsExpression ||
-				parent.Kind == ast.KindTypeAssertionExpression ||
-				parent.Kind == ast.KindSpreadElement ||
-				parent.Kind == ast.KindSpreadAssignment ||
-				parent.Kind == ast.KindSatisfiesExpression)
-			castIsAny := utils.IsTypeFlagSet(castType, checker.TypeFlagsAny) && !parentSkipsAnyFallback
+			castIsAny := utils.IsTypeFlagSet(castType, checker.TypeFlagsAny)
 			var contextualType *checker.Type
-			if !shouldSkipAssertionContextualTypeFallback(ctx, node, castIsAny) {
+			if assertionHasStableContext(ctx, node, castIsAny) {
 				contextualType = assertionContextualType(ctx, node)
 			}
 			if contextualType != nil {

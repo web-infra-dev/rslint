@@ -977,3 +977,60 @@ const third = ((value) => value * 2)(3);
 		},
 	)
 }
+
+func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {
+	const declarations = `enum Mode { Auto = 1, Manual = 2 } declare const mode: Mode;`
+	var valid []rule_tester.ValidTestCase
+	for _, code := range []string{
+		`const values = [0].map(() => { return mode as number; }); values.includes(-1);`,
+		`declare function infer<T>(callback: () => T): T;
+const value = infer(function() { return mode as number; }); value === -1;`,
+		`type Model = { mode: number };
+declare function useMemo<T>(callback: () => T, deps: readonly unknown[]): T;
+const value = useMemo(() => { return { mode } as unknown as Model; }, []); value.mode === -1;`,
+		`declare const value: number;
+declare function choose(value: Mode): 'mode'; declare function choose(value: number): 'number';
+const result: 'mode' = choose(value as any);`,
+		`declare const condition: boolean;
+declare function choose(value: Mode): 'mode'; declare function choose(value: number): 'number';
+const result: 'number' = choose(condition ? mode as number : mode);`,
+		`declare function choose(value: () => Mode): 'mode'; declare function choose(value: () => number): 'number';
+const result: 'number' = choose(() => { return mode as number; });`,
+		`interface Box { data: unknown; write<T>(value: T): asserts this is Box & { data: T } }
+declare const box: Box; box.write({ value: mode } as { value: number }); box.data.value === -1;`,
+		`declare function tag(parts: TemplateStringsArray, value: Mode): 'mode';
+declare function tag(parts: TemplateStringsArray, value: number): 'number';
+const result: 'number' = tag` + "`${mode as number}`" + `;`,
+		`declare function consume(value: { x: number }): number;
+declare function consume(value: { y?: number; x: number }): number;
+consume({ x: 1, extra: true } as { x: number });`,
+		`declare function consume(value: { x: number }): void;
+consume({ x: 1, extra: true } as { x: number });`,
+		`declare function consume(value: number | string): void;
+consume((mode as number) || mode.toString());`,
+		`declare function raw(): any;
+declare function consume(value: string): void;
+consume(raw() as unknown as string);
+function read<T>(): T { return raw() as unknown as T; }`,
+		`declare const raw: MissingType;
+declare function consume(value: string): void;
+consume(raw as unknown as string);`,
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: declarations + code})
+	}
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code: declarations + `
+declare namespace JSX { interface Element {} interface IntrinsicElements {} }
+declare function View<T>(props: { value: T; render(value: T): unknown }): JSX.Element;
+<View value={mode as number} render={value => value === -1} />;`,
+		Tsx: true,
+	})
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code: `declare namespace JSX { interface Element {} interface IntrinsicElements {
+probe: { kind: 'a'; a: true } | { kind: 'b'; b: true };
+} }
+declare const kind: 'a' | 'b'; <probe kind={kind as 'a'} a />;`,
+		Tsx: true,
+	})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, valid, nil)
+}
