@@ -8,10 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 )
@@ -52,9 +49,6 @@ type lintArgs struct {
 	// Native CLI supplies one cached instance so the later target/program phases
 	// reuse directory entries already read by the staged frontier.
 	FS vfs.FS
-	// nativeFileSystem marks the standard CLI disk host constructed below.
-	// Injected filesystems keep serial plugin text reads.
-	nativeFileSystem bool
 	// DeferTimingTable, when non-nil, receives the rendered --timing table
 	// instead of it being printed to stderr by the pipeline. The IPC entry
 	// uses it to emit the table only after the async stdout forwarding has
@@ -73,13 +67,6 @@ type lintArgs struct {
 	// after read-only target/Program preparation and before any lint or fixes.
 	// The command also joins it on early failure. Nil means already activated.
 	CompleteConfigActivation func() error
-}
-
-func (args *lintArgs) initFileSystem() {
-	if args.FS == nil {
-		args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		args.nativeFileSystem = true
-	}
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).

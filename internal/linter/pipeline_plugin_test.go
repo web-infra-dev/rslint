@@ -22,34 +22,52 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+func pluginTextTestPlan(count int) *LintPlan {
+	files := make([]lintFilePlan, count)
+	rules := &preparedRuleSet{plugins: []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}}
+	for i := range files {
+		files[i] = lintFilePlan{file: pluginSyntax(fmt.Sprintf("/src/%d.ts", i), "x;"), rules: rules}
+	}
+	return &LintPlan{programs: []programLintPlan{{files: files}}}
+}
+
 func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		resources := newPluginDispatchResources()
+		slots := make(pluginSourceReadSlots, 8)
 		gate := make(chan struct{})
 		release := sync.OnceFunc(func() { close(gate) })
 		defer release()
 		var calls atomic.Int32
-		readText := func(path string, _ ast.SourceFileLike) (string, error) {
-			calls.Add(1)
-			<-gate
-			return path, nil
-		}
-		inputs := make([]EslintPluginFileInput, 16)
-		paths := make([]string, len(inputs))
-		for index := range inputs {
-			inputs[index].Path = fmt.Sprintf("wire:%d", index)
-			paths[index] = fmt.Sprintf("/target/%d.ts", index)
+		generation := Generation{
+			Target: TargetProjection{
+				Path: func(path string) string { return "target:" + path },
+				ReadText: func(path string, _ ast.SourceFileLike) (string, error) {
+					calls.Add(1)
+					<-gate
+					return path, nil
+				},
+			},
+			Plugin: &PluginGeneration{WirePath: func(path string) string { return "wire:" + path }},
 		}
 		done := make(chan error, 2)
-		go func() { done <- resources.readPluginSources(context.Background(), readText, inputs, paths) }()
+		run := func(count int) {
+			task, err := materializePluginTask(t.Context(), pluginTextTestPlan(count), generation, SourceSnapshot{}, ObservationPolicy{}, false, false, slots)
+			if err == nil {
+				for i, input := range task.inputs {
+					path := fmt.Sprintf("/src/%d.ts", i)
+					if input.Path != "wire:"+path || input.Text == nil || *input.Text != "target:"+path {
+						t.Errorf("input %d lost its original wire path, text or order", i)
+					}
+				}
+			}
+			done <- err
+		}
+		go run(16)
 		synctest.Wait()
 		if got := calls.Load(); got != 8 {
 			t.Fatalf("large binding started %d reads, want 8", got)
 		}
-		single := []EslintPluginFileInput{{Path: "wire:single"}}
-		go func() {
-			done <- resources.readPluginSources(context.Background(), readText, single, []string{"/single.ts"})
-		}()
+		go run(1)
 		synctest.Wait()
 		if got := calls.Load(); got != 8 {
 			t.Fatalf("single-file binding exceeded the shared read budget: %d", got)
@@ -60,15 +78,37 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for index, input := range inputs {
-			if input.Path != fmt.Sprintf("wire:%d", index) || input.Text == nil || *input.Text != paths[index] {
-				t.Fatalf("plugin input %d changed path, text or order: %+v", index, input)
-			}
-		}
-		if single[0].Text == nil || *single[0].Text != "/single.ts" || calls.Load() != 17 {
-			t.Fatalf("single-file text/read count = %v/%d", single[0].Text, calls.Load())
+		if got := calls.Load(); got != 17 {
+			t.Fatalf("read %d inputs, want 17", got)
 		}
 	})
+}
+
+func TestPluginSourceReadsPreserveFirstInputError(t *testing.T) {
+	plan := pluginTextTestPlan(2)
+	for _, singleThreaded := range []bool{false, true} {
+		var reads atomic.Int32
+		generation := Generation{
+			Native: NativeGeneration{SingleThreaded: singleThreaded},
+			Target: TargetProjection{ReadText: func(path string, source ast.SourceFileLike) (string, error) {
+				reads.Add(1)
+				if path == "/src/1.ts" {
+					return "", errors.New("later read failed")
+				}
+				return source.Text(), nil
+			}},
+			Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig {
+				return EslintPluginFileConfig{Settings: map[string]any{"invalid": make(chan int)}}
+			}},
+		}
+		_, err := materializePluginTask(t.Context(), plan, generation, SourceSnapshot{}, ObservationPolicy{}, true, false, make(pluginSourceReadSlots, 8))
+		if err == nil || !strings.Contains(err.Error(), `freeze plugin input "/src/0.ts": clone settings`) {
+			t.Fatalf("single-threaded %v: first input error = %v", singleThreaded, err)
+		}
+		if singleThreaded && reads.Load() != 1 {
+			t.Fatal("single-threaded preparation read past its first error")
+		}
+	}
 }
 
 func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testing.T) {
@@ -321,7 +361,6 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Native: NativeGeneration{
 				Programs:         programs,
 				TargetsByProgram: [][]string{{paths[0]}, {paths[1]}},
-				SingleThreaded:   true,
 				Cwd:              root,
 				RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
 					rules := []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}

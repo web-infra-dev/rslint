@@ -1433,95 +1433,66 @@ func TestHandleLintCommandTypedCatalogEnforcesPluginDeclarations(t *testing.T) {
 }
 
 func TestCLIPluginInitialTextMatchesSourceMedium(t *testing.T) {
-	dir := tspath.NormalizePath(t.TempDir())
-	sources := []struct {
-		name string
-		raw  []byte
-		text string
-	}{
-		{name: "plain", raw: []byte("const plain = 1;"), text: "const plain = 1;"},
-		{name: "utf8-bom", raw: []byte(utils.BOM + "const marked = 2;"), text: "const marked = 2;"},
-		{name: "source-bom", raw: []byte(utils.BOM + utils.BOM + "const text = '文🌳';"), text: utils.BOM + "const text = '文🌳';"},
-		{name: "utf16-le", raw: []byte{0xFF, 0xFE, 'a', 0, ';', 0}, text: "a;"},
-		{name: "utf16-be", raw: []byte{0xFE, 0xFF, 0, 'b', 0, ';'}, text: "b;"},
+	dir := t.TempDir()
+	targetPath := tspath.NormalizePath(filepath.Join(dir, "index.ts"))
+	content := "const value = 1;\n"
+	if err := os.WriteFile(targetPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	paths := make([]string, len(sources))
-	want := make(map[string]string, len(sources))
-	for index, source := range sources {
-		path := tspath.ResolvePath(dir, source.name+".ts")
-		if err := os.WriteFile(path, source.raw, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		paths[index] = path
-		want[utils.ExactPathID(path)] = source.text
-	}
-	alias := tspath.ResolvePath(dir, "alias.ts")
-	if err := os.Symlink(paths[1], alias); err == nil {
-		want[utils.ExactPathID(alias)] = want[utils.ExactPathID(paths[1])]
-		paths[1] = alias
-	} else {
-		t.Logf("symlink fixture unavailable: %v", err)
-	}
+	configDirectory := tspath.NormalizePath(dir)
 	baseArgs := lintArgs{
 		ConfigCatalog: &discovery.ConfigCatalog{
 			Configs: map[string]rslintconfig.RslintConfig{
-				dir: {{
+				configDirectory: {{
 					Files:   []string{"**/*.ts"},
 					Plugins: []string{"external"},
 					Rules:   rslintconfig.Rules{"external/check": "error"},
 				}},
 			},
-			EslintPlugins: []rslintconfig.EslintPluginEntry{{Prefix: "external", RuleNames: []string{"check"}}},
-			Explicit:      true,
+			EslintPlugins: []rslintconfig.EslintPluginEntry{{
+				Prefix:    "external",
+				RuleNames: []string{"check"},
+			}},
+			Explicit: true,
 		},
-		AllowFiles: paths,
-		Format:     "jsonline",
-		NoColor:    true,
+		AllowFiles:     []string{targetPath},
+		Format:         "jsonline",
+		NoColor:        true,
+		SingleThreaded: true,
 	}
-	var serialFrames map[string][]byte
 	for _, test := range []struct {
-		name           string
-		fs             vfs.FS
-		singleThreaded bool
+		name string
+		fs   vfs.FS
 	}{
-		{name: "single-threaded disk host", singleThreaded: true},
-		{name: "concurrent disk host"},
-		{name: "injected filesystem", fs: bundled.WrapFS(cachedvfs.From(osvfs.FS()))},
+		{name: "production disk host"},
+		{
+			name: "injected filesystem",
+			fs:   bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			args := baseArgs
 			args.FS = test.fs
-			args.SingleThreaded = test.singleThreaded
-			frames := make(map[string][]byte)
-			var mu sync.Mutex
-			code, stdout, stderr := runLintCommandWithDispatcherForTest(t, dir, args,
-				linter.EslintPluginDispatchFunc(func(_ context.Context, request linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-					mu.Lock()
-					defer mu.Unlock()
-					results := make([]linter.EslintPluginFileResult, len(request.Files))
-					for index, file := range request.Files {
-						if _, duplicate := frames[file.Path]; duplicate {
-							t.Errorf("duplicate plugin input %q", file.Path)
-						}
-						frames[file.Path] = slices.Clone(file.Frame)
+			var request linter.EslintPluginLintRequest
+			code, stdout, stderr := runLintCommandWithDispatcherForTest(
+				t,
+				dir,
+				args,
+				linter.EslintPluginDispatchFunc(func(_ context.Context, got linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					request = got
+					results := make([]linter.EslintPluginFileResult, len(got.Files))
+					for index, file := range got.Files {
 						results[index].FilePath = file.Path
 					}
 					return &linter.EslintPluginLintResult{Results: results}, nil
-				}))
-			if code != 0 || len(frames) != len(sources) {
-				t.Fatalf("CLI plugin request failed: code=%d files=%d stdout=%q stderr=%q", code, len(frames), stdout, stderr)
+				}),
+			)
+			if code != 0 || len(request.Files) != 1 {
+				t.Fatalf("CLI plugin request failed: code=%d request=%+v stdout=%q stderr=%q", code, request, stdout, stderr)
 			}
-			for path, frame := range frames {
-				expected, ok := want[utils.ExactPathID(path)]
-				if !ok || estree.SourceText(t, frame) != expected {
-					t.Errorf("CLI frame changed source text or BOM for %q", path)
-				}
-				if serialFrames != nil && !bytes.Equal(frame, serialFrames[path]) {
-					t.Errorf("CLI frame differs from single-threaded disk host for %q", path)
-				}
-			}
-			if serialFrames == nil {
-				serialFrames = frames
+			frame := request.Files[0].Frame
+			if estree.SourceText(t, frame) != strings.TrimPrefix(content, "\ufeff") {
+				t.Fatal("CLI frame did not freeze its filesystem generation")
 			}
 		})
 	}

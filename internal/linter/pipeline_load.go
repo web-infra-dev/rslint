@@ -30,15 +30,23 @@ func executeObservation(
 	results := make([]observationExecution, len(loads))
 	errs := make([]error, len(loads))
 	resources := newPluginDispatchResources()
+	sourceReadLimit := 8
+	if plan.SingleThreaded {
+		sourceReadLimit = 1
+	}
+	sourceReads := make(pluginSourceReadSlots, sourceReadLimit)
 	prepare := func(i int, reservation *programReservation) (preparedObservation, error) {
 		load := loads[i]
 		loads[i] = GenerationLoad{}
 		prepared, err := prepareObservation(ctx, load.Acquire, snapshot, policy, dispatcher,
-			planChanges, stopOnTargetSyntaxErrors, reservation, resources)
-		if err == nil && len(prepared.plugin.inputs) != 0 {
-			// Projection is another AST consumer. Native shard completion
-			// alone must not return all of this binding's admission capacity.
-			reservation.retainUntilClose(1)
+			planChanges, stopOnTargetSyntaxErrors, reservation, sourceReads)
+		if err == nil {
+			prepared.plugin.resources = resources
+			if len(prepared.plugin.inputs) != 0 {
+				// Projection is another AST consumer. Native shard completion
+				// alone must not return all of this binding's admission capacity.
+				reservation.retainUntilClose(1)
+			}
 		}
 		return prepared, err
 	}

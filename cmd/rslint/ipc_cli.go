@@ -45,7 +45,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -329,7 +332,7 @@ func runCLI(args []string) int {
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
-	baseArgs.initFileSystem()
+	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
 	// Preserve help/init priority, then reject an invalid payload-authoritative
 	// format before config discovery can execute user JavaScript.

@@ -37,7 +37,7 @@ func prepareObservation(
 	planChanges bool,
 	stopOnTargetSyntaxErrors bool,
 	reservation *programReservation,
-	resources *pluginDispatchResources,
+	sourceReads pluginSourceReadSlots,
 ) (preparedObservation, error) {
 	if err := ctx.Err(); err != nil {
 		return preparedObservation{}, err
@@ -83,12 +83,11 @@ func prepareObservation(
 	targetSyntaxBlocked := stopOnTargetSyntaxErrors && plan != nil && plan.HasSyntacticDiagnostics()
 	pluginWork := pluginTask{failure: policy.PluginFailure}
 	if !targetSyntaxBlocked {
-		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges, resources)
+		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges, sourceReads)
 		if err != nil {
 			return preparedObservation{}, err
 		}
 	}
-	pluginWork.resources = resources
 	if len(pluginWork.inputs) > 0 && policy.Plugin != pluginProgressiveAfterNative && dispatcher == nil {
 		return preparedObservation{}, errors.New("linter pipeline: joined plugin work requires a dispatcher")
 	}

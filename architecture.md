@@ -759,10 +759,9 @@ stages. The lifecycle is:
    target/SourceFile result only when the observation's artifact demand asks
    for it (the API does; CLI and LSP do not).
 4. Join the observation's required producers against one generation text view,
-   freeze the exact fix text snapshot, and compute deterministic whole-file changes. An
-   initial disk-backed CLI plugin pass may use the host filesystem fast path;
-   detached work and every later memory generation carry complete inline
-   plugin inputs so one observation cannot mix memory and stale disk.
+   freeze the exact fix text snapshot, and compute deterministic whole-file changes.
+   Each plugin task freezes its inputs before dispatch. In-memory changes take
+   precedence over the generation reader for the same target.
 5. Validate and apply the entire change set atomically to the pipeline's private
    memory state. No integration mutation or persistence callback runs between
    fix rounds; the generation provider only projects the immutable snapshot
@@ -781,10 +780,10 @@ These are semantic ports rather than generic pre/post hooks:
   corresponding immutable generation, but it cannot advance fix state.
 - `TargetProjection` maps Program source paths to stable target identities and
   exposes the exact complete text of that generation. Core validation, frozen
-  fix text, and inline plugin input all consume this same view. Ordinary disk
-  CLI lint opts into a shared limit of eight concurrent plugin text reads.
-  Other text readers, fix observations, in-memory snapshots, and explicit
-  single-threaded execution retain serial reads.
+  fix text, and inline plugin input all consume this same view. The pipeline
+  shares up to eight plugin source reads across an observation's bindings.
+  Single-threaded bindings read each input inline. Source preparation
+  preserves input order, and frames are projected while the generation is leased.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It
   is independent from generation construction, confirms complete file
   replacements, and is never called after an unsuccessful observation or

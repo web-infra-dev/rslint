@@ -115,7 +115,7 @@ func materializePluginTask(
 	policy ObservationPolicy,
 	detached bool,
 	planChanges bool,
-	resources *pluginDispatchResources,
+	sourceReads pluginSourceReadSlots,
 ) (pluginTask, error) {
 	if generation.Plugin == nil {
 		return pluginTask{failure: policy.PluginFailure}, nil
@@ -156,20 +156,17 @@ func materializePluginTask(
 		}
 		input.Path = wirePath
 	}
-	if generation.Target.ReadTextConcurrent && !generation.Native.SingleThreaded && !detached && !planChanges && snapshot.Empty() {
-		if err := resources.readPluginSources(ctx, generation.Target.ReadText, inputs, targetPaths); err != nil {
-			return pluginTask{}, err
-		}
+	read := func(i int) error {
+		return sourceReads.read(ctx, generation.Target.ReadText, snapshot, targetPaths[i], &inputs[i])
 	}
+	ready, readErr := sourceReads.prefetch(len(inputs), generation.Native.SingleThreaded, read)
 	var builder estree.Builder
-	for index := range inputs {
+	for index := range inputs[:ready] {
 		input := &inputs[index]
 		if input.Text == nil {
-			text, err := readTargetText(generation.Target.ReadText, snapshot, targetPaths[index], input.SourceFile)
-			if err != nil {
-				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
+			if err := read(index); err != nil {
+				return pluginTask{}, err
 			}
-			input.Text = &text
 		}
 		if detached {
 			frame, projectErr := projectPluginFrame(ctx, &builder, *input, nil)
@@ -201,6 +198,9 @@ func materializePluginTask(
 			input.Rules = rules
 		}
 	}
+	if readErr != nil {
+		return pluginTask{}, readErr
+	}
 	suggestionsMode := SuggestionsModeOff
 	if policy.Demand.Plugin&rule.EditDemandSuggestion != 0 {
 		suggestionsMode = SuggestionsModeEager
@@ -222,53 +222,66 @@ func materializePluginTask(
 	}, nil
 }
 
-// readPluginSources fills the original input slots under one observation-wide
-// IO budget, independently of projection and JS dispatch. A chunk keeps one
-// slot while reading its files serially, so large bindings need few goroutines.
-func (resources *pluginDispatchResources) readPluginSources(
+// All bindings in an observation share these slots. Only source reads hold
+// a slot; frame projection and JavaScript dispatch have their own lifetimes.
+type pluginSourceReadSlots chan struct{}
+
+func (slots pluginSourceReadSlots) read(
 	ctx context.Context,
 	readText sourceTextReader,
-	inputs []EslintPluginFileInput,
-	targetPaths []string,
+	snapshot SourceSnapshot,
+	targetPath string,
+	input *EslintPluginFileInput,
 ) error {
-	if len(inputs) == 0 {
-		return nil
+	select {
+	case slots <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	workerCount := min(cap(resources.sourceReadSlots), len(inputs))
-	errs := make([]error, workerCount)
-	work := newLintWorkGroup(workerCount == 1)
+	defer func() { <-slots }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	text, err := readTargetText(readText, snapshot, targetPath, input.SourceFile)
+	if err != nil {
+		return fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
+	}
+	input.Text = &text
+	return nil
+}
+
+// Single-threaded and single-file bindings read inline. Otherwise join all
+// readers and return the prefix to project before reporting a later read error.
+func (slots pluginSourceReadSlots) prefetch(count int, singleThreaded bool, read func(int) error) (int, error) {
+	workerCount := min(cap(slots), count)
+	if singleThreaded || workerCount < 2 {
+		return count, nil
+	}
+	failures := make([]struct {
+		index int
+		err   error
+	}, workerCount)
+	work := newLintWorkGroup(false)
 	for worker := range workerCount {
-		start := worker * len(inputs) / workerCount
-		end := (worker + 1) * len(inputs) / workerCount
+		start := worker * count / workerCount
+		end := (worker + 1) * count / workerCount
 		work.Queue(func() {
-			select {
-			case resources.sourceReadSlots <- struct{}{}:
-			case <-ctx.Done():
-				errs[worker] = ctx.Err()
-				return
-			}
-			defer func() { <-resources.sourceReadSlots }()
 			for index := start; index < end; index++ {
-				if err := ctx.Err(); err != nil {
-					errs[worker] = err
+				if err := read(index); err != nil {
+					failures[worker].index = index
+					failures[worker].err = err
 					return
 				}
-				text, err := readTargetText(readText, SourceSnapshot{}, targetPaths[index], inputs[index].SourceFile)
-				if err != nil {
-					errs[worker] = fmt.Errorf("linter pipeline: freeze plugin source %q: %w", inputs[index].Path, err)
-					return
-				}
-				inputs[index].Text = &text
 			}
 		})
 	}
 	work.RunAndWait()
-	for _, err := range errs {
-		if err != nil {
-			return err
+	for _, failure := range failures {
+		if failure.err != nil {
+			return failure.index, failure.err
 		}
 	}
-	return nil
+	return count, nil
 }
 
 func detachPluginInput(input EslintPluginFileInput) (EslintPluginFileInput, error) {
