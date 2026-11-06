@@ -336,9 +336,20 @@ func TestBuildProjectsKeepsServiceGapsSourceOnly(t *testing.T) {
 
 type serviceBoundaryFS struct {
 	vfs.FS
-	mu    sync.Mutex
-	reads map[string]int
-	dirs  map[string]int
+	mu      sync.Mutex
+	reads   map[string]int
+	dirs    map[string]int
+	lookups map[string]int
+}
+
+func (fsys *serviceBoundaryFS) FileExists(path string) bool {
+	fsys.mu.Lock()
+	if fsys.lookups == nil {
+		fsys.lookups = make(map[string]int)
+	}
+	fsys.lookups[path]++
+	fsys.mu.Unlock()
+	return fsys.FS.FileExists(path)
 }
 
 func (fsys *serviceBoundaryFS) ReadFile(path string) (string, bool) {
@@ -2663,13 +2674,39 @@ func TestBuildProjectsPreservesBroadRootFallback(t *testing.T) {
 					file: {ExplicitProject: declaration}, other: {ExplicitProject: declaration},
 				},
 			}
-			loads, err := NewSession(fsys).PlanLoads(request, dir, false)
+			loadPlan, err := NewSession(fsys).PlanLoads(request, dir, false)
 			if err != nil {
 				t.Fatal(err)
 			}
+			loads := loadPlan.Loads
 			if test.target == "target.js" {
 				if len(loads) != 0 {
 					t.Fatal("compatibility binding must be resolved before publishing work")
+				}
+				projects, err := loadPlan.BuildProjects()
+				if err != nil {
+					t.Fatal(err)
+				}
+				binding, err := loadPlan.session.LoadAPI(projects, request.Targets, dir, false)
+				if err != nil {
+					t.Fatal(err)
+				}
+				found := false
+				for index, names := range binding.TargetsByProgram {
+					if !slices.Contains(names, file.Path) {
+						continue
+					}
+					found = true
+					want := ""
+					if test.wantProject != "" {
+						want = tspath.ResolvePath(dir, test.wantProject)
+					}
+					if got := binding.Programs[index].Options().ConfigFilePath; got != want {
+						t.Fatalf("prepared fallback selected %q, want %q", got, want)
+					}
+				}
+				if !found {
+					t.Fatal("prepared fallback lost its selected root")
 				}
 			} else {
 				if len(loads) != 2 {
@@ -4180,7 +4217,8 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			loads, err := NewSession(fsys).PlanLoads(request, dir, test.compilerRoots)
+			loadPlan, err := NewSession(fsys).PlanLoads(request, dir, test.compilerRoots)
+			loads := loadPlan.Loads
 			if err != nil || len(loads) != 3 {
 				t.Fatalf("loads=%d, err=%v", len(loads), err)
 			}
@@ -4222,5 +4260,103 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 				t.Fatal("admitted loads changed complete source graphs, target grouping, capabilities, or source identity")
 			}
 		})
+	}
+}
+
+func TestProgramLoadPlanReusesPreparationOnlyWithinItsGeneration(t *testing.T) {
+	for _, scope := range []ProjectScope{ActiveOwners, Targeted, AllDeclared} {
+		for _, singleThreaded := range []bool{true, false} {
+			t.Run(fmt.Sprintf("scope=%d/serial=%t", scope, singleThreaded), func(t *testing.T) {
+				dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+				serviceConfig := tspath.ResolvePath(dir, "a/tsconfig.json")
+				serviceSource := tspath.ResolvePath(dir, "a/src/file.ts")
+				fsys := &serviceBoundaryFS{
+					FS: utils.NewOverlayVFS(bundled.WrapFS(cachedvfs.From(osvfs.FS())), map[string]string{
+						serviceConfig:                            `{"compilerOptions":{"noLib":true},"files":["src/file.ts"]}`,
+						tspath.ResolvePath(dir, "b/custom.json"): `{"compilerOptions":{"noLib":true},"files":["src/file.ts"],"references":[{"path":"../a/tsconfig.json"}]}`,
+					}),
+					reads: make(map[string]int), dirs: make(map[string]int),
+				}
+				service := testLintTarget(fsys, dir, serviceSource)
+				explicit := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "b/src/file.ts"))
+				request := ProjectBuildRequest{
+					Configs: map[string]rslintconfig.RslintConfig{dir: projectConfig("b/custom.json")},
+					Targets: target.Plan{Files: []target.File{service, explicit}}, Scope: scope, SingleThreaded: singleThreaded,
+					Policies: map[target.File]rslintconfig.ProjectPolicy{
+						service: {ServiceRootDirectory: dir},
+						explicit: {ExplicitProject: &rslintconfig.ProjectDeclaration{
+							Patterns: rslintconfig.ProjectPaths{"b/custom.json"}, BaseDirectory: dir,
+						}},
+					},
+				}
+				session := NewSession(fsys)
+				plan, err := session.PlanLoads(request, dir, false)
+				if err != nil || len(plan.Loads) != 0 {
+					t.Fatalf("referenced ordinary project must retain whole binding: loads=%d err=%v", len(plan.Loads), err)
+				}
+				// This missing ancestor config is queried only by service
+				// discovery, never by constructing either selected Program.
+				searchedConfig := tspath.ResolvePath(dir, "a/src/tsconfig.json")
+				wantSearches := 1
+				if scope == AllDeclared {
+					wantSearches = 0 // Complete checking still skips independent preparation.
+				}
+				if got := fsys.lookups[searchedConfig]; got != wantSearches {
+					t.Fatalf("service discovery before fallback = %d, want %d", got, wantSearches)
+				}
+				set, err := plan.BuildProjects()
+				if err != nil || set.Len() != 2 {
+					t.Fatalf("prepared fallback: projects=%d err=%v", set.Len(), err)
+				}
+				if got := fsys.lookups[searchedConfig]; got != 1 {
+					t.Fatalf("fallback repeated service discovery: lookups=%d, want 1", got)
+				}
+				initial, err := session.LoadAPI(set, request.Targets, dir, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var original *lintprogram.Program
+				for _, program := range initial.Programs {
+					if program.Options().ConfigFilePath == serviceConfig {
+						original = program
+					}
+				}
+				if original == nil || original.GetSourceFile(serviceSource) == nil {
+					t.Fatal("prepared service metadata did not construct its selected source")
+				}
+				// Direct callers prepare a new request rather than inheriting
+				// the preceding load plan as an implicit Session cache.
+				direct, err := session.BuildProjects(request)
+				if err != nil || direct.Len() != set.Len() || fsys.lookups[searchedConfig] != 2 {
+					t.Fatalf("direct build: projects=%d searches=%d err=%v", direct.Len(), fsys.lookups[searchedConfig], err)
+				}
+				// A changed source generation receives a fresh Session and
+				// discovery; neither selected roots nor source bytes leak.
+				const replacement = "export const replacement = 2;"
+				round := NewSession(utils.NewOverlayVFS(fsys, map[string]string{
+					serviceConfig: `{"compilerOptions":{"noLib":true},"files":["src/disabled.ts"]}`,
+					serviceSource: replacement,
+				}))
+				after, err := round.BuildProjects(request)
+				if err != nil || after.Len() != 1 || fsys.lookups[searchedConfig] != 3 {
+					t.Fatalf("new generation reused discovery: projects=%d searches=%d err=%v", after.Len(), fsys.lookups[searchedConfig], err)
+				}
+				binding, err := round.LoadAPI(after, request.Targets, dir, singleThreaded)
+				if err != nil {
+					t.Fatal(err)
+				}
+				found := false
+				for index, names := range binding.TargetsByProgram {
+					if slices.Contains(names, serviceSource) {
+						program := binding.Programs[index]
+						source := program.GetSourceFile(serviceSource)
+						found = source != nil && source.Text() == replacement && !program.CanProvideTypeChecker(source)
+					}
+				}
+				if !found || original.GetSourceFile(serviceSource).Text() == replacement {
+					t.Fatal("new generation lost its source-only overlay or mutated the initial source")
+				}
+			})
+		}
 	}
 }

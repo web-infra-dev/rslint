@@ -489,8 +489,17 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
+	var initialProjectPlan *loader.ProjectLoadPlan
 	buildBinding := func(session *loader.Session) (loader.LoadResult, error) {
-		projects, buildErr := session.BuildProjects(projectRequest)
+		var projects loader.ProjectSet
+		var buildErr error
+		if session == programSession && initialProjectPlan != nil {
+			plan := initialProjectPlan
+			initialProjectPlan = nil
+			projects, buildErr = plan.BuildProjects()
+		} else {
+			projects, buildErr = session.BuildProjects(projectRequest)
+		}
 		if buildErr != nil {
 			return loader.LoadResult{}, buildErr
 		}
@@ -583,11 +592,14 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	if !req.Fix {
 		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
-			loads, err := programSession.PlanLoads(projectRequest, configDirectory, true)
+			plan, err := programSession.PlanLoads(projectRequest, configDirectory, true)
 			if err != nil {
 				return nil, err
 			}
-			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			if len(plan.Loads) == 0 {
+				initialProjectPlan = &plan
+			}
+			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 

@@ -23,7 +23,30 @@ type ProgramLoad struct {
 	Load        func() (LoadResult, error)
 }
 
-// PlanLoads separates target ownership from source construction. A nil plan
+// ProjectLoadPlan retains only prepared project metadata for one request and
+// immutable Session generation. If Loads is empty, BuildProjects preserves the
+// whole-binding acquisition without repeating declaration or service discovery.
+// The plan contains no execution slots, Programs, or source ASTs. Like other
+// Session operations, it must not cross source invalidation or overlap a build.
+// Its request's target, config, and policy inputs remain immutable until use.
+type ProjectLoadPlan struct {
+	Loads []ProgramLoad
+
+	session  *Session
+	request  ProjectBuildRequest
+	prepared *projectPlan
+}
+
+// BuildProjects constructs the complete binding's project set from the same
+// metadata used to consider independent loads. Call only when Loads is empty.
+func (plan ProjectLoadPlan) BuildProjects() (ProjectSet, error) {
+	if plan.prepared == nil {
+		return plan.session.BuildProjects(plan.request)
+	}
+	return plan.session.buildProjects(*plan.prepared, plan.request)
+}
+
+// PlanLoads separates target ownership from source construction. Empty Loads
 // keeps the whole-binding acquisition. Compiler-only roots preserve consumers
 // that require the compiler AST representation; otherwise the parser/binder
 // facade handles supported project-external roots.
@@ -31,14 +54,24 @@ type ProgramLoad struct {
 // Call on a fresh Session, before constructing any Programs. Config validation
 // and root identity ranking are shared with BuildProjects. The loads retain
 // immutable metadata and source snapshots, but no completed Program or AST.
-func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoots bool) ([]ProgramLoad, error) {
+func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoots bool) (ProjectLoadPlan, error) {
+	result := ProjectLoadPlan{session: s, request: request}
 	if request.Scope == AllDeclared {
-		return nil, nil
+		return result, nil
 	}
 	plan, err := s.prepareProjectPlan(request)
 	if err != nil {
-		return nil, err
+		return ProjectLoadPlan{}, err
 	}
+	result.prepared = &plan
+	result.Loads, err = s.planLoads(plan, request, cwd, compilerRoots)
+	if err != nil {
+		return ProjectLoadPlan{}, err
+	}
+	return result, nil
+}
+
+func (s *Session) planLoads(plan projectPlan, request ProjectBuildRequest, cwd string, compilerRoots bool) ([]ProgramLoad, error) {
 	if len(plan.specs) < 2 {
 		return nil, nil
 	}

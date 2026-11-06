@@ -407,9 +407,18 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
+	var initialProjectPlan *loader.ProjectLoadPlan
 	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
 		defer session.ReleaseBuildCache()
-		rebuilt, err := session.BuildProjects(projectRequest)
+		var rebuilt loader.ProjectSet
+		var err error
+		if session == programSession && initialProjectPlan != nil {
+			plan := initialProjectPlan
+			initialProjectPlan = nil
+			rebuilt, err = plan.BuildProjects()
+		} else {
+			rebuilt, err = session.BuildProjects(projectRequest)
+		}
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
@@ -521,14 +530,18 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// lint admits disjoint bindings independently, regardless of rule backend.
 	if !fix {
 		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
-			loads, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
-			if err != nil || len(loads) == 0 {
+			plan, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
+			if err != nil {
 				return nil, err
+			}
+			if len(plan.Loads) == 0 {
+				initialProjectPlan = &plan
+				return nil, nil
 			}
 			if err := activate(); err != nil {
 				return nil, err
 			}
-			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 
