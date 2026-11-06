@@ -85,6 +85,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_optional_catch_binding"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_query_selector"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_reflect_apply"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
@@ -190,6 +191,7 @@ func GetAllRules() []rule.Rule {
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
+		prefer_query_selector.PreferQuerySelectorRule,
 		prefer_reflect_apply.PreferReflectApplyRule,
 		prefer_set_has.PreferSetHasRule,
 		prefer_set_size.PreferSetSizeRule,
