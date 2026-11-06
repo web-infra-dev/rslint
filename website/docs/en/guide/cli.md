@@ -153,3 +153,5 @@ The table is written to stderr, so machine-readable output formats such as `json
 | `0`  | No errors (warnings may be present)               |
 | `1`  | Errors found, or warnings exceed `--max-warnings` |
 | `2`  | Invalid command-line usage or flag combinations   |
+
+Terminating Rslint stops the current check even when output is paused. On macOS and Linux, `SIGHUP`, `SIGINT`, and `SIGTERM` exit with status `129`, `130`, and `143`, respectively.

@@ -498,39 +498,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     return configActivation;
   };
 
-  // Without our own SIGINT handler Node's default action _exit(130)s
-  // immediately, leaving the Go child to discover the disconnect via stdin EOF
-  // — which a wedged child can't. Intercept and force it down first.
-  const onSignal = () => {
-    // No log: a user Ctrl-C (SIGINT) or a normal SIGTERM/SIGHUP teardown is the
-    // expected path, not an error — forward the kill to the Go child and tear
-    // the worker pool down so its threads don't outlive us.
-    shuttingDown = true;
-    configAbort.abort();
-    safeKillGo(child);
-    void Promise.allSettled([
-      shutdownPluginHost(pluginHost),
-      ...[...stagedPluginHosts].map(shutdownPluginHost),
-    ]);
-  };
-  process.on('SIGINT', onSignal);
-  process.on('SIGTERM', onSignal);
-  process.on('SIGHUP', onSignal);
-  const removeSignalHandlers = () => {
-    process.off('SIGINT', onSignal);
-    process.off('SIGTERM', onSignal);
-    process.off('SIGHUP', onSignal);
-  };
+  // Keep Node's native termination behavior, which works even if stdout is
+  // blocked in a synchronous write. Go cancels and exits when this IPC parent
+  // disappears; no JavaScript signal callback is needed to stop the child.
   const forwardedStdout = new StdoutWriteBarrier(stdout);
 
-  // try/finally so the worker pool is always drained — every exit path
-  // (init failure as well as normal completion) runs the `finally`, which
-  // tears down the signal handlers and the plugin worker pool. Without this
-  // the init-failure returns below leaked a graceful drain (the pool's
-  // threads were only reaped by the outer process.exit), whereas the normal
-  // and signal paths drained it cleanly. `pluginHost?.shutdown()` is
-  // null-safe (no pool ⇒ no-op) and idempotent (WorkerPool.shutdown guards
-  // on `closed`), so the signal handler firing shutdown first is harmless.
+  // Every return, including init failure, releases the plugin worker pool.
   try {
     // Wire handlers BEFORE start so the first frame Go writes is routable.
     ipc.setInboundHandler(async (msg) => {
@@ -656,12 +629,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     const finalExit = await waitForExit();
     return finalExit.code;
   } finally {
-    // Single cleanup site for every return above: drop the process-level
-    // signal listeners and drain the plugin worker pool. Both are no-ops
-    // when already done (removeSignalHandlers off()s detached listeners;
-    // pluginHost?.shutdown() is null-safe + idempotent), so this is safe
-    // even on the normal path and after the signal handler already fired.
-    removeSignalHandlers();
     shuttingDown = true;
     configAbort.abort();
     await Promise.allSettled([...pendingPluginHostBuilds]);

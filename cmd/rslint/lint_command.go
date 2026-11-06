@@ -279,8 +279,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 1
 	}
 	abortRun := func(reason, legacyMessage string) int {
-		// The IPC owner maps a canceled command to exit 130. Do not make an
-		// interrupted run look like an ordinary completed failure.
+		// The IPC owner reports the signal or disconnect that canceled the run.
 		if ctx.Err() != nil {
 			return 1
 		}
