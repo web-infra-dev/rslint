@@ -13,11 +13,14 @@
       "getSignaturesOfType",
       "getPropertyNameForKnownSymbolName",
       "getTypeFromTypeNode",
+      "getTypeOfExpression",
+      "isConstContext",
       "getAccessedPropertyName",
       "isArrayOrTupleType",
       "isArrayType",
       "getTypeArguments",
       "getContextualType",
+      "getApparentTypeOfContextualType",
       "getAwaitedType",
       "getTypeOfSymbol",
       "getReturnTypeOfSignature",
@@ -25,8 +28,10 @@
       "getContextualTypeForArgumentAtIndex",
       "getResolvedSignature",
       "getBaseTypeOfLiteralType",
+      "getWidenedLiteralLikeTypeForContextualType",
       "getWidenedType",
       "isTypeAssignableTo",
+      "isTypeIdenticalTo",
       "isTypeStrictSubtypeOf",
       "getIndexInfosOfType",
       "getIterationTypeOfIterable",
@@ -44,7 +49,12 @@
     "TupleType": ["combinedFlags"],
     "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],
-    "Checker": ["numberType", "booleanType", "globalRegExpType"],
+    "Checker": [
+      "numberType",
+      "booleanType",
+      "globalRegExpType",
+      "couldContainTypeVariables"
+    ],
     "InterfaceType": ["thisType"]
   }
 }

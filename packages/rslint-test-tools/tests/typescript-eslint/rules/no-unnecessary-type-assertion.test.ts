@@ -946,28 +946,19 @@ enum E {
 }
 const x: E | undefined = o?.fn(n => n | 0, 0 as E);
     `,
-  ],
 
-  invalid: [
+    // These upstream inputs intentionally stay valid: removing the assertion
+    // restores fresh literal widening when const/readonly values are copied.
     {
       code: 'const foo = <3>3;',
-      errors: [{ column: 13, line: 1, messageId: 'unnecessaryAssertion' }],
-      output: 'const foo = 3;',
     },
     {
       code: 'const foo = 3 as 3;',
-      errors: [{ column: 13, line: 1, messageId: 'unnecessaryAssertion' }],
-      output: 'const foo = 3;',
     },
     {
       code: `
 type Foo = 3;
 const foo = <Foo>3;
-      `,
-      errors: [{ column: 13, line: 3, messageId: 'unnecessaryAssertion' }],
-      output: `
-type Foo = 3;
-const foo = 3;
       `,
     },
     {
@@ -975,12 +966,74 @@ const foo = 3;
 type Foo = 3;
 const foo = 3 as Foo;
       `,
-      errors: [{ column: 13, line: 3, messageId: 'unnecessaryAssertion' }],
-      output: `
-type Foo = 3;
-const foo = 3;
+    },
+    {
+      code: `
+class T {
+  readonly a = 3 as 3;
+}
       `,
     },
+    {
+      code: `
+type S = 10;
+
+class T {
+  readonly a = 10 as S;
+}
+      `,
+    },
+    {
+      code: 'const a = true as const;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const a = <const>true;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const a = 1 as const;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const a = <const>1;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const a = 1n as const;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const a = <const>1n;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    // https://github.com/typescript-eslint/typescript-eslint/issues/8737
+    {
+      code: 'const a = `a` as const;',
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: "const a = 'a' as const;",
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: "const a = <const>'a';",
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: `
+class T {
+  readonly a = 'a' as const;
+}
+      `,
+      options: [{ checkLiteralConstAssertions: true }],
+    },
+    {
+      code: 'const x = 5 as any as 5;',
+    },
+  ],
+
+  invalid: [
     {
       code: `
 const foo = 3;
@@ -1711,46 +1764,6 @@ var x = 1;
     {
       code: `
 class T {
-  readonly a = 3 as 3;
-}
-      `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'unnecessaryAssertion',
-        },
-      ],
-      output: `
-class T {
-  readonly a = 3;
-}
-      `,
-    },
-    {
-      code: `
-type S = 10;
-
-class T {
-  readonly a = 10 as S;
-}
-      `,
-      errors: [
-        {
-          line: 5,
-          messageId: 'unnecessaryAssertion',
-        },
-      ],
-      output: `
-type S = 10;
-
-class T {
-  readonly a = 10;
-}
-      `,
-    },
-    {
-      code: `
-class T {
   readonly a = (3 + 5) as number;
 }
       `,
@@ -1836,80 +1849,6 @@ foo(baz!);
 function foo(bar: unknown) {}
 const baz: unknown = {};
 foo(baz);
-      `,
-    },
-    {
-      code: 'const a = true as const;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = true;',
-    },
-    {
-      code: 'const a = <const>true;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = true;',
-    },
-    {
-      code: 'const a = 1 as const;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = 1;',
-    },
-    {
-      code: 'const a = <const>1;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = 1;',
-    },
-    {
-      code: 'const a = 1n as const;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = 1n;',
-    },
-    {
-      code: 'const a = <const>1n;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = 1n;',
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/8737
-    {
-      code: 'const a = `a` as const;',
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: 'const a = `a`;',
-    },
-    {
-      code: "const a = 'a' as const;",
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: "const a = 'a';",
-    },
-    {
-      code: "const a = <const>'a';",
-      errors: [{ line: 1, messageId: 'unnecessaryAssertion' }],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: "const a = 'a';",
-    },
-    {
-      code: `
-class T {
-  readonly a = 'a' as const;
-}
-      `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'unnecessaryAssertion',
-        },
-      ],
-      options: [{ checkLiteralConstAssertions: true }],
-      output: `
-class T {
-  readonly a = 'a';
-}
       `,
     },
     {
@@ -2026,15 +1965,6 @@ doThing({ required: 'yes', alsoRequired: 1 });
       `,
     },
     {
-      code: 'const x = 5 as any as 5;',
-      errors: [
-        {
-          messageId: 'unnecessaryAssertion',
-        },
-      ],
-      output: 'const x = 5;',
-    },
-    {
       code: `
 const v: number = 5;
 const x = v as unknown as number;
@@ -2074,7 +2004,7 @@ const x = (1 + 1) as any as number;
         },
       ],
       output: `
-const x = 1 + 1;
+const x = (1 + 1);
       `,
     },
     {
@@ -2087,7 +2017,7 @@ const x = 2 * ((1 + 1) as any as number);
         },
       ],
       output: `
-const x = 2 * (1 + 1);
+const x = 2 * ((1 + 1));
       `,
     },
     {
@@ -2102,7 +2032,7 @@ const x = <number>(<any>v);
       ],
       output: `
 const v: number = 5;
-const x = v;
+const x = (v);
       `,
     },
     {

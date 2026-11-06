@@ -2,17 +2,13 @@
 
 ## Rule Details
 
-Disallow type assertions that do not change the type of an expression.
-
-Type assertions (`as` expressions, angle-bracket syntax, and non-null assertions `!`) that don't actually change the type of an expression are unnecessary and add noise to the code. This includes non-null assertions on values that are already non-nullable.
+This rule reports unnecessary assertions, including `as`, angle-bracket assertions, and non-null assertions (`!`).
 
 Examples of **incorrect** code for this rule:
 
 ```typescript
 const foo = 3;
 const bar = foo!; // foo is already non-nullable
-
-const str = 'hello' as string; // already a string
 
 declare const value: number;
 const num = value as number; // already a number
@@ -26,8 +22,21 @@ const bar = foo!; // non-null assertion is meaningful
 
 const value = someUnknown as string; // type narrowing
 
-const x = 3 as const; // const assertions are allowed
+const x = 3 as const;
 ```
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `typesToIgnore` | `[]` | Skip `as` and angle-bracket assertions for the listed type names. |
+| `checkLiteralConstAssertions` | `false` | Also check for unnecessary `as const` assertions on literal values. |
+
+## Differences from upstream
+
+Rslint keeps assertions that your code relies on. This helps avoid new type errors, lost type information, or changes in behavior after running `--fix`.
+
+Some assertions are reported without an automatic fix, so their diagnostics remain after `--fix`. This includes certain assertions split across lines with comments. The rule leaves these assertions in place to preserve your program's behavior.
 
 ## Original Documentation
 

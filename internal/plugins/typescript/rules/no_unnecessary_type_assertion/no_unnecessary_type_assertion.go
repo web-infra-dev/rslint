@@ -3,12 +3,13 @@ package no_unnecessary_type_assertion
 import (
 	_ "embed"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -86,23 +87,6 @@ func assertionWalkUpParentheses(node *ast.Node) *ast.Node {
 		node = node.Parent
 	}
 	return node
-}
-
-func assertionIsStartOfArrowFunctionBody(sourceFile *ast.SourceFile, node *ast.Node) bool {
-	nodeStart := utils.TrimNodeTextRange(sourceFile, node).Pos()
-	for current := node; current != nil && current.Parent != nil; current = current.Parent {
-		parent := current.Parent
-		if ast.IsParenthesizedExpression(parent) {
-			return false
-		}
-		if ast.IsArrowFunction(parent) {
-			return parent.AsArrowFunction().Body == current
-		}
-		if !ast.IsExpression(parent) || utils.TrimNodeTextRange(sourceFile, parent).Pos() != nodeStart {
-			return false
-		}
-	}
-	return false
 }
 
 func assertionTypeArguments(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
@@ -286,26 +270,6 @@ func assertionHasIndexSignature(typeChecker *checker.Checker, t *checker.Type) b
 	return false
 }
 
-func assertionHasSameProperties(typeChecker *checker.Checker, uncast, cast *checker.Type) bool {
-	uncastProperties := typeChecker.GetPropertiesOfType(uncast)
-	castProperties := typeChecker.GetPropertiesOfType(cast)
-	if len(uncastProperties) != len(castProperties) {
-		return false
-	}
-	castPropertyNames := make(map[string]struct{}, len(castProperties))
-	for _, property := range castProperties {
-		castPropertyNames[property.Name] = struct{}{}
-	}
-	for _, property := range uncastProperties {
-		if _, ok := castPropertyNames[property.Name]; !ok ||
-			typescriptutil.IsPropertyReadonlyInType(typeChecker, uncast, property.Name) !=
-				typescriptutil.IsPropertyReadonlyInType(typeChecker, cast, property.Name) {
-			return false
-		}
-	}
-	return true
-}
-
 func assertionHasSameTypeArguments(typeChecker *checker.Checker, uncast, cast *checker.Type) bool {
 	uncastArguments := assertionTypeArguments(typeChecker, uncast)
 	castArguments := assertionTypeArguments(typeChecker, cast)
@@ -320,8 +284,8 @@ func assertionHasSameTypeArguments(typeChecker *checker.Checker, uncast, cast *c
 	return true
 }
 
-func assertionHasGenericCallSignature(typeChecker *checker.Checker, t *checker.Type) bool {
-	for _, signature := range utils.GetCallSignatures(typeChecker, t) {
+func assertionHasGenericSignature(typeChecker *checker.Checker, t *checker.Type, kind checker.SignatureKind) bool {
+	for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, t, kind) {
 		if len(signature.TypeParameters()) > 0 {
 			return true
 		}
@@ -329,40 +293,40 @@ func assertionHasGenericCallSignature(typeChecker *checker.Checker, t *checker.T
 	return false
 }
 
-func assertionIsInGenericContext(ctx rule.RuleContext, node *ast.Node) bool {
+func assertionGenericCall(ctx rule.RuleContext, node *ast.Node) *ast.Node {
 	seenFunction := false
 	for child := assertionWalkUpParentheses(node); child.Parent != nil; child = child.Parent {
 		current := child.Parent
 		switch current.Kind {
 		case ast.KindFunctionDeclaration:
-			return false
+			return nil
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 			// ESTree wraps method parameters and bodies in a function expression.
 			// Computed names and decorators remain in the enclosing context.
 			if child == current.Body() || ast.IsParameterDeclaration(child) {
-				return false
+				return nil
 			}
 		case ast.KindFunctionExpression, ast.KindArrowFunction:
-			if ast.IsBlock(current.Body()) || seenFunction {
-				return false
+			body := current.Body()
+			if (body != nil && ast.IsBlock(body)) || seenFunction {
+				return nil
 			}
 			seenFunction = true
 		case ast.KindCallExpression, ast.KindNewExpression:
 			if current.TypeArguments() != nil {
 				continue
 			}
-			if current.Kind == ast.KindCallExpression && ast.IsAccessExpression(ast.SkipParentheses(current.Expression())) {
-				if _, ok := assertionArgumentIndex(current, node); ok {
-					continue
-				}
+			calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(current.Expression()))
+			kind := checker.SignatureKindCall
+			if ast.IsNewExpression(current) {
+				kind = checker.SignatureKindConstruct
 			}
-			calleeType := ctx.TypeChecker.GetTypeAtLocation(current.Expression())
-			if assertionHasGenericCallSignature(ctx.TypeChecker, calleeType) {
-				return true
+			if assertionHasGenericSignature(ctx.TypeChecker, calleeType, kind) {
+				return current
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 func assertionIsConceptuallyLiteral(node *ast.Node) bool {
@@ -399,6 +363,285 @@ func assertionOriginalExpression(node *ast.Node) *ast.Node {
 		expression = ast.SkipParentheses(expression.Expression())
 	}
 	return expression
+}
+
+func assertionExpressionType(typeChecker *checker.Checker, expression *ast.Node) *checker.Type {
+	// GetTypeAtLocation regularizes literal types. Preserve freshness when
+	// comparing the type inferred after removing an assertion.
+	return checker.Checker_getTypeOfExpression(typeChecker, ast.GetReparsedNodeForNode(expression))
+}
+
+func assertionPreservesWidening(typeChecker *checker.Checker, original, asserted *checker.Type) bool {
+	// Mutable locations and implicit returns also widen unique symbols,
+	// independently of the fresh-literal metadata.
+	widenedOriginal := checker.Checker_getWidenedLiteralLikeTypeForContextualType(typeChecker, original, nil)
+	widenedAsserted := typeChecker.GetWidenedLiteralType(asserted)
+	return (widenedOriginal == original && widenedAsserted == asserted) ||
+		checker.Checker_isTypeIdenticalTo(typeChecker, widenedOriginal, widenedAsserted)
+}
+
+func assertionHasExplicitLiteralType(ctx rule.RuleContext, node *ast.Node, asserted *checker.Type) bool {
+	if !assertionIsTypeLiteral(asserted) {
+		return false
+	}
+	semanticNode := assertionWalkUpParentheses(node)
+	parent := semanticNode.Parent
+	if parent == nil || (!ast.IsVariableDeclaration(parent) && !ast.IsPropertyDeclaration(parent)) ||
+		parent.Type() == nil || parent.Initializer() != semanticNode {
+		return false
+	}
+	return checker.Checker_isTypeIdenticalTo(ctx.TypeChecker,
+		checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, parent.Type()), asserted)
+}
+
+// This is deliberately a one-level check. An inferred aggregate carried by a
+// reference is retained when its nested member writes cannot be inspected.
+func assertionAggregateMayWiden(typeChecker *checker.Checker, t *checker.Type, opaque bool) bool {
+	memberMayWiden := func(member *checker.Type) bool {
+		return member != nil && (typeChecker.GetWidenedLiteralType(member) != member ||
+			opaque && checker.Type_objectFlags(member)&checker.ObjectFlagsContainsObjectOrArrayLiteral != 0)
+	}
+	if checker.Checker_isArrayOrTupleType(typeChecker, t) {
+		return memberMayWiden(checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker)))
+	}
+	if utils.IsTypeFlagSetWithUnion(t, checker.TypeFlagsObject) {
+		for _, property := range typeChecker.GetPropertiesOfType(t) {
+			if memberMayWiden(checker.Checker_getTypeOfSymbol(typeChecker, property)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func assertionMemberWriteMayWiden(ctx rule.RuleContext, value *ast.Node, original, written *checker.Type, retainedConst bool) bool {
+	return written == nil || ((!retainedConst || !checker.Checker_isConstContext(ctx.TypeChecker, value)) &&
+		!assertionPreservesWidening(ctx.TypeChecker, original, written))
+}
+
+func assertionFunctionMayAffectInference(ctx rule.RuleContext, expression *ast.Node, contextualParameters bool) bool {
+	if contextualParameters && ast.HasContextSensitiveParameters(expression) {
+		return true
+	}
+	if expression.Type() != nil {
+		return false
+	}
+	// Both yielded values and the value of a yield expression (TNext)
+	// can be inferred from the assertion's contextual generator type.
+	if ast.GetFunctionFlags(expression)&ast.FunctionFlagsGenerator != 0 {
+		return true
+	}
+	body := expression.Body()
+	if body != nil && ast.IsBlock(body) {
+		return ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+			return assertionValueMayAffectInference(ctx, statement.Expression(), false, true)
+		})
+	}
+	return assertionValueMayAffectInference(ctx, body, false, true)
+}
+
+// A call's type inside an assertion may already include return-type inferences
+// supplied by that assertion. Comparing those types cannot prove that removing
+// the assertion preserves the type inferred for the expression.
+// Member writes also need a widening proof unless the receiving context has
+// already been proved stable. retainedConst only describes an inner assertion
+// that remains after the proposed fix.
+func assertionValueMayAffectInference(ctx rule.RuleContext, expression *ast.Node, retainedConst, memberWrites bool) bool {
+	if expression == nil {
+		return false
+	}
+	expression = ast.SkipParentheses(expression)
+	var expressionType *checker.Type
+	explicitLiteral := false
+	if memberWrites {
+		expressionType = assertionExpressionType(ctx.TypeChecker, expression)
+		contextual := checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone)
+		parent := assertionWalkUpParentheses(expression).Parent
+		// A declaration that explicitly fixes this literal keeps it pinned;
+		// its operand still needs the inference checks below.
+		explicitLiteral = contextual != nil && parent != nil && ast.IsAssertionExpression(parent) &&
+			assertionHasExplicitLiteralType(ctx, parent, contextual)
+		if contextual != nil && !explicitLiteral && assertionMemberWriteMayWiden(ctx, expression, expressionType, contextual, retainedConst) {
+			return true
+		}
+	}
+	switch expression.Kind {
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		// Const assertions inherit the surrounding contextual type, while
+		// ordinary assertions supply their own context to the operand.
+		if ast.IsConstAssertion(expression) {
+			return assertionValueMayAffectInference(ctx, expression.Expression(), true, memberWrites)
+		}
+	case ast.KindSatisfiesExpression:
+		// The constraint supplies the operand's context. The value still
+		// has the operand's inferred type, including its member freshness.
+		return memberWrites && assertionAggregateMayWiden(ctx.TypeChecker, expressionType, true)
+	case ast.KindTemplateExpression:
+		// Context can produce a template type or regular string literals;
+		// type-only widening cannot recover the string otherwise produced.
+		// A retained const context fixes that independently.
+		return memberWrites && !explicitLiteral && !utils.IsTypeFlagSet(expressionType, checker.TypeFlagsString) &&
+			(!retainedConst || !checker.Checker_isConstContext(ctx.TypeChecker, expression))
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+		if !memberWrites && checker.Checker_getContextualType(ctx.TypeChecker, expression, checker.ContextFlagsNone) == nil {
+			return false
+		}
+		var callee *ast.Node
+		kind := checker.SignatureKindCall
+		if expression.Kind == ast.KindTaggedTemplateExpression {
+			callee = expression.AsTaggedTemplateExpression().Tag
+		} else {
+			callee = expression.Expression()
+			if expression.Kind == ast.KindNewExpression {
+				kind = checker.SignatureKindConstruct
+			}
+		}
+		callee = ast.SkipParentheses(callee)
+		// An IIFE's parameters are inferred from its arguments, while its
+		// return expression can still depend on the assertion's context.
+		if expression.Kind == ast.KindCallExpression && ast.IsFunctionExpressionOrArrowFunction(callee) &&
+			assertionFunctionMayAffectInference(ctx, callee, false) {
+			return true
+		}
+		// Explicit type arguments, including trailing defaults, fix this
+		// call's type parameters, but not inference inside an IIFE's body.
+		if len(expression.TypeArguments()) != 0 {
+			return false
+		}
+		calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(callee))
+		// Removing the contextual type can change overload selection, so the
+		// currently resolved signature alone cannot establish safety.
+		for _, signature := range checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind) {
+			if len(signature.TypeParameters()) != 0 &&
+				checker.Checker_couldContainTypeVariables(ctx.TypeChecker)(checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) {
+				return true
+			}
+		}
+	case ast.KindObjectLiteralExpression:
+		objectType := expressionType
+		if memberWrites {
+			if assertionAggregateMayWiden(ctx.TypeChecker, objectType, false) {
+				return true
+			}
+		}
+		for _, property := range expression.Properties() {
+			switch property.Kind {
+			case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
+				var value *ast.Node
+				var original *checker.Type
+				if ast.IsShorthandPropertyAssignment(property) {
+					value = property.Name()
+					if memberWrites {
+						symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(property)
+						if symbol == nil {
+							return true
+						}
+						original = ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, value)
+					}
+				} else {
+					value = property.Initializer()
+					if memberWrites {
+						original = assertionExpressionType(ctx.TypeChecker, value)
+					}
+				}
+				if memberWrites {
+					opaque := !ast.IsObjectLiteralExpression(ast.SkipParentheses(value)) && !ast.IsArrayLiteralExpression(ast.SkipParentheses(value))
+					if assertionAggregateMayWiden(ctx.TypeChecker, original, opaque) {
+						return true
+					}
+					symbol := property.Symbol()
+					if symbol == nil {
+						return true
+					}
+					written := ctx.TypeChecker.GetPropertyOfType(objectType, symbol.Name)
+					if written == nil || assertionMemberWriteMayWiden(ctx, value, original,
+						checker.Checker_getTypeOfSymbol(ctx.TypeChecker, written), retainedConst) {
+						return true
+					}
+				}
+				if assertionValueMayAffectInference(ctx, value, retainedConst, memberWrites) {
+					return true
+				}
+			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+				if assertionValueMayAffectInference(ctx, property, retainedConst, memberWrites) {
+					return true
+				}
+			case ast.KindSpreadAssignment:
+				if memberWrites {
+					value := ast.SkipParentheses(property.Expression())
+					opaque := !ast.IsObjectLiteralExpression(value) && !ast.IsArrayLiteralExpression(value)
+					if assertionAggregateMayWiden(ctx.TypeChecker, assertionExpressionType(ctx.TypeChecker, value), opaque) {
+						return true
+					}
+				}
+				if assertionValueMayAffectInference(ctx, property.Expression(), false, memberWrites) {
+					return true
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		arrayType := expressionType
+		if arrayType == nil {
+			arrayType = assertionExpressionType(ctx.TypeChecker, expression)
+		}
+		if memberWrites && assertionAggregateMayWiden(ctx.TypeChecker, arrayType, false) {
+			return true
+		}
+		// A mutable tuple inferred for an array literal depends on its
+		// contextual type; removing that context can produce an array.
+		if checker.IsTupleType(arrayType) && !arrayType.TargetTupleType().IsReadonly() {
+			return true
+		}
+		for index, element := range expression.Elements() {
+			spread := element.Kind == ast.KindSpreadElement
+			if element.Kind == ast.KindSpreadElement {
+				element = element.Expression()
+			}
+			if element.Kind == ast.KindOmittedExpression {
+				continue
+			}
+			if memberWrites {
+				value := ast.SkipParentheses(element)
+				opaque := !ast.IsObjectLiteralExpression(value) && !ast.IsArrayLiteralExpression(value)
+				if assertionAggregateMayWiden(ctx.TypeChecker, assertionExpressionType(ctx.TypeChecker, value), opaque) {
+					return true
+				}
+			}
+			if memberWrites && !spread && element.Kind != ast.KindOmittedExpression {
+				written := checker.Checker_getIndexTypeOfType(ctx.TypeChecker, arrayType, checker.Checker_numberType(ctx.TypeChecker))
+				if checker.IsTupleType(arrayType) {
+					if property := ctx.TypeChecker.GetPropertyOfType(arrayType, strconv.Itoa(index)); property != nil {
+						written = checker.Checker_getTypeOfSymbol(ctx.TypeChecker, property)
+					}
+				}
+				if assertionMemberWriteMayWiden(ctx, element,
+					assertionExpressionType(ctx.TypeChecker, element), written, retainedConst) {
+					return true
+				}
+			}
+			if assertionValueMayAffectInference(ctx, element, retainedConst, memberWrites) {
+				return true
+			}
+		}
+	case ast.KindConditionalExpression:
+		conditional := expression.AsConditionalExpression()
+		return assertionValueMayAffectInference(ctx, conditional.WhenTrue, retainedConst, memberWrites) ||
+			assertionValueMayAffectInference(ctx, conditional.WhenFalse, retainedConst, memberWrites)
+	case ast.KindBinaryExpression:
+		binary := expression.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return assertionValueMayAffectInference(ctx, binary.Left, retainedConst, memberWrites) ||
+				assertionValueMayAffectInference(ctx, binary.Right, retainedConst, memberWrites)
+		case ast.KindAmpersandAmpersandToken, ast.KindCommaToken:
+			return assertionValueMayAffectInference(ctx, binary.Right, retainedConst, memberWrites)
+		}
+	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return assertionFunctionMayAffectInference(ctx, expression, true)
+	case ast.KindAwaitExpression, ast.KindNonNullExpression:
+		return assertionValueMayAffectInference(ctx, expression.Expression(), retainedConst, memberWrites)
+	}
+	return false
 }
 
 func assertionIsInDestructuringDeclaration(node *ast.Node) bool {
@@ -448,31 +691,6 @@ func assertionIsPropertyInProblematicContext(ctx rule.RuleContext, node *ast.Nod
 		assertionWalkUpParentheses(objectParent).Parent.Kind == ast.KindSatisfiesExpression
 }
 
-func assertionIsAssignmentInNonStatementContext(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsBinaryExpression(parent) {
-		return false
-	}
-	binary := parent.AsBinaryExpression()
-	if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Right != semanticNode {
-		return false
-	}
-	assignment := assertionWalkUpParentheses(parent)
-	return assignment.Parent == nil || !ast.IsExpressionStatement(assignment.Parent)
-}
-
-func assertionIsRightHandSideOfLogicalAssignment(node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsBinaryExpression(parent) {
-		return false
-	}
-	binary := parent.AsBinaryExpression()
-	return binary.Right == semanticNode && binary.OperatorToken != nil &&
-		ast.IsLogicalOrCoalescingAssignmentOperator(binary.OperatorToken.Kind)
-}
-
 func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type {
 	if contextualType := checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone); contextualType != nil {
 		return contextualType
@@ -488,17 +706,16 @@ func assertionContextualType(ctx rule.RuleContext, node *ast.Node) *checker.Type
 }
 
 func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Node) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if !ast.IsCallExpression(parent) && !ast.IsNewExpression(parent) {
-		return false
-	}
-	argumentIndex, ok := assertionArgumentIndex(parent, node)
-	if !ok {
+	parent, argumentIndex, _ := assertionCallArgument(node)
+	if parent == nil {
 		return false
 	}
 	calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(parent.Expression()))
-	signatures := utils.GetCallSignatures(ctx.TypeChecker, calleeType)
+	kind := checker.SignatureKindCall
+	if ast.IsNewExpression(parent) {
+		kind = checker.SignatureKindConstruct
+	}
+	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind)
 	if len(signatures) <= 1 {
 		return false
 	}
@@ -521,7 +738,7 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 	first := parameterTypes[0]
 	allSame := true
 	for _, parameterType := range parameterTypes[1:] {
-		if parameterType != first {
+		if !checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, parameterType, first) {
 			allSame = false
 			break
 		}
@@ -529,9 +746,19 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 	if allSame {
 		return false
 	}
-	uncastType := ctx.TypeChecker.GetTypeAtLocation(node.Expression())
-	for _, parameterType := range parameterTypes {
-		if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, parameterType) {
+	// Selecting a different overload is harmless only when this is the
+	// sole argument and all non-generic candidates accept it and expose
+	// the same result. Type predicates can affect later control flow.
+	if len(parent.Arguments()) != 1 || ast.SkipParentheses(parent.Arguments()[0]) != node {
+		return true
+	}
+	uncastType := ctx.TypeChecker.GetTypeAtLocation(assertionOriginalExpression(node))
+	returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signatures[0])
+	for index, signature := range signatures {
+		if len(signature.TypeParameters()) != 0 || signature.ThisParameter() != nil ||
+			ctx.TypeChecker.GetTypePredicateOfSignature(signature) != nil ||
+			!checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, returnType, checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)) ||
+			!checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, parameterTypes[index]) {
 			return true
 		}
 	}
@@ -541,13 +768,14 @@ func assertionIsArgumentToOverloadedFunction(ctx rule.RuleContext, node *ast.Nod
 func assertionGenericsMismatch(ctx rule.RuleContext, uncastType, contextualType *checker.Type) bool {
 	for _, property := range ctx.TypeChecker.GetPropertiesOfType(contextualType) {
 		propertyType := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, property)
-		if !assertionHasGenericCallSignature(ctx.TypeChecker, propertyType) {
+		if !assertionHasGenericSignature(ctx.TypeChecker, propertyType, checker.SignatureKindCall) {
 			continue
 		}
 		uncastProperty := ctx.TypeChecker.GetPropertyOfType(uncastType, property.Name)
-		if uncastProperty == nil || !assertionHasGenericCallSignature(
+		if uncastProperty == nil || !assertionHasGenericSignature(
 			ctx.TypeChecker,
 			checker.Checker_getTypeOfSymbol(ctx.TypeChecker, uncastProperty),
+			checker.SignatureKindCall,
 		) {
 			return true
 		}
@@ -569,7 +797,7 @@ func assertionHasPhantomTypeArguments(typeChecker *checker.Checker, t *checker.T
 }
 
 func assertionHasPhantomTypeArgumentMismatch(ctx rule.RuleContext, node *ast.Node, uncastType, contextualType *checker.Type) bool {
-	if !assertionIsInGenericContext(ctx, node) ||
+	if assertionGenericCall(ctx, node) == nil ||
 		(!assertionHasPhantomTypeArguments(ctx.TypeChecker, uncastType) &&
 			!assertionHasPhantomTypeArguments(ctx.TypeChecker, contextualType)) {
 		return false
@@ -587,36 +815,212 @@ func assertionHasPhantomTypeArgumentMismatch(ctx rule.RuleContext, node *ast.Nod
 	return false
 }
 
-func shouldSkipAssertionContextualTypeFallback(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
-	semanticNode := assertionWalkUpParentheses(node)
-	parent := semanticNode.Parent
-	if parent == nil {
+// Find the nearest argument that can receive contextual types through these
+// containers. The final result also identifies a sole inference path, without
+// sibling properties, elements, arguments, or callback parameters.
+func assertionCallArgument(node *ast.Node) (*ast.Node, int, bool) {
+	independent := true
+	for current := node; ; current = current.Parent {
+		parent := current.Parent
+		if parent == nil {
+			return nil, 0, false
+		}
+		switch parent.Kind {
+		case ast.KindCallExpression, ast.KindNewExpression:
+			for index, argument := range parent.Arguments() {
+				if current == argument {
+					return parent, index, independent && len(parent.Arguments()) == 1
+				}
+			}
+			return nil, 0, false
+		case ast.KindParenthesizedExpression:
+		case ast.KindPropertyAssignment:
+			if parent.Initializer() != current || ast.IsComputedPropertyName(parent.Name()) {
+				return nil, 0, false
+			}
+		case ast.KindObjectLiteralExpression:
+			independent = independent && len(parent.Properties()) == 1
+		case ast.KindArrayLiteralExpression:
+			independent = independent && len(parent.Elements()) == 1
+		case ast.KindArrowFunction:
+			if parent.Body() != current {
+				return nil, 0, false
+			}
+			independent = independent && len(parent.Parameters()) == 0
+		default:
+			return nil, 0, false
+		}
+	}
+}
+
+func assertionHasFixedCallContext(ctx rule.RuleContext, node, call *ast.Node, castIsAny bool) bool {
+	if genericCall := assertionGenericCall(ctx, node); genericCall != nil && genericCall != call {
+		return false
+	}
+	calleeType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(call.Expression()))
+	if utils.IsTypeAnyType(calleeType) {
 		return true
 	}
-	if castIsAny {
-		return ast.IsLogicalOrCoalescingBinaryExpression(parent) || assertionIsInGenericContext(ctx, node)
+	kind := checker.SignatureKindCall
+	if ast.IsNewExpression(call) {
+		kind = checker.SignatureKindConstruct
 	}
-	if ast.IsTemplateExpression(ast.SkipParentheses(node.Expression())) {
+	signatures := checker.Checker_getSignaturesOfType(ctx.TypeChecker, calleeType, kind)
+	if len(signatures) == 0 {
+		return false
+	}
+	for _, signature := range signatures {
+		// Predicates and this parameters can propagate an argument's inferred
+		// type even when the call's result is discarded.
+		if signature.ThisParameter() != nil || ctx.TypeChecker.GetTypePredicateOfSignature(signature) != nil {
+			return false
+		}
+		if len(signature.TypeParameters()) == 0 || call.TypeArguments() != nil {
+			continue
+		}
+		argumentCall, _, independent := assertionCallArgument(node)
+		original := assertionOriginalExpression(node)
+		if castIsAny || len(signatures) != 1 || argumentCall != call || !independent ||
+			ast.IsTemplateExpression(original) ||
+			!ast.IsExpressionStatement(assertionWalkUpParentheses(call).Parent) ||
+			utils.IsTypeFlagSetWithUnion(ctx.TypeChecker.GetTypeAtLocation(original), checker.TypeFlagsEnumLike) ||
+			(!assertionIsConceptuallyLiteral(original) && !ast.IsPropertyAssignment(assertionWalkUpParentheses(node).Parent)) {
+			return false
+		}
+	}
+	if len(signatures) > 1 {
+		argumentCall, _, _ := assertionCallArgument(node)
+		return argumentCall == call && !assertionIsArgumentToOverloadedFunction(ctx, node)
+	}
+	return true
+}
+
+func assertionHasFixedDeclarationContext(ctx rule.RuleContext, node, value, declaration *ast.Node) bool {
+	if declaration.Initializer() != value || declaration.Type() == nil {
+		return false
+	}
+	declaredType := checker.Checker_getTypeFromTypeNode(ctx.TypeChecker, declaration.Type())
+	if !declaredType.IsUnion() {
 		return true
 	}
-	switch parent.Kind {
-	case ast.KindAsExpression,
-		ast.KindTypeAssertionExpression,
-		ast.KindSpreadElement,
-		ast.KindSpreadAssignment,
-		ast.KindSatisfiesExpression:
-		return true
+	property := assertionWalkUpParentheses(node).Parent
+	if !ast.IsPropertyAssignment(property) || property.Parent != value || !ast.IsObjectLiteralExpression(value) {
+		return false
 	}
-	if ast.IsArrayLiteralExpression(ast.SkipParentheses(node.Expression())) ||
-		assertionIsInDestructuringDeclaration(node) ||
-		assertionIsPropertyInProblematicContext(ctx, node) ||
-		assertionIsAssignmentInNonStatementContext(node) ||
-		assertionIsRightHandSideOfLogicalAssignment(node) ||
-		assertionIsArgumentToOverloadedFunction(ctx, node) {
-		return true
+	// An assertion is not a discriminant value in the compiler. A single
+	// constituent here was therefore selected by other, unchanged members.
+	selected := checker.Checker_getApparentTypeOfContextualType(ctx.TypeChecker, value, checker.ContextFlagsNone)
+	return selected != nil && !selected.IsUnion() && slices.Contains(declaredType.Types(), selected)
+}
+
+// Contextual assignability is only a removal proof at a type boundary. In
+// particular, a contextual callback return type can still participate in the
+// inference of its caller, including through a block-bodied return statement.
+func assertionHasStableContext(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
+	original := assertionOriginalExpression(node)
+	if ast.IsTemplateExpression(original) {
+		// A template keeps its type when the receiving context supplies the
+		// same type. The boundary checks below establish its independence.
+		contextual := assertionContextualType(ctx, node)
+		if contextual == nil ||
+			!checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, contextual, ctx.TypeChecker.GetTypeAtLocation(node)) {
+			return false
+		}
 	}
-	if assertionIsInGenericContext(ctx, node) {
-		return !assertionIsConceptuallyLiteral(assertionOriginalExpression(node)) && !ast.IsPropertyAssignment(parent)
+	if (!castIsAny && ast.IsArrayLiteralExpression(original)) ||
+		assertionIsInDestructuringDeclaration(node) || assertionIsPropertyInProblematicContext(ctx, node) {
+		return false
+	}
+	for current := assertionWalkUpParentheses(node); current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindPropertyAssignment:
+			if parent.Initializer() != current || ast.IsComputedPropertyName(parent.Name()) {
+				return false
+			}
+		case ast.KindObjectLiteralExpression:
+			contextual := checker.Checker_getContextualType(ctx.TypeChecker, parent, checker.ContextFlagsNone)
+			if contextual != nil && contextual.IsUnion() {
+				selected := checker.Checker_getApparentTypeOfContextualType(ctx.TypeChecker, parent, checker.ContextFlagsNone)
+				if selected == nil || selected.IsUnion() {
+					return false
+				}
+			}
+		case ast.KindArrayLiteralExpression:
+		case ast.KindConditionalExpression:
+			if parent.AsConditionalExpression().Condition == current {
+				return false
+			}
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Right == current {
+				// Assignment flow only preserves a non-union declared type. The
+				// assignment's own value must not feed another inference.
+				if !ast.IsExpressionStatement(assertionWalkUpParentheses(parent).Parent) {
+					return false
+				}
+				symbol := ctx.TypeChecker.GetSymbolAtLocation(binary.Left)
+				if symbol == nil {
+					return false
+				}
+				target := checker.Checker_getTypeOfSymbol(ctx.TypeChecker, symbol)
+				return !target.IsUnion() && !utils.IsTypeAnyType(target)
+			}
+			if castIsAny || !ast.IsLogicalOrCoalescingBinaryExpression(parent) {
+				return false
+			}
+			// A left operand also controls flow in the right operand. A literal
+			// has no references whose narrowed types could change.
+			if binary.Left == current && !ast.IsLiteralExpression(binary.Right) &&
+				binary.Right.Kind != ast.KindNullKeyword && binary.Right.Kind != ast.KindTrueKeyword && binary.Right.Kind != ast.KindFalseKeyword {
+				return false
+			}
+		case ast.KindVariableDeclaration, ast.KindParameter, ast.KindPropertyDeclaration:
+			return assertionHasFixedDeclarationContext(ctx, node, current, parent)
+		case ast.KindArrowFunction:
+			if parent.Body() != current {
+				return false
+			}
+			if parent.Type() != nil {
+				return true
+			}
+			if len(parent.Parameters()) != 0 {
+				return false
+			}
+		case ast.KindReturnStatement:
+			function := ast.GetContainingFunction(parent)
+			return function != nil && function.Type() != nil
+		case ast.KindCallExpression, ast.KindNewExpression:
+			for _, argument := range parent.Arguments() {
+				if argument == current {
+					return assertionHasFixedCallContext(ctx, node, parent, castIsAny)
+				}
+			}
+			return false
+		case ast.KindJsxExpression:
+			attribute := parent.Parent
+			if !ast.IsJsxAttribute(attribute) || attribute.Initializer() != parent {
+				return false
+			}
+			opening := attribute.Parent.Parent
+			var tag *ast.Node
+			var attributes *ast.Node
+			if ast.IsJsxOpeningElement(opening) {
+				tag = opening.AsJsxOpeningElement().TagName
+				attributes = opening.AsJsxOpeningElement().Attributes
+			} else if ast.IsJsxSelfClosingElement(opening) {
+				tag = opening.AsJsxSelfClosingElement().TagName
+				attributes = opening.AsJsxSelfClosingElement().Attributes
+			}
+			if !ast.IsIdentifier(tag) || !scanner.IsIntrinsicJsxName(tag.Text()) {
+				return false
+			}
+			props := checker.Checker_getContextualType(ctx.TypeChecker, attributes, checker.ContextFlagsNone)
+			return props != nil && !props.IsUnion()
+		default:
+			return false
+		}
+		current = assertionWalkUpParentheses(parent)
 	}
 	return false
 }
@@ -643,6 +1047,93 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			tokenScanner.ResetPos(pos)
 			tokenScanner.Scan()
 			return tokenScanner.TokenRange()
+		}
+		parenthesesForRemoval := func(outer, assertion *ast.Node) (parenthesize, canFix bool) {
+			first := getTokenRange(assertion.Expression().Pos())
+			lineBreak := tokenScanner.HasPrecedingLineBreak()
+			// Other diagnostics may remove surrounding assertions in the same
+			// pass. Parentheses protect the source syntax, but TypeScript can
+			// elide them while erasing assertions, exposing their comments.
+			context := outer
+			hasParentheses := false
+			start := getTokenRange(context.Pos()).Pos()
+			for parent := context.Parent; parent != nil && ast.IsExpression(parent); parent = context.Parent {
+				parentStart := getTokenRange(parent.Pos()).Pos()
+				if ast.IsParenthesizedExpression(parent) {
+					hasParentheses = true
+				} else if !ast.IsAssertionExpression(parent) && parentStart != start {
+					break
+				}
+				context = parent
+				start = parentStart
+			}
+			firstText := sourceText[first.Pos():first.End()]
+			switch context.Parent.Kind {
+			case ast.KindReturnStatement, ast.KindThrowStatement, ast.KindYieldExpression:
+				if assertion.Kind != ast.KindTypeAssertionExpression || !lineBreak {
+					return false, true
+				}
+				// TypeScript can preserve line breaks before or inside block
+				// comments here. Parenthesizing would change that emitted behavior.
+				trivia := core.NewTextRange(assertion.Expression().Pos(), first.Pos())
+				lastBlockCommentEnd := trivia.Pos()
+				for comment := range utils.GetCommentsInRange(ctx.SourceFile, trivia) {
+					if comment.Kind == ast.KindMultiLineCommentTrivia {
+						lastBlockCommentEnd = max(lastBlockCommentEnd, comment.End())
+					}
+				}
+				if strings.ContainsFunc(sourceText[trivia.Pos():lastBlockCommentEnd], ecmascript.IsLineTerminator) {
+					return false, false
+				}
+				return !hasParentheses, true
+			case ast.KindExpressionStatement:
+				if hasParentheses {
+					return false, true
+				}
+				if firstText == "async" {
+					next := getTokenRange(first.End())
+					return sourceText[next.Pos():next.End()] == "function", true
+				}
+				return firstText == "{" || firstText == "function" || firstText == "class", true
+			case ast.KindArrowFunction:
+				return !hasParentheses && context.Parent.Body() == context && firstText == "{", true
+			}
+			return false, true
+		}
+		removeAssertion := func(assertion *ast.Node) rule.RuleFix {
+			expression := assertion.Expression()
+			if assertion.Kind == ast.KindAsExpression {
+				asKeywordRange := getTokenRange(expression.End())
+				start := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
+				return rule.RuleFixRemoveRange(asKeywordRange.WithPos(start).WithEnd(assertion.Type().End()))
+			}
+			return rule.RuleFixRemoveRange(getTokenRange(assertion.Pos()).WithEnd(expression.Pos()))
+		}
+		buildAssertionFixes := func(outer, bridge *ast.Node) []rule.RuleFix {
+			fixes := []rule.RuleFix{removeAssertion(outer)}
+			parenthesize, canFix := parenthesesForRemoval(outer, outer)
+			if !canFix {
+				return nil
+			}
+			if bridge != nil {
+				fixes = append(fixes, removeAssertion(bridge))
+				innerParentheses, canFix := parenthesesForRemoval(outer, bridge)
+				if !canFix {
+					return nil
+				}
+				// Parentheses around the bridge survive the range edits and
+				// protect the fixed source syntax, but not the original emission.
+				if outer.Expression() == bridge {
+					parenthesize = parenthesize || innerParentheses
+				}
+			}
+			if parenthesize {
+				fixes = append(fixes,
+					rule.RuleFixInsertBefore(ctx.SourceFile, outer, "("),
+					rule.RuleFixInsertAfter(outer, ")"),
+				)
+			}
+			return fixes
 		}
 
 		compilerOptions := ctx.Program().Options()
@@ -806,6 +1297,14 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 		}
 
 		isTypeUnchanged := func(node, expression *ast.Node, uncast, cast *checker.Type) bool {
+			if assertionHasExplicitLiteralType(ctx, node, cast) {
+				return checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, uncast, cast)
+			}
+			// Fresh literals can be identical to an asserted regular type
+			// while widening differently in later assignments or arrays.
+			if !assertionPreservesWidening(ctx.TypeChecker, uncast, cast) {
+				return false
+			}
 			if uncast == cast {
 				return true
 			}
@@ -864,12 +1363,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			if !assertionHasSameProperties(ctx.TypeChecker, uncast, cast) ||
-				!assertionHasSameTypeArguments(ctx.TypeChecker, uncast, cast) {
-				return false
-			}
-			return checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncast, cast) &&
-				checker.Checker_isTypeAssignableTo(ctx.TypeChecker, cast, uncast)
+			return assertionHasSameTypeArguments(ctx.TypeChecker, uncast, cast) &&
+				checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, uncast, cast)
 		}
 
 		getUncastType := func(node *ast.Node) *checker.Type {
@@ -888,7 +1383,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					}
 				}
 			}
-			return ctx.TypeChecker.GetTypeAtLocation(expression)
+			return assertionExpressionType(ctx.TypeChecker, expression)
 		}
 
 		checkTypeAssertion := func(node *ast.Node) {
@@ -913,47 +1408,37 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 			expression := node.Expression()
 			uncastType := getUncastType(node)
+			canRemove := func(originalExpression *ast.Node, originalType *checker.Type, memberWrites bool) bool {
+				return !assertionValueMayAffectInference(ctx, originalExpression, false, memberWrites) &&
+					(assertionPreservesWidening(ctx.TypeChecker, originalType, castType) ||
+						checker.Checker_getContextualType(ctx.TypeChecker, node, checker.ContextFlagsNone) != nil)
+			}
 			reportAssertion := func(msg rule.RuleMessage) {
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
-					if node.Kind == ast.KindAsExpression {
-						asKeywordRange := getTokenRange(expression.End())
-						startPos := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
-
-						fixRange := asKeywordRange.WithPos(startPos).WithEnd(typeNode.End())
-						return []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
-					}
-
-					openingAngleBracket := getTokenRange(node.Pos())
-					fixRange := openingAngleBracket.WithEnd(expression.Pos())
-					fixes := []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
-					firstOperandRange := getTokenRange(expression.Pos())
-					firstOperandText := sourceText[firstOperandRange.Pos():firstOperandRange.End()]
-					breaksExpressionStatement := (firstOperandText == "{" || firstOperandText == "function" || firstOperandText == "class") &&
-						utils.IsStartOfExpressionStatement(ctx.SourceFile, node)
-					breaksArrowFunctionBody := firstOperandText == "{" && assertionIsStartOfArrowFunctionBody(ctx.SourceFile, node)
-					if breaksExpressionStatement || breaksArrowFunctionBody {
-						fixes = append(fixes,
-							rule.RuleFixInsertBefore(ctx.SourceFile, node, "("),
-							rule.RuleFixInsertAfter(node, ")"),
-						)
-					}
-					return fixes
+					return buildAssertionFixes(node, nil)
 				})
 			}
 			reportDoubleAssertionIfUnnecessary := func(contextualType *checker.Type) {
 				innerExpression := ast.SkipParentheses(expression)
-				if innerExpression == nil || (innerExpression.Kind != ast.KindAsExpression && innerExpression.Kind != ast.KindTypeAssertionExpression) {
+				if !ast.IsAssertionExpression(innerExpression) || ast.IsConstAssertion(innerExpression) {
 					return
 				}
-				originalExpression := assertionOriginalExpression(node)
-				originalType := ctx.TypeChecker.GetTypeAtLocation(originalExpression)
+				intermediateType := ctx.TypeChecker.GetTypeAtLocation(innerExpression)
+				if !utils.IsTypeFlagSet(intermediateType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) || utils.IsIntrinsicErrorType(intermediateType) {
+					return
+				}
+				// Only consume this bridge. Earlier assertions, especially as const,
+				// must remain in the expression used by both the proof and the fix.
+				retainedExpression := innerExpression.Expression()
+				retainedType := assertionExpressionType(ctx.TypeChecker, retainedExpression)
 				msg := rule.RuleMessage{}
-				if isTypeUnchanged(node, innerExpression, originalType, castType) && !utils.IsTypeAnyType(castType) {
+				if isTypeUnchanged(node, retainedExpression, retainedType, castType) && !utils.IsTypeAnyType(castType) &&
+					canRemove(retainedExpression, retainedType, true) {
 					msg = buildUnnecessaryAssertionMessage()
-				} else if contextualType != nil {
-					intermediateType := ctx.TypeChecker.GetTypeAtLocation(innerExpression)
-					if utils.IsTypeFlagSet(intermediateType, checker.TypeFlagsAny|checker.TypeFlagsUnknown) &&
-						checker.Checker_isTypeAssignableTo(ctx.TypeChecker, originalType, contextualType) {
+				} else if contextualType != nil && !assertionTypeContainsAny(ctx.TypeChecker, retainedType) &&
+					!assertionTypeContainsAny(ctx.TypeChecker, contextualType) {
+					if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, retainedType, contextualType) &&
+						canRemove(retainedExpression, retainedType, false) {
 						msg = buildContextuallyUnnecessaryMessage()
 					}
 				}
@@ -961,38 +1446,27 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
-					originalRange := utils.TrimNodeTextRange(ctx.SourceFile, originalExpression)
-					replacement := sourceText[originalRange.Pos():originalRange.End()]
-					semanticNode := assertionWalkUpParentheses(node)
-					if originalExpression.Kind == ast.KindObjectLiteralExpression &&
-						semanticNode.Parent != nil && ast.IsArrowFunction(semanticNode.Parent) &&
-						semanticNode.Parent.AsArrowFunction().Body == semanticNode {
-						replacement = "(" + replacement + ")"
-					}
-					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)}
+					return buildAssertionFixes(node, innerExpression)
 				})
 			}
 
 			typeIsUnchanged := isTypeUnchanged(node, expression, uncastType, castType)
 			wouldSameTypeBeInferred := !typeAnnotationIsConstAssertion
 			if castTypeIsLiteral {
-				wouldSameTypeBeInferred = isImplicitlyNarrowedLiteralDeclaration(node)
+				wouldSameTypeBeInferred = assertionHasExplicitLiteralType(ctx, node, castType) || isImplicitlyNarrowedLiteralDeclaration(node)
 			}
 			if typeIsUnchanged && wouldSameTypeBeInferred {
-				reportAssertion(buildUnnecessaryAssertionMessage())
-				return
+				if canRemove(expression, uncastType, true) {
+					reportAssertion(buildUnnecessaryAssertionMessage())
+					return
+				}
 			}
 
 			semanticNode := assertionWalkUpParentheses(node)
 			parent := semanticNode.Parent
-			parentSkipsAnyFallback := parent != nil && (parent.Kind == ast.KindAsExpression ||
-				parent.Kind == ast.KindTypeAssertionExpression ||
-				parent.Kind == ast.KindSpreadElement ||
-				parent.Kind == ast.KindSpreadAssignment ||
-				parent.Kind == ast.KindSatisfiesExpression)
-			castIsAny := utils.IsTypeFlagSet(castType, checker.TypeFlagsAny) && !parentSkipsAnyFallback
+			castIsAny := utils.IsTypeFlagSet(castType, checker.TypeFlagsAny)
 			var contextualType *checker.Type
-			if !shouldSkipAssertionContextualTypeFallback(ctx, node, castIsAny) {
+			if assertionHasStableContext(ctx, node, castIsAny) {
 				contextualType = assertionContextualType(ctx, node)
 			}
 			if contextualType != nil {
@@ -1012,7 +1486,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					!assertionHasPhantomTypeArgumentMismatch(ctx, node, uncastType, contextualType) &&
 					(castIsAny || !assertionGenericsMismatch(ctx, uncastType, contextualType)) &&
 					(contextualTypeIsAny || checker.Checker_isTypeAssignableTo(ctx.TypeChecker, uncastType, contextualType)) &&
-					!isNullishLiteralToUnion {
+					!isNullishLiteralToUnion && canRemove(expression, uncastType, false) {
 					reportAssertion(buildContextuallyUnnecessaryMessage())
 					return
 				}

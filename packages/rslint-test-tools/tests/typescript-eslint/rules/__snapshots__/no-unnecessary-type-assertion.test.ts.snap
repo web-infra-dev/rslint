@@ -2,126 +2,6 @@
 
 exports[`no-unnecessary-type-assertion > invalid 1`] = `
 {
-  "code": "const foo = <3>3;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const foo = 3;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 2`] = `
-{
-  "code": "const foo = 3 as 3;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 19,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const foo = 3;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 3`] = `
-{
-  "code": "
-type Foo = 3;
-const foo = <Foo>3;
-      ",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 19,
-          "line": 3,
-        },
-        "start": {
-          "column": 13,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-type Foo = 3;
-const foo = 3;
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 4`] = `
-{
-  "code": "
-type Foo = 3;
-const foo = 3 as Foo;
-      ",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 21,
-          "line": 3,
-        },
-        "start": {
-          "column": 13,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-type Foo = 3;
-const foo = 3;
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 5`] = `
-{
   "code": "
 const foo = 3;
 const bar = foo!;
@@ -153,7 +33,7 @@ const bar = foo;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 6`] = `
+exports[`no-unnecessary-type-assertion > invalid 2`] = `
 {
   "code": "
 const foo = (3 + 5) as number;
@@ -184,7 +64,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 7`] = `
+exports[`no-unnecessary-type-assertion > invalid 3`] = `
 {
   "code": "
 const foo = <number>(3 + 5);
@@ -215,7 +95,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 8`] = `
+exports[`no-unnecessary-type-assertion > invalid 4`] = `
 {
   "code": "
 type Foo = number;
@@ -248,7 +128,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 9`] = `
+exports[`no-unnecessary-type-assertion > invalid 5`] = `
 {
   "code": "
 type Foo = number;
@@ -281,7 +161,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 10`] = `
+exports[`no-unnecessary-type-assertion > invalid 6`] = `
 {
   "code": "
 let bar: number = 1;
@@ -314,7 +194,7 @@ bar + 1;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 11`] = `
+exports[`no-unnecessary-type-assertion > invalid 7`] = `
 {
   "code": "
 let bar!: number;
@@ -347,7 +227,7 @@ bar + 1;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 12`] = `
+exports[`no-unnecessary-type-assertion > invalid 8`] = `
 {
   "code": "
 let bar: number | undefined;
@@ -382,7 +262,7 @@ bar + 1;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 13`] = `
+exports[`no-unnecessary-type-assertion > invalid 9`] = `
 {
   "code": "
 declare const y: number;
@@ -415,7 +295,7 @@ console.log(y);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 14`] = `
+exports[`no-unnecessary-type-assertion > invalid 10`] = `
 {
   "code": "Proxy!;",
   "diagnostics": [
@@ -442,7 +322,7 @@ exports[`no-unnecessary-type-assertion > invalid 14`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 15`] = `
+exports[`no-unnecessary-type-assertion > invalid 11`] = `
 {
   "code": "
 function foo<T extends string>(bar: T) {
@@ -477,7 +357,7 @@ function foo<T extends string>(bar: T) {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 16`] = `
+exports[`no-unnecessary-type-assertion > invalid 12`] = `
 {
   "code": "
 declare const foo: Foo;
@@ -510,7 +390,7 @@ const bar = foo;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 17`] = `
+exports[`no-unnecessary-type-assertion > invalid 13`] = `
 {
   "code": "
 declare function nonNull(s: string | null);
@@ -545,7 +425,7 @@ nonNull(s);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 18`] = `
+exports[`no-unnecessary-type-assertion > invalid 14`] = `
 {
   "code": "
 const x: number | null = null;
@@ -578,7 +458,7 @@ const y: number | null = x;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 19`] = `
+exports[`no-unnecessary-type-assertion > invalid 15`] = `
 {
   "code": "
 const x: number | null = null;
@@ -615,7 +495,7 @@ class Foo {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 20`] = `
+exports[`no-unnecessary-type-assertion > invalid 16`] = `
 {
   "code": "
 declare function a(a: string): any;
@@ -656,7 +536,7 @@ class Mx {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 21`] = `
+exports[`no-unnecessary-type-assertion > invalid 17`] = `
 {
   "code": "
 declare namespace JSX {
@@ -703,7 +583,7 @@ function Test(props: { id?: string | number }) {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 22`] = `
+exports[`no-unnecessary-type-assertion > invalid 18`] = `
 {
   "code": "
 let x: number | undefined;
@@ -740,7 +620,7 @@ y = 0;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 23`] = `
+exports[`no-unnecessary-type-assertion > invalid 19`] = `
 {
   "code": "
 declare function foo(arg?: number): number | void;
@@ -773,7 +653,7 @@ const bar: number | void = foo();
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 24`] = `
+exports[`no-unnecessary-type-assertion > invalid 20`] = `
 {
   "code": "
 declare function foo(): number;
@@ -806,7 +686,7 @@ const a = foo();
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 25`] = `
+exports[`no-unnecessary-type-assertion > invalid 21`] = `
 {
   "code": "
 const b = new Date()!;
@@ -837,7 +717,7 @@ const b = new Date();
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 26`] = `
+exports[`no-unnecessary-type-assertion > invalid 22`] = `
 {
   "code": "
 const b = (1 + 1)!;
@@ -868,7 +748,7 @@ const b = (1 + 1);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 27`] = `
+exports[`no-unnecessary-type-assertion > invalid 23`] = `
 {
   "code": "
 declare function foo(): number;
@@ -901,7 +781,7 @@ const a = foo();
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 28`] = `
+exports[`no-unnecessary-type-assertion > invalid 24`] = `
 {
   "code": "
 declare function foo(): number;
@@ -934,7 +814,7 @@ const a = foo();
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 29`] = `
+exports[`no-unnecessary-type-assertion > invalid 25`] = `
 {
   "code": "
 type RT = { log: () => void };
@@ -969,7 +849,7 @@ declare function foo(): RT;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 30`] = `
+exports[`no-unnecessary-type-assertion > invalid 26`] = `
 {
   "code": "
 declare const arr: object[];
@@ -1002,7 +882,7 @@ const item = arr[0];
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 31`] = `
+exports[`no-unnecessary-type-assertion > invalid 27`] = `
 {
   "code": "
 const foo = (  3 + 5  ) as number;
@@ -1033,7 +913,7 @@ const foo = (  3 + 5  );
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 32`] = `
+exports[`no-unnecessary-type-assertion > invalid 28`] = `
 {
   "code": "
 const foo = (  3 + 5  ) /*as*/ as number;
@@ -1064,7 +944,7 @@ const foo = (  3 + 5  ) /*as*/;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 33`] = `
+exports[`no-unnecessary-type-assertion > invalid 29`] = `
 {
   "code": "
 const foo = (  3 + 5
@@ -1100,7 +980,7 @@ const foo = (  3 + 5
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 34`] = `
+exports[`no-unnecessary-type-assertion > invalid 30`] = `
 {
   "code": "
 const foo = (3 + (5 as number) ) as number;
@@ -1131,7 +1011,7 @@ const foo = (3 + (5 as number) );
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 35`] = `
+exports[`no-unnecessary-type-assertion > invalid 31`] = `
 {
   "code": "
 const foo = 3 + 5/*as*/ as number;
@@ -1162,7 +1042,7 @@ const foo = 3 + 5/*as*/;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 36`] = `
+exports[`no-unnecessary-type-assertion > invalid 32`] = `
 {
   "code": "
 const foo = 3 + 5/*a*/ /*b*/ as number;
@@ -1193,7 +1073,7 @@ const foo = 3 + 5/*a*/ /*b*/;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 37`] = `
+exports[`no-unnecessary-type-assertion > invalid 33`] = `
 {
   "code": "
 const foo = <(number)>(3 + 5);
@@ -1224,7 +1104,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 38`] = `
+exports[`no-unnecessary-type-assertion > invalid 34`] = `
 {
   "code": "
 const foo = < ( number ) >( 3 + 5 );
@@ -1255,7 +1135,7 @@ const foo = ( 3 + 5 );
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 39`] = `
+exports[`no-unnecessary-type-assertion > invalid 35`] = `
 {
   "code": "
 const foo = <number> /* a */ (3 + 5);
@@ -1286,7 +1166,7 @@ const foo =  /* a */ (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 40`] = `
+exports[`no-unnecessary-type-assertion > invalid 36`] = `
 {
   "code": "
 const foo = <number /* a */>(3 + 5);
@@ -1317,7 +1197,7 @@ const foo = (3 + 5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 41`] = `
+exports[`no-unnecessary-type-assertion > invalid 37`] = `
 {
   "code": "
 function foo(item: string) {}
@@ -1358,7 +1238,7 @@ function bar(items: string[]) {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 42`] = `
+exports[`no-unnecessary-type-assertion > invalid 38`] = `
 {
   "code": "
 declare const foo: {
@@ -1395,7 +1275,7 @@ const bar = foo.a;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 43`] = `
+exports[`no-unnecessary-type-assertion > invalid 39`] = `
 {
   "code": "
 declare const foo: {
@@ -1432,7 +1312,7 @@ const bar = foo.a;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 44`] = `
+exports[`no-unnecessary-type-assertion > invalid 40`] = `
 {
   "code": "
 varDeclarationFromFixture!;
@@ -1463,7 +1343,7 @@ varDeclarationFromFixture;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 45`] = `
+exports[`no-unnecessary-type-assertion > invalid 41`] = `
 {
   "code": "
 var x = 1;
@@ -1496,7 +1376,7 @@ x;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 46`] = `
+exports[`no-unnecessary-type-assertion > invalid 42`] = `
 {
   "code": "
 var x = 1;
@@ -1533,81 +1413,7 @@ var x = 1;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 47`] = `
-{
-  "code": "
-class T {
-  readonly a = 3 as 3;
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 3,
-        },
-        "start": {
-          "column": 16,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-class T {
-  readonly a = 3;
-}
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 48`] = `
-{
-  "code": "
-type S = 10;
-
-class T {
-  readonly a = 10 as S;
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 5,
-        },
-        "start": {
-          "column": 16,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-type S = 10;
-
-class T {
-  readonly a = 10;
-}
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 49`] = `
+exports[`no-unnecessary-type-assertion > invalid 43`] = `
 {
   "code": "
 class T {
@@ -1642,7 +1448,7 @@ class T {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 50`] = `
+exports[`no-unnecessary-type-assertion > invalid 44`] = `
 {
   "code": "
 const a = '';
@@ -1675,7 +1481,7 @@ const b: string | undefined = (a ? undefined : a);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 51`] = `
+exports[`no-unnecessary-type-assertion > invalid 45`] = `
 {
   "code": "
 enum T {
@@ -1718,7 +1524,7 @@ const b = a;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 52`] = `
+exports[`no-unnecessary-type-assertion > invalid 46`] = `
 {
   "code": "
 const foo: unknown = {};
@@ -1751,7 +1557,7 @@ const bar: unknown = foo;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 53`] = `
+exports[`no-unnecessary-type-assertion > invalid 47`] = `
 {
   "code": "
 function foo(bar: unknown) {}
@@ -1786,285 +1592,7 @@ foo(baz);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 54`] = `
-{
-  "code": "const a = true as const;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 24,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = true;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 55`] = `
-{
-  "code": "const a = <const>true;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = true;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 56`] = `
-{
-  "code": "const a = 1 as const;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 21,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 1;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 57`] = `
-{
-  "code": "const a = <const>1;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 19,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 1;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 58`] = `
-{
-  "code": "const a = 1n as const;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 22,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 1n;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 59`] = `
-{
-  "code": "const a = <const>1n;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 20,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 1n;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 60`] = `
-{
-  "code": "const a = \`a\` as const;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = \`a\`;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 61`] = `
-{
-  "code": "const a = 'a' as const;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 'a';",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 62`] = `
-{
-  "code": "const a = <const>'a';",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 21,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const a = 'a';",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 63`] = `
-{
-  "code": "
-class T {
-  readonly a = 'a' as const;
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 28,
-          "line": 3,
-        },
-        "start": {
-          "column": 16,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-class T {
-  readonly a = 'a';
-}
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 64`] = `
+exports[`no-unnecessary-type-assertion > invalid 48`] = `
 {
   "code": "
 enum T {
@@ -2107,7 +1635,7 @@ const b = a;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 65`] = `
+exports[`no-unnecessary-type-assertion > invalid 49`] = `
 {
   "code": "
 ((): undefined => {})() as undefined;
@@ -2138,7 +1666,7 @@ exports[`no-unnecessary-type-assertion > invalid 65`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 66`] = `
+exports[`no-unnecessary-type-assertion > invalid 50`] = `
 {
   "code": "
 (() => 1)() as number;
@@ -2169,7 +1697,7 @@ exports[`no-unnecessary-type-assertion > invalid 66`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 67`] = `
+exports[`no-unnecessary-type-assertion > invalid 51`] = `
 {
   "code": "
 interface Overloaded {
@@ -2210,7 +1738,7 @@ interface Overloaded {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 68`] = `
+exports[`no-unnecessary-type-assertion > invalid 52`] = `
 {
   "code": "
 function doThing(a: number) {}
@@ -2243,7 +1771,7 @@ doThing(5);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 69`] = `
+exports[`no-unnecessary-type-assertion > invalid 53`] = `
 {
   "code": "
 interface A {
@@ -2284,34 +1812,7 @@ doThing({ required: 'yes', alsoRequired: 1 });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 70`] = `
-{
-  "code": "const x = 5 as any as 5;",
-  "diagnostics": [
-    {
-      "message": "This assertion is unnecessary since it does not change the type of the expression.",
-      "messageId": "unnecessaryAssertion",
-      "range": {
-        "end": {
-          "column": 24,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "const x = 5;",
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-type-assertion > invalid 71`] = `
+exports[`no-unnecessary-type-assertion > invalid 54`] = `
 {
   "code": "
 const v: number = 5;
@@ -2344,7 +1845,7 @@ const x = v;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 72`] = `
+exports[`no-unnecessary-type-assertion > invalid 55`] = `
 {
   "code": "
 const v: number = 5;
@@ -2377,7 +1878,7 @@ const x = v;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 73`] = `
+exports[`no-unnecessary-type-assertion > invalid 56`] = `
 {
   "code": "
 const x = (1 + 1) as any as number;
@@ -2402,13 +1903,13 @@ const x = (1 + 1) as any as number;
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-const x = 1 + 1;
+const x = (1 + 1);
       ",
   "ruleCount": 1,
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 74`] = `
+exports[`no-unnecessary-type-assertion > invalid 57`] = `
 {
   "code": "
 const x = 2 * ((1 + 1) as any as number);
@@ -2433,13 +1934,13 @@ const x = 2 * ((1 + 1) as any as number);
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-const x = 2 * (1 + 1);
+const x = 2 * ((1 + 1));
       ",
   "ruleCount": 1,
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 75`] = `
+exports[`no-unnecessary-type-assertion > invalid 58`] = `
 {
   "code": "
 const v: number = 5;
@@ -2466,13 +1967,13 @@ const x = <number>(<any>v);
   "fileCount": 1,
   "output": "
 const v: number = 5;
-const x = v;
+const x = (v);
       ",
   "ruleCount": 1,
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 76`] = `
+exports[`no-unnecessary-type-assertion > invalid 59`] = `
 {
   "code": "
 const obj = { id: '' };
@@ -2505,7 +2006,7 @@ const obj2 = obj;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 77`] = `
+exports[`no-unnecessary-type-assertion > invalid 60`] = `
 {
   "code": "
 const obj = { id: '' };
@@ -2538,7 +2039,7 @@ const obj2 = obj;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 78`] = `
+exports[`no-unnecessary-type-assertion > invalid 61`] = `
 {
   "code": "
 const obj = { id: '' };
@@ -2571,7 +2072,7 @@ const obj2 = obj;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 79`] = `
+exports[`no-unnecessary-type-assertion > invalid 62`] = `
 {
   "code": "
 const array = ['a', 'b'];
@@ -2604,7 +2105,7 @@ const array2 = array;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 80`] = `
+exports[`no-unnecessary-type-assertion > invalid 63`] = `
 {
   "code": "
 const array = ['a', 'b'];
@@ -2637,7 +2138,7 @@ const array2 = array;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 81`] = `
+exports[`no-unnecessary-type-assertion > invalid 64`] = `
 {
   "code": "
 type A = 'a';
@@ -2678,7 +2179,7 @@ fn(a);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 82`] = `
+exports[`no-unnecessary-type-assertion > invalid 65`] = `
 {
   "code": "
 interface Props {
@@ -2715,7 +2216,7 @@ const x = { a: 1 };
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 83`] = `
+exports[`no-unnecessary-type-assertion > invalid 66`] = `
 {
   "code": "
 interface Props {
@@ -2752,7 +2253,7 @@ const x = { a: 1 };
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 84`] = `
+exports[`no-unnecessary-type-assertion > invalid 67`] = `
 {
   "code": "
 interface Props {
@@ -2789,7 +2290,7 @@ const fn = (): Props => ({ a: 1 });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 85`] = `
+exports[`no-unnecessary-type-assertion > invalid 68`] = `
 {
   "code": "
 declare function fn(param: number): void;
@@ -2822,7 +2323,7 @@ fn(42);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 86`] = `
+exports[`no-unnecessary-type-assertion > invalid 69`] = `
 {
   "code": "
 declare function fn(param: number): void;
@@ -2855,7 +2356,7 @@ fn(42);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 87`] = `
+exports[`no-unnecessary-type-assertion > invalid 70`] = `
 {
   "code": "
 declare function fn(params: { param: number });
@@ -2888,7 +2389,7 @@ fn({ param: 42 });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 88`] = `
+exports[`no-unnecessary-type-assertion > invalid 71`] = `
 {
   "code": "
 declare function fn(params: { param: number });
@@ -2921,7 +2422,7 @@ fn({ param: 42 });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 89`] = `
+exports[`no-unnecessary-type-assertion > invalid 72`] = `
 {
   "code": "
 type StringOrNumber = string | number;
@@ -2956,7 +2457,7 @@ fn(42);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 90`] = `
+exports[`no-unnecessary-type-assertion > invalid 73`] = `
 {
   "code": "
 type NumbersRecord = { [key: string]: number };
@@ -2993,7 +2494,7 @@ fn({ data: data });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 91`] = `
+exports[`no-unnecessary-type-assertion > invalid 74`] = `
 {
   "code": "
 type NumbersRecord = { [key: string]: number };
@@ -3036,7 +2537,7 @@ fn({
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 92`] = `
+exports[`no-unnecessary-type-assertion > invalid 75`] = `
 {
   "code": "
 type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
@@ -3073,7 +2574,7 @@ const result = updatedColumn;
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 93`] = `
+exports[`no-unnecessary-type-assertion > invalid 76`] = `
 {
   "code": "
 interface T {
@@ -3112,7 +2613,7 @@ fn<T>({ a: '' });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 94`] = `
+exports[`no-unnecessary-type-assertion > invalid 77`] = `
 {
   "code": "
 declare function update<T extends string>(value: T): void;
@@ -3145,7 +2646,7 @@ update('hi');
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 95`] = `
+exports[`no-unnecessary-type-assertion > invalid 78`] = `
 {
   "code": "
 declare function update<T extends string>(value: T): void;
@@ -3178,7 +2679,7 @@ update('hi');
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 96`] = `
+exports[`no-unnecessary-type-assertion > invalid 79`] = `
 {
   "code": "
 declare function fn(param: string): void;
@@ -3213,7 +2714,7 @@ fn(\`hello \${name_}\`);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 97`] = `
+exports[`no-unnecessary-type-assertion > invalid 80`] = `
 {
   "code": "
 declare function fn(x: string[]): void;
@@ -3246,7 +2747,7 @@ fn(['hello']);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 98`] = `
+exports[`no-unnecessary-type-assertion > invalid 81`] = `
 {
   "code": "
 type ChatMessage = { message: string };
@@ -3285,7 +2786,7 @@ update({ chat: chat });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 99`] = `
+exports[`no-unnecessary-type-assertion > invalid 82`] = `
 {
   "code": "
 type ChatMessage = { message: string };
@@ -3324,7 +2825,7 @@ update({ chat: chat });
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 100`] = `
+exports[`no-unnecessary-type-assertion > invalid 83`] = `
 {
   "code": "
 interface Node {
@@ -3367,7 +2868,7 @@ function fn2<T extends Node>(node: T): void {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 101`] = `
+exports[`no-unnecessary-type-assertion > invalid 84`] = `
 {
   "code": "
 interface A {
@@ -3416,7 +2917,7 @@ fn(a);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 102`] = `
+exports[`no-unnecessary-type-assertion > invalid 85`] = `
 {
   "code": "
 declare const a: string[];
@@ -3451,7 +2952,7 @@ const fileNames: string[] = a.concat(b);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 103`] = `
+exports[`no-unnecessary-type-assertion > invalid 86`] = `
 {
   "code": "
 declare function fn(text: any): void;
@@ -3486,7 +2987,7 @@ fn(value);
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 104`] = `
+exports[`no-unnecessary-type-assertion > invalid 87`] = `
 {
   "code": "
 interface A {
@@ -3539,7 +3040,7 @@ const schema: A | B = {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 105`] = `
+exports[`no-unnecessary-type-assertion > invalid 88`] = `
 {
   "code": "
 interface A {
@@ -3592,7 +3093,7 @@ const schema: A | B = {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 106`] = `
+exports[`no-unnecessary-type-assertion > invalid 89`] = `
 {
   "code": "
 declare function fn1<T>(fn: () => void): void;
@@ -3631,7 +3132,7 @@ fn1(() => {
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 107`] = `
+exports[`no-unnecessary-type-assertion > invalid 90`] = `
 {
   "code": "[].map(() => <{ a: false; b: false }>{ a: false, b: false });",
   "diagnostics": [
@@ -3658,7 +3159,7 @@ exports[`no-unnecessary-type-assertion > invalid 107`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 108`] = `
+exports[`no-unnecessary-type-assertion > invalid 91`] = `
 {
   "code": "[].map(() => /* 1 */ <{ a: false; b: false }> /* 2 */ { a: false, b: false } /* 3 */);",
   "diagnostics": [
@@ -3685,7 +3186,7 @@ exports[`no-unnecessary-type-assertion > invalid 108`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 109`] = `
+exports[`no-unnecessary-type-assertion > invalid 92`] = `
 {
   "code": "[].map(() => <{ a: false; b: false }>({ a: false, b: false }));",
   "diagnostics": [
@@ -3712,7 +3213,7 @@ exports[`no-unnecessary-type-assertion > invalid 109`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 110`] = `
+exports[`no-unnecessary-type-assertion > invalid 93`] = `
 {
   "code": "[].map(() => (<{ a: false; b: false }>{ a: false, b: false }));",
   "diagnostics": [
@@ -3739,7 +3240,7 @@ exports[`no-unnecessary-type-assertion > invalid 110`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 111`] = `
+exports[`no-unnecessary-type-assertion > invalid 94`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' };",
   "diagnostics": [
@@ -3766,7 +3267,7 @@ exports[`no-unnecessary-type-assertion > invalid 111`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 112`] = `
+exports[`no-unnecessary-type-assertion > invalid 95`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' } + 1;",
   "diagnostics": [
@@ -3793,7 +3294,7 @@ exports[`no-unnecessary-type-assertion > invalid 112`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 113`] = `
+exports[`no-unnecessary-type-assertion > invalid 96`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' } && true;",
   "diagnostics": [
@@ -3820,7 +3321,7 @@ exports[`no-unnecessary-type-assertion > invalid 113`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 114`] = `
+exports[`no-unnecessary-type-assertion > invalid 97`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' } ? 1 : 2;",
   "diagnostics": [
@@ -3847,7 +3348,7 @@ exports[`no-unnecessary-type-assertion > invalid 114`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 115`] = `
+exports[`no-unnecessary-type-assertion > invalid 98`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' }, foo();",
   "diagnostics": [
@@ -3874,7 +3375,7 @@ exports[`no-unnecessary-type-assertion > invalid 115`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 116`] = `
+exports[`no-unnecessary-type-assertion > invalid 99`] = `
 {
   "code": "<{ a: string }>{ a: 'foo' } + 1 + 2;",
   "diagnostics": [
@@ -3901,7 +3402,7 @@ exports[`no-unnecessary-type-assertion > invalid 116`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 117`] = `
+exports[`no-unnecessary-type-assertion > invalid 100`] = `
 {
   "code": "(<{ a: string }>{ a: 'foo' }, 1);",
   "diagnostics": [
@@ -3928,7 +3429,7 @@ exports[`no-unnecessary-type-assertion > invalid 117`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 118`] = `
+exports[`no-unnecessary-type-assertion > invalid 101`] = `
 {
   "code": "1 + <{ a: string }>{ a: 'foo' };",
   "diagnostics": [
@@ -3955,7 +3456,7 @@ exports[`no-unnecessary-type-assertion > invalid 118`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 119`] = `
+exports[`no-unnecessary-type-assertion > invalid 102`] = `
 {
   "code": "<number>{ lol: 32 as number }.lol;",
   "diagnostics": [
@@ -3982,7 +3483,7 @@ exports[`no-unnecessary-type-assertion > invalid 119`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 120`] = `
+exports[`no-unnecessary-type-assertion > invalid 103`] = `
 {
   "code": "<number>function Fun() {}.length;",
   "diagnostics": [
@@ -4009,7 +3510,7 @@ exports[`no-unnecessary-type-assertion > invalid 120`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 121`] = `
+exports[`no-unnecessary-type-assertion > invalid 104`] = `
 {
   "code": "<number>class Clazz {}.length;",
   "diagnostics": [
@@ -4036,7 +3537,7 @@ exports[`no-unnecessary-type-assertion > invalid 121`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 122`] = `
+exports[`no-unnecessary-type-assertion > invalid 105`] = `
 {
   "code": "const foo = () => <number>{ lol: 123 as number }.lol + 54321;",
   "diagnostics": [
@@ -4063,7 +3564,7 @@ exports[`no-unnecessary-type-assertion > invalid 122`] = `
 }
 `;
 
-exports[`no-unnecessary-type-assertion > invalid 123`] = `
+exports[`no-unnecessary-type-assertion > invalid 106`] = `
 {
   "code": "
 declare const maybeFn: ((arg: string | number) => void) | undefined;

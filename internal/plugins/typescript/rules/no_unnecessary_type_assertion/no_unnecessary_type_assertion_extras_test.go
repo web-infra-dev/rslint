@@ -165,6 +165,53 @@ func TestNoUnnecessaryTypeAssertionContextual(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `const x = ((1 as 1));`},
+			{Code: `class C { readonly x = (1 as 1); }`},
+			{Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+declare const numeric: number;
+(value as number) === -1;
+const widened = nullable as number | null | undefined;
+const enumValue = numeric as Mode;
+(value as unknown as number) === -1;
+`},
+			{Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+const values = Array.of(mode as number);
+values.includes(-1);
+declare const optionalWrap: (<T>(value: T) => T) | undefined;
+const optional = optionalWrap?.(mode as number);
+optional === -1;
+declare function wrap<T>(value: T): T;
+const wrapped = wrap(mode as number);
+wrapped === -1;
+const nested = wrap({ mode: mode as number });
+nested.mode === -1;
+declare class Box<T> { constructor(value: T); value: T; }
+const box = new Box(mode as number);
+box.value === -1;
+declare const item: { mode: Mode };
+declare function apply<T>(input: { value: T; run: (value: T) => void }): void;
+apply({ value: mode as number, run(value) { value = -1; } });
+apply({ value: item as { mode: number }, run(value) { value.mode = -1; } });
+declare function choose(value: Mode): 'mode';
+declare function choose(value: number): 'number';
+const selected: 'number' = choose(mode as number);
+declare function chooseShape(value: { mode: Mode; label: string }): 'mode';
+declare function chooseShape(value: { mode: number; label: string }): 'number';
+const selectedShape: 'number' = chooseShape({ mode: mode as number, label: 'value' });
+const isAuto = (value: Mode) => value === Mode.Auto;
+declare const overloadedCheck: typeof isAuto & ((value: number) => boolean);
+if (overloadedCheck(mode as number)) { mode === Mode.Manual; }
+const widened = item as { mode: number };
+widened.mode === -1;
+declare const factory: () => Mode;
+const widenedFactory = factory as () => number;
+widenedFactory() === -1;
+`},
 			{Code: `const value = 5 as any;`},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
@@ -233,6 +280,65 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 `},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+type First = Mode | null;
+type Second = Mode | null;
+declare const alias: First;
+const same = value as Mode;
+const sameNullable = nullable as Mode | null | undefined;
+const sameDouble = value as unknown as Mode;
+const sameAlias = alias as Second;
+`,
+				Output: []string{`
+enum Mode { Auto = 1, Manual = 2 }
+declare const value: Mode;
+declare const nullable: Mode | null | undefined;
+type First = Mode | null;
+type Second = Mode | null;
+declare const alias: First;
+const same = value;
+const sameNullable = nullable;
+const sameDouble = value;
+const sameAlias = alias;
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+			{
+				Code:   `enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value as number);`,
+				Output: []string{`enum Mode { Auto = 1, Manual = 2 } declare const value: Mode; declare function consume(value: number): void; consume(value);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			},
+			{
+				Code: `
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+Array.of<number>(mode as number).includes(-1);
+declare function choose(value: number, flag: string): 'string';
+declare function choose(value: number, flag: boolean): 'boolean';
+choose(mode as number, 'value');
+`,
+				Output: []string{`
+enum Mode { Auto = 1, Manual = 2 }
+declare const mode: Mode;
+Array.of<number>(mode).includes(-1);
+declare function choose(value: number, flag: string): 'string';
+declare function choose(value: number, flag: boolean): 'boolean';
+choose(mode, 'value');
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+				},
+			},
 			{
 				Code:    `declare const x: number; x as /* comment */ number;`,
 				Output:  []string{`declare const x: number; x;`},
@@ -307,16 +413,6 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
 			},
 			{
-				Code:   `const x = ((1 as 1));`,
-				Output: []string{`const x = ((1));`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
-			},
-			{
-				Code:   `class C { readonly x = (1 as 1); }`,
-				Output: []string{`class C { readonly x = (1); }`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
-			},
-			{
 				Code:   `declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x as string} />;`,
 				Output: []string{`declare namespace JSX { interface IntrinsicElements { div: { p: string } } } declare const x: 'a'; <div p={x} />;`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
@@ -353,7 +449,7 @@ inferred({ addons: [{} as Test<{ parameters: { potato: boolean } }>] });
 			},
 			{
 				Code:   "const v: number = 5;\nconst x = <number>(<any>v);",
-				Output: []string{"const v: number = 5;\nconst x = v;"},
+				Output: []string{"const v: number = 5;\nconst x = (v);"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
 			},
 			{
@@ -453,6 +549,12 @@ func TestNoUnnecessaryTypeAssertionIndexSignatures(t *testing.T) {
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `
+interface Config { field?: boolean; [key: string]: unknown }
+declare const config: Config | undefined;
+export const value = (config as Record<string, unknown> | undefined)?.field;
+const unknownType: unknown extends typeof value ? true : false = true;
+`},
+			{Code: `
 declare const config: { field?: boolean } | undefined;
 export const value = (config as Record<string, unknown> | undefined)?.field;
 `},
@@ -487,19 +589,6 @@ const result = identity(config as Record<string, unknown> | undefined);
 			},
 		},
 		[]rule_tester.InvalidTestCase{
-			{
-				Code: `
-interface Config { field?: boolean; [key: string]: unknown }
-declare const config: Config | undefined;
-export const value = (config as Record<string, unknown> | undefined)?.field;
-`,
-				Output: []string{`
-interface Config { field?: boolean; [key: string]: unknown }
-declare const config: Config | undefined;
-export const value = (config)?.field;
-`},
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
-			},
 			{
 				Code:   `declare const value: Record<string, unknown> | null; const result = <Record<string, unknown> | null>value;`,
 				Output: []string{`declare const value: Record<string, unknown> | null; const result = value;`},
@@ -542,6 +631,67 @@ func TestNoUnnecessaryTypeAssertionInferenceGuards(t *testing.T) {
 		t,
 		&NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: `
+const values = [].map(() => ({ a: false, b: false } as { a: false; b: false }));
+const proof: false = values[0].a;
+`},
+			// A cast can supply return-type inference for a generic call. The
+			// operand's type inside the cast is not its type after removing it.
+			{Code: `
+declare function makeCheck<T>(): (value: T) => T;
+export const check = makeCheck() as (value: string) => string;
+const value: string = check('value');
+`},
+			{Code: `
+declare function makeCheck<T = any>(): (value: T) => T;
+export const check = makeCheck() as (value: string) => string;
+const value: string = check('value');
+`},
+			{Code: `
+declare function make<T>(): T;
+export const value = (() => make())() as string;
+value.toUpperCase();
+`},
+			{Code: `
+declare function make<T>(): T;
+export const value = { *items() { yield make(); } } as { items(): Generator<string, void, unknown> };
+for (const item of value.items()) { item.toUpperCase(); }
+`},
+			{Code: `
+export const value = { *items() { const reply = yield 1; reply.toUpperCase(); } } as { items(): Generator<number, void, string> };
+`},
+			{Code: `
+type Fields = { name: string };
+type Checks<T> = { [K in keyof T]: { value: T[K] } };
+declare function makeChecks<T extends Record<string, unknown>, R>(options: { rules: R }): (state: object) => Checks<T>;
+const rules = { name: {} };
+export const check = makeChecks({ rules }) as (state: object) => Checks<Fields>;
+const value: string = check({}).name.value;
+`},
+			{Code: `
+declare class Box<T = unknown> { value: T; }
+export const box = new Box() as Box<string>;
+const value: string = box.value;
+`},
+			{Code: "declare function tag<T>(parts: TemplateStringsArray): (value: T) => T;\nexport const check = tag`value` as (value: string) => string;"},
+			{Code: `
+declare function makeCheck<T>(): (value: T) => T;
+export const checks = { check: makeCheck() } as { check: (value: string) => string };
+const value: string = checks.check('value');
+`},
+			{Code: `
+declare function make<T = any>(): (value: T) => T;
+export const value = ({ f: make() } as const) as { readonly f: (value: string) => string };
+`},
+			{Code: `
+declare function f<T>(fn: (x: T) => string): T;
+declare function f(fn: (x: string) => number): string;
+const value = f(x => x.length) as string;
+`},
+			{Code: `
+declare function consume(value: unknown): void;
+consume((value => value) as (value: string) => string);
+`},
 			{Code: `
 namespace N { export type R = any }
 type R = () => N.R;
@@ -636,6 +786,57 @@ test.options.parameters.potato;
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code:   `const value = { *items(): Generator<string, void, unknown> { yield 'value'; } } as { items(): Generator<string, void, unknown> };`,
+				Output: []string{`const value = { *items(): Generator<string, void, unknown> { yield 'value'; } };`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function makeCheck<T, U = T>(): (value: T) => U;
+export const check = makeCheck<string>() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck<T, U = T>(): (value: T) => U;
+export const check = makeCheck<string>();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function makeCheck<T>(): (value: T) => T;
+const makeStringCheck = makeCheck<string>;
+export const check = makeStringCheck() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck<T>(): (value: T) => T;
+const makeStringCheck = makeCheck<string>;
+export const check = makeStringCheck();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function makeCheck(): (value: string) => string;
+export const check = makeCheck() as (value: string) => string;
+`,
+				Output: []string{`
+declare function makeCheck(): (value: string) => string;
+export const check = makeCheck();
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+declare function count<T>(value: T): number;
+export const value = count('value') as number;
+`,
+				Output: []string{`
+declare function count<T>(value: T): number;
+export const value = count('value');
+`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
 				Code: `
 type Wrapper<T> = () => T;
 declare const x: Wrapper<string> & Wrapper<number>;
@@ -678,4 +879,457 @@ inferred({ addons: [{}] });
 			},
 		},
 	)
+}
+
+func TestNoUnnecessaryTypeAssertionLiteralInference(t *testing.T) {
+	const declarations = `
+enum Mode { A, B, C }
+declare const flag: boolean;
+type Pair = Mode.A | Mode.B;
+`
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: declarations + `let value = (flag ? Mode.A : Mode.B) as Pair; function read(): Pair { return value; }`},
+			{Code: declarations + `const key = (flag ? Mode.A : Mode.B) as Pair; let value = key; function read(): Pair { return value; }`},
+			{Code: declarations + `const key = flag ? Mode.A : Mode.B; let value = key as Pair; function read(): Pair { return value; }`},
+			{Code: declarations + `const values = [(flag ? Mode.A : Mode.B) as Pair]; function read(): Pair { return values[0]; }`},
+			{Code: declarations + `const key = (flag ? Mode.A : Mode.B) as unknown as Pair; let value = key; function read(): Pair { return value; }`},
+			{Code: declarations + `
+type NullablePair = Mode.A | null;
+let value = (flag ? Mode.A : null) as NullablePair;
+const key = (flag ? Mode.A : null) as NullablePair;
+let copied = key;
+const values = [(flag ? Mode.A : null) as NullablePair];
+function read(): NullablePair { return value; }
+function readCopied(): NullablePair { return copied; }
+function readArray(): NullablePair { return values[0]; }
+`},
+			{Code: `declare const flag: boolean; const key = (flag ? 'a' : 'b') as 'a' | 'b'; let value = key; function read(): 'a' | 'b' { return value; }`},
+			{Code: `
+const key = 1 as 1;
+let value = key;
+function read(): 1 { return value; }
+const fresh = 1;
+let copied = fresh as 1;
+function readCopied(): 1 { return copied; }
+const values = [1 as 1];
+function readArray(): 1 { return values[0]; }
+const pinned = 1 as unknown as 1;
+let throughDouble = pinned;
+function readDouble(): 1 { return throughDouble; }
+`},
+			{Code: declarations + `
+const key = Mode.A as Mode.A;
+let value = key;
+function read(): Mode.A { return value; }
+const fresh = Mode.A;
+const pinned = fresh as Mode.A;
+let copied = pinned;
+function readCopied(): Mode.A { return copied; }
+class Holder { readonly value = Mode.A as Mode.A; }
+let fromMember = new Holder().value;
+function readMember(): Mode.A { return fromMember; }
+`},
+			{Code: `enum Status { A = 'a', B = 'b' } const key = Status.A as Status.A; let value = key; function read(): Status.A { return value; }`},
+			{Code: `const value = { pos: [1, 2] } as { pos: [number, number] }; const tuple: [number, number] = value.pos;`},
+			{Code: `const value = (() => 'x')() as 'x'; const literal: 'x' = value;`},
+			{Code: `const value = (() => ({ tag: 'x' }))() as { tag: 'x' }; const literal: 'x' = value.tag;`},
+			{Code: `const fn = (() => 'x') as () => 'x'; const literal: 'x' = fn();`},
+			{Code: `const fn = ((value): number => value * 2) as (value: number) => number;`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:    `const fixed: 1 = 1 as const; let mutable: 1 = 1 as const; class Holder { readonly value: 1 = 1 as const; }`,
+				Output:  []string{`const fixed: 1 = 1; let mutable: 1 = 1; class Holder { readonly value: 1 = 1; }`},
+				Options: []any{map[string]any{"checkLiteralConstAssertions": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+			{
+				Code:   declarations + `type Same = Mode | null; declare const value: Mode | null; const copied = value as Same; const double = value as unknown as Same;`,
+				Output: []string{declarations + `type Same = Mode | null; declare const value: Mode | null; const copied = value; const double = value;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `
+const first = ((value): number => value * 2)(3) as number;
+const second = ((value: number) => value * 2)(3) as number;
+const third = ((value) => value * 2)(3) as number;
+`,
+				Output: []string{`
+const first = ((value): number => value * 2)(3);
+const second = ((value: number) => value * 2)(3);
+const third = ((value) => value * 2)(3);
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+		},
+	)
+}
+
+func TestNoUnnecessaryTypeAssertionAggregateInference(t *testing.T) {
+	const declarations = `
+enum Mode { A, B, C }
+type Pair = Mode.A | Mode.B;
+declare const flag: boolean;
+const raw = flag ? Mode.A : Mode.B;
+`
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const row = ((n) => ({ ...{ n, value: 1 } } as const))(0) as { readonly n: number; readonly value: 1 }; const one: 1 = row.value;`},
+			{Code: declarations + `
+const direct = { mode: flag ? Mode.A : Mode.B } as { mode: Pair };
+let first = direct.mode;
+function readFirst(): Pair { return first; }
+const shorthand = { raw } as { raw: Pair };
+let second = shorthand.raw;
+function readSecond(): Pair { return second; }
+const nested = { members: [{ ...{ value: raw } }] } as { members: Array<{ value: Pair }> };
+let third = nested.members[0].value;
+function readThird(): Pair { return third; }
+`},
+			{Code: `
+declare const flag: boolean;
+const raw = flag ? 'a' : 'b';
+const row = (() => ({ ...{ value: raw } } as const))() as { readonly value: 'a' | 'b' };
+let copied = row.value;
+function read(): 'a' | 'b' { return copied; }
+`},
+			{Code: `
+declare function make<T = any>(): T;
+type Model = { name: string };
+type IsAny<T> = 0 extends 1 & T ? true : false;
+type IsFalse<T extends false> = T;
+const row = ((n) => ({ ...{ n, data: make() } } as const))(0) as { readonly n: number; readonly data: Model };
+type TypedMember = IsFalse<IsAny<typeof row.data>>;
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare const ready: { value: number };
+declare const count: number;
+const stored = ready as { value: number };
+const built = { value: count } as { value: number };
+const annotated = ((n): { readonly value: 1 } => ({ value: 1 }))(3) as { readonly value: 1 };
+const held = { nested: { n: Math.random() } };
+const reused = held as typeof held;
+`,
+				Output: []string{`
+declare const ready: { value: number };
+declare const count: number;
+const stored = ready;
+const built = { value: count };
+const annotated = ((n): { readonly value: 1 } => ({ value: 1 }))(3);
+const held = { nested: { n: Math.random() } };
+const reused = held;
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+		},
+	)
+}
+
+func TestNoUnnecessaryTypeAssertionContextualValueWidening(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "declare const n: number; type Path = `id:${number}`;\n" +
+				"declare function infer<T>(value: T): T; const inferred = infer(`id:${n}` as Path);\n" +
+				"declare function constrain<T extends Path>(value: T): T; const narrowed = constrain(`id:${1}` as Path);\n" +
+				"declare function select(value: 'id:1'): 1; declare function select(value: Path): 2; const selected = select(`id:${1}` as Path);"},
+			{Code: "declare function fmt(n: 1): number; type Path = `id:${number}`;\n" +
+				"const scalar = (() => `id:${fmt(1)}`)() as Path; const scalarProof: Path = scalar;\n" +
+				"declare function digit(): 1 | 2; type Finite = `id:${1 | 2}`;\n" +
+				"const finite = { paths: [`id:${digit()}`] } as { paths: Finite[] }; const finiteProof: Finite = finite.paths[0];"},
+			{Code: `
+declare const tag: unique symbol;
+declare const other: unique symbol;
+declare const flag: boolean;
+type Both = typeof tag | typeof other;
+const nested = { values: [tag] } as { values: Array<typeof tag> }; const arrayProof: typeof tag = nested.values[0];
+const either = { tag: flag ? tag : other } as { tag: Both }; const conditionalProof: Both = either.tag;
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare const tag: unique symbol;
+const fixed: { tag: typeof tag } = ({ tag } as { tag: typeof tag });
+`,
+				Output: []string{`
+declare const tag: unique symbol;
+const fixed: { tag: typeof tag } = ({ tag });
+`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+				},
+			},
+			{
+				Code: "declare const n: number; type Path = `id:${number}`;\n" +
+					"let value: Path = `id:${n}` as Path;\n" +
+					"function read(): Path { return `id:${n}` as Path; }\n" +
+					"const row: { path: Path } = { path: `id:${n}` as Path };\n" +
+					"declare function consume(value: Path): void; consume(`id:${n}` as Path);\n" +
+					"declare function infer<T>(value: T): T; const explicit = infer<Path>(`id:${n}` as Path);",
+				Output: []string{"declare const n: number; type Path = `id:${number}`;\n" +
+					"let value: Path = `id:${n}`;\n" +
+					"function read(): Path { return `id:${n}`; }\n" +
+					"const row: { path: Path } = { path: `id:${n}` };\n" +
+					"declare function consume(value: Path): void; consume(`id:${n}`);\n" +
+					"declare function infer<T>(value: T): T; const explicit = infer<Path>(`id:${n}`);"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+				},
+			},
+			{
+				Code: "declare const n: number; type Path = `id:${number}`;\n" +
+					"const returned = ((): Path => `id:${n}`)() as Path;\n" +
+					"const pinned = ({ path: `id:${n}` } as const) as { readonly path: Path };\n" +
+					"const fixed: 'id:1' = `id:${1}` as 'id:1';",
+				Output: []string{"declare const n: number; type Path = `id:${number}`;\n" +
+					"const returned = ((): Path => `id:${n}`)();\n" +
+					"const pinned = ({ path: `id:${n}` } as const);\n" +
+					"const fixed: 'id:1' = `id:${1}`;"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+					{MessageId: "unnecessaryAssertion"},
+				},
+			},
+		},
+	)
+}
+
+func TestNoUnnecessaryTypeAssertionRetainedTypeBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `const row = ({ value: 1 } satisfies { value: number }) as { value: 1 }; const one: 1 = row.value;`},
+			{Code: `declare const n: number; const tuple = ([n] satisfies number[]) as [number]; const one: [number] = tuple;`},
+			{Code: `declare const n: number; const value = n as MissingType as number;`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code:   `declare function make<T>(): T; typeof <number>(/* keep */ make() as number as unknown);`,
+				Output: []string{`declare function make<T>(): T; typeof (/* keep */ make() as number);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `<number><unknown>async function named() {}.length;`,
+				Output: []string{`(async function named() {}.length);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `const x: number = 2, y: number = 3; const value = 10 * <number>(x + y as number as unknown);`,
+				Output: []string{
+					`const x: number = 2, y: number = 3; const value = 10 * (x + y as number);`,
+					`const x: number = 2, y: number = 3; const value = 10 * (x + y);`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `const x: number = 2, y: number = 3; const value = 10 * <number><unknown>(x + y);`,
+				Output: []string{`const x: number = 2, y: number = 3; const value = 10 * (x + y);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function call(value: string): number; <{ a: number; b: number }><unknown>{ a: call('a'), b: call('b') };`,
+				Output: []string{`declare function call(value: string): number; ({ a: call('a'), b: call('b') });`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function a(): number; declare function b(): number; declare function pick(value: number): void; pick(<number><unknown>(a(), /* keep */ b()));`,
+				Output: []string{`declare function a(): number; declare function b(): number; declare function pick(value: number): void; pick((a(), /* keep */ b()));`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const getBox = () => <{ readonly n: number }>({ n } as const as unknown);`,
+				Output: []string{`declare const n: number; const getBox = () => ({ n } as const);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const value = n as unknown as unknown as number;`,
+				Output: []string{`declare const n: number; const value = n as unknown as number;`, `declare const n: number; const value = n;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare function make<T>(): T; const value = (make() satisfies string) as string;`,
+				Output: []string{`declare function make<T>(): T; const value = (make() satisfies string);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const value = ([n, n] satisfies [number, number]) as [number, number];`,
+				Output: []string{`declare const n: number; const value = ([n, n] satisfies [number, number]);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const out = { v: [n] } as const as unknown as { readonly v: readonly [number] }; const tuple: readonly [number] = out.v;`,
+				Output: []string{`declare const n: number; const out = { v: [n] } as const; const tuple: readonly [number] = out.v;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `declare const n: number; const out = { n } as const as unknown as { readonly n: number }; type Same<X, Y> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? true : false; const proof: Same<typeof out, { readonly n: number }> = true;`,
+				Output: []string{`declare const n: number; const out = { n } as const; type Same<X, Y> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? true : false; const proof: Same<typeof out, { readonly n: number }> = true;`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+		},
+	)
+}
+
+func TestNoUnnecessaryTypeAssertionLineBreaks(t *testing.T) {
+	const declaration = "type Path = `id:${number}`; const n = 1; function read(): Path { return "
+	var invalid []rule_tester.InvalidTestCase
+	for _, separator := range []string{"\n", "\r\n", " // keep\n", " /* keep */\n"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   declaration + "<Path>" + separator + "`id:${n}`; }",
+			Output: []string{declaration + "(" + separator + "`id:${n}`); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		})
+	}
+	for _, separator := range []string{" /* keep\n */ ", "\n /* keep */ ", "\r\n /* keep */ ", " /* first */\n /* second */ "} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   declaration + "<Path>" + separator + "`id:${n}`; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		})
+	}
+	for _, expression := range []string{
+		"<number>(<unknown>\n /* keep */ value)",
+		"(<number>\n /* keep */ value)",
+		"(<unknown>\n /* keep */ value) as number",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return " + expression + "; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		})
+	}
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return <number>(<number>\n /* keep */ value); }",
+			Output: []string{"function read(value: number) { return (<number>\n /* keep */ value); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return <number>(<unknown> /* keep */\nvalue); }",
+			Output: []string{"function read(value: number) { return ( /* keep */\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return (<number>\nvalue); }",
+			Output: []string{"function read(value: number) { return (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return <number><unknown>\n /* keep */ value; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function* values(value: number) { yield <number>\n /* keep */ value; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare function value(): number; function read() { return <number>\nvalue() + 1; }",
+			Output: []string{"declare function value(): number; function read() { return (\nvalue()) + 1; }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code: "declare function value(): number; function read() { return <number><number>\nvalue(); }",
+			Output: []string{
+				"declare function value(): number; function read() { return <number>\nvalue(); }",
+				"declare function value(): number; function read() { return (\nvalue()); }",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare const value: number; function read() { return <unknown>\nvalue as number; }",
+			Output: []string{"declare const value: number; function read() { return (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare const err: Error; function fail() { throw <Error>\nerr; }",
+			Output: []string{"declare const err: Error; function fail() { throw (\nerr); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function* values(value: number) { yield <number>\nvalue; }",
+			Output: []string{"function* values(value: number) { yield (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, nil, invalid)
+}
+
+func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {
+	const declarations = `enum Mode { Auto = 1, Manual = 2 } declare const mode: Mode;`
+	var valid []rule_tester.ValidTestCase
+	for _, code := range []string{
+		`const values = [0].map(() => { return mode as number; }); values.includes(-1);`,
+		`declare function infer<T>(callback: () => T): T;
+const value = infer(function() { return mode as number; }); value === -1;`,
+		`type Model = { mode: number };
+declare function useMemo<T>(callback: () => T, deps: readonly unknown[]): T;
+const value = useMemo(() => { return { mode } as unknown as Model; }, []); value.mode === -1;`,
+		`declare const value: number;
+declare function choose(value: Mode): 'mode'; declare function choose(value: number): 'number';
+const result: 'mode' = choose(value as any);`,
+		`declare const condition: boolean;
+declare function choose(value: Mode): 'mode'; declare function choose(value: number): 'number';
+const result: 'number' = choose(condition ? mode as number : mode);`,
+		`declare function choose(value: () => Mode): 'mode'; declare function choose(value: () => number): 'number';
+const result: 'number' = choose(() => { return mode as number; });`,
+		`interface Box { data: unknown; write<T>(value: T): asserts this is Box & { data: T } }
+declare const box: Box; box.write({ value: mode } as { value: number }); box.data.value === -1;`,
+		`declare function tag(parts: TemplateStringsArray, value: Mode): 'mode';
+declare function tag(parts: TemplateStringsArray, value: number): 'number';
+const result: 'number' = tag` + "`${mode as number}`" + `;`,
+		`declare function consume(value: { x: number }): number;
+declare function consume(value: { y?: number; x: number }): number;
+consume({ x: 1, extra: true } as { x: number });`,
+		`declare function consume(value: { x: number }): void;
+consume({ x: 1, extra: true } as { x: number });`,
+		`declare function consume(value: number | string): void;
+consume((mode as number) || mode.toString());`,
+		`declare function raw(): any;
+declare function consume(value: string): void;
+consume(raw() as unknown as string);
+function read<T>(): T { return raw() as unknown as T; }`,
+		`declare const raw: MissingType;
+declare function consume(value: string): void;
+consume(raw as unknown as string);`,
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{Code: declarations + code})
+	}
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code: declarations + `
+declare namespace JSX { interface Element {} interface IntrinsicElements {} }
+declare function View<T>(props: { value: T; render(value: T): unknown }): JSX.Element;
+<View value={mode as number} render={value => value === -1} />;`,
+		Tsx: true,
+	})
+	valid = append(valid, rule_tester.ValidTestCase{
+		Code: `declare namespace JSX { interface Element {} interface IntrinsicElements {
+probe: { kind: 'a'; a: true } | { kind: 'b'; b: true };
+} }
+declare const kind: 'a' | 'b'; <probe kind={kind as 'a'} a />;`,
+		Tsx: true,
+	})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, valid, nil)
 }

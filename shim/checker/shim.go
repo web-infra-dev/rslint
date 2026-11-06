@@ -81,8 +81,12 @@ const CheckModeTypeOnly = checker.CheckModeTypeOnly
 type Checker = checker.Checker
 //go:linkname Checker_getIterationTypeOfIterable github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getIterationTypeOfIterable
 func Checker_getIterationTypeOfIterable(recv *checker.Checker, use checker.IterationUse, typeKind checker.IterationTypeKind, inputType *checker.Type, errorNode *ast.Node) *checker.Type
+//go:linkname Checker_getTypeOfExpression github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfExpression
+func Checker_getTypeOfExpression(recv *checker.Checker, node *ast.Node) *checker.Type
 //go:linkname Checker_getResolvedSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
+//go:linkname Checker_isConstContext github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isConstContext
+func Checker_isConstContext(recv *checker.Checker, node *ast.Node) bool
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getWidenedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedType
@@ -123,18 +127,24 @@ func Checker_isArrayOrTupleType(recv *checker.Checker, t *checker.Type) bool
 func Checker_getDeclaredTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
 //go:linkname Checker_getBaseTypeOfLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseTypeOfLiteralType
 func Checker_getBaseTypeOfLiteralType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_getWidenedLiteralLikeTypeForContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getWidenedLiteralLikeTypeForContextualType
+func Checker_getWidenedLiteralLikeTypeForContextualType(recv *checker.Checker, t *checker.Type, contextualType *checker.Type) *checker.Type
 //go:linkname Checker_getBaseConstraintOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getBaseConstraintOfType
 func Checker_getBaseConstraintOfType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualType
 func Checker_getContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getContextualTypeForArgumentAtIndex github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getContextualTypeForArgumentAtIndex
 func Checker_getContextualTypeForArgumentAtIndex(recv *checker.Checker, callTarget *ast.Node, argIndex int) *checker.Type
+//go:linkname Checker_getApparentTypeOfContextualType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getApparentTypeOfContextualType
+func Checker_getApparentTypeOfContextualType(recv *checker.Checker, node *ast.Node, contextFlags checker.ContextFlags) *checker.Type
 //go:linkname Checker_getAwaitedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAwaitedType
 func Checker_getAwaitedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getAccessedPropertyName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAccessedPropertyName
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
+//go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
+func Checker_isTypeIdenticalTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_isTypeAssignableTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeAssignableTo
 func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_isTypeStrictSubtypeOf github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeStrictSubtypeOf
@@ -472,6 +482,9 @@ func Checker_booleanType(v *checker.Checker) *checker.Type {
 }
 func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).globalRegExpType
+}
+func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) bool {
+  return ((*extra_Checker)(unsafe.Pointer(v))).couldContainTypeVariables
 }
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
 func CompareTypes(t1 *checker.Type, t2 *checker.Type) int
