@@ -458,6 +458,7 @@ func TestPreferWhileLoopConditionEditDemand(t *testing.T) {
 		{"for", "for (;;) { if (done) break; work(); }", "while (!done) {  work(); }", false},
 		{"do", "do { if (done) break; work(); } while (true);", "while (!done) {  work(); }", false},
 		{"comment", "while (true) { if (/* keep */ done) break; work(); }", "", false},
+		{"eval", "while (true) { if (eval(\"done()\")) break; function done() { return true; } }", "", false},
 		{"disabled", "// eslint-disable-next-line unicorn/prefer-while-loop-condition\nwhile (true) { if (done) break; work(); }", "", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -524,6 +525,57 @@ func TestPreferWhileLoopConditionEditDemand(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreferWhileLoopConditionEval(t *testing.T) {
+	// Direct eval can access loop-body bindings that are absent from the AST.
+	// Keep the diagnostic, but do not move the call outside their scope.
+	var cases []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		`while (true) { if (eval("done()")) break; function done() { return true; } }`,
+		`for (;;) { if (eval("done()")) break; function done() { return true; } }`,
+		`do { if (eval("done()")) break; function done() { return true; } } while (true);`,
+		`while (true) { if ((eval)("done()")) break; function done() { return true; } }`,
+		`while (true) { if (!eval(source)) break; work(); }`,
+		`while (true) { if (check(eval(source))) break; work(); }`,
+		`while (true) { if ((() => eval("done()"))()) break; function done() { return true; } }`,
+		`while (true) { if (\u0065val("done()")) break; function done() { return true; } }`,
+		`while (true) { if (eval?.(eval(source))) break; work(); }`,
+	} {
+		cases = append(cases, rule_tester.InvalidTestCase{
+			Code: code, FileName: "case.js",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-while-loop-condition"}},
+		})
+	}
+	for _, callee := range []string{
+		`eval!`, `(eval as typeof eval)`, `(eval satisfies typeof eval)`,
+		`(<typeof eval>eval)`, `(eval<string>)`,
+	} {
+		cases = append(cases, rule_tester.InvalidTestCase{
+			Code: `while (true) { if (` + callee + `("done()")) break; function done() { return true; } }`, FileName: "case.ts",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-while-loop-condition"}},
+		})
+	}
+	// A local binding named eval can still hold the intrinsic eval function.
+	cases = append(cases, rule_tester.InvalidTestCase{
+		Code: `function run(eval) { while (true) { if (eval("done()")) break; function done() { return true; } } } run(globalThis.eval);`, FileName: "case.js",
+		LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+		Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "prefer-while-loop-condition"}},
+	})
+	// Indirect eval cannot access the loop's local scope, so keep safe fixes.
+	for _, condition := range []string{
+		`eval?.("true")`, `(eval)?.("true")`, `(0, eval)("true")`,
+		`globalThis.eval("true")`, `eval.call(null, "true")`, `eval.bind(null)("true")`,
+		"eval`true`", `Boolean(eval)`,
+	} {
+		cases = append(cases, rule_tester.InvalidTestCase{
+			Code: `while (true) { if (` + condition + `) break; work(); }`, FileName: "case.js",
+			Output: []string{`while (!` + condition + `) {  work(); }`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "prefer-while-loop-condition"}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+		&prefer_while_loop_condition.PreferWhileLoopConditionRule, nil, cases)
 }
 
 func TestPreferWhileLoopConditionWithTypeInformation(t *testing.T) {

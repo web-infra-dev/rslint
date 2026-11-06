@@ -36,7 +36,7 @@ var PreferWhileLoopConditionRule = rule.Rule{
 				Id:          "prefer-while-loop-condition",
 				Description: "Prefer putting the condition in the `while` statement.",
 			}, func() []rule.RuleFix {
-				if hasUnpreservedComment(ctx, loop, body, first) {
+				if hasDirectEval(guard.Expression) || hasUnpreservedComment(ctx, loop, body, first) {
 					return nil
 				}
 				condition := loopConditionText(ctx, guard.Expression)
@@ -125,6 +125,17 @@ func hasUnsafeLiftReference(ctx rule.RuleContext, test, body *ast.Node) bool {
 		return node.ForEachChild(visit)
 	}
 	return visit(test)
+}
+
+func hasDirectEval(node *ast.Node) bool {
+	if ast.IsCallExpression(node) && node.AsCallExpression().QuestionDotToken == nil {
+		callee := ast.SkipOuterExpressions(node.Expression(), ast.OEKAll)
+		// Even a local binding named eval can hold the intrinsic eval function.
+		if ast.IsIdentifier(callee) && callee.AsIdentifier().Text == "eval" {
+			return true
+		}
+	}
+	return node.ForEachChild(hasDirectEval)
 }
 
 func loopConditionText(ctx rule.RuleContext, test *ast.Node) string {

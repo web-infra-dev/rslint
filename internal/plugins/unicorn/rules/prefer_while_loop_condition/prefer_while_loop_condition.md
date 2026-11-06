@@ -48,13 +48,31 @@ guard. Infinite `for` and `do ... while` loops become `while` loops.
 Comments around the guard or loop syntax prevent automatic fixes. Comments
 inside the retained body are preserved and do not prevent fixing.
 
+Conditions containing direct `eval` are reported without an automatic fix.
+
 ## Options
 
 This rule has no options.
 
 ## Differences from upstream
 
-No known differences from eslint-plugin-unicorn v79.0.0.
+Unlike eslint-plugin-unicorn v79.0.0, rslint withholds automatic fixes when the
+guard condition contains direct `eval`. For example, this code is reported but
+left unchanged by automatic fixing:
+
+```javascript
+'use strict';
+
+while (true) {
+  if (eval('done()')) break;
+  function done() {
+    return true;
+  }
+}
+```
+
+Moving the `eval` call into the loop header would make `done` inaccessible and
+cause a `ReferenceError`.
 
 ## Original Documentation
 
