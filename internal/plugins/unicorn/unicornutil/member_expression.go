@@ -53,3 +53,36 @@ func ShouldAddParenthesesToMemberExpressionObject(
 		return true
 	}
 }
+
+// ShouldAddParenthesesToMemberExpressionObjectAt also accounts for the source
+// position an expression will occupy, including statement and arrow-body starts.
+func ShouldAddParenthesesToMemberExpressionObjectAt(source *ast.SourceFile, node, replacement *ast.Node) bool {
+	first, _ := utils.TokenAtOrAfter(source, utils.TrimNodeTextRange(source, node).Pos())
+	next, _ := utils.TokenAtOrAfter(source, first.End)
+	if first.Kind == ast.KindOpenBraceToken || first.Kind == ast.KindFunctionKeyword || first.Kind == ast.KindClassKeyword ||
+		(first.Text == "async" && next.Kind == ast.KindFunctionKeyword) ||
+		(first.Text == "let" && next.Kind == ast.KindOpenBracketToken) {
+		for current := replacement; current.Parent != nil; current = current.Parent {
+			parent := current.Parent
+			if ast.IsParenthesizedExpression(parent) {
+				break
+			}
+			if parent.Kind == ast.KindExpressionStatement || (parent.Kind == ast.KindArrowFunction && parent.Body() == current && first.Kind == ast.KindOpenBraceToken) {
+				return true
+			}
+			if utils.TrimNodeTextRange(source, parent).Pos() != utils.TrimNodeTextRange(source, current).Pos() {
+				break
+			}
+		}
+	}
+	switch node.Kind {
+	case ast.KindFunctionExpression, ast.KindObjectLiteralExpression:
+		return true
+	case ast.KindTaggedTemplateExpression, ast.KindNonNullExpression, ast.KindMetaProperty:
+		return false
+	case ast.KindCallExpression:
+		return false
+	default:
+		return ShouldAddParenthesesToMemberExpressionObject(source, node)
+	}
+}
