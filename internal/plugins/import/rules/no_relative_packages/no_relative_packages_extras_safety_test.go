@@ -281,7 +281,6 @@ func TestNoRelativePackagesResolverDefaults(t *testing.T) {
 // even for options such as basedir that do not affect lookup. Environments that
 // share a Program must not reuse each other's resolver configuration.
 func TestNoRelativePackagesResolverOptionsShareProgram(t *testing.T) {
-	const code = `const value = require("../b");`
 	root := safetyRoot(t, "C01", true, false)
 	file := tspath.ResolvePath(root.Dir, "packages/a/source.cjs")
 	empty := map[string]any{"import/resolver": map[string]any{"node": map[string]any{}}}
