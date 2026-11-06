@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -455,6 +457,140 @@ func TestIsDirAbsolutelyBlockedAboveFloor(t *testing.T) {
 	} {
 		if got := isDirAbsolutelyBlockedAboveFloor("a/b/c", ParseIgnorePatterns(test.patterns), test.floor); got != test.want {
 			t.Errorf("patterns=%v floor=%d: got %v, want %v", test.patterns, test.floor, got, test.want)
+		}
+	}
+}
+
+func TestDirectoryPatternFiltersPreserveAbsoluteBlocks(t *testing.T) {
+	globs := []string{
+		"**/dist/**", "**/*.config.*", "**/x", "**/X", "a/x", "a/b*c", "a/?/leaf",
+		"**", "*", "./*", "a/*", "a/**/*", "!a/**", "foo/..", "",
+		"**/{dist,build}/**", "a/[bc]*/**", "a/[", "a/{", "a/}",
+		"**/DÉP/**", "**/K", "**/\ufffd", "**/\xff", "a//b/**", "../a/**", "/a/**",
+	}
+	directories := []string{
+		"", ".", "a", "a/b", "a/bbc/leaf", "a/dist/deep", "a/nested.config.dir",
+		"a/build/child", "a/b/leaf", "src/clean/deep", "/a/b", "../a/b",
+		"C:/Repo/a/dist", "//server/share/a/dist", "DÉP/child", "dép/child", "K", "\xff",
+	}
+	for _, caseInsensitive := range []bool{false, true} {
+		for _, glob := range globs {
+			patterns := ParseIgnorePatterns([]string{"**/unrelated-pattern/**", glob, "!**/keep/**", "**/covered/**/*"})
+			for index := range patterns {
+				patterns[index].CaseInsensitive = caseInsensitive
+			}
+			filters := buildDirectoryPatternFilters(patterns)
+			for _, directory := range directories {
+				for _, floor := range []int{0, 1, 2, 4} {
+					want := isDirAbsolutelyBlockedAboveFloor(directory, patterns, floor)
+					if got := isDirAbsolutelyBlockedWithFilters(directory, patterns, filters, floor); got != want {
+						t.Fatalf("glob=%q directory=%q insensitive=%v floor=%d: filtered=%v unfiltered=%v",
+							glob, directory, caseInsensitive, floor, got, want)
+					}
+				}
+			}
+		}
+	}
+
+	// Preserve escapes supplied by already-parsed callers instead of passing
+	// them through path normalization, which treats backslashes as separators.
+	escaped := []IgnorePattern{{Glob: `a/\*/**`, Kind: dirAbsoluteBlock}}
+	assert.Equal(t, isDirAbsolutelyBlockedWithFilters("a/*/child", escaped, buildDirectoryPatternFilters(escaped), 0), true)
+
+	// The synthetic x exemption applies after the matcher's exact case fold.
+	folded := []IgnorePattern{{Glob: "**/X", Kind: dirAbsoluteBlock, CaseInsensitive: true}}
+	assert.Equal(t, isDirAbsolutelyBlockedWithFilters("a", folded, buildDirectoryPatternFilters(folded), 0), true)
+	// A rune matcher can equate a valid replacement character with invalid
+	// bytes in a Unix filename. Non-ASCII patterns must retain that behavior.
+	replacement := []IgnorePattern{{Glob: "**/\ufffd", Kind: dirAbsoluteBlock}}
+	assert.Equal(t, isDirAbsolutelyBlockedWithFilters("a/\xff", replacement, buildDirectoryPatternFilters(replacement), 0), true)
+}
+
+func BenchmarkDirectoryPatternFiltering(b *testing.B) {
+	for _, shape := range []struct {
+		directories int
+		depth       int
+		patterns    int
+	}{
+		{1, 1, 1},
+		{128, 8, 8},
+		{128, 32, 8},
+		{128, 8, 64},
+		{1024, 8, 8},
+	} {
+		patterns := make([]IgnorePattern, shape.patterns)
+		for index := range patterns {
+			patterns[index] = ParseIgnorePattern(fmt.Sprintf("**/generated-%d/**", index))
+		}
+		filters := buildDirectoryPatternFilters(patterns)
+		directories := make([]string, shape.directories)
+		for index := range directories {
+			directories[index] = strings.Repeat("source/", shape.depth-1) + fmt.Sprintf("package-%d", index)
+		}
+		for _, filtered := range []bool{false, true} {
+			name := fmt.Sprintf("dirs=%d/depth=%d/patterns=%d/filtered=%v", shape.directories, shape.depth, shape.patterns, filtered)
+			b.Run(name, func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					for _, directory := range directories {
+						if filtered {
+							isDirAbsolutelyBlockedWithFilters(directory, patterns, filters, 0)
+						} else {
+							isDirAbsolutelyBlocked(directory, patterns)
+						}
+					}
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkBuildDirectoryPatternFilters(b *testing.B) {
+	for _, count := range []int{0, 1, 8, 64} {
+		patterns := make([]IgnorePattern, count)
+		for index := range patterns {
+			patterns[index] = ParseIgnorePattern(fmt.Sprintf("**/generated-%d/**", index))
+		}
+		b.Run(fmt.Sprintf("patterns=%d", count), func(b *testing.B) {
+			filters := buildDirectoryPatternFilters(patterns)
+			b.ReportMetric(float64(len(filters))*float64(reflect.TypeFor[string]().Size()), "retained-B")
+			b.ReportAllocs()
+			for b.Loop() {
+				buildDirectoryPatternFilters(patterns)
+			}
+		})
+	}
+}
+
+func BenchmarkDirectoryPatternFilteringSyntax(b *testing.B) {
+	for _, test := range []struct {
+		name      string
+		patterns  []string
+		directory string
+		blocked   bool
+	}{
+		{"literal_hit", []string{"**/generated/**"}, "src/generated/deep", true},
+		{"complex_miss", []string{"**/*.{js,mjs}", "**/[abc].generated"}, "src/source/deep", false},
+		{"mixed_miss", []string{"**/generated/**", "**/*.{js,mjs}", "**/*.config.*"}, "src/source/deep", false},
+		{"complex_hit", []string{"**/generated/**", "**/{build,dist}/**"}, "src/build/deep", true},
+	} {
+		patterns := ParseIgnorePatterns(test.patterns)
+		filters := buildDirectoryPatternFilters(patterns)
+		for _, filtered := range []bool{false, true} {
+			b.Run(fmt.Sprintf("%s/filtered=%v", test.name, filtered), func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					var got bool
+					if filtered {
+						got = isDirAbsolutelyBlockedWithFilters(test.directory, patterns, filters, 0)
+					} else {
+						got = isDirAbsolutelyBlocked(test.directory, patterns)
+					}
+					if got != test.blocked {
+						b.Fatal("unexpected directory block")
+					}
+				}
+			})
 		}
 	}
 }

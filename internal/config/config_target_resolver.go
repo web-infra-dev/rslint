@@ -42,8 +42,9 @@ type configTargetEntry struct {
 // pruning project their path once per authored root instead of once per
 // pattern.
 type ignorePatternCoordinateGroup struct {
-	patterns      []IgnorePattern
-	negationReach negReach
+	patterns         []IgnorePattern
+	directoryFilters []string
+	negationReach    negReach
 }
 
 type configTargetMatch struct {
@@ -283,8 +284,9 @@ func buildIgnorePatternCoordinateGroups(patterns []IgnorePattern) []ignorePatter
 		}
 		groupPatterns := patterns[start:end]
 		groups = append(groups, ignorePatternCoordinateGroup{
-			patterns:      groupPatterns,
-			negationReach: buildNegReach(groupPatterns),
+			patterns:         groupPatterns,
+			directoryFilters: buildDirectoryPatternFilters(groupPatterns),
+			negationReach:    buildNegReach(groupPatterns),
 		})
 		start = end
 	}
@@ -581,13 +583,7 @@ func (resolver *configTargetResolver) hasAbsoluteDirectoryBlockForDirectory(
 					&configArrayMatch,
 				)
 			}
-			if minimumDirectoryDepth == 0 {
-				if isDirAbsolutelyBlocked(relative, group.patterns) {
-					return true
-				}
-				continue
-			}
-			if isDirAbsolutelyBlockedAboveFloor(relative, group.patterns, minimumDirectoryDepth) {
+			if isDirAbsolutelyBlockedWithFilters(relative, group.patterns, group.directoryFilters, minimumDirectoryDepth) {
 				return true
 			}
 		}
@@ -646,13 +642,10 @@ func (resolver *configTargetResolver) canPruneDirectoryWithEntry(path string, ca
 					&matches[entry.configArrayBaseIndex],
 				)
 			}
-			if minimumDirectoryDepth == 0 {
-				if isDirAbsolutelyBlocked(relative, group.patterns) {
-					return true
-				}
-			} else if isDirAbsolutelyBlockedAboveFloor(
+			if isDirAbsolutelyBlockedWithFilters(
 				relative,
 				group.patterns,
+				group.directoryFilters,
 				minimumDirectoryDepth,
 			) {
 				return true

@@ -317,6 +317,10 @@ func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {
 		"npm/util.ts",
 		"src/app/main.ts",
 		"src/util.tsx",
+		"synthetic/child/main.ts",
+		"partial/log/deep/main.ts",
+		"src/nested.config.dir/main.ts",
+		"src/brace-build/main.ts",
 	}
 	configDir, paths := setupDiscoveryFixture(t, layout)
 	config := rslintconfig.RslintConfig{
@@ -329,6 +333,10 @@ func TestRealWorldTargetWalkMatchesConfigSelection(t *testing.T) {
 			"npm/**/*.node",
 			"npm/*",
 			"!npm/darwin-arm64/**/*",
+			"synthetic/x",
+			"partial/lo*g/**",
+			"**/*.config.*",
+			"**/{brace-build,brace-cache}/**",
 		}},
 		{Files: []string{"**/*.ts", "**/*.tsx"}, Rules: rslintconfig.Rules{"test-rule": "error"}},
 	}
