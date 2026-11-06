@@ -1,6 +1,8 @@
 package rule
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -12,6 +14,58 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	rslint_utils "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+func TestCachedByEnvironmentSharesFilesAndSeparatesInputs(t *testing.T) {
+	p := lintprogram.NewFromCompiler(programCacheTestProgram(t))
+	environment := &RuleEnvironment{}
+	context := func(environment *RuleEnvironment) RuleContext {
+		return (RuleContext{}).WithProgram(p).WithFileCache(NewFileCacheWithEnvironment("/repo", environment))
+	}
+	var builds atomic.Int32
+	build := func() *int {
+		builds.Add(1)
+		return new(int)
+	}
+	var workers sync.WaitGroup
+	results := make([]*int, 8)
+	for i := range results {
+		workers.Go(func() {
+			results[i] = CachedByEnvironment(context(environment), programCacheTestKey{}, build)
+		})
+	}
+	workers.Wait()
+	for _, result := range results {
+		if result != results[0] {
+			t.Fatal("files sharing an environment received different values")
+		}
+	}
+	if builds.Load() != 1 {
+		t.Fatalf("concurrent initialization ran %d times, want 1", builds.Load())
+	}
+	if CachedByEnvironment(context(&RuleEnvironment{}), programCacheTestKey{}, build) == results[0] {
+		t.Fatal("different environments reused a value")
+	}
+	if CachedByEnvironment(context(environment), "other input", build) == results[0] {
+		t.Fatal("different construction inputs reused a value")
+	}
+	other := (RuleContext{}).WithProgram(lintprogram.NewFromCompiler(programCacheTestProgram(t))).
+		WithFileCache(NewFileCacheWithEnvironment("/repo", environment))
+	if CachedByEnvironment(other, programCacheTestKey{}, build) == results[0] {
+		t.Fatal("different Program generations reused a value")
+	}
+}
+
+func TestCachedByEnvironmentWithoutIdentityBuildsEveryTime(t *testing.T) {
+	for _, ctx := range []RuleContext{{}, (RuleContext{}).WithFileCache(NewFileCache())} {
+		builds := 0
+		build := func() int { builds++; return builds }
+		first := CachedByEnvironment(ctx, programCacheTestKey{}, build)
+		second := CachedByEnvironment(ctx, programCacheTestKey{}, build)
+		if first != 1 || second != 2 {
+			t.Fatal("unbound context cached mutable configuration")
+		}
+	}
+}
 
 type programCacheTestKey struct{}
 

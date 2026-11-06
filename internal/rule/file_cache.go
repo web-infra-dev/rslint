@@ -6,6 +6,7 @@ package rule
 type FileCache struct {
 	values                  map[any]any
 	processCurrentDirectory string
+	environment             *RuleEnvironment
 }
 
 // NewFileCache creates the cache that the linter shares with every rule on one
@@ -19,6 +20,13 @@ func NewFileCache() *FileCache {
 // instead of copying its string into every rule context.
 func NewFileCacheWithProcessCurrentDirectory(currentDirectory string) *FileCache {
 	return &FileCache{processCurrentDirectory: currentDirectory}
+}
+
+// NewFileCacheWithEnvironment binds the immutable configuration shared by file
+// plans to this file pass. Settings in contexts using this cache must come from
+// environment and remain unchanged throughout the prepared lint plan.
+func NewFileCacheWithEnvironment(currentDirectory string, environment *RuleEnvironment) *FileCache {
+	return &FileCache{processCurrentDirectory: currentDirectory, environment: environment}
 }
 
 // WithFileCache returns a context attached to cache. This is a linter assembly

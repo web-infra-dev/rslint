@@ -86,12 +86,17 @@ func TestResolverCachePreservesRecursiveErrorIdentity(t *testing.T) {
 	}
 	p := programForResolution(t, files, "/cycle/ordinary.js")
 	options := moduleresolver.Options{AliasFields: [][]string{{"browser"}}}
+	prepared := moduleresolver.PrepareOptions(options)
+	preparedProgram := programForResolution(t, files, "/cycle/ordinary.js")
 	for _, test := range []struct{ file, message string }{
 		{"/cycle/ordinary.js", "Recursive alias while resolving 'y'"},
 		{"/cycle/__import__.js", "Recursive alias while resolving 'x'"},
 	} {
 		if got := moduleresolver.Resolve(p, "x", test.file, options); got.Path != "" || got.Error != test.message {
 			t.Errorf("resolve from %s = %+v, want %s", test.file, got, test.message)
+		}
+		if got := prepared.Resolve(preparedProgram, "x", test.file); got.Path != "" || got.Error != test.message {
+			t.Errorf("prepared resolve from %s = %+v, want %s", test.file, got, test.message)
 		}
 	}
 }
@@ -138,6 +143,7 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		return programForResolution(t, files, "/node-runtime/input.js")
 	}
 	p := create()
+	preparedProgram := create()
 	for _, test := range []struct {
 		name    string
 		options moduleresolver.Options
@@ -148,6 +154,7 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		{"_stream_readable", moduleresolver.Options{}, "/node-runtime/node_modules/_stream_readable/index.js"},
 		{"_http_agent", moduleresolver.Options{}, ""},
 		{"pkg", moduleresolver.Options{Modules: []string{}}, ""},
+		{"pkg", moduleresolver.Options{Extensions: []string{}}, ""},
 		{"pkg", moduleresolver.Options{Modules: []string{"/node-runtime/vendor"}}, "/node-runtime/vendor/pkg/index.js"},
 		// Module directories may themselves contain a node_modules component.
 		{"pkg", moduleresolver.Options{Modules: []string{"node_modules/custom"}}, "/node-runtime/node_modules/custom/pkg/index.js"},
@@ -160,17 +167,27 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 		{"custom", moduleresolver.Options{}, ""},
 		{"custom", moduleresolver.Options{Extensions: []string{".custom"}}, "/node-runtime/node_modules/custom/index.custom"},
 		{"conditional", moduleresolver.Options{}, "/node-runtime/node_modules/conditional/import.js"},
+		{"conditional", moduleresolver.Options{Conditions: []string{}}, ""},
 		{"conditional", moduleresolver.Options{Conditions: []string{"types"}}, "/node-runtime/node_modules/conditional/index.d.ts"},
 	} {
 		if got := moduleresolver.ResolveModule(p, test.name, "/node-runtime/input.js", test.options); got != test.want {
 			t.Errorf("moduleresolver.ResolveModule(%s, %#v) = %q, want %q", test.name, test.options, got, test.want)
 		}
+		got := moduleresolver.PrepareOptions(test.options).Resolve(preparedProgram, test.name, "/node-runtime/input.js")
+		want := moduleresolver.Resolve(p, test.name, "/node-runtime/input.js", test.options)
+		if got != want {
+			t.Errorf("prepared resolution (%s, %#v) = %+v, want %+v", test.name, test.options, got, want)
+		}
 	}
+	prepared := moduleresolver.PrepareOptions(moduleresolver.Options{})
 	var group sync.WaitGroup
 	for range 8 {
 		group.Go(func() {
 			if got := moduleresolver.ResolveModule(p, "pkg", "/node-runtime/input.js", moduleresolver.Options{}); got != "/node-runtime/node_modules/pkg/index.js" {
 				t.Errorf("concurrent cached resolution = %q", got)
+			}
+			if got := prepared.Resolve(preparedProgram, "pkg", "/node-runtime/input.js"); got.Path != "/node-runtime/node_modules/pkg/index.js" {
+				t.Errorf("concurrent prepared resolution = %+v", got)
 			}
 		})
 	}
@@ -223,6 +240,59 @@ func TestResolveModuleGenerationAndOptions(t *testing.T) {
 			t.Errorf("symlinked directory export = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestPreparedResolverSnapshotsMutableOptions(t *testing.T) {
+	fileName := "/prepared/input.js"
+	p := programForResolution(t, map[string]string{
+		fileName:             "export {};",
+		"/prepared/first.js": "export {};", "/prepared/first.ts": "export {};",
+		"/prepared/second.js": "export {};", "/prepared/thing.ts": "export {};", "/prepared/thing.jsx": "export {};",
+		"/prepared/a/item.js": "export {};", "/prepared/b/item.js": "export {};",
+		"/prepared/vendor-a/pkg/index.js": "export {};", "/prepared/vendor-b/pkg/index.js": "export {};",
+		"/prepared/node_modules/conditional/package.json": `{"exports":{"first":"./first.js","second":"./second.js"}}`,
+		"/prepared/node_modules/conditional/first.js":     "export {};", "/prepared/node_modules/conditional/second.js": "export {};",
+		"/prepared/directory/first.js": "export {};", "/prepared/directory/second.js": "export {};",
+		"/prepared/entry/package.json": `{"entry":{"first":"./first.js","second":"./second.js"}}`,
+		"/prepared/entry/first.js":     "export {};", "/prepared/entry/second.js": "export {};",
+		"/prepared/package.json": `{"maps":{"first":{"mapped":"./first.js"},"second":{"mapped":"./second.js"}}}`,
+	}, fileName)
+	for _, test := range []struct {
+		name, request, want string
+		options             moduleresolver.Options
+		mutate              func(*moduleresolver.Options)
+	}{
+		{"extensions", "./first", "/prepared/first.js", moduleresolver.Options{Extensions: []string{".js"}}, func(o *moduleresolver.Options) { o.Extensions[0] = ".ts" }},
+		{"modules", "pkg", "/prepared/vendor-a/pkg/index.js", moduleresolver.Options{Modules: []string{"vendor-a"}}, func(o *moduleresolver.Options) { o.Modules[0] = "vendor-b" }},
+		{"paths", "./item", "/prepared/a/item.js", moduleresolver.Options{Paths: []string{"/prepared/a"}}, func(o *moduleresolver.Options) { o.Paths[0] = "/prepared/b" }},
+		{"conditions", "conditional", "/prepared/node_modules/conditional/first.js", moduleresolver.Options{Conditions: []string{"first"}}, func(o *moduleresolver.Options) { o.Conditions[0] = "second" }},
+		{"extension aliases", "./thing.js", "/prepared/thing.ts", moduleresolver.Options{ExtensionAliases: map[string][]string{".js": {".ts"}}}, func(o *moduleresolver.Options) {
+			o.ExtensionAliases[".js"][0] = ".jsx"
+			o.ExtensionAliases[".ts"] = []string{}
+		}},
+		{"aliases", "alias", "/prepared/first.js", moduleresolver.Options{Aliases: []moduleresolver.Alias{{Name: "alias", Targets: []string{"./first.js"}}}}, func(o *moduleresolver.Options) {
+			o.Aliases[0].Targets[0] = "./second.js"
+			o.Aliases[0].OnlyModule = true
+		}},
+		{"fallbacks", "virtual", "/prepared/first.js", moduleresolver.Options{Fallbacks: []moduleresolver.Alias{{Name: "virtual", Targets: []string{"./first.js"}}}}, func(o *moduleresolver.Options) {
+			o.Fallbacks[0].Targets[0] = "./second.js"
+			o.Fallbacks[0].Ignore = true
+		}},
+		{"main fields", "./entry", "/prepared/entry/first.js", moduleresolver.Options{MainFields: []moduleresolver.MainField{{Name: []string{"entry", "first"}, ForceRelative: true}}}, func(o *moduleresolver.Options) { o.MainFields[0].Name[1] = "second" }},
+		{"main files", "./directory", "/prepared/directory/first.js", moduleresolver.Options{MainFiles: []string{"first"}}, func(o *moduleresolver.Options) { o.MainFiles[0] = "second" }},
+		{"alias fields", "mapped", "/prepared/first.js", moduleresolver.Options{AliasFields: [][]string{{"maps", "first"}}}, func(o *moduleresolver.Options) { o.AliasFields[0][1] = "second" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			prepared := moduleresolver.PrepareOptions(test.options)
+			test.mutate(&test.options)
+			if got := prepared.Resolve(p, test.request, fileName); got.Path != test.want || got.Error != "" {
+				t.Fatalf("mutated snapshot resolved %+v, want %q", got, test.want)
+			}
+			if got := moduleresolver.Resolve(p, test.request, fileName, test.options); got.Path == test.want {
+				t.Fatalf("compatibility Resolve ignored caller mutation: %+v", got)
+			}
+		})
+	}
 }
 
 func TestPathAliasRequestContext(t *testing.T) {
