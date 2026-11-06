@@ -553,11 +553,11 @@ func BenchmarkBuildDirectoryPatternFilters(b *testing.B) {
 		}
 		b.Run(fmt.Sprintf("patterns=%d", count), func(b *testing.B) {
 			filters := buildDirectoryPatternFilters(patterns)
-			b.ReportMetric(float64(len(filters))*float64(reflect.TypeFor[string]().Size()), "retained-B")
 			b.ReportAllocs()
 			for b.Loop() {
 				buildDirectoryPatternFilters(patterns)
 			}
+			b.ReportMetric(float64(len(filters))*float64(reflect.TypeFor[string]().Size()), "retained-B")
 		})
 	}
 }
