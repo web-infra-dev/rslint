@@ -3,8 +3,9 @@
 ## Rule Details
 
 Disallow namespace (`*`) imports in favor of default or named imports. This also
-applies to TypeScript's `import type * as` declarations. Namespace re-exports and
-TypeScript `import name = require('module')` declarations are not reported.
+applies to TypeScript's `import type * as` declarations. Namespace re-exports,
+deferred imports such as `import defer * as`, and TypeScript
+`import name = require('module')` declarations are not reported.
 
 Examples of **incorrect** code:
 
@@ -55,8 +56,13 @@ import * as icon from './assets/icon.svg';
 
 ## Differences from upstream
 
-Diagnostics follow eslint-plugin-import 2.32.0. Some automatic fixes differ:
+Diagnostics follow eslint-plugin-import 2.32.0, except for deferred imports.
+Some automatic fixes also differ:
 
+- **Deferred imports are not reported.** A deferred import such as
+  `import defer * as helpers from './helpers'` only accepts a namespace binding,
+  so it has no default or named form. Removing `defer` would evaluate the module
+  eagerly.
 - **Dynamic keys are not autofixed.** Dynamic keys such as `helpers[key]`, and
   uses of the namespace as a key such as `object[helpers]`, are reported without
   a fix. Upstream can incorrectly replace them with an unrelated named import.

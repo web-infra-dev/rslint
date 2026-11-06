@@ -29,7 +29,11 @@ func TestNoNamespaceIgnore(t *testing.T) {
 			{Code: `import * as ns from './file.json';`, Options: options("*.js", "*.json")},
 			{Code: `import * as ns from '';`, Options: options("**", "")},
 			{Code: `import * as ns from '';`, Options: options(" ", "**")},
+			// Deferred imports only accept namespace bindings.
+			{Code: `import defer * as ns from 'm'; ns.foo;`},
+			{Code: `import defer * as ns from 'm';`},
 		}, []rule_tester.InvalidTestCase{
+			{Code: `import defer * as a from 'm'; import * as b from 'm';`, Errors: namespaceError(1, 38, 1, 44)},
 			{Code: `import * as ns from 'm';`, Options: map[string]any{}, Errors: namespaceError(1, 8, 1, 15)},
 			{Code: `import * as ns from 'm';`, Options: options(), Errors: namespaceError(1, 8, 1, 15)},
 			{Code: `import * as ns from './file.SVG';`, Options: options("*.svg"), Errors: namespaceError(1, 8, 1, 15)},
