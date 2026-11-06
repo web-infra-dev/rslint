@@ -897,6 +897,7 @@ func assertionHasFixedCallContext(ctx rule.RuleContext, node, call *ast.Node, ca
 		argumentCall, _, independent := assertionCallArgument(node)
 		original := assertionOriginalExpression(node)
 		if castIsAny || len(signatures) != 1 || argumentCall != call || !independent ||
+			ast.IsTemplateExpression(original) ||
 			!ast.IsExpressionStatement(assertionWalkUpParentheses(call).Parent) ||
 			utils.IsTypeFlagSetWithUnion(ctx.TypeChecker.GetTypeAtLocation(original), checker.TypeFlagsEnumLike) ||
 			(!assertionIsConceptuallyLiteral(original) && !ast.IsPropertyAssignment(assertionWalkUpParentheses(node).Parent)) {
@@ -933,8 +934,16 @@ func assertionHasFixedDeclarationContext(ctx rule.RuleContext, node, value, decl
 // inference of its caller, including through a block-bodied return statement.
 func assertionHasStableContext(ctx rule.RuleContext, node *ast.Node, castIsAny bool) bool {
 	original := assertionOriginalExpression(node)
-	if ast.IsTemplateExpression(original) ||
-		(!castIsAny && ast.IsArrayLiteralExpression(original)) ||
+	if ast.IsTemplateExpression(original) {
+		// A template keeps its type when the receiving context supplies the
+		// same type. The boundary checks below establish its independence.
+		contextual := assertionContextualType(ctx, node)
+		if contextual == nil ||
+			!checker.Checker_isTypeIdenticalTo(ctx.TypeChecker, contextual, ctx.TypeChecker.GetTypeAtLocation(node)) {
+			return false
+		}
+	}
+	if (!castIsAny && ast.IsArrayLiteralExpression(original)) ||
 		assertionIsInDestructuringDeclaration(node) || assertionIsPropertyInProblematicContext(ctx, node) {
 		return false
 	}

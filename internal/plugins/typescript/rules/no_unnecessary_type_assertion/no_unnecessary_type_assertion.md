@@ -55,6 +55,8 @@ With `checkLiteralConstAssertions` enabled, `--fix` can simplify `const count: 1
 
 If `make<T>(): T` is a generic function, `(make() satisfies string) as string` simplifies to `(make() satisfies string)`. The `satisfies string` clause already gives the call its `string` type.
 
+For template strings, the rule can remove an extra assertion when a variable annotation, property annotation, return type, or parameter already supplies the same type.
+
 `--fix` may leave a redundant assertion in place when its effect on a generic call or a generator's inferred type is uncertain. If `A` and `B` are both aliases for `Mode | null`, `--fix` can remove `as B` from a value of type `A`.
 
 ## Original Documentation

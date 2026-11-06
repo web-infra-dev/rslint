@@ -1049,6 +1049,10 @@ const reused = held;
 func TestNoUnnecessaryTypeAssertionContextualValueWidening(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule,
 		[]rule_tester.ValidTestCase{
+			{Code: "declare const n: number; type Path = `id:${number}`;\n" +
+				"declare function infer<T>(value: T): T; const inferred = infer(`id:${n}` as Path);\n" +
+				"declare function constrain<T extends Path>(value: T): T; const narrowed = constrain(`id:${1}` as Path);\n" +
+				"declare function select(value: 'id:1'): 1; declare function select(value: Path): 2; const selected = select(`id:${1}` as Path);"},
 			{Code: "declare function fmt(n: 1): number; type Path = `id:${number}`;\n" +
 				"const scalar = (() => `id:${fmt(1)}`)() as Path; const scalarProof: Path = scalar;\n" +
 				"declare function digit(): 1 | 2; type Finite = `id:${1 | 2}`;\n" +
@@ -1073,6 +1077,27 @@ declare const tag: unique symbol;
 const fixed: { tag: typeof tag } = ({ tag });
 `},
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+				},
+			},
+			{
+				Code: "declare const n: number; type Path = `id:${number}`;\n" +
+					"let value: Path = `id:${n}` as Path;\n" +
+					"function read(): Path { return `id:${n}` as Path; }\n" +
+					"const row: { path: Path } = { path: `id:${n}` as Path };\n" +
+					"declare function consume(value: Path): void; consume(`id:${n}` as Path);\n" +
+					"declare function infer<T>(value: T): T; const explicit = infer<Path>(`id:${n}` as Path);",
+				Output: []string{"declare const n: number; type Path = `id:${number}`;\n" +
+					"let value: Path = `id:${n}`;\n" +
+					"function read(): Path { return `id:${n}`; }\n" +
+					"const row: { path: Path } = { path: `id:${n}` };\n" +
+					"declare function consume(value: Path): void; consume(`id:${n}`);\n" +
+					"declare function infer<T>(value: T): T; const explicit = infer<Path>(`id:${n}`);"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
+					{MessageId: "contextuallyUnnecessary"},
 					{MessageId: "contextuallyUnnecessary"},
 				},
 			},
