@@ -2032,7 +2032,7 @@ const x = <number>(<any>v);
       ],
       output: `
 const v: number = 5;
-const x = v;
+const x = (v);
       `,
     },
     {

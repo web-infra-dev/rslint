@@ -1353,7 +1353,7 @@ const v: number = 5;
 const x = <number>(<any>v);
       `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: `unnecessaryAssertion`}}, Output: []string{`
 const v: number = 5;
-const x = v;
+const x = (v);
       `}},
 			{Code: `
 const obj = { id: '' };

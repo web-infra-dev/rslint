@@ -449,7 +449,7 @@ choose(mode, 'value');
 			},
 			{
 				Code:   "const v: number = 5;\nconst x = <number>(<any>v);",
-				Output: []string{"const v: number = 5;\nconst x = v;"},
+				Output: []string{"const v: number = 5;\nconst x = (v);"},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
 			},
 			{
@@ -1129,6 +1129,24 @@ func TestNoUnnecessaryTypeAssertionRetainedTypeBoundaries(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				Code:   `declare function make<T>(): T; typeof <number>(/* keep */ make() as number as unknown);`,
+				Output: []string{`declare function make<T>(): T; typeof (/* keep */ make() as number);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code:   `<number><unknown>async function named() {}.length;`,
+				Output: []string{`(async function named() {}.length);`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+			},
+			{
+				Code: `const x: number = 2, y: number = 3; const value = 10 * <number>(x + y as number as unknown);`,
+				Output: []string{
+					`const x: number = 2, y: number = 3; const value = 10 * (x + y as number);`,
+					`const x: number = 2, y: number = 3; const value = 10 * (x + y);`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+			},
+			{
 				Code:   `const x: number = 2, y: number = 3; const value = 10 * <number><unknown>(x + y);`,
 				Output: []string{`const x: number = 2, y: number = 3; const value = 10 * (x + y);`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
@@ -1175,6 +1193,53 @@ func TestNoUnnecessaryTypeAssertionRetainedTypeBoundaries(t *testing.T) {
 			},
 		},
 	)
+}
+
+func TestNoUnnecessaryTypeAssertionLineBreaks(t *testing.T) {
+	const declaration = "type Path = `id:${number}`; const n = 1; function read(): Path { return "
+	var invalid []rule_tester.InvalidTestCase
+	for _, separator := range []string{"\n", "\r\n", " // keep\n"} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   declaration + "<Path>" + separator + "`id:${n}`; }",
+			Output: []string{declaration + "(" + separator + "`id:${n}`); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		})
+	}
+	invalid = append(invalid,
+		rule_tester.InvalidTestCase{
+			Code:   declaration + "<Path> /* keep\n */ `id:${n}`; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare function value(): number; function read() { return <number>\nvalue() + 1; }",
+			Output: []string{"declare function value(): number; function read() { return (\nvalue()) + 1; }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code: "declare function value(): number; function read() { return <number><number>\nvalue(); }",
+			Output: []string{
+				"declare function value(): number; function read() { return <number>\nvalue(); }",
+				"declare function value(): number; function read() { return (\nvalue()); }",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare const value: number; function read() { return <unknown>\nvalue as number; }",
+			Output: []string{"declare const value: number; function read() { return (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "declare const err: Error; function fail() { throw <Error>\nerr; }",
+			Output: []string{"declare const err: Error; function fail() { throw (\nerr); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function* values(value: number) { yield <number>\nvalue; }",
+			Output: []string{"function* values(value: number) { yield (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+	)
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, nil, invalid)
 }
 
 func TestNoUnnecessaryTypeAssertionContextualTypeBoundaries(t *testing.T) {

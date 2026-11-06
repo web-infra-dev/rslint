@@ -1967,7 +1967,7 @@ const x = <number>(<any>v);
   "fileCount": 1,
   "output": "
 const v: number = 5;
-const x = v;
+const x = (v);
       ",
   "ruleCount": 1,
 }

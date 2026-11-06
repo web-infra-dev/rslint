@@ -57,6 +57,8 @@ If `make<T>(): T` is a generic function, `(make() satisfies string) as string` s
 
 For template strings, the rule can remove an extra assertion when a variable annotation, property annotation, return type, or parameter already supplies the same type.
 
+When a block comment containing a line break follows an angle-bracket assertion after `return`, `throw`, or `yield`, the rule can report the assertion without an automatic fix. Keeping it preserves the JavaScript emitted by TypeScript.
+
 `--fix` may leave a redundant assertion in place when its effect on a generic call or a generator's inferred type is uncertain. If `A` and `B` are both aliases for `Mode | null`, `--fix` can remove `as B` from a value of type `A`.
 
 ## Original Documentation

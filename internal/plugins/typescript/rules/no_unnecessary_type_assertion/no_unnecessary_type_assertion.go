@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -86,23 +87,6 @@ func assertionWalkUpParentheses(node *ast.Node) *ast.Node {
 		node = node.Parent
 	}
 	return node
-}
-
-func assertionIsStartOfArrowFunctionBody(sourceFile *ast.SourceFile, node *ast.Node) bool {
-	nodeStart := utils.TrimNodeTextRange(sourceFile, node).Pos()
-	for current := node; current != nil && current.Parent != nil; current = current.Parent {
-		parent := current.Parent
-		if ast.IsParenthesizedExpression(parent) {
-			return false
-		}
-		if ast.IsArrowFunction(parent) {
-			return parent.AsArrowFunction().Body == current
-		}
-		if !ast.IsExpression(parent) || utils.TrimNodeTextRange(sourceFile, parent).Pos() != nodeStart {
-			return false
-		}
-	}
-	return false
 }
 
 func assertionTypeArguments(typeChecker *checker.Checker, t *checker.Type) []*checker.Type {
@@ -1064,16 +1048,83 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			tokenScanner.Scan()
 			return tokenScanner.TokenRange()
 		}
-		needsParenthesesAfterRemoval := func(assertion, operand *ast.Node) bool {
-			first := getTokenRange(operand.Pos())
-			switch sourceText[first.Pos():first.End()] {
-			case "{":
-				return utils.IsStartOfExpressionStatement(ctx.SourceFile, assertion) ||
-					assertionIsStartOfArrowFunctionBody(ctx.SourceFile, assertion)
-			case "function", "class":
-				return utils.IsStartOfExpressionStatement(ctx.SourceFile, assertion)
+		parenthesesForRemoval := func(outer, assertion *ast.Node) (parenthesize, canFix bool) {
+			first := getTokenRange(assertion.Expression().Pos())
+			lineBreak := tokenScanner.HasPrecedingLineBreak()
+			// Other diagnostics may remove surrounding assertions in the same
+			// pass. Follow the expression's beginning until retained parentheses
+			// or an operator before it provides a syntax boundary.
+			context := outer
+			start := getTokenRange(context.Pos()).Pos()
+			for parent := context.Parent; parent != nil && ast.IsExpression(parent) && !ast.IsParenthesizedExpression(parent); parent = context.Parent {
+				parentStart := getTokenRange(parent.Pos()).Pos()
+				if !ast.IsAssertionExpression(parent) && parentStart != start {
+					break
+				}
+				context = parent
+				start = parentStart
 			}
-			return false
+			firstText := sourceText[first.Pos():first.End()]
+			switch context.Parent.Kind {
+			case ast.KindReturnStatement, ast.KindThrowStatement, ast.KindYieldExpression:
+				if assertion.Kind != ast.KindTypeAssertionExpression || !lineBreak {
+					return false, true
+				}
+				// TypeScript can emit a multiline block comment immediately after
+				// the keyword. Parenthesizing it would change that emitted behavior.
+				trivia := core.NewTextRange(assertion.Expression().Pos(), first.Pos())
+				for comment := range utils.GetCommentsInRange(ctx.SourceFile, trivia) {
+					if comment.Kind == ast.KindMultiLineCommentTrivia &&
+						strings.ContainsFunc(sourceText[comment.Pos():comment.End()], ecmascript.IsLineTerminator) {
+						return false, false
+					}
+				}
+				return true, true
+			case ast.KindExpressionStatement:
+				if firstText == "async" {
+					next := getTokenRange(first.End())
+					return sourceText[next.Pos():next.End()] == "function", true
+				}
+				return firstText == "{" || firstText == "function" || firstText == "class", true
+			case ast.KindArrowFunction:
+				return context.Parent.Body() == context && firstText == "{", true
+			}
+			return false, true
+		}
+		removeAssertion := func(assertion *ast.Node) rule.RuleFix {
+			expression := assertion.Expression()
+			if assertion.Kind == ast.KindAsExpression {
+				asKeywordRange := getTokenRange(expression.End())
+				start := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
+				return rule.RuleFixRemoveRange(asKeywordRange.WithPos(start).WithEnd(assertion.Type().End()))
+			}
+			return rule.RuleFixRemoveRange(getTokenRange(assertion.Pos()).WithEnd(expression.Pos()))
+		}
+		buildAssertionFixes := func(outer, bridge *ast.Node) []rule.RuleFix {
+			fixes := []rule.RuleFix{removeAssertion(outer)}
+			parenthesize, canFix := parenthesesForRemoval(outer, outer)
+			if !canFix {
+				return nil
+			}
+			if bridge != nil {
+				fixes = append(fixes, removeAssertion(bridge))
+				// Parentheses around the bridge survive the range edits and
+				// already protect its operand from the outer syntax context.
+				if outer.Expression() == bridge {
+					innerParentheses, canFix := parenthesesForRemoval(outer, bridge)
+					if !canFix {
+						return nil
+					}
+					parenthesize = parenthesize || innerParentheses
+				}
+			}
+			if parenthesize {
+				fixes = append(fixes,
+					rule.RuleFixInsertBefore(ctx.SourceFile, outer, "("),
+					rule.RuleFixInsertAfter(outer, ")"),
+				)
+			}
+			return fixes
 		}
 
 		compilerOptions := ctx.Program().Options()
@@ -1355,24 +1406,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 			reportAssertion := func(msg rule.RuleMessage) {
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
-					if node.Kind == ast.KindAsExpression {
-						asKeywordRange := getTokenRange(expression.End())
-						startPos := ecmascript.SkipTrailingWhitespace(sourceText, expression.End(), asKeywordRange.Pos())
-
-						fixRange := asKeywordRange.WithPos(startPos).WithEnd(typeNode.End())
-						return []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
-					}
-
-					openingAngleBracket := getTokenRange(node.Pos())
-					fixRange := openingAngleBracket.WithEnd(expression.Pos())
-					fixes := []rule.RuleFix{rule.RuleFixRemoveRange(fixRange)}
-					if needsParenthesesAfterRemoval(node, expression) {
-						fixes = append(fixes,
-							rule.RuleFixInsertBefore(ctx.SourceFile, node, "("),
-							rule.RuleFixInsertAfter(node, ")"),
-						)
-					}
-					return fixes
+					return buildAssertionFixes(node, nil)
 				})
 			}
 			reportDoubleAssertionIfUnnecessary := func(contextualType *checker.Type) {
@@ -1403,12 +1437,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				ctx.ReportRangeWithDeferredFixes(getTokenRange(node.Pos()).WithEnd(node.End()), msg, func() []rule.RuleFix {
-					retainedRange := utils.TrimNodeTextRange(ctx.SourceFile, retainedExpression)
-					replacement := sourceText[retainedRange.Pos():retainedRange.End()]
-					if needsParenthesesAfterRemoval(node, retainedExpression) {
-						replacement = "(" + replacement + ")"
-					}
-					return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)}
+					return buildAssertionFixes(node, innerExpression)
 				})
 			}
 
