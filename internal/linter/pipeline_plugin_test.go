@@ -1,12 +1,17 @@
 package linter
 
+// cspell:ignore synctest
+
 import (
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -16,6 +21,193 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
+
+func pluginTextTestPlan(count int) *LintPlan {
+	files := make([]lintFilePlan, count)
+	rules := &preparedRuleSet{plugins: []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}}
+	for i := range files {
+		files[i] = lintFilePlan{file: pluginSyntax(fmt.Sprintf("/src/%d.ts", i), "x;"), rules: rules}
+	}
+	return &LintPlan{programs: []programLintPlan{{files: files}}}
+}
+
+func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		gate := make(chan struct{})
+		release := sync.OnceFunc(func() { close(gate) })
+		defer release()
+		var active, calls atomic.Int32
+		texts := make(map[string]string)
+		target := TargetProjection{
+			Path: func(path string) string { return "target:" + path },
+			ReadText: func(path string, _ ast.SourceFileLike) (string, error) {
+				text, ok := texts[path]
+				if !ok {
+					return "", fmt.Errorf("unexpected plugin target %q", path)
+				}
+				calls.Add(1)
+				if n := active.Add(1); n > 8 {
+					t.Errorf("%d plugin source reads overlapped, limit is 8", n)
+				}
+				defer active.Add(-1)
+				<-gate
+				return text, nil
+			},
+		}
+		plugin := &PluginGeneration{WirePath: func(path string) string { return "wire:" + path }}
+		var paths []string
+		var loads []GenerationLoad
+		for _, count := range []int{9, 1} {
+			files := make(map[string]string, count)
+			targets := make([]string, count)
+			for i := range targets {
+				index := len(paths) + i
+				targets[i] = fmt.Sprintf("%d.ts", index)
+				files[targets[i]] = fmt.Sprintf("const x = %d;", index)
+			}
+			cp, pathsByName := createTestProgramWithFilesAndCompilerOptions(t, files, `{"noLib":true}`)
+			for i, name := range targets {
+				targets[i] = pathsByName[name]
+				texts[target.Path(targets[i])] = files[name]
+			}
+			paths = append(paths, targets...)
+			native := NativeGeneration{
+				Programs:         []*program.Program{program.NewFromCompiler(cp)},
+				TargetsByProgram: [][]string{targets},
+				Cwd:              cp.GetCurrentDirectory(),
+				RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+					return []rule.ConfiguredRule{{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true}}
+				},
+			}
+			loads = append(loads, GenerationLoad{TargetCount: count, CheckerCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+				return Generation{Native: native, Target: target, Plugin: plugin}, nil, nil
+			}})
+		}
+		dispatch := EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+			results := make([]EslintPluginFileResult, len(req.Files))
+			for i, file := range req.Files {
+				results[i] = EslintPluginFileResult{FilePath: file.Path, Diagnostics: []EslintPluginDiagnostic{{
+					RuleName: "plugin/check", Message: file.Path,
+				}}}
+			}
+			return &EslintPluginLintResult{Results: results}, nil
+		})
+		var result PipelineResult
+		var err error
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			result, err = RunPipeline(t.Context(), NewLintRequest(pipelinePlanProvider{GenerationPlan{Loads: loads}}, ObservationPolicy{}, dispatch))
+		}()
+		synctest.Wait()
+		if active.Load() == 1 {
+			// The single-file binding may be admitted first on its own.
+			gate <- struct{}{}
+			synctest.Wait()
+		}
+		if got := active.Load(); got < 2 {
+			t.Errorf("expected overlapping plugin reads, got %d", got)
+		}
+		release()
+		<-done
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := int(calls.Load()); got != len(paths) {
+			t.Fatalf("read %d plugin inputs, want %d", got, len(paths))
+		}
+		diagnostics, complete := result.Observation.CompleteDiagnostics()
+		if !complete || len(diagnostics) != len(paths) {
+			t.Fatalf("received %d plugin diagnostics, complete=%v", len(diagnostics), complete)
+		}
+		for i, diagnostic := range diagnostics {
+			if diagnostic.FilePath != "target:"+paths[i] || diagnostic.Message.Description != "wire:"+paths[i] {
+				t.Errorf("input %d produced %q at %q, want wire and target for %q", i, diagnostic.Message.Description, diagnostic.FilePath, paths[i])
+			}
+		}
+	})
+}
+
+func TestPluginSourceReadsPreserveFirstInputError(t *testing.T) {
+	for _, tc := range []struct {
+		files          int
+		singleThreaded bool
+		inline         bool
+	}{
+		{files: 4},
+		{files: 4, singleThreaded: true, inline: true},
+		{files: 2, inline: true},
+	} {
+		var reads atomic.Int32
+		generation := Generation{
+			Native: NativeGeneration{SingleThreaded: tc.singleThreaded},
+			Target: TargetProjection{ReadText: func(path string, source ast.SourceFileLike) (string, error) {
+				reads.Add(1)
+				if path == "/src/1.ts" {
+					return "", errors.New("later read failed")
+				}
+				return source.Text(), nil
+			}},
+			Plugin: &PluginGeneration{ConfigForFile: func(string) EslintPluginFileConfig {
+				return EslintPluginFileConfig{Settings: map[string]any{"invalid": make(chan int)}}
+			}},
+		}
+		_, err := materializePluginTask(t.Context(), pluginTextTestPlan(tc.files), generation, SourceSnapshot{}, ObservationPolicy{}, true, false, make(pluginSourceReadSlots, 8))
+		if err == nil || !strings.Contains(err.Error(), `freeze plugin input "/src/0.ts": clone settings`) {
+			t.Fatalf("%d files, single-threaded %v: first input error = %v", tc.files, tc.singleThreaded, err)
+		}
+		if tc.inline && reads.Load() != 1 {
+			t.Fatal("inline preparation read past its first error")
+		}
+	}
+}
+
+func TestPluginSourceReadsStopAfterFirstFailure(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		const limit = 8
+		fail := make(chan struct{})
+		finish := make(chan struct{})
+		readErr := errors.New("source unavailable")
+		var calls atomic.Int32
+		generation := Generation{
+			Target: TargetProjection{ReadText: func(path string, source ast.SourceFileLike) (string, error) {
+				calls.Add(1)
+				if path == "/src/0.ts" {
+					<-fail
+					return "", readErr
+				}
+				<-finish
+				return source.Text(), nil
+			}},
+			Plugin: &PluginGeneration{},
+		}
+		done := make(chan struct{})
+		var err error
+		go func() {
+			defer close(done)
+			_, err = materializePluginTask(t.Context(), pluginTextTestPlan(80), generation, SourceSnapshot{}, ObservationPolicy{}, false, false, make(pluginSourceReadSlots, limit))
+		}()
+		synctest.Wait()
+		if got := calls.Load(); got != limit {
+			t.Errorf("started %d reads before failure, want %d", got, limit)
+		}
+		close(fail)
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Error("returned before the other admitted readers finished")
+		default:
+		}
+		close(finish)
+		<-done
+		if !errors.Is(err, readErr) {
+			t.Errorf("materialization error = %v, want %v", err, readErr)
+		}
+		if got := calls.Load(); got != limit {
+			t.Errorf("read %d inputs after admitting %d before failure", got, limit)
+		}
+	})
+}
 
 func TestPipelineConcurrentPluginStartsBeforeNativeAndPlansProjectedFix(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
@@ -267,7 +459,6 @@ func TestPipelineFreezesCompletePluginInputAfterMemoryChanges(t *testing.T) {
 			Native: NativeGeneration{
 				Programs:         programs,
 				TargetsByProgram: [][]string{{paths[0]}, {paths[1]}},
-				SingleThreaded:   true,
 				Cwd:              root,
 				RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
 					rules := []rule.ConfiguredRule{{Name: "plugin/check", IsEslintPluginRule: true}}

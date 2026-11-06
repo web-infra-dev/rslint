@@ -115,6 +115,7 @@ func materializePluginTask(
 	policy ObservationPolicy,
 	detached bool,
 	planChanges bool,
+	sourceReads pluginSourceReadSlots,
 ) (pluginTask, error) {
 	if generation.Plugin == nil {
 		return pluginTask{failure: policy.PluginFailure}, nil
@@ -127,10 +128,9 @@ func materializePluginTask(
 	if needsFixSources {
 		fixCandidates = make([]fixSourceCandidate, 0, len(inputs))
 	}
-	targetPaths := make([]string, len(inputs))
-	// Validate the complete path projection before reading or freezing any
-	// source. A malformed later input must not leave observable read side
-	// effects from an earlier one or mask the structural contract error.
+	missing := make([]int, 0, len(inputs))
+	// Validate every path before calling the generation reader. Snapshot hits
+	// already contain complete text and never enter the read queue.
 	for index := range inputs {
 		input := &inputs[index]
 		sourcePath := input.Path
@@ -146,7 +146,11 @@ func materializePluginTask(
 			return pluginTask{}, fmt.Errorf("linter pipeline: duplicate plugin wire path %q", wirePath)
 		}
 		targetPathByWire[wirePath] = targetPath
-		targetPaths[index] = targetPath
+		if text, ok := snapshot.Text(targetPath); ok {
+			input.Text = new(text)
+		} else {
+			missing = append(missing, index)
+		}
 		if needsFixSources {
 			fixCandidates = append(fixCandidates, fixSourceCandidate{
 				path:   targetPath,
@@ -155,42 +159,41 @@ func materializePluginTask(
 		}
 		input.Path = wirePath
 	}
-	var builder estree.Builder
-	for index := range inputs {
-		input := &inputs[index]
-		text, err := readTargetText(generation.Target.ReadText, snapshot, targetPaths[index], input.SourceFile)
+	readText := generation.Target.ReadText
+	read := func(i int) error {
+		input := &inputs[i]
+		text, err := readGenerationText(readText, targetPathByWire[input.Path], input.SourceFile)
 		if err != nil {
-			return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
+			return fmt.Errorf("linter pipeline: freeze plugin source %q: %w", input.Path, err)
 		}
 		input.Text = &text
-		if detached {
-			frame, projectErr := projectPluginFrame(ctx, &builder, *input, nil)
-			if projectErr != nil {
-				if ctx.Err() != nil {
-					return pluginTask{}, ctx.Err()
-				}
-				input.FrameError = projectErr.Error()
-			} else {
-				input.Frame = frame
-			}
-			frozen, err := detachPluginInput(*input)
-			if err != nil {
-				return pluginTask{}, fmt.Errorf("linter pipeline: freeze plugin input %q: %w", input.Path, err)
-			}
-			inputs[index] = frozen
-		} else {
-			// Joined wire tasks also need only rule identity, options and
-			// severity. Never retain native Run closures or rule environments.
-			rules := make([]rule.ConfiguredRule, len(input.Rules))
-			for ruleIndex, configured := range input.Rules {
-				rules[ruleIndex] = rule.ConfiguredRule{
-					Name:               configured.Name,
-					Severity:           configured.Severity,
-					IsEslintPluginRule: true,
-					Options:            configured.Options,
+		return nil
+	}
+	var builder estree.Builder
+	workers := min(cap(sourceReads), len(missing))
+	// Keep tiny batches inline: scheduling workers can dominate a small
+	// in-memory request. Inline reads still share the observation's slots.
+	if generation.Native.SingleThreaded || workers <= 2 {
+		for i := range inputs {
+			input := &inputs[i]
+			if input.Text == nil {
+				if err := sourceReads.withSlot(ctx, func() error { return read(i) }); err != nil {
+					return pluginTask{}, err
 				}
 			}
-			input.Rules = rules
+			if err := finishPluginInput(ctx, &builder, input, detached); err != nil {
+				return pluginTask{}, err
+			}
+		}
+	} else {
+		ready, readErr := sourceReads.prefetch(ctx, missing, len(inputs), workers, read)
+		for i := range ready {
+			if err := finishPluginInput(ctx, &builder, &inputs[i], detached); err != nil {
+				return pluginTask{}, err
+			}
+		}
+		if readErr != nil {
+			return pluginTask{}, readErr
 		}
 	}
 	suggestionsMode := SuggestionsModeOff
@@ -212,6 +215,110 @@ func materializePluginTask(
 		timing:           timing,
 		failure:          policy.PluginFailure,
 	}, nil
+}
+
+// finishPluginInput projects a detached frame while its generation is leased,
+// or retains just the rule data required by a joined plugin task.
+func finishPluginInput(ctx context.Context, builder *estree.Builder, input *EslintPluginFileInput, detached bool) error {
+	if detached {
+		frame, projectErr := projectPluginFrame(ctx, builder, *input, nil)
+		if projectErr != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			input.FrameError = projectErr.Error()
+		} else {
+			input.Frame = frame
+		}
+		frozen, err := detachPluginInput(*input)
+		if err != nil {
+			return fmt.Errorf("linter pipeline: freeze plugin input %q: %w", input.Path, err)
+		}
+		*input = frozen
+		return nil
+	}
+	// Joined wire tasks also need only rule identity, options and
+	// severity. Never retain native Run closures or rule environments.
+	rules := make([]rule.ConfiguredRule, len(input.Rules))
+	for ruleIndex, configured := range input.Rules {
+		rules[ruleIndex] = rule.ConfiguredRule{
+			Name:               configured.Name,
+			Severity:           configured.Severity,
+			IsEslintPluginRule: true,
+			Options:            configured.Options,
+		}
+	}
+	input.Rules = rules
+	return nil
+}
+
+// All bindings in an observation share these slots. Only source reads hold
+// a slot; frame projection and JavaScript dispatch have their own lifetimes.
+type pluginSourceReadSlots chan struct{}
+
+func (slots pluginSourceReadSlots) withSlot(ctx context.Context, run func() error) error {
+	select {
+	case slots <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-slots }()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return run()
+}
+
+// Claim missing inputs in order, after acquiring a slot. When a reader fails,
+// every earlier input is already claimed. Join those reads so the earliest
+// error wins, and leave later unclaimed inputs alone.
+func (slots pluginSourceReadSlots) prefetch(ctx context.Context, missing []int, count, workers int, read func(int) error) (int, error) {
+	// Stop waiting for slots as soon as the last input is claimed or a read
+	// fails. Reads already in flight still finish under the generation lease.
+	admission, stop := context.WithCancel(ctx)
+	defer stop()
+	var mu sync.Mutex
+	ready := count
+	var firstErr error
+	readNext := func() error {
+		mu.Lock()
+		if len(missing) == 0 {
+			mu.Unlock()
+			return nil
+		}
+		index := missing[0]
+		missing = missing[1:]
+		if len(missing) == 0 {
+			stop()
+		}
+		mu.Unlock()
+		if err := read(index); err != nil {
+			mu.Lock()
+			missing = nil
+			if index < ready {
+				ready, firstErr = index, err
+			}
+			mu.Unlock()
+			return err
+		}
+		return nil
+	}
+	work := newLintWorkGroup(false)
+	for range workers {
+		work.Queue(func() {
+			defer stop()
+			for {
+				if err := slots.withSlot(admission, readNext); err != nil {
+					return
+				}
+			}
+		})
+	}
+	work.RunAndWait()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	return ready, firstErr
 }
 
 func detachPluginInput(input EslintPluginFileInput) (EslintPluginFileInput, error) {

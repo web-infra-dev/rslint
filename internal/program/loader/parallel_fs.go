@@ -33,11 +33,11 @@ func newParallelProgramFS(fs vfs.FS) *parallelProgramFS {
 	return &parallelProgramFS{FS: fs}
 }
 
-// SourceHasBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
+// ReadSourceBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
 // that interface's methods, so this layer has to pass [BOMSource] through by
 // hand or every overlay identity below it becomes invisible.
-func (f *parallelProgramFS) SourceHasBOM(path string) bool {
-	return utils.SourceHasBOM(f.FS, path)
+func (f *parallelProgramFS) ReadSourceBOM(path string) (bool, error) {
+	return utils.ReadSourceBOM(f.FS, path)
 }
 
 func (f *parallelProgramFS) Realpath(path string) string {

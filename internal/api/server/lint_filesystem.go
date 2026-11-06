@@ -19,11 +19,11 @@ func (fs *canonicalPathVFS) Realpath(filePath string) string {
 	return fs.FS.Realpath(filePath)
 }
 
-// SourceHasBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
+// ReadSourceBOM forwards to the wrapped VFS. Embedding vfs.FS promotes only
 // that interface's methods, so this layer has to pass [utils.BOMSource]
 // through by hand or every overlay identity below it becomes invisible.
-func (fs *canonicalPathVFS) SourceHasBOM(filePath string) bool {
-	return utils.SourceHasBOM(fs.FS, filePath)
+func (fs *canonicalPathVFS) ReadSourceBOM(filePath string) (bool, error) {
+	return utils.ReadSourceBOM(fs.FS, filePath)
 }
 
 func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS, canonicalPaths map[string]string) {

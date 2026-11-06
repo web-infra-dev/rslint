@@ -88,5 +88,6 @@ func readPhysicalFileText(path string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	return utils.RestoreSourceBOM(fsys, path, text), true
+	text, err := utils.RestoreSourceBOM(fsys, path, text)
+	return text, err == nil
 }

@@ -30,11 +30,16 @@ func executeObservation(
 	results := make([]observationExecution, len(loads))
 	errs := make([]error, len(loads))
 	resources := newPluginDispatchResources()
+	sourceReadLimit := 8
+	if plan.SingleThreaded {
+		sourceReadLimit = 1
+	}
+	sourceReads := make(pluginSourceReadSlots, sourceReadLimit)
 	prepare := func(i int, reservation *programReservation) (preparedObservation, error) {
 		load := loads[i]
 		loads[i] = GenerationLoad{}
 		prepared, err := prepareObservation(ctx, load.Acquire, snapshot, policy, dispatcher,
-			planChanges, stopOnTargetSyntaxErrors, reservation)
+			planChanges, stopOnTargetSyntaxErrors, reservation, sourceReads)
 		if err == nil {
 			prepared.plugin.resources = resources
 			if len(prepared.plugin.inputs) != 0 {

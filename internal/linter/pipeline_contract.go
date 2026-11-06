@@ -148,8 +148,8 @@ type NativeGeneration struct {
 // representation in this generation, including a byte order mark when its
 // source medium carries one. The pipeline uses that one view for validation,
 // fix text snapshots, and inline plugin input. Path must be deterministic and
-// side-effect free; ReadText may be called more than once and must always
-// return the same generation text.
+// side-effect free. ReadText must return the same generation text on every
+// call and support concurrent reads when the generation enables parallelism.
 type TargetProjection struct {
 	Path     func(sourcePath string) string
 	ReadText func(targetPath string, source ast.SourceFileLike) (string, error)

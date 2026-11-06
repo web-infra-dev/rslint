@@ -597,14 +597,12 @@ func TestBuildContextPreservesBOMSourceThroughVFSWrappers(t *testing.T) {
 	metadata := newProgramMetadataFS(overlay)
 	parallel := newParallelProgramFS(metadata)
 
-	for name, fsys := range map[string]interface {
-		SourceHasBOM(path string) bool
-	}{
+	for name, fsys := range map[string]utils.BOMSource{
 		"programMetadataFS": metadata,
 		"parallelProgramFS": parallel,
 	} {
-		if fsys.SourceHasBOM(fileName) {
-			t.Errorf("%s does not forward to the overlay beneath it", name)
+		if has, err := fsys.ReadSourceBOM(fileName); has || err != nil {
+			t.Errorf("%s returned (%t, %v) for unmarked overlay content", name, has, err)
 		}
 	}
 }

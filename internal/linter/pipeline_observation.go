@@ -37,6 +37,7 @@ func prepareObservation(
 	planChanges bool,
 	stopOnTargetSyntaxErrors bool,
 	reservation *programReservation,
+	sourceReads pluginSourceReadSlots,
 ) (preparedObservation, error) {
 	if err := ctx.Err(); err != nil {
 		return preparedObservation{}, err
@@ -82,7 +83,7 @@ func prepareObservation(
 	targetSyntaxBlocked := stopOnTargetSyntaxErrors && plan != nil && plan.HasSyntacticDiagnostics()
 	pluginWork := pluginTask{failure: policy.PluginFailure}
 	if !targetSyntaxBlocked {
-		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges)
+		pluginWork, err = materializePluginTask(ctx, plan, generation, snapshot, policy, detachedPlugin, planChanges, sourceReads)
 		if err != nil {
 			return preparedObservation{}, err
 		}

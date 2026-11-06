@@ -466,7 +466,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			Target: linter.TargetProjection{
 				Path: targetPath,
 				ReadText: func(path string, source ast.SourceFileLike) (string, error) {
-					return utils.RestoreSourceBOM(generationFS, path, source.Text()), nil
+					return utils.RestoreSourceBOM(generationFS, path, source.Text())
 				},
 			},
 			Plugin: plugin,
