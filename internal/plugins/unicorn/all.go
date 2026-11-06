@@ -95,6 +95,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_ternary"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_then_catch"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_type_error"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_unary_minus"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_unicode_code_point_escapes"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
@@ -199,6 +200,7 @@ func GetAllRules() []rule.Rule {
 		prefer_then_catch.PreferThenCatchRule,
 		prefer_ternary.PreferTernaryRule,
 		prefer_type_error.PreferTypeErrorRule,
+		prefer_unary_minus.PreferUnaryMinusRule,
 		prefer_unicode_code_point_escapes.PreferUnicodeCodePointEscapesRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,

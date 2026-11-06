@@ -1417,12 +1417,10 @@ func EslintLikePrecedence(node *ast.Node) int {
 	}
 
 	// ESTree represents the complete optional chain with a ChainExpression.
-	// tsgo marks ordinary chain links with NodeFlagsOptionalChain; for
-	// `value?.property!`, the trailing NonNullExpression instead directly wraps
-	// the flagged link and belongs to that same ESTree ChainExpression.
-	if ast.IsOptionalChain(node) ||
-		ast.IsNonNullExpression(node) &&
-			ast.IsOptionalChain(node.AsNonNullExpression().Expression) {
+	// tsgo marks chain links with NodeFlagsOptionalChain. Trailing non-null
+	// assertions belong to that chain too, including repeated assertions.
+	// Parentheses terminate a chain, so only skip non-null wrappers here.
+	if ast.IsOptionalChain(ast.SkipOuterExpressions(node, ast.OEKNonNullAssertions)) {
 		return 18
 	}
 
