@@ -97,6 +97,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_type_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_unary_minus"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_unicode_code_point_escapes"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_while_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_post_message_target_origin"
@@ -202,6 +203,7 @@ func GetAllRules() []rule.Rule {
 		prefer_type_error.PreferTypeErrorRule,
 		prefer_unary_minus.PreferUnaryMinusRule,
 		prefer_unicode_code_point_escapes.PreferUnicodeCodePointEscapesRule,
+		prefer_while_loop_condition.PreferWhileLoopConditionRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
 		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
 		require_post_message_target_origin.RequirePostMessageTargetOriginRule,
