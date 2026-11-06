@@ -88,9 +88,16 @@ func resolverConfigPreset(settings map[string]any) string {
 		}
 	case map[string]any:
 		if len(value) == 1 {
-			for _, name := range [...]string{"typescript", "eslint-import-resolver-typescript"} {
-				if _, ok := value[name]; ok {
-					return name
+			for _, preset := range [...]struct{ name, configured string }{
+				{"typescript", "typescript configured"},
+				{"eslint-import-resolver-typescript", "eslint-import-resolver-typescript configured"},
+			} {
+				if rawConfig, ok := value[preset.name]; ok {
+					// Keep defaultConfig in the identity without traversing options.
+					if config, _ := rawConfig.(map[string]any); len(config) != 0 {
+						return preset.configured
+					}
+					return preset.name
 				}
 			}
 		}
@@ -98,9 +105,10 @@ func resolverConfigPreset(settings map[string]any) string {
 	return ""
 }
 
-// resolverConfigIdentity retains resolver order and the options actually read
-// by the native adapter. In particular, TypeScript project lists and unknown
-// resolver options do not affect native resolution and need not be traversed.
+// resolverConfigIdentity retains resolver order, whether each resolver has any
+// options, and the Node options actually read by the native adapter. The values
+// of TypeScript project lists and unknown resolver options do not affect native
+// resolution and need not be traversed.
 func resolverConfigIdentity(raw any) any {
 	switch value := raw.(type) {
 	case []any:
@@ -118,17 +126,22 @@ func resolverConfigIdentity(raw any) any {
 		}
 		entries := make(map[string]any, len(value))
 		for name, rawConfig := range value {
-			entries[name] = nil
-			if name == "node" || name == "eslint-import-resolver-node" {
-				config, _ := rawConfig.(map[string]any)
-				relevant := make(map[string]any)
-				for _, option := range [...]string{"extensions", "preserveSymlinks", "moduleDirectory", "paths"} {
-					if setting, ok := config[option]; ok {
-						relevant[option] = setting
-					}
-				}
-				entries[name] = relevant
+			config, _ := rawConfig.(map[string]any)
+			// Whether any option is present controls suggestion eligibility
+			// (importResolver.defaultConfig), even when the options themselves
+			// do not affect lookup.
+			defaultConfig := len(config) == 0
+			if name != "node" && name != "eslint-import-resolver-node" {
+				entries[name] = defaultConfig
+				continue
 			}
+			relevant := make(map[string]any)
+			for _, option := range [...]string{"extensions", "preserveSymlinks", "moduleDirectory", "paths"} {
+				if setting, ok := config[option]; ok {
+					relevant[option] = setting
+				}
+			}
+			entries[name] = []any{defaultConfig, relevant}
 		}
 		return entries
 	default:

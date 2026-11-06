@@ -186,6 +186,56 @@ func TestImportResolverPreparedConfiguration(t *testing.T) {
 		}
 		check(t, second, "./target", "/import-prepare/other/target.js", true, "")
 	})
+	t.Run("option presence belongs to configuration identity", func(t *testing.T) {
+		// defaultConfig decides suggestion eligibility in import/no-relative-packages,
+		// so options that do not affect lookup must still separate configurations.
+		for _, tc := range []struct {
+			name              string
+			empty, configured map[string]any
+		}{
+			{"node", map[string]any{"import/resolver": map[string]any{"node": map[string]any{}}}, map[string]any{"import/resolver": map[string]any{"node": map[string]any{"basedir": "/repo"}}}},
+			{"node alias", map[string]any{"import/resolver": map[string]any{"eslint-import-resolver-node": nil}}, map[string]any{"import/resolver": map[string]any{"eslint-import-resolver-node": map[string]any{"basedir": "/repo"}}}},
+			{"node in list", map[string]any{"import/resolver": []any{map[string]any{"node": map[string]any{}}}}, map[string]any{"import/resolver": []any{map[string]any{"node": map[string]any{"basedir": "/repo"}}}}},
+			{"legacy", map[string]any{"import/resolve": map[string]any{}}, map[string]any{"import/resolve": map[string]any{"basedir": "/repo"}}},
+			{"typescript", map[string]any{"import/resolver": map[string]any{"typescript": map[string]any{}}}, map[string]any{"import/resolver": map[string]any{"typescript": map[string]any{"project": "tsconfig.json"}}}},
+			{"unavailable", map[string]any{"import/resolver": map[string]any{"unavailable": map[string]any{}}}, map[string]any{"import/resolver": map[string]any{"unavailable": map[string]any{"project": "tsconfig.json"}}}},
+		} {
+			for _, emptyFirst := range []bool{true, false} {
+				order := "configured first"
+				if emptyFirst {
+					order = "empty first"
+				}
+				t.Run(tc.name+"/"+order, func(t *testing.T) {
+					p, err := program.NewFromRoots(program.RootOptions{
+						Host: rslintUtils.CreateCompilerHost("/import-prepare", fs), CompilerOptions: &core.CompilerOptions{},
+						RootFileNames: []string{"/import-prepare/input.ts", "/import-prepare/other/input.ts"}, SingleThreaded: true,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					resolve := func(file string, settings map[string]any) *ImportResolver {
+						environment := &rule.RuleEnvironment{Settings: settings}
+						configured := (rule.RuleContext{SourceFile: p.GetSourceFile(file), Settings: settings}).WithProgram(p)
+						return NewImportResolver(configured.WithFileCache(rule.NewFileCacheWithEnvironment("/import-prepare", environment)))
+					}
+					var empty, configured *ImportResolver
+					if emptyFirst {
+						empty = resolve("/import-prepare/input.ts", tc.empty)
+						configured = resolve("/import-prepare/other/input.ts", tc.configured)
+					} else {
+						configured = resolve("/import-prepare/other/input.ts", tc.configured)
+						empty = resolve("/import-prepare/input.ts", tc.empty)
+					}
+					if len(empty.resolvers) != 1 || !empty.resolvers[0].defaultConfig {
+						t.Fatalf("empty options lost defaultConfig: %+v", empty.resolvers)
+					}
+					if len(configured.resolvers) != 1 || configured.resolvers[0].defaultConfig {
+						t.Fatalf("configured options reported defaultConfig: %+v", configured.resolvers)
+					}
+				})
+			}
+		}
+	})
 	t.Run("snapshot settings and separate changed configuration", func(t *testing.T) {
 		extensions, core := []string{".custom"}, []string{"virtual"}
 		configured := ctx

@@ -200,8 +200,10 @@ fields and directory entry names. Prepared options own an immutable copy and
 encode the same cache identity once, retaining nil versus empty search lists.
 Import rules share context-free resolver configuration by immutable rule
 environment and process working directory, preparing its content key only once
-per Program generation. Content keys retain only options used by the native
-resolver; manually assembled contexts still compare their current settings.
+per Program generation. Content keys retain the options used by the native
+resolver and whether each resolver has any options, which also controls
+suggestion eligibility; manually assembled contexts still compare their current
+settings.
 Runtime options are shared by compiler resolution mode. Source
 attributes and file context stay on each request. Fallback aliases run only after
 ordinary resolution fails; `fullySpecified` limits file/directory guessing for the request
