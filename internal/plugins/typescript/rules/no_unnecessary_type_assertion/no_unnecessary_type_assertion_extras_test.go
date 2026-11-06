@@ -1211,7 +1211,32 @@ func TestNoUnnecessaryTypeAssertionLineBreaks(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
 		})
 	}
+	for _, expression := range []string{
+		"<number>(<unknown>\n /* keep */ value)",
+		"(<number>\n /* keep */ value)",
+		"(<unknown>\n /* keep */ value) as number",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return " + expression + "; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		})
+	}
 	invalid = append(invalid,
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return <number>(<number>\n /* keep */ value); }",
+			Output: []string{"function read(value: number) { return (<number>\n /* keep */ value); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}, {MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return <number>(<unknown> /* keep */\nvalue); }",
+			Output: []string{"function read(value: number) { return ( /* keep */\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function read(value: number) { return (<number>\nvalue); }",
+			Output: []string{"function read(value: number) { return (\nvalue); }"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
 		rule_tester.InvalidTestCase{
 			Code:   "function read(value: number) { return <number><unknown>\n /* keep */ value; }",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},

@@ -1052,13 +1052,16 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			first := getTokenRange(assertion.Expression().Pos())
 			lineBreak := tokenScanner.HasPrecedingLineBreak()
 			// Other diagnostics may remove surrounding assertions in the same
-			// pass. Follow the expression's beginning until retained parentheses
-			// or an operator before it provides a syntax boundary.
+			// pass. Parentheses protect the source syntax, but TypeScript can
+			// elide them while erasing assertions, exposing their comments.
 			context := outer
+			hasParentheses := false
 			start := getTokenRange(context.Pos()).Pos()
-			for parent := context.Parent; parent != nil && ast.IsExpression(parent) && !ast.IsParenthesizedExpression(parent); parent = context.Parent {
+			for parent := context.Parent; parent != nil && ast.IsExpression(parent); parent = context.Parent {
 				parentStart := getTokenRange(parent.Pos()).Pos()
-				if !ast.IsAssertionExpression(parent) && parentStart != start {
+				if ast.IsParenthesizedExpression(parent) {
+					hasParentheses = true
+				} else if !ast.IsAssertionExpression(parent) && parentStart != start {
 					break
 				}
 				context = parent
@@ -1082,15 +1085,18 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				if strings.ContainsFunc(sourceText[trivia.Pos():lastBlockCommentEnd], ecmascript.IsLineTerminator) {
 					return false, false
 				}
-				return true, true
+				return !hasParentheses, true
 			case ast.KindExpressionStatement:
+				if hasParentheses {
+					return false, true
+				}
 				if firstText == "async" {
 					next := getTokenRange(first.End())
 					return sourceText[next.Pos():next.End()] == "function", true
 				}
 				return firstText == "{" || firstText == "function" || firstText == "class", true
 			case ast.KindArrowFunction:
-				return context.Parent.Body() == context && firstText == "{", true
+				return !hasParentheses && context.Parent.Body() == context && firstText == "{", true
 			}
 			return false, true
 		}
@@ -1111,13 +1117,13 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			}
 			if bridge != nil {
 				fixes = append(fixes, removeAssertion(bridge))
+				innerParentheses, canFix := parenthesesForRemoval(outer, bridge)
+				if !canFix {
+					return nil
+				}
 				// Parentheses around the bridge survive the range edits and
-				// already protect its operand from the outer syntax context.
+				// protect the fixed source syntax, but not the original emission.
 				if outer.Expression() == bridge {
-					innerParentheses, canFix := parenthesesForRemoval(outer, bridge)
-					if !canFix {
-						return nil
-					}
 					parenthesize = parenthesize || innerParentheses
 				}
 			}
