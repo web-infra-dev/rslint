@@ -407,15 +407,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
-	var initialProjectPlan *loader.ProjectLoadPlan
-	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
+	// Carry prepared fallback metadata from planning to initial acquisition only.
+	var pendingInitialFallback *loader.ProjectLoadPlan
+	createPrograms := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
 		defer session.ReleaseBuildCache()
 		var rebuilt loader.ProjectSet
 		var err error
-		if session == programSession && initialProjectPlan != nil {
-			plan := initialProjectPlan
-			initialProjectPlan = nil
-			rebuilt, err = plan.BuildProjects()
+		if prepared != nil {
+			rebuilt, err = prepared.BuildProjects()
 		} else {
 			rebuilt, err = session.BuildProjects(projectRequest)
 		}
@@ -484,7 +483,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	provider := &cliGenerationProvider{
 		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
-			binding, err := createPrograms(programSession)
+			prepared := pendingInitialFallback
+			pendingInitialFallback = nil
+			binding, err := createPrograms(programSession, prepared)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
 			}
@@ -514,7 +515,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				}
 			}
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
-			binding, err := createPrograms(roundSession)
+			binding, err := createPrograms(roundSession, nil)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
 			}
@@ -535,7 +536,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				return nil, err
 			}
 			if len(plan.Loads) == 0 {
-				initialProjectPlan = &plan
+				pendingInitialFallback = &plan
 				return nil, nil
 			}
 			if err := activate(); err != nil {

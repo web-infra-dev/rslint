@@ -489,14 +489,13 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
-	var initialProjectPlan *loader.ProjectLoadPlan
-	buildBinding := func(session *loader.Session) (loader.LoadResult, error) {
+	// Carry prepared fallback metadata from planning to initial acquisition only.
+	var pendingInitialFallback *loader.ProjectLoadPlan
+	buildBinding := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
 		var projects loader.ProjectSet
 		var buildErr error
-		if session == programSession && initialProjectPlan != nil {
-			plan := initialProjectPlan
-			initialProjectPlan = nil
-			projects, buildErr = plan.BuildProjects()
+		if prepared != nil {
+			projects, buildErr = prepared.BuildProjects()
 		} else {
 			projects, buildErr = session.BuildProjects(projectRequest)
 		}
@@ -563,7 +562,9 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	provider := &apiGenerationProvider{
 		initial: func(context.Context) (linter.Generation, error) {
-			binding, err := buildBinding(programSession)
+			prepared := pendingInitialFallback
+			pendingInitialFallback = nil
+			binding, err := buildBinding(programSession, prepared)
 			if err != nil {
 				return linter.Generation{}, err
 			}
@@ -580,7 +581,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS, canonicalPaths)
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
-			roundBinding, rebuildErr := buildBinding(roundSession)
+			roundBinding, rebuildErr := buildBinding(roundSession, nil)
 			if rebuildErr != nil {
 				return linter.Generation{}, rebuildErr
 			}
@@ -597,7 +598,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				return nil, err
 			}
 			if len(plan.Loads) == 0 {
-				initialProjectPlan = &plan
+				pendingInitialFallback = &plan
 			}
 			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}
