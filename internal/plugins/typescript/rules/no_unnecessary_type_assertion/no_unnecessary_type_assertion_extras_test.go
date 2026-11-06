@@ -1198,17 +1198,27 @@ func TestNoUnnecessaryTypeAssertionRetainedTypeBoundaries(t *testing.T) {
 func TestNoUnnecessaryTypeAssertionLineBreaks(t *testing.T) {
 	const declaration = "type Path = `id:${number}`; const n = 1; function read(): Path { return "
 	var invalid []rule_tester.InvalidTestCase
-	for _, separator := range []string{"\n", "\r\n", " // keep\n"} {
+	for _, separator := range []string{"\n", "\r\n", " // keep\n", " /* keep */\n"} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{
 			Code:   declaration + "<Path>" + separator + "`id:${n}`; }",
 			Output: []string{declaration + "(" + separator + "`id:${n}`); }"},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
 		})
 	}
+	for _, separator := range []string{" /* keep\n */ ", "\n /* keep */ ", "\r\n /* keep */ ", " /* first */\n /* second */ "} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   declaration + "<Path>" + separator + "`id:${n}`; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+		})
+	}
 	invalid = append(invalid,
 		rule_tester.InvalidTestCase{
-			Code:   declaration + "<Path> /* keep\n */ `id:${n}`; }",
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "contextuallyUnnecessary"}},
+			Code:   "function read(value: number) { return <number><unknown>\n /* keep */ value; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   "function* values(value: number) { yield <number>\n /* keep */ value; }",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryAssertion"}},
 		},
 		rule_tester.InvalidTestCase{
 			Code:   "declare function value(): number; function read() { return <number>\nvalue() + 1; }",

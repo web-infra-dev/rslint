@@ -1070,14 +1070,17 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				if assertion.Kind != ast.KindTypeAssertionExpression || !lineBreak {
 					return false, true
 				}
-				// TypeScript can emit a multiline block comment immediately after
-				// the keyword. Parenthesizing it would change that emitted behavior.
+				// TypeScript can preserve line breaks before or inside block
+				// comments here. Parenthesizing would change that emitted behavior.
 				trivia := core.NewTextRange(assertion.Expression().Pos(), first.Pos())
+				lastBlockCommentEnd := trivia.Pos()
 				for comment := range utils.GetCommentsInRange(ctx.SourceFile, trivia) {
-					if comment.Kind == ast.KindMultiLineCommentTrivia &&
-						strings.ContainsFunc(sourceText[comment.Pos():comment.End()], ecmascript.IsLineTerminator) {
-						return false, false
+					if comment.Kind == ast.KindMultiLineCommentTrivia {
+						lastBlockCommentEnd = max(lastBlockCommentEnd, comment.End())
 					}
+				}
+				if strings.ContainsFunc(sourceText[trivia.Pos():lastBlockCommentEnd], ecmascript.IsLineTerminator) {
+					return false, false
 				}
 				return true, true
 			case ast.KindExpressionStatement:
