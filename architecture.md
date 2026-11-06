@@ -787,9 +787,10 @@ These are semantic ports rather than generic pre/post hooks:
   Single-threaded bindings and batches with at most two pending reads run inline
   under the same budget. Source preparation preserves input order, and frames
   are projected while the generation is leased. Disk BOM probes open files
-  independently. A probe that exhausts file descriptors retries when a peer
-  closes a file and periodically checks for descriptors released elsewhere.
-  Once no peer can free a descriptor, it makes a final open attempt. Missing
+  independently. A probe that exhausts file descriptors retries locally every
+  10 ms within a one-second recovery window, then returns the latest OS error
+  if opening still fails. Recovery has no shared state or dependency on another
+  request completing; it does not bound a blocking OS open or read. Missing
   files and short headers without a mark are valid unmarked inputs. Other
   open, read, or close errors abort the affected plugin task before dispatch.
 - `FinalChangeCommitter` is the optional terminal persistence boundary. It

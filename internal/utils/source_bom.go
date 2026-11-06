@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"sync"
 	"syscall"
 	"time"
 
@@ -44,22 +43,24 @@ func ReadSourceBOM(fileSystem vfs.FS, path string) (bool, error) {
 	if source, ok := fileSystem.(interface{ SourceHasBOM(path string) bool }); ok {
 		return source.SourceHasBOM(path), nil
 	}
-	return diskBOMReads.read(path, os.Open)
+	return readDiskBOM(path, os.Open)
 }
 
-// active counts opens in flight and files held until close. closed lets a
-// failed opener notice a file released during its own open attempt.
-type bomFileReads struct {
-	mu      sync.Mutex
-	active  int
-	closed  uint64
-	changed chan struct{} // allocated only when a failed open needs to wait
-}
-
-var diskBOMReads bomFileReads
-
-func (r *bomFileReads) read(path string, openFile func(string) (*os.File, error)) (bool, error) {
-	file, err := r.open(path, openFile)
+func readDiskBOM(path string, openFile func(string) (*os.File, error)) (bool, error) {
+	file, err := openFile(path)
+	if isFileDescriptorLimit(err) {
+		// Allow concurrent reads to release descriptors, without depending on
+		// another request finishing. Only failed opens enter this recovery window.
+		deadline := time.Now().Add(time.Second)
+		for isFileDescriptorLimit(err) {
+			delay := min(10*time.Millisecond, time.Until(deadline))
+			if delay <= 0 {
+				break
+			}
+			time.Sleep(delay)
+			file, err = openFile(path)
+		}
+	}
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return false, nil
@@ -68,65 +69,10 @@ func (r *bomFileReads) read(path string, openFile func(string) (*os.File, error)
 	}
 	has, readErr := readBOMHeader(file)
 	closeErr := file.Close()
-	r.mu.Lock()
-	r.finish(closeErr == nil)
-	r.mu.Unlock()
 	if readErr != nil {
 		return false, readErr
 	}
 	return has && closeErr == nil, closeErr
-}
-
-func (r *bomFileReads) open(path string, openFile func(string) (*os.File, error)) (*os.File, error) {
-	finalTry := false
-	r.mu.Lock()
-	for {
-		before := r.closed
-		r.active++
-		r.mu.Unlock()
-		file, err := openFile(path)
-		if err == nil {
-			return file, nil
-		}
-		r.mu.Lock()
-		r.finish(false)
-		if !isFileDescriptorLimit(err) || (finalTry && r.closed == before && r.active == 0) {
-			r.mu.Unlock()
-			return nil, err
-		}
-		woke := false
-		if r.closed == before && r.active != 0 {
-			if r.changed == nil {
-				r.changed = make(chan struct{})
-			}
-			changed := r.changed
-			r.mu.Unlock()
-			select {
-			case <-changed:
-				woke = true
-			case <-time.After(time.Second):
-				// Descriptors released outside BOM probes have no notification.
-				// Recheck even if a peer is still blocked in I/O.
-			}
-			r.mu.Lock()
-		}
-		// A notification without a close means the active probes drained.
-		// Give the OS one last chance when no probe could release a file.
-		finalTry = r.closed == before && (woke || r.active == 0)
-	}
-}
-
-// finish unregisters an attempt under mu. A failed open wakes peers only when
-// it was the last attempt, so an exhausted batch can return the OS error.
-func (r *bomFileReads) finish(closed bool) {
-	r.active--
-	if closed {
-		r.closed++
-	}
-	if r.changed != nil && (closed || r.active == 0) {
-		close(r.changed)
-		r.changed = nil
-	}
 }
 
 func isFileDescriptorLimit(err error) bool {

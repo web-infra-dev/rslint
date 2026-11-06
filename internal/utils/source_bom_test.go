@@ -13,6 +13,7 @@ import (
 	"testing"
 	"testing/iotest"
 	"testing/synctest"
+	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
@@ -179,28 +180,31 @@ func TestDiskBOMRetriesDescriptorExhaustion(t *testing.T) {
 		wantBOM  bool
 	}{
 		{"descriptor released", []error{processLimit, nil}, nil, true},
-		{"system limit persists", []error{processLimit, syscall.ENFILE}, syscall.ENFILE, false},
 		{"retry denied", []error{processLimit, os.ErrPermission}, os.ErrPermission, false},
 		{"retry I/O error", []error{processLimit, syscall.EIO}, syscall.EIO, false},
 		{"file disappeared", []error{processLimit, os.ErrNotExist}, nil, false},
 		{"first open denied", []error{os.ErrPermission}, os.ErrPermission, false},
 	} {
-		attempts := 0
-		var reads bomFileReads
-		has, err := reads.read(path, func(path string) (*os.File, error) {
-			if attempts >= len(tc.openErrs) {
-				t.Fatalf("%s: unexpected extra open", tc.name)
-			}
-			openErr := tc.openErrs[attempts]
-			attempts++
-			if openErr != nil {
-				return nil, &os.PathError{Op: "open", Path: path, Err: openErr}
-			}
-			return os.Open(path)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
+				attempts := 0
+				has, err := readDiskBOM(path, func(path string) (*os.File, error) {
+					if attempts >= len(tc.openErrs) {
+						t.Fatal("unexpected extra open")
+					}
+					openErr := tc.openErrs[attempts]
+					attempts++
+					if openErr != nil {
+						return nil, &os.PathError{Op: "open", Path: path, Err: openErr}
+					}
+					return os.Open(path)
+				})
+				if attempts != len(tc.openErrs) || has != tc.wantBOM || !errors.Is(err, tc.wantErr) {
+					t.Errorf("got (%t, %v) in %d attempts, want (%t, %v) in %d", has, err, attempts, tc.wantBOM, tc.wantErr, len(tc.openErrs))
+				}
+			})
 		})
-		if attempts != len(tc.openErrs) || has != tc.wantBOM || !errors.Is(err, tc.wantErr) {
-			t.Errorf("%s: got (%t, %v) in %d attempts, want (%t, %v) in %d", tc.name, has, err, attempts, tc.wantBOM, tc.wantErr, len(tc.openErrs))
-		}
 	}
 }
 
@@ -215,11 +219,10 @@ func TestBOMHeaderReadError(t *testing.T) {
 func TestHealthyDiskBOMReadsProceedDuringDescriptorRetry(t *testing.T) {
 	path := writeTestFile(t, t.TempDir(), "marked.ts", []byte(BOM))
 	synctest.Test(t, func(t *testing.T) {
-		var reads bomFileReads
 		start := func(open func(string) (*os.File, error)) <-chan bool {
 			done := make(chan bool, 1)
 			go func() {
-				has, err := reads.read(path, open)
+				has, err := readDiskBOM(path, open)
 				done <- has && err == nil
 			}()
 			return done
@@ -259,9 +262,10 @@ func TestHealthyDiskBOMReadsProceedDuringDescriptorRetry(t *testing.T) {
 		})
 		synctest.Wait()
 		checkHealthy()
+		time.Sleep(10 * time.Millisecond)
 		synctest.Wait()
 		if !retryStarted {
-			t.Fatal("closing the healthy file did not wake the failed open")
+			t.Fatal("failed open did not retry")
 		}
 		checkHealthy()
 	})
@@ -270,26 +274,10 @@ func TestHealthyDiskBOMReadsProceedDuringDescriptorRetry(t *testing.T) {
 func TestDiskBOMRetriesDescriptorsReleasedElsewhere(t *testing.T) {
 	path := writeTestFile(t, t.TempDir(), "marked.ts", []byte(BOM))
 	synctest.Test(t, func(t *testing.T) {
-		var reads bomFileReads
-		slow := make(chan struct{})
-		defer close(slow)
 		available := make(chan struct{})
 		done := make(chan bool, 1)
 		go func() {
-			attempts := 0
-			has, err := reads.read(path, func(path string) (*os.File, error) {
-				attempts++
-				if attempts == 2 {
-					// A peer enters during the retry and stays open even
-					// after an external descriptor becomes available.
-					entered := make(chan struct{})
-					go reads.read(path, func(path string) (*os.File, error) {
-						close(entered)
-						<-slow
-						return os.Open(path)
-					})
-					<-entered
-				}
+			has, err := readDiskBOM(path, func(path string) (*os.File, error) {
 				select {
 				case <-available:
 					return os.Open(path)
@@ -300,9 +288,45 @@ func TestDiskBOMRetriesDescriptorsReleasedElsewhere(t *testing.T) {
 			done <- has && err == nil
 		}()
 		synctest.Wait()
+		time.Sleep(50 * time.Millisecond)
 		close(available)
 		if !<-done {
 			t.Fatal("failed open did not recover the BOM after an external descriptor release")
+		}
+	})
+}
+
+func TestDiskBOMRetryStopsWhileAnotherOpenIsBlocked(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		blocked := make(chan struct{})
+		defer close(blocked)
+		go readDiskBOM("unrelated.ts", func(string) (*os.File, error) {
+			<-blocked
+			return nil, os.ErrPermission
+		})
+		synctest.Wait()
+
+		done := make(chan error, 1)
+		go func() {
+			attempts := 0
+			_, err := readDiskBOM("target.ts", func(string) (*os.File, error) {
+				attempts++
+				if attempts == 1 {
+					return nil, syscall.EMFILE
+				}
+				return nil, syscall.ENFILE
+			})
+			done <- err
+		}()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		select {
+		case err := <-done:
+			if !errors.Is(err, syscall.ENFILE) {
+				t.Fatalf("got %v, want the descriptor-limit error", err)
+			}
+		default:
+			t.Fatal("descriptor recovery waited indefinitely for an unrelated open")
 		}
 	})
 }
