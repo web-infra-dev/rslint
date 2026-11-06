@@ -39,20 +39,18 @@ value.flat()`,
 		},
 	)
 
-	// ---- Differential: TypeScript-only contextual keywords are identifier tokens ----
-	// The closing `)` already separates these tokens, so upstream does not add
-	// whitespace around `as` or `satisfies`.
+	// Unicorn v79 also separates the contextual `as` and `satisfies` operators.
 	suite.addFixed(
 		`const result = _.flatten(value)as unknown[];`,
 		`_.flatten(value)`,
-		`value.flat()`,
+		`value.flat() `,
 		`_.flatten()`,
 		nil,
 	)
 	suite.addFixed(
 		`const result = _.flatten(value)satisfies unknown[];`,
 		`_.flatten(value)`,
-		`value.flat()`,
+		`value.flat() `,
 		`_.flatten()`,
 		nil,
 	)

@@ -362,14 +362,18 @@ func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
 		wantOutput string
 	}{
 		{
-			name:   "TypeScript as stays identifier-like",
-			code:   "const result = consume(value)as unknown;",
-			target: "consume(value)",
+			name:       "TypeScript as after",
+			code:       "const result = consume(value)as unknown;",
+			target:     "consume(value)",
+			wantFixes:  1,
+			wantOutput: "const result = consume(value) as unknown;",
 		},
 		{
-			name:   "TypeScript satisfies stays identifier-like",
-			code:   "const result = consume(value)satisfies unknown;",
-			target: "consume(value)",
+			name:       "TypeScript satisfies after",
+			code:       "const result = consume(value)satisfies unknown;",
+			target:     "consume(value)",
+			wantFixes:  1,
+			wantOutput: "const result = consume(value) satisfies unknown;",
 		},
 		{
 			name:       "ECMAScript keyword after",

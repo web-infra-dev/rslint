@@ -928,6 +928,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-then-catch.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-ternary.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-type-error.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-unary-minus.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-unicode-code-point-escapes.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',

@@ -8,12 +8,12 @@ import (
 )
 
 func isProblematicKeywordToken(token utils.SourceToken) bool {
-	if token.Text == "of" || token.Text == "await" {
+	if token.Text == "of" || token.Text == "await" || token.Text == "as" || token.Text == "satisfies" {
 		return true
 	}
 	// @typescript-eslint/parser exposes only ECMAScript keywords through
-	// ESLint's `Keyword` token type. TypeScript-only contextual keywords such
-	// as `as` and `satisfies` remain identifiers and need no inserted space.
+	// ESLint's `Keyword` token type. The contextual identifiers above also
+	// need spacing when a replacement changes its boundary tokens.
 	if token.Kind < ast.KindFirstKeyword ||
 		token.Kind > ast.KindLastFutureReservedWord ||
 		token.Text == "" {
@@ -29,7 +29,7 @@ func isProblematicKeywordToken(token utils.SourceToken) bool {
 
 // SpaceAroundKeywordFixes mirrors Unicorn's fixSpaceAroundKeyword helper. It
 // adds spaces only when the complete parenthesized range directly touches a
-// lowercase keyword (plus the contextual `of` and `await` identifier tokens).
+// lowercase keyword or a contextual operator identifier.
 func SpaceAroundKeywordFixes(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 	if sourceFile == nil || node == nil {
 		return nil

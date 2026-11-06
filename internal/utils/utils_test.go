@@ -459,6 +459,9 @@ func TestEslintLikePrecedence(t *testing.T) {
 		"object.property;\n" +
 		"object?.property;\n" +
 		"(object?.property!);\n" +
+		"(object?.property!!);\n" +
+		"((object?.property)!);\n" +
+		"((object?.property!)!);\n" +
 		"(object!);\n" +
 		"(object as any);\n" +
 		"(<div />);\n" +
@@ -483,6 +486,9 @@ func TestEslintLikePrecedence(t *testing.T) {
 		// @typescript-eslint/parser exposes this complete optional chain as a
 		// ChainExpression even though tsgo's outer node is NonNullExpression.
 		{text: "object?.property!", want: 18},
+		{text: "object?.property!!", want: 18},
+		{text: "(object?.property)!", want: -1},
+		{text: "(object?.property!)!", want: -1},
 		{text: "object!", want: -1},
 		{text: "object as any", want: -1},
 	}
