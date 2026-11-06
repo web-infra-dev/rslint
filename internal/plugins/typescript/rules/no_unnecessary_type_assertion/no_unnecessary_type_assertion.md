@@ -4,7 +4,7 @@
 
 This rule reports assertions you can remove while keeping the same type where the value is used. It checks `as` assertions, angle-bracket assertions, and `!` on values that are already non-nullable.
 
-The rule reports these assertions.
+Examples of **incorrect** code for this rule:
 
 ```typescript
 const foo = 3;
@@ -14,7 +14,7 @@ declare const value: number;
 const num = value as number; // already a number
 ```
 
-The rule keeps these assertions with the default options.
+Examples of **correct** code for this rule with the default options:
 
 ```typescript
 const foo: number | undefined = getValue();
