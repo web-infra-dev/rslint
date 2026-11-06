@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/program/contentmappers"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
 	"golang.org/x/sync/errgroup"
@@ -149,6 +150,9 @@ type Server struct {
 
 	initialized  bool
 	lintPrograms *lintProgramStore
+	// contentMappers is created at initialize from the client's
+	// runExternalCode option and lives for the session.
+	contentMappers *contentmappers.Runtime
 
 	// rslint config
 	// jsConfigs is keyed by the catalog's absolute filesystem directory
@@ -346,6 +350,8 @@ func (s *Server) PublishDiagnostics(ctx context.Context, params *lsproto.Publish
 func (s *Server) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Initialization creates the Runtime, so read it only on the way out.
+	defer func() { _ = s.contentMappers.Close() }()
 
 	g, ctx := errgroup.WithContext(ctx)
 	s.backgroundCtx = ctx

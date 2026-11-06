@@ -104,6 +104,12 @@ describe('parseArgs positionals', () => {
     expect(result.format).toBe('jsonline');
   });
 
+  test('a boolean flag keeps its inline value when forwarded to Go', () => {
+    const result = parseArgs(['--run-external-code=false', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+    expect(result.rest).toEqual(['--run-external-code=false', 'src/a.ts']);
+  });
+
   test('format defaults to null when absent', () => {
     expect(parseArgs(['src/a.ts']).format).toBeNull();
   });

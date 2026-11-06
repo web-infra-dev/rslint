@@ -170,7 +170,7 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 			CanonicalPath: targetPath}, ConfigDirectory: configDir,
 		}}}
 
-		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys), true)
+		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys, nil), true)
 		if err != nil {
 			t.Fatalf("loadAPIForTest: %v", err)
 		}
@@ -193,7 +193,7 @@ func TestLoadProgramsPreservesExactAndProjectOrder(t *testing.T) {
 		}}}
 		fsys.resetCalls()
 
-		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys), true)
+		binding, err := loadAPIForTest(set, plan, configDir, newBuildContext(fsys, nil), true)
 		if err != nil {
 			t.Fatalf("loadAPIForTest: %v", err)
 		}

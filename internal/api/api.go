@@ -127,6 +127,10 @@ type LintRequest struct {
 	// final post-fix generation.
 	Fix                       bool `json:"fix,omitempty"`
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+	// RunExternalCode lets the content mappers that tsconfig files declare run
+	// for this request, like tsc's --runExternalCode. Each mapper is an npm
+	// package started as a child process. Unsupported by WASM.
+	RunExternalCode bool `json:"runExternalCode,omitempty"`
 }
 
 // ConfigDiscoveryRequest is the API-facing scope for Go's shared staged

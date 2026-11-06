@@ -68,6 +68,13 @@ export interface RslintOptions {
   /** Apply rule auto-fixes; results carry `output` (the JS side persists via outputFixes). */
   fix?: boolean;
   /**
+   * Run the content mappers declared in tsconfig `contentMappers`, so files
+   * they map (for example `.vue`) provide types to the files that import them.
+   * Like tsc's `--runExternalCode`: each mapper is an npm package started as
+   * a child process, so enable it only for trusted projects.
+   */
+  runExternalCode?: boolean;
+  /**
    * In-memory file overlay (path → content) for project inputs (issue #1106):
    * put a config selected by `parserOptions.project` or discovered by
    * `projectService`, plus dependency files, here before calling `lintText`.
@@ -141,6 +148,7 @@ export class Rslint {
   readonly #overrideConfig?: RslintConfigEntry | RslintConfig | null;
   readonly #overrideConfigFile?: string | true | null;
   readonly #fix: boolean;
+  readonly #runExternalCode: boolean;
   readonly #virtualFiles?: Record<string, string>;
   readonly #pluginHosts = new PluginHostLifecycle();
   #normalizedOverrideConfig?: Record<string, unknown>[];
@@ -152,6 +160,7 @@ export class Rslint {
     this.#overrideConfig = options.overrideConfig;
     this.#overrideConfigFile = options.overrideConfigFile;
     this.#fix = options.fix ?? false;
+    this.#runExternalCode = options.runExternalCode ?? false;
     this.#virtualFiles = options.virtualFiles;
     this.#service = new RSLintService(new NodeRslintService());
   }
@@ -203,6 +212,7 @@ export class Rslint {
           // same-path code entry wins so `lintText` always lints `code`.
           fileContents: { ...this.#resolveOverlay(), [filePath]: code },
           fix: this.#fix,
+          runExternalCode: this.#runExternalCode,
         },
         discoverySession?.handlers ?? {},
       );
@@ -267,6 +277,7 @@ export class Rslint {
           // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
           fileContents: overlay,
           fix: this.#fix,
+          runExternalCode: this.#runExternalCode,
         },
         discoverySession?.handlers ?? {},
       );

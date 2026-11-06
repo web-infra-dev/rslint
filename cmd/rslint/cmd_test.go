@@ -1887,7 +1887,7 @@ func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	activeConfig := append(append(rslintconfig.RslintConfig(nil), baseConfig...), *cliEntry)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	programSession := loader.NewSession(fs)
+	programSession := loader.NewSession(fs, nil)
 	programSet, err := programSession.BuildProjects(loader.ProjectBuildRequest{
 		Configs:        map[string]rslintconfig.RslintConfig{dir: activeConfig},
 		Scope:          loader.AllDeclared,
@@ -2615,6 +2615,29 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 				t.Fatalf("physical fix source = %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestParseLintFlagsRunExternalCode(t *testing.T) {
+	cases := []struct {
+		argv []string
+		want bool
+	}{
+		{argv: []string{}},
+		{argv: []string{"--run-external-code"}, want: true},
+		{argv: []string{"--run-external-code=true"}, want: true},
+		{argv: []string{"--run-external-code=false"}},
+	}
+	for _, c := range cases {
+		args, _, exitCode := parseLintFlags(c.argv)
+		if exitCode != 0 {
+			t.Errorf("parseLintFlags(%v) exit code = %d, want 0", c.argv, exitCode)
+			continue
+		}
+		if args.RunExternalCode != c.want || len(args.AllowFiles)+len(args.AllowDirs) != 0 {
+			t.Errorf("parseLintFlags(%v) = RunExternalCode %v with targets %v %v, want %v and no targets",
+				c.argv, args.RunExternalCode, args.AllowFiles, args.AllowDirs, c.want)
+		}
 	}
 }
 

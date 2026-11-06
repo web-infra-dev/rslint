@@ -92,6 +92,7 @@ export class RSLintService {
       fileContents,
       includeEncodedSourceFiles,
       fix,
+      runExternalCode,
     } = options;
 
     await this.handshake(requiredReverse);
@@ -111,6 +112,7 @@ export class RSLintService {
       fileContents,
       includeEncodedSourceFiles,
       fix,
+      runExternalCode,
     });
   }
 

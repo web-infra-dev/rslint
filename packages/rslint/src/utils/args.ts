@@ -1,4 +1,4 @@
-import { parseArgs as nodeParseArgs } from 'node:util';
+import { parseArgs as nodeParseArgs, type ParseArgsConfig } from 'node:util';
 
 // Keep this list in sync with internal/output/format.go.
 export const OUTPUT_FORMATS = [
@@ -19,28 +19,29 @@ export function isJSConfigFile(filePath: string): boolean {
 }
 
 export function parseArgs(argv: string[]) {
+  const options = {
+    config: { type: 'string', short: 'c' },
+    init: { type: 'boolean' },
+    help: { type: 'boolean', short: 'h' },
+    // Detected so the JS host can size the ESLint-plugin worker pool to a
+    // single worker. NOT skipped below, so it still forwards to Go in
+    // `rest` (Go's native pass honors the same flag independently).
+    singleThreaded: { type: 'boolean' },
+    // Register known Go string-valued flags so their values are not
+    // mistaken for positional file/dir arguments.
+    format: { type: 'string' },
+    'max-warnings': { type: 'string' },
+    rule: { type: 'string', multiple: true },
+    trace: { type: 'string' },
+    cpuprof: { type: 'string' },
+    // Consumed by the JS entry point; must not reach Go from user input.
+    'start-time': { type: 'string' },
+  } satisfies ParseArgsConfig['options'];
   const { values, tokens } = nodeParseArgs({
     args: argv,
     strict: false,
     tokens: true,
-    options: {
-      config: { type: 'string', short: 'c' },
-      init: { type: 'boolean' },
-      help: { type: 'boolean', short: 'h' },
-      // Detected so the JS host can size the ESLint-plugin worker pool to a
-      // single worker. NOT skipped below, so it still forwards to Go in
-      // `rest` (Go's native pass honors the same flag independently).
-      singleThreaded: { type: 'boolean' },
-      // Register known Go string-valued flags so their values are not
-      // mistaken for positional file/dir arguments.
-      format: { type: 'string' },
-      'max-warnings': { type: 'string' },
-      rule: { type: 'string', multiple: true },
-      trace: { type: 'string' },
-      cpuprof: { type: 'string' },
-      // Consumed by the JS entry point; must not reach Go from user input.
-      'start-time': { type: 'string' },
-    },
+    options,
   });
 
   // Collect args that are not --config or --init for pass-through to Go.
@@ -78,8 +79,15 @@ export function parseArgs(argv: string[]) {
         }
         continue;
       }
-      flags.push(token.rawName);
-      if (token.value != null) flags.push(token.value);
+      // Keep an unregistered flag's inline value attached: those are Go's
+      // boolean flags, which only read a value written as `--flag=value` and
+      // would take a separate `false` as a positional path.
+      if (token.inlineValue && !Object.hasOwn(options, token.name)) {
+        flags.push(`${token.rawName}=${token.value}`);
+      } else {
+        flags.push(token.rawName);
+        if (token.value != null) flags.push(token.value);
+      }
     } else if (token.kind === 'option-terminator') {
       seenTerminator = true;
     } else if (token.kind === 'positional') {

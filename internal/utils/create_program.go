@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
+	"github.com/microsoft/TypeScript/tsc/shim/contentmapper"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/microsoft/TypeScript/tsc/shim/tsoptions"
@@ -28,8 +29,14 @@ func (e *SyntacticError) Error() string {
 }
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
-	defaultLibraryPath := bundled.LibPath()
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, nil, nil, nil)
+	return CreateCompilerHostWithContentMappers(cwd, fs, nil)
+}
+
+// CreateCompilerHostWithContentMappers is CreateCompilerHost plus the content
+// mapper project that turns mapped files, such as .vue, into virtual
+// TypeScript. A nil project maps no files.
+func CreateCompilerHostWithContentMappers(cwd string, fs vfs.FS, project contentmapper.Project) compiler.CompilerHost {
+	return compiler.NewCompilerHost(cwd, fs, bundled.LibPath(), nil, nil, project)
 }
 
 func configNotFoundError(resolvedConfigPath string) error {

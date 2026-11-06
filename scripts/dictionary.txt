@@ -124,6 +124,9 @@ componentwillupdate
 constantness
 contenteditable
 contentinfo
+contentmapper
+contentmappers
+contentmappertest
 corge
 cpuprof
 ctype
