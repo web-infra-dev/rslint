@@ -30,7 +30,7 @@ func executeObservation(
 	results := make([]observationExecution, len(loads))
 	errs := make([]error, len(loads))
 	resources := newPluginDispatchResources()
-	sourceReadLimit := 8
+	sourceReadLimit := runtime.GOMAXPROCS(0)
 	if plan.SingleThreaded {
 		sourceReadLimit = 1
 	}
