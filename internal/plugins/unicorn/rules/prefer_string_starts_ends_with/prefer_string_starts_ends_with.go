@@ -94,7 +94,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 							dot, _ := utils.TokenBeforePosition(ctx.SourceFile, utils.TrimNodeTextRange(ctx.SourceFile, call.Property).Pos())
 							edits = append(edits, rule.RuleFixReplaceRange(core.NewTextRange(dot.Start, dot.End), "?."))
 						}
-						if !regexWrapped && !targetWrapped && needsMemberParentheses(ctx.SourceFile, target, regex) {
+						if !regexWrapped && !targetWrapped && unicornutil.ShouldAddParenthesesToMemberExpressionObjectAt(ctx.SourceFile, target, regex) {
 							text = "(" + text + ")"
 						}
 					}
@@ -195,7 +195,7 @@ var PreferStringStartsEndsWithRule = rule.Rule{
 					if negated {
 						position = target
 					}
-					if utils.OutermostParenthesizedExpression(target) == target && needsMemberParentheses(ctx.SourceFile, target, position) {
+					if utils.OutermostParenthesizedExpression(target) == target && unicornutil.ShouldAddParenthesesToMemberExpressionObjectAt(ctx.SourceFile, target, position) {
 						text = "(" + text + ")"
 					}
 					if negated {
@@ -354,37 +354,6 @@ func needsNullishParentheses(node *ast.Node) bool {
 		return op != ast.KindQuestionQuestionToken
 	default:
 		return false
-	}
-}
-
-func needsMemberParentheses(source *ast.SourceFile, node, replacement *ast.Node) bool {
-	first, _ := utils.TokenAtOrAfter(source, utils.TrimNodeTextRange(source, node).Pos())
-	next, _ := utils.TokenAtOrAfter(source, first.End)
-	if first.Kind == ast.KindOpenBraceToken || first.Kind == ast.KindFunctionKeyword || first.Kind == ast.KindClassKeyword ||
-		(first.Text == "async" && next.Kind == ast.KindFunctionKeyword) ||
-		(first.Text == "let" && next.Kind == ast.KindOpenBracketToken) {
-		for current := replacement; current.Parent != nil; current = current.Parent {
-			parent := current.Parent
-			if ast.IsParenthesizedExpression(parent) {
-				break
-			}
-			if parent.Kind == ast.KindExpressionStatement || (parent.Kind == ast.KindArrowFunction && parent.Body() == current && first.Kind == ast.KindOpenBraceToken) {
-				return true
-			}
-			if utils.TrimNodeTextRange(source, parent).Pos() != utils.TrimNodeTextRange(source, current).Pos() {
-				break
-			}
-		}
-	}
-	switch node.Kind {
-	case ast.KindFunctionExpression, ast.KindObjectLiteralExpression:
-		return true
-	case ast.KindTaggedTemplateExpression, ast.KindNonNullExpression, ast.KindMetaProperty:
-		return false
-	case ast.KindCallExpression:
-		return false
-	default:
-		return unicornutil.ShouldAddParenthesesToMemberExpressionObject(source, node)
 	}
 }
 
