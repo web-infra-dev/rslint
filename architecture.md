@@ -781,7 +781,8 @@ These are semantic ports rather than generic pre/post hooks:
 - `TargetProjection` maps Program source paths to stable target identities and
   exposes the exact complete text of that generation. Core validation, frozen
   fix text, and inline plugin input all consume this same view. The pipeline
-  shares up to eight plugin source reads across an observation's bindings.
+  shares up to `GOMAXPROCS` plugin source reads across an observation's bindings,
+  reduced to one when the generation plan is single-threaded.
   Snapshot hits bypass this budget. After a read failure, the pipeline stops
   claiming inputs for that binding and joins outstanding reads to preserve error order.
   Single-threaded bindings and batches with at most two pending reads run inline

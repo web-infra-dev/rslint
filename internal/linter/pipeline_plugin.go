@@ -173,7 +173,7 @@ func materializePluginTask(
 	workers := min(cap(sourceReads), len(missing))
 	// Keep tiny batches inline: scheduling workers can dominate a small
 	// in-memory request. Inline reads still share the observation's slots.
-	if generation.Native.SingleThreaded || workers <= 2 {
+	if generation.Native.SingleThreaded || workers <= 1 || len(missing) <= 2 {
 		for i := range inputs {
 			input := &inputs[i]
 			if input.Text == nil {
