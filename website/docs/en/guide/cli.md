@@ -154,6 +154,4 @@ The table is written to stderr, so machine-readable output formats such as `json
 | `1`  | Errors found, or warnings exceed `--max-warnings` |
 | `2`  | Invalid command-line usage or flag combinations   |
 
-With Node's default signal handling, the CLI can exit even while a terminal or pipe stops reading output. On POSIX, the exit statuses are `129` for `SIGHUP`, `130` for `SIGINT` (Ctrl+C), and `143` for `SIGTERM`.
-
-When embedding `runCLI()`, the engine listens for termination signals that the host already handles when the run starts. Once Node dispatches such a signal, the engine cancels the run and sets `process.exitCode` to its corresponding status. A synchronous stdout write to a stalled reader delays JavaScript signal handlers until the write returns. A handler installed later in the run handles the signal on the host's own terms.
+Terminating Rslint stops the current check even when output is paused. On macOS and Linux, `SIGHUP`, `SIGINT`, and `SIGTERM` exit with status `129`, `130`, and `143`, respectively.

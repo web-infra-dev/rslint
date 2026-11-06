@@ -283,13 +283,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // Attached BEFORE any await so an immediate spawn error (ENOENT/EACCES) or
   // instant exit is observed rather than crashing the process as 'unhandled'.
   type ChildExit = { code: number };
-  let signalExitCode: number | undefined;
   const childExit = new Promise<ChildExit>((resolve) => {
     let resolved = false;
     const settle = (code: number) => {
       if (!resolved) {
         resolved = true;
-        resolve({ code: signalExitCode ?? code });
+        resolve({ code });
       }
     };
     child.once('error', (err) => {
@@ -328,14 +327,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         }),
       ]);
       if (naturalExit) return naturalExit;
-      if (signalExitCode === undefined) {
-        stderr.write(
-          'rslint: Go IPC closed without process exit; terminating Go process\n',
-        );
-      }
+      stderr.write(
+        'rslint: Go IPC closed without process exit; terminating Go process\n',
+      );
       safeKillGo(child);
       await childExit;
-      return { code: signalExitCode ?? 2 };
+      return { code: 2 };
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -501,36 +498,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     return configActivation;
   };
 
-  // A native default action works even during a synchronous stdout write.
-  // Only join termination signals that this host has chosen to handle itself.
-  const hostSignalHandlers = [];
-  for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM'] as const) {
-    if (process.listenerCount(signal) === 0) continue;
-    const handle = () => {
-      signalExitCode ??= SIGNAL_EXIT_CODES[signal];
-      shuttingDown = true;
-      configAbort.abort();
-      // Let Go observe the same disconnect as a host exit on every platform.
-      ipc.close();
-      child.stdin?.destroy();
-      void Promise.allSettled([
-        shutdownPluginHost(pluginHost),
-        ...[...stagedPluginHosts].map(shutdownPluginHost),
-      ]);
-    };
-    process.once(signal, handle);
-    hostSignalHandlers.push({ signal, handle });
-  }
+  // Keep Node's native termination behavior, which works even if stdout is
+  // blocked in a synchronous write. Go cancels and exits when this IPC parent
+  // disappears; no JavaScript signal callback is needed to stop the child.
   const forwardedStdout = new StdoutWriteBarrier(stdout);
 
-  // try/finally so the worker pool is always drained — every exit path
-  // (init failure as well as normal completion) runs the `finally`, which
-  // tears down the signal handlers and the plugin worker pool. Without this
-  // the init-failure returns below leaked a graceful drain (the pool's
-  // threads were only reaped by the outer process.exit), whereas the normal
-  // and signal paths drained it cleanly. `pluginHost?.shutdown()` is
-  // null-safe (no pool ⇒ no-op) and idempotent (WorkerPool.shutdown guards
-  // on `closed`), so the signal handler firing shutdown first is harmless.
+  // Every return, including init failure, releases the plugin worker pool.
   try {
     // Wire handlers BEFORE start so the first frame Go writes is routable.
     ipc.setInboundHandler(async (msg) => {
@@ -628,9 +601,8 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
         // Fast paths can close stdout without an init acknowledgement. Their
         // natural exit remains authoritative within the disconnect grace.
         const state = await waitForExit();
-        if (state.code !== 0 && signalExitCode === undefined) {
-          stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
-        }
+        if (state.code === 0) return 0;
+        stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
         return state.code;
       }
       if (outcome.kind === 'exit') {
@@ -657,9 +629,6 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     const finalExit = await waitForExit();
     return finalExit.code;
   } finally {
-    for (const { signal, handle } of hostSignalHandlers) {
-      process.off(signal, handle);
-    }
     shuttingDown = true;
     configAbort.abort();
     await Promise.allSettled([...pendingPluginHostBuilds]);
