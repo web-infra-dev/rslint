@@ -111,6 +111,10 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		if kind == directiveNone {
 			continue
 		}
+		// Only line-flavored directives can be carried by line comments.
+		if comment.Kind == ast.KindSingleLineCommentTrivia && (kind == directiveBlock || kind == directiveEnable) {
+			continue
+		}
 
 		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
 		endLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.End())

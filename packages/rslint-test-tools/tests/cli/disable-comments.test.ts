@@ -643,6 +643,63 @@ describe('eslint-disable comment directives', () => {
 });
 
 describe('unused disable directives', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const { name, source, rules } of [
+      {
+        name: 'line disable does not suppress diagnostics',
+        source: `// ${prefix}-disable no-debugger, custom/check\ndebugger;\n`,
+        rules: ['custom/check', 'no-debugger'],
+      },
+      {
+        name: 'line enable does not end block suppression',
+        source: `/* ${prefix}-disable no-debugger, custom/check */\n// ${prefix}-enable no-debugger, custom/check\ndebugger;\n`,
+        rules: [],
+      },
+      {
+        name: 'unused line disable is preserved',
+        source: `// ${prefix}-disable no-debugger, custom/check\nconst x = 1;\n`,
+        rules: [],
+      },
+    ]) {
+      test(`${prefix}: ${name}`, async () => {
+        const tempDir = await createTempDir({
+          'test.ts': source,
+          'rslint.config.mjs': `export default [{
+            files: ['**/*.ts'],
+            linterOptions: { reportUnusedDisableDirectives: 'warn' },
+            plugins: { custom: { rules: { check: {
+              meta: { schema: [] },
+              create(context) { return { DebuggerStatement(node) { context.report({ node, message: 'plugin debugger' }); } }; }
+            } } } },
+            rules: { 'no-debugger': 'error', 'custom/check': 'error' }
+          }];`,
+        });
+        try {
+          for (const args of [[], ['--fix']]) {
+            const result = await runRslint(
+              [...args, '--format', 'jsonline', 'test.ts'],
+              tempDir,
+            );
+            expect(result.exitCode).toBe(rules.length ? 1 : 0);
+            const reportedRules = result.stdout
+              .split('\n')
+              .filter(Boolean)
+              .map(
+                (line) => (JSON.parse(line) as { ruleName: string }).ruleName,
+              )
+              .sort();
+            expect(reportedRules).toEqual(rules);
+            expect(
+              await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8'),
+            ).toBe(source);
+          }
+        } finally {
+          await cleanupTempDir(tempDir);
+        }
+      });
+    }
+  }
+
   test('uses mixed native/plugin usage and fixes only unused entries', async () => {
     const source =
       '/* eslint-disable no-debugger, custom/check, no-console -- reason */\ndebugger;\n';

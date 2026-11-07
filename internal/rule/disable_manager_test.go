@@ -614,6 +614,37 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 	}
 }
 
+func TestDisableManagerIgnoresBlockDirectivesInLineComments(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, tc := range []struct {
+			name, source string
+			report       bool
+			disabled     bool
+		}{
+			{"specific disable", "// eslint-disable a\nx();", true, false},
+			{"wildcard disable", "// eslint-disable\nx();", true, false},
+			{"specific enable", "/* eslint-disable a */\n// eslint-enable a\nx();", true, true},
+			{"wildcard enable", "/* eslint-disable */\n// eslint-enable\nx();", true, true},
+			{"unused disable", "// eslint-disable a\nx();", false, false},
+			{"unmatched enable", "// eslint-enable a\nx();", false, false},
+		} {
+			t.Run(prefix+"/"+tc.name, func(t *testing.T) {
+				source := strings.ReplaceAll(tc.source, "eslint-", prefix+"-")
+				sf := parseCommentStoreSource(t, source)
+				manager := NewDisableManager(sf, NewCommentStore(sf))
+				if tc.report {
+					if got := manager.IsRuleDisabled("a", strings.Index(source, "x();")); got != tc.disabled {
+						t.Fatalf("disabled = %v, want %v", got, tc.disabled)
+					}
+				}
+				if diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil); len(diagnostics) != 0 {
+					t.Fatalf("unexpected unused diagnostics or fixes: %+v", diagnostics)
+				}
+			})
+		}
+	}
+}
+
 func TestUnusedDisableDirectives(t *testing.T) {
 	for _, tc := range []struct {
 		name, source, usedRule, fixed string
