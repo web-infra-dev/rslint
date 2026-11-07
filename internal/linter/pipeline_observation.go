@@ -98,7 +98,6 @@ func prepareObservation(
 	}
 	nativeWork.execution.options.reservation = reservation
 	nativeWork.execution.options.directives = directives
-	nativeWork.execution.options.directivesPrepared = true
 
 	var directivesByTarget map[string]*fileDirectives
 	if len(directives) > 0 {

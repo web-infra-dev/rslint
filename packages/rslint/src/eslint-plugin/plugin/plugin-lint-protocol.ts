@@ -4,6 +4,7 @@
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
 import type { SharedBytes } from '../../native/types.js';
+import type { DisableDirectiveUsage } from '../linter/apply-disable-directives.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -22,6 +23,7 @@ export interface EslintPluginLintRequest {
   files: ReadonlyArray<
     {
       path: string;
+      collectDirectiveUsage?: boolean;
       /**
        * Per-file `languageOptions`, computed by Go via `GetConfigForFile`
        * (flat-config files-glob match + deep merge). Opaque here; the
@@ -106,6 +108,7 @@ export function buildPluginLintTasks(
     suggestionsMode,
     collectTiming,
     configKey: f.configKey ?? '',
+    ...(f.collectDirectiveUsage ? { collectDirectiveUsage: true } : {}),
   }));
 }
 
@@ -122,6 +125,7 @@ export function buildPluginLintTasks(
 export interface EslintPluginLintResult {
   results: Array<{
     filePath: string;
+    usedDisableDirectives?: DisableDirectiveUsage[];
     diagnostics: unknown[];
     parseError?: string;
     cancelled?: boolean;
@@ -141,6 +145,9 @@ export function buildPluginLintResult(
   return {
     results: results.map((r) => ({
       filePath: r.filePath,
+      ...(r.usedDisableDirectives !== undefined
+        ? { usedDisableDirectives: r.usedDisableDirectives }
+        : {}),
       diagnostics: r.diagnostics,
       parseError: r.parseError,
       cancelled: r.cancelled,

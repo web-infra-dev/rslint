@@ -54,6 +54,10 @@ import {
 import type { GlobalsConfig } from '../../languages/js/types.js';
 import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
+import {
+  applyDisableDirectives,
+  type DisableDirectiveUsage,
+} from './apply-disable-directives.js';
 
 // Unicode matching treats a valid surrogate pair as one non-surrogate scalar.
 const UNPAIRED_SURROGATE = /[\uD800-\uDFFF]/gu;
@@ -95,6 +99,7 @@ export interface RuleConfig {
 
 /** Per-file task carrying final syntax from the Go Program. */
 export interface LintFileRequest {
+  collectDirectiveUsage?: boolean;
   filePath: string;
   /** Workers materialize ordinary objects from owned bytes after the last native read. */
   frame: Uint8Array | SharedBytes;
@@ -163,6 +168,7 @@ export interface LintFileRequest {
 
 /** Per-file lint response — one record per LintFileRequest. */
 export interface LintFileResult {
+  usedDisableDirectives?: DisableDirectiveUsage[];
   filePath: string;
   diagnostics: Diagnostic[];
   /** Aggregated fixes (sum of diagnostic.fixes for ApplyRuleFixes). For convenience; same data as diagnostics[].fixes. */
@@ -528,14 +534,26 @@ export function lintFile(
     for (const d of diags) staged.push(d);
   }
 
-  // Go applies directives after converting offsets, sharing usage with native rules.
+  const filtered = applyDisableDirectives({
+    comments:
+      staged.length > 0 && ruleContexts.length > 0
+        ? ruleContexts[0].ctx.sourceCode.getAllComments()
+        : [],
+    diagnostics: staged,
+    lineStartOffsets: lso,
+    textLength: sourceText.length,
+    collectUsage: req.collectDirectiveUsage === true,
+  });
+  if (filtered.usedDisableDirectives) {
+    result.usedDisableDirectives = filtered.usedDisableDirectives;
+  }
 
   // ── 8. UTF-16 → UTF-8 conversion + wire push ────────────────────
   // Building the per-character UTF-16→UTF-8 map is O(N) over the
   // source text. When the file produced no diagnostics (empirically
   // ~60% of files on a clean codebase), every byte of that map is
   // unused. Gate the build on having something to convert.
-  if (staged.length > 0) {
+  if (filtered.diagnostics.length > 0) {
     const u16ToByte = parsed.utf16ToByte ?? buildUtf16ToByteMap(sourceText);
     // `u16ToByte` indexes from 0 to `sourceText.length` inclusive (the
     // sentinel at `[length]` is the total byte count for one-past-end
@@ -615,7 +633,7 @@ export function lintFile(
       // Only framework-owned source fragments belong in the wire result.
       return parts ? { range, text, parts } : { range, text };
     };
-    for (const d of staged) {
+    for (const d of filtered.diagnostics) {
       d.startPos = toByte(d.startPos);
       d.endPos = toByte(d.endPos);
       if (d.fixes && d.fixes.length > 0) {

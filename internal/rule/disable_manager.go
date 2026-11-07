@@ -39,6 +39,10 @@ var directivePrefixes = []directivePrefix{
 type DisableManager struct {
 	mu         sync.Mutex
 	tracked    []trackedDirective
+	blocks     []int
+	lines      map[int][]int
+	usageIndex map[directiveUsageKey]*directiveEntry
+	trackUsage bool
 	sourceFile ast.SourceFileLike
 	comments   *CommentStore
 	parsed     bool
@@ -50,7 +54,13 @@ func NewDisableManager(sourceFile *ast.SourceFile, comments *CommentStore) *Disa
 	return &DisableManager{
 		sourceFile: sourceFile,
 		comments:   comments,
+		trackUsage: true,
 	}
+}
+
+// NewSuppressionManager retains lazy matching without unused-reporting metadata.
+func NewSuppressionManager(sourceFile *ast.SourceFile, comments *CommentStore) *DisableManager {
+	return &DisableManager{sourceFile: sourceFile, comments: comments}
 }
 
 func (dm *DisableManager) ensureParsed() {
@@ -100,9 +110,9 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		var commentContent string
 		switch comment.Kind {
 		case ast.KindSingleLineCommentTrivia:
-			commentContent = ecmascript.StringTrim(text[comment.Pos()+2 : comment.End()])
+			commentContent = strings.TrimLeftFunc(text[comment.Pos()+2:comment.End()], ecmascript.IsWhiteSpaceOrLineTerminator)
 		case ast.KindMultiLineCommentTrivia:
-			commentContent = ecmascript.StringTrim(text[comment.Pos()+2 : comment.End()-2])
+			commentContent = strings.TrimLeftFunc(text[comment.Pos()+2:comment.End()-2], ecmascript.IsWhiteSpaceOrLineTerminator)
 		default:
 			continue
 		}
@@ -116,7 +126,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
-		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
+		lineNum, column := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
 		endLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.End())
 		if kind == directiveLine && lineNum != endLine {
 			continue
@@ -125,7 +135,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		if kind == directiveNextLine {
 			targetLine = endLine + 1
 		}
-		tracked := trackedDirective{kind: kind, location: core.NewTextRange(comment.Pos(), comment.End()), line: targetLine}
+		tracked := trackedDirective{kind: kind, location: core.NewTextRange(comment.Pos(), comment.End()), line: targetLine, sourceLine: lineNum, column: int(column)}
 		if len(rules) == 0 {
 			tracked.entries = []directiveEntry{{}}
 		} else {
@@ -133,9 +143,19 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 				tracked.entries = append(tracked.entries, directiveEntry{name: name})
 			}
 		}
-		tracked.locateEntries(text, commentContent)
+		if dm.trackUsage {
+			tracked.locateEntries(text, commentContent)
+		}
+		index := len(dm.tracked)
 		dm.tracked = append(dm.tracked, tracked)
-
+		if kind == directiveBlock || kind == directiveEnable {
+			dm.blocks = append(dm.blocks, index)
+		} else {
+			if dm.lines == nil {
+				dm.lines = map[int][]int{}
+			}
+			dm.lines[targetLine] = append(dm.lines[targetLine], index)
+		}
 	}
 }
 
@@ -206,13 +226,10 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		return false
 	}
 	var active *directiveEntry
-	for i := range dm.tracked {
-		d := &dm.tracked[i]
+	for _, index := range dm.blocks {
+		d := &dm.tracked[index]
 		if d.location.Pos() > pos {
 			break
-		}
-		if d.kind != directiveBlock && d.kind != directiveEnable {
-			continue
 		}
 		for j := range d.entries {
 			e := &d.entries[j]
@@ -230,17 +247,16 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		}
 	}
 	if active != nil {
-		active.used = true
+		if dm.trackUsage {
+			active.used = true
+		}
 		return true
 	}
 	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
 	// Line directives form a separate pass. Their stable source ordering
 	// determines attribution when next-line and same-line comments overlap.
-	for i := range dm.tracked {
-		d := &dm.tracked[i]
-		if (d.kind != directiveLine && d.kind != directiveNextLine) || d.line != line {
-			continue
-		}
+	for _, index := range dm.lines[line] {
+		d := &dm.tracked[index]
 		for j := range d.entries {
 			e := &d.entries[j]
 			if e.invalid {
@@ -252,7 +268,9 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		}
 	}
 	if active != nil {
-		active.used = true
+		if dm.trackUsage {
+			active.used = true
+		}
 		return true
 	}
 	return false

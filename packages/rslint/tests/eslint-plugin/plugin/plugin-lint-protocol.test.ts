@@ -40,6 +40,20 @@ function input(
 }
 
 describe('buildPluginLintTasks', () => {
+  test('directive usage collection is selected independently per file', () => {
+    const tasks = buildPluginLintTasks(
+      input([
+        {
+          path: '/enabled.ts',
+          frame: new Uint8Array([1]),
+          collectDirectiveUsage: true,
+        },
+        { path: '/disabled.ts', frame: new Uint8Array([1]) },
+      ]),
+    );
+    expect(tasks[0].collectDirectiveUsage).toBe(true);
+    expect(tasks[1]).not.toHaveProperty('collectDirectiveUsage');
+  });
   test('forwards native source capabilities without decoding or reading files', () => {
     const frame = { lease: 1, offset: 0, length: 12 };
     const tasks = buildPluginLintTasks(input([{ path: '/missing.ts', frame }]));
@@ -128,6 +142,23 @@ describe('buildPluginLintTasks', () => {
 });
 
 describe('buildPluginLintResult', () => {
+  test('preserves an explicitly empty usage summary for enabled reporting', () => {
+    const result: LintFileResult = {
+      filePath: '/enabled.ts',
+      diagnostics: [],
+      fixes: [],
+      suggestionsCount: 0,
+      cancelled: false,
+      usedDisableDirectives: [],
+    };
+    expect(
+      buildPluginLintResult([result]).results[0].usedDisableDirectives,
+    ).toEqual([]);
+    delete result.usedDisableDirectives;
+    expect(buildPluginLintResult([result]).results[0]).not.toHaveProperty(
+      'usedDisableDirectives',
+    );
+  });
   test('projects to the 6-field wire shape, drops aggregate convenience fields', () => {
     const results: LintFileResult[] = [
       {

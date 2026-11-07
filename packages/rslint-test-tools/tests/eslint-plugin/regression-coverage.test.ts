@@ -1572,9 +1572,9 @@ describe('WorkerPool init treats any rejection as fatal (no undefined sentinel)'
   });
 });
 
-// Directive filtering and attribution belong to Go after transport.
-describe('plugin host returns unfiltered diagnostics', () => {
-  test('line disable comments leave host diagnostics for Go', () => {
+// Block directives require block comments; workers filter before transport.
+describe('plugin host filters disable directives', () => {
+  test('line comments cannot carry block disable directives', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1607,7 +1607,7 @@ describe('plugin host returns unfiltered diagnostics', () => {
     expect(result.diagnostics).toHaveLength(1);
   });
 
-  test('enable comments leave host diagnostics for Go', () => {
+  test('line comments cannot end block suppression', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1640,10 +1640,10 @@ describe('plugin host returns unfiltered diagnostics', () => {
       loaded,
     );
     expect(result.parseError).toBeUndefined();
-    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics).toHaveLength(0);
   });
 
-  test('block disable comments leave host diagnostics for Go', () => {
+  test('block disable comments suppress plugin diagnostics', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1672,7 +1672,7 @@ describe('plugin host returns unfiltered diagnostics', () => {
       },
       loaded,
     );
-    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics).toHaveLength(0);
   });
 });
 

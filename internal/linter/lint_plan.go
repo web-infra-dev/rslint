@@ -39,11 +39,10 @@ type programLintPlan struct {
 // checker policy as a coherent execution unit. Parallel
 // slices would allow these decisions to drift by index across plan reuse.
 type lintFilePlan struct {
-	hasDirectiveCandidate bool
-	skippedRules          map[string]bool
-	file                  *ast.SourceFile
-	rules                 *preparedRuleSet
-	hasTypeChecker        bool
+	skippedRules   map[string]bool
+	file           *ast.SourceFile
+	rules          *preparedRuleSet
+	hasTypeChecker bool
 }
 
 type lintPlanFileRef struct {
@@ -295,8 +294,7 @@ func resolveProgramLintPlanFile(
 	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
 	filePlan.rules = ruleSets.prepare(rules, filePlan.hasTypeChecker)
 
-	filePlan.hasDirectiveCandidate = rule.MayContainDisableDirective(file.Text())
-	if filePlan.hasDirectiveCandidate && !filePlan.hasTypeChecker {
+	if !filePlan.hasTypeChecker {
 		for _, r := range rules {
 			if r.RequiresTypeInfo {
 				if filePlan.skippedRules == nil {

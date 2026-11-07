@@ -696,8 +696,11 @@ func TestPipelineUnusedDirectives(t *testing.T) {
 					if tc.fail {
 						return nil, errors.New("plugin failed")
 					}
-					pos := strings.Index(tc.source, "debugger")
-					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", StartPos: pos, EndPos: pos + 8, Message: "plugin"}}}}}, nil
+					if !req.Files[0].CollectDirectiveUsage {
+						t.Fatal("missing per-file usage request")
+					}
+					name := "plugin/check"
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, UsedDisableDirectives: []rule.DisableDirectiveUsage{{Line: 0, Column: 0, RuleID: &name}}}}}, nil
 				})
 				result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{Plugin: mode}, dispatch))
 				if err != nil {
@@ -763,6 +766,102 @@ func TestUnusedDirectiveMultiplePluginBatches(t *testing.T) {
 	}
 	if got := state.complete(false, false, "/test.ts"); len(got) != 1 {
 		t.Fatalf("last batch produced %d reports", len(got))
+	}
+}
+
+func TestPipelineUnusedDirectiveUsageValidation(t *testing.T) {
+	name := "plugin/check"
+	for _, tc := range []struct {
+		name   string
+		usage  []rule.DisableDirectiveUsage
+		failed bool
+	}{
+		{"missing", nil, true},
+		{"empty", []rule.DisableDirectiveUsage{}, false},
+		{"unknown", []rule.DisableDirectiveUsage{{Line: 9, RuleID: &name}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			generation := pipelineTestGeneration(t, root, path, "/* eslint-disable plugin/check */\nx();", []rule.ConfiguredRule{{Name: name, Severity: rule.SeverityError, IsEslintPluginRule: true}}, &EslintPluginFileConfig{})
+			generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+			result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, UsedDisableDirectives: tc.usage}}}, nil
+			})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics, _ := result.Observation.CompleteDiagnostics()
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics: %+v", diagnostics)
+			}
+			if tc.failed {
+				if diagnostics[0].RuleName != "rslint/plugin-lint-error" || len(diagnostics[0].Fixes()) != 0 {
+					t.Fatalf("unsafe failure result: %+v", diagnostics)
+				}
+			} else if diagnostics[0].RuleName != "" || len(diagnostics[0].Fixes()) != 1 {
+				t.Fatalf("missing unused fix: %+v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestPipelineUnusedReportingOffSkipsUsageState(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path := tspath.ResolvePath(root, "source.ts")
+	generation := pipelineTestGeneration(t, root, path, "/* eslint-disable plugin/check */\nx();", []rule.ConfiguredRule{{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true}}, &EslintPluginFileConfig{})
+	generation.Native.DirectiveRuleExists = func(string, string) bool { t.Fatal("off reporting parsed directive state"); return false }
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if req.Files[0].CollectDirectiveUsage {
+			t.Fatal("off reporting requested usage")
+		}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path}}}, nil
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 0 {
+		t.Fatalf("off reporting emitted diagnostics: %+v", diagnostics)
+	}
+}
+
+func TestPipelineDirectiveUsageSelectionIsPerFile(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	onPath := tspath.ResolvePath(root, "on.ts")
+	offPath := tspath.ResolvePath(root, "off.ts")
+	source := "/* eslint-disable plugin/check */\nx();"
+	rules := []rule.ConfiguredRule{{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true}}
+	generation := pipelineTestGeneration(t, root, onPath, source, rules, &EslintPluginFileConfig{})
+	generation.Native.Programs = append(generation.Native.Programs, pipelineTestProgram(t, root, offPath, source))
+	generation.Native.TargetsByProgram = append(generation.Native.TargetsByProgram, []string{offPath})
+	generation.Target.Path = nil
+	generation.Native.UnusedDirectiveSeverity = func(path string) rule.DiagnosticSeverity {
+		if path == onPath {
+			return rule.SeverityWarning
+		}
+		return rule.SeverityOff
+	}
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		result := &EslintPluginLintResult{}
+		for _, file := range req.Files {
+			if file.CollectDirectiveUsage != (file.Path == onPath) {
+				t.Fatalf("wrong per-file collection: %+v", file)
+			}
+			row := EslintPluginFileResult{FilePath: file.Path}
+			if file.CollectDirectiveUsage {
+				row.UsedDisableDirectives = []rule.DisableDirectiveUsage{}
+			}
+			result.Results = append(result.Results, row)
+		}
+		return result, nil
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 1 || diagnostics[0].FilePath != onPath || diagnostics[0].RuleName != "" {
+		t.Fatalf("wrong per-file unused reports: %+v", diagnostics)
 	}
 }
 

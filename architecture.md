@@ -1443,23 +1443,33 @@ Rslint supports inline directives with both `rslint-` and `eslint-` prefixes:
 - `/* rslint-disable @typescript-eslint/no-unsafe-assignment */`
 - `// eslint-disable-next-line`
 
-The Go `DisableManager` owns directive parsing, suppression attribution, and
-unused reporting for native and Node plugin diagnostics. One state belongs to
-one file and execution round. Native rules consult it before building fixes;
-Node returns unfiltered diagnostics and Go applies the same state after position
-conversion. Files without candidate directive text do not scan comments.
+Native rules use a lazy Go `DisableManager`; Node plugin workers suppress
+reports before UTF-16-to-UTF-8 conversion and serialization. Both matchers use
+ESLint's block-before-line attribution and the same conformance corpus. Native
+line directives use a per-line lookup instead of scanning all directives for
+each report.
 
-The pipeline freezes directive data with a text-only source frame while syntax
-is leased. Native and plugin completion join per file; finalization happens
-once, including zero-rule files. Failure, missing plugin results, and cancellation
-suppress unused reports. Each source-changing fix round creates new state.
-Progressive LSP continuations retain no Program or AST through this state and
-publish through the existing source-version checks.
+Unused reporting creates a frozen, text-only Go state only for files whose
+effective severity is enabled and whose text contains a directive candidate.
+The plugin request's per-file `collectDirectiveUsage` asks Node to return a
+deduplicated `usedDisableDirectives` summary alongside visible diagnostics.
+Each entry identifies the original comment's zero-based ECMAScript line,
+UTF-16 column, and declared rule ID (`null` for a wildcard). Go validates the
+entire summary against that file's parsed entries before marking usage. Missing
+or unknown summaries are visible protocol failures and suppress unused reports
+and their fixes for the file.
+
+Native and plugin completion join per file; finalization happens once, including
+zero-rule files. Failure, missing plugin results, and cancellation suppress
+unused reports. Each source-changing fix round creates new state. Progressive
+LSP continuations retain no Program or AST through this state and publish
+through the existing source-version checks.
 
 `linterOptions.reportUnusedDisableDirectives` is resolved per file independently
 of its enabled rules. Explicit CLI settings override it. Reporting defaults to
-off. API protocol 6 and config-discovery protocol 4 require matching peers for
-the changed unfiltered plugin-result contract.
+off; the disabled path creates no unused-reporting state or usage summary.
+API protocol 6 and config-discovery protocol 4 require matching peers for the
+filtered plugin-result and usage-summary contract.
 
 ## 9. CLI Flow
 
@@ -2240,7 +2250,7 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.1.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `6.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 

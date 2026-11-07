@@ -13,6 +13,12 @@
  *     was the missing piece.
  */
 import { describe, test, expect } from 'rstack/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { applyDisableDirectives } from '../../../../rslint/src/eslint-plugin/linter/apply-disable-directives.js';
+import { buildLineStartOffsets } from '../../../../rslint/src/languages/js/positions.js';
+import type { Comment } from '../../../../rslint/src/languages/js/token-builder.js';
 
 import { lintFile } from '../project-frame.js';
 import type { LoadedPlugins } from '../../../../rslint/src/eslint-plugin/plugin/plugin-loader.js';
@@ -257,14 +263,241 @@ describe('sourceCode.getDisableDirectives: rslint-* prefix recognition', () => {
   });
 });
 
-test('returns suppressed plugin diagnostics for shared Go attribution', () => {
+test('returns used entry locations instead of suppressed plugin diagnostics', () => {
   const loaded = makeReportingPlugin((ctx) => {
     ctx.report({ loc: { line: 2, column: 0 }, message: 'reported to Go' });
   });
   const result = lintFile(
-    defaultRequest('/* eslint-disable stub/probe */\nconst x = 1;\n'),
+    {
+      ...defaultRequest('/* eslint-disable stub/probe */\nconst x = 1;\n'),
+      collectDirectiveUsage: true,
+    },
     loaded,
   );
-  expect(result.diagnostics).toHaveLength(1);
-  expect(result.diagnostics[0].message).toBe('reported to Go');
+  expect(result.diagnostics).toHaveLength(0);
+  expect(result.usedDisableDirectives).toEqual([
+    { line: 0, column: 0, ruleId: 'stub/probe' },
+  ]);
+});
+
+test('disable filtering and usage attribution match the shared ESLint corpus', () => {
+  const require = createRequire(import.meta.url);
+  const espree = require('espree') as {
+    tokenize(text: string, options: object): { comments: Comment[] };
+  };
+  const coreRequire = createRequire(
+    new URL('../../../../rslint/package.json', import.meta.url),
+  );
+  const { ConfigCommentParser } = coreRequire('@eslint/plugin-kit') as {
+    ConfigCommentParser: new () => {
+      parseDirective(
+        value: string,
+      ): { label: string; value: string } | undefined;
+      parseListConfig(value: string): Record<string, boolean>;
+    };
+  };
+  const parser = new ConfigCommentParser();
+  interface Corpus {
+    cases: Array<{
+      name: string;
+      source: string;
+      rslintSource: string;
+      reports: Array<{ ruleId: string; pos: number; suppressed: boolean }>;
+      ignored?: string[];
+      invalidRules?: string[];
+      variants: Array<{
+        severity: string;
+        diagnostics: Array<{ line: number; column: number; message: string }>;
+      }>;
+    }>;
+  }
+  let reports = 0;
+  let entries = 0;
+  for (const file of ['source.json', 'upstream.json']) {
+    const corpus = JSON.parse(
+      fs.readFileSync(
+        path.resolve(
+          import.meta.dirname,
+          '../../../../../internal/rule/testdata/eslint-directives',
+          file,
+        ),
+        'utf8',
+      ),
+    ) as Corpus;
+    expect(corpus.cases.length).toBeGreaterThan(0);
+    for (const item of corpus.cases) {
+      for (const source of [item.source, item.rslintSource]) {
+        const comments = espree.tokenize(source, {
+          ecmaVersion: 'latest',
+          range: true,
+          loc: true,
+          comment: true,
+        }).comments;
+        const lineStarts = buildLineStartOffsets(source);
+        for (const reverse of [false, true]) {
+          const diagnosticInputs = item.reports.map((report, index) => ({
+            ruleName: report.ruleId,
+            startPos: report.pos,
+            endPos: report.pos,
+            message: String(index),
+          }));
+          if (reverse) diagnosticInputs.reverse();
+          const filtered = applyDisableDirectives({
+            comments,
+            diagnostics: diagnosticInputs,
+            lineStartOffsets: lineStarts,
+            textLength: source.length,
+            collectUsage: true,
+          });
+          const visible = new Set(
+            filtered.diagnostics.map((d) => Number(d.message)),
+          );
+          item.reports.forEach((report, index) => {
+            reports++;
+            expect(visible.has(index), item.name).toBe(!report.suppressed);
+          });
+          const variant = item.variants.find((v) => v.severity !== 'off');
+          const usedKeys = new Set(
+            (filtered.usedDisableDirectives ?? []).map((usage) =>
+              JSON.stringify([
+                lineStarts[usage.line] + usage.column,
+                usage.ruleId,
+              ]),
+            ),
+          );
+          if (variant) {
+            for (const comment of comments) {
+              if (comment.type !== 'Line' && comment.type !== 'Block') continue;
+              const parsed = parser.parseDirective(comment.value);
+              const label = parsed?.label.replace(/^rslint-/u, 'eslint-');
+              if (
+                !parsed ||
+                ![
+                  'eslint-disable',
+                  'eslint-disable-line',
+                  'eslint-disable-next-line',
+                ].includes(label ?? '')
+              )
+                continue;
+              if (label === 'eslint-disable' && comment.type === 'Line')
+                continue;
+              if (
+                label === 'eslint-disable-line' &&
+                comment.loc.start.line !== comment.loc.end.line
+              )
+                continue;
+              const names = Object.keys(parser.parseListConfig(parsed.value));
+              for (const name of names.length ? names : [null]) {
+                if (
+                  name !== null &&
+                  (item.invalidRules?.includes(name) ||
+                    item.ignored?.includes(name))
+                )
+                  continue;
+                if (name === null && (item.ignored?.length ?? 0) > 0) continue;
+                const unused = variant.diagnostics.some(
+                  (d) =>
+                    d.message.startsWith('Unused eslint-disable') &&
+                    lineStarts[d.line - 1] + d.column - 1 ===
+                      comment.range[0] &&
+                    (name === null || d.message.includes(`'${name}'`)),
+                );
+                expect(
+                  usedKeys.has(JSON.stringify([comment.range[0], name])),
+                  item.name,
+                ).toBe(!unused);
+              }
+            }
+          }
+          for (const usage of filtered.usedDisableDirectives ?? []) {
+            entries++;
+            const offset = lineStarts[usage.line] + usage.column;
+            expect(
+              comments.some((c) => c.range[0] === offset),
+              item.name,
+            ).toBe(true);
+            if (variant) {
+              expect(
+                variant.diagnostics.some(
+                  (d) =>
+                    d.message.startsWith('Unused eslint-disable') &&
+                    lineStarts[d.line - 1] + d.column - 1 === offset &&
+                    (usage.ruleId === null ||
+                      d.message.includes(`'${usage.ruleId}'`)),
+                ),
+                item.name,
+              ).toBe(false);
+            }
+          }
+          // Every original suppression-only input still works without summary collection.
+          const withoutUsage = applyDisableDirectives({
+            comments,
+            diagnostics: diagnosticInputs,
+            lineStartOffsets: lineStarts,
+            textLength: source.length,
+            collectUsage: false,
+          });
+          expect(withoutUsage.usedDisableDirectives).toBeUndefined();
+          expect(withoutUsage.diagnostics).toEqual(filtered.diagnostics);
+        }
+      }
+    }
+  }
+  expect(reports).toBe(10012);
+  expect(entries).toBeGreaterThan(0);
+});
+
+test('usage summary distinguishes partial, wildcard and repeated directives', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const source of [
+      `// 😀\r\n/* ${prefix}-disable stub/probe, other/check */\r\nx();`,
+      `// 😀\r\n/* ${prefix}-disable */\r\nx();`,
+      `/* ${prefix}-disable stub/probe */\n/* ${prefix}-disable stub/probe */\nx();`,
+      `// ${prefix}-disable-next-line stub/probe\n`,
+      `// 😀\r\n/* ${prefix}-disable stub/probe -- */\r\nx();`,
+    ]) {
+      const loaded = makeReportingPlugin((ctx) => {
+        const lines = buildLineStartOffsets(source);
+        const line = lines.length;
+        ctx.report({ loc: { line, column: 0 }, message: 'first' });
+        ctx.report({ loc: { line, column: 0 }, message: 'second' });
+      });
+      const result = lintFile(
+        { ...defaultRequest(source), collectDirectiveUsage: true },
+        loaded,
+      );
+      expect(result.parseError).toBeUndefined();
+      expect(result.diagnostics).toEqual([]);
+      expect(result.usedDisableDirectives).toHaveLength(1);
+      expect(result.usedDisableDirectives?.[0]).toEqual({
+        line: source.startsWith(`// ${prefix}-disable-next-line`) ? 0 : 1,
+        column: 0,
+        ruleId: source.includes(`/* ${prefix}-disable */`)
+          ? null
+          : 'stub/probe',
+      });
+    }
+  }
+});
+
+test('usage locations use UTF-16 columns against BOM-stripped source', () => {
+  for (const bom of ['', '\ufeff']) {
+    const loaded = makeReportingPlugin((ctx) => {
+      ctx.report({ loc: { line: 2, column: 0 }, message: 'hidden' });
+    });
+    const result = lintFile(
+      {
+        ...defaultRequest(
+          `${bom}"😀"; /* eslint-disable stub/probe */\r\nx();`,
+        ),
+        collectDirectiveUsage: true,
+      },
+      loaded,
+    );
+    expect(result.parseError).toBeUndefined();
+    expect(result.diagnostics).toEqual([]);
+    expect(result.usedDisableDirectives).toEqual([
+      { line: 0, column: 6, ruleId: 'stub/probe' },
+    ]);
+  }
 });

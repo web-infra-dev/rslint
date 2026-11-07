@@ -1,6 +1,9 @@
 package rule
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"strings"
 
@@ -20,7 +23,86 @@ type trackedDirective struct {
 	kind               directiveKind
 	location           core.TextRange
 	line               int
+	sourceLine, column int
 	entries            []directiveEntry
+}
+
+// DisableDirectiveUsage identifies a rule entry by its original comment's
+// zero-based ECMAScript line and UTF-16 column. Nil RuleID means a wildcard.
+type DisableDirectiveUsage struct {
+	Line   int     `json:"line"`
+	Column int     `json:"column"`
+	RuleID *string `json:"ruleId"`
+}
+
+func (usage *DisableDirectiveUsage) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Line   *int            `json:"line"`
+		Column *int            `json:"column"`
+		RuleID json.RawMessage `json:"ruleId"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Line == nil || wire.Column == nil || *wire.Line < 0 || *wire.Column < 0 || len(wire.RuleID) == 0 {
+		return errors.New("disable directive usage requires a nonnegative line, column, and a declared ruleId")
+	}
+	var name *string
+	if err := json.Unmarshal(wire.RuleID, &name); err != nil {
+		return err
+	}
+	if name != nil && *name == "" {
+		return errors.New("disable directive usage ruleId must be nonempty or null")
+	}
+	*usage = DisableDirectiveUsage{Line: *wire.Line, Column: *wire.Column, RuleID: name}
+	return nil
+}
+
+type directiveUsageKey struct {
+	line, column int
+	name         string
+}
+
+// MarkUsedDirectives validates the whole summary before changing usage. Unknown
+// entries are protocol errors: treating them as unused could erase a valid disable.
+func (dm *DisableManager) MarkUsedDirectives(usages []DisableDirectiveUsage) error {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	dm.ensureParsed()
+	if dm.usageIndex == nil {
+		dm.usageIndex = map[directiveUsageKey]*directiveEntry{}
+		for i := range dm.tracked {
+			d := &dm.tracked[i]
+			if d.kind == directiveEnable {
+				continue
+			}
+			for j := range d.entries {
+				e := &d.entries[j]
+				if !e.invalid {
+					dm.usageIndex[directiveUsageKey{d.sourceLine, d.column, e.name}] = e
+				}
+			}
+		}
+	}
+	entries := make([]*directiveEntry, 0, len(usages))
+	for _, usage := range usages {
+		name := ""
+		if usage.RuleID != nil {
+			name = *usage.RuleID
+			if name == "" {
+				return fmt.Errorf("empty named disable entry at %d:%d", usage.Line, usage.Column)
+			}
+		}
+		entry := dm.usageIndex[directiveUsageKey{usage.Line, usage.Column, name}]
+		if entry == nil {
+			return fmt.Errorf("unknown disable entry at %d:%d for %q", usage.Line, usage.Column, name)
+		}
+		entries = append(entries, entry)
+	}
+	for _, entry := range entries {
+		entry.used = true
+	}
+	return nil
 }
 
 // Freeze parses while syntax is leased and replaces it with a text-only frame.

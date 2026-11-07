@@ -44,7 +44,6 @@ func validatePrograms(sourcePrograms []*program.Program) error {
 // not change a prepared plan's meaning.
 type programRunOptions struct {
 	directives           directiveStates
-	directivesPrepared   bool
 	Cwd                  string
 	CollectExecutedRules bool
 	SingleThreaded       bool
@@ -163,12 +162,10 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// Pipeline calls use the frozen state shared with plugin diagnostics.
 		// Standalone native calls retain lazy directive parsing.
 		var disableManager *rule.DisableManager
-		if opts.directivesPrepared {
-			if state := opts.directives[file.FileName()]; state != nil {
-				disableManager = state.manager
-			}
+		if state := opts.directives[file.FileName()]; state != nil {
+			disableManager = state.manager
 		} else {
-			disableManager = rule.NewDisableManager(file, comments)
+			disableManager = rule.NewSuppressionManager(file, comments)
 		}
 
 		// A cheap source-text check inside each parser avoids asking the store

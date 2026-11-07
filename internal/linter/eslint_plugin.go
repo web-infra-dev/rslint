@@ -33,12 +33,13 @@ type EslintPluginRuleConfig struct {
 }
 
 type EslintPluginLintFile struct {
-	Path            string         `json:"path"`
-	Frame           []byte         `json:"frame,omitempty"`
-	FrameAttachment *uint32        `json:"frameAttachment,omitempty"`
-	ConfigKey       string         `json:"configKey"`
-	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
-	Settings        map[string]any `json:"settings,omitempty"`
+	CollectDirectiveUsage bool           `json:"collectDirectiveUsage,omitempty"`
+	Path                  string         `json:"path"`
+	Frame                 []byte         `json:"frame,omitempty"`
+	FrameAttachment       *uint32        `json:"frameAttachment,omitempty"`
+	ConfigKey             string         `json:"configKey"`
+	LanguageOptions       map[string]any `json:"languageOptions,omitempty"`
+	Settings              map[string]any `json:"settings,omitempty"`
 }
 
 type EslintPluginLintRequest struct {
@@ -110,12 +111,13 @@ type EslintPluginRuleError struct {
 }
 
 type EslintPluginFileResult struct {
-	FilePath    string                   `json:"filePath"`
-	Diagnostics []EslintPluginDiagnostic `json:"diagnostics"`
-	ParseError  string                   `json:"parseError,omitempty"`
-	Cancelled   bool                     `json:"cancelled"`
-	RuleErrors  []EslintPluginRuleError  `json:"ruleErrors,omitempty"`
-	RuleTimes   map[string]float64       `json:"ruleTimes,omitempty"`
+	UsedDisableDirectives []rule.DisableDirectiveUsage `json:"usedDisableDirectives"`
+	FilePath              string                       `json:"filePath"`
+	Diagnostics           []EslintPluginDiagnostic     `json:"diagnostics"`
+	ParseError            string                       `json:"parseError,omitempty"`
+	Cancelled             bool                         `json:"cancelled"`
+	RuleErrors            []EslintPluginRuleError      `json:"ruleErrors,omitempty"`
+	RuleTimes             map[string]float64           `json:"ruleTimes,omitempty"`
 }
 
 type EslintPluginLintResult struct {
@@ -824,11 +826,12 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, collectFixes bool, 
 	wireFiles := make([]EslintPluginLintFile, 0, len(batch))
 	for _, f := range batch {
 		wireFiles = append(wireFiles, EslintPluginLintFile{
-			Path:            f.Path,
-			Frame:           f.Frame[:len(f.Frame):len(f.Frame)],
-			ConfigKey:       f.ConfigKey,
-			LanguageOptions: f.LanguageOptions,
-			Settings:        f.Settings,
+			CollectDirectiveUsage: f.directives != nil,
+			Path:                  f.Path,
+			Frame:                 f.Frame[:len(f.Frame):len(f.Frame)],
+			ConfigKey:             f.ConfigKey,
+			LanguageOptions:       f.LanguageOptions,
+			Settings:              f.Settings,
 		})
 	}
 	return EslintPluginLintRequest{
@@ -916,6 +919,19 @@ func applyEslintPluginResults(
 			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
 				"rule error: "+re.Message))
 		}
+		directiveFailure := len(fr.RuleErrors) > 0
+		if f.directives != nil && !directiveFailure {
+			var usageErr error
+			if fr.UsedDisableDirectives == nil {
+				usageErr = errors.New("missing disable directive usage summary")
+			} else {
+				usageErr = f.directives.manager.MarkUsedDirectives(fr.UsedDisableDirectives)
+			}
+			if usageErr != nil {
+				directiveFailure = true
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, "rslint/plugin-lint-error", "ESLint plugin directive usage failed: "+usageErr.Error()))
+			}
+		}
 
 		for _, d := range fr.Diagnostics {
 			sev, known := sevByRule[d.RuleName]
@@ -930,9 +946,6 @@ func applyEslintPluginResults(
 				}
 			}
 			start := clamp(d.StartPos)
-			if f.directives != nil && f.directives.manager.IsRuleDisabled(d.RuleName, start) {
-				continue
-			}
 			end := clamp(d.EndPos)
 			if end < start {
 				end = start
@@ -949,7 +962,7 @@ func applyEslintPluginResults(
 			}
 			onDiagnostic(rd)
 		}
-		for _, diagnostic := range f.directives.complete(false, len(fr.RuleErrors) > 0, f.Path) {
+		for _, diagnostic := range f.directives.complete(false, directiveFailure, f.Path) {
 			onDiagnostic(diagnostic)
 		}
 	}

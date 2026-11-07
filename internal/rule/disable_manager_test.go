@@ -656,6 +656,8 @@ func TestUnusedDisableDirectives(t *testing.T) {
 		{"partial first", "/* eslint-disable a, b -- reason */\nx();", "b", "/* eslint-disable b -- reason */\nx();", 1},
 		{"rule name substring", "/* eslint-disable bar, a -- reason */\nx();", "bar", "/* eslint-disable bar -- reason */\nx();", 1},
 		{"partial last", "/* eslint-disable a, b -- reason */\nx();", "a", "/* eslint-disable a -- reason */\nx();", 1},
+		{"empty explanation", "/* eslint-disable a, b -- */\nx();", "a", "/* eslint-disable a -- */\nx();", 1},
+		{"used empty explanation", "/* eslint-disable a -- */\nx();", "a", "", 0},
 		{"unused enable", "/* eslint-enable a */\nx();", "", " \nx();", 1},
 		{"matched enable", "/* eslint-disable a */\nx();\n/* eslint-enable a */", "a", "", 0},
 		{"rslint next line", "// rslint-disable-next-line a\nx();", "a", "", 0},
@@ -820,6 +822,75 @@ func TestUnusedDirectiveSkippedRules(t *testing.T) {
 	}
 	if got := dm.UnusedDiagnostics("/test.ts", SeverityOff, EditDemandAutofix, nil); len(got) != 0 {
 		t.Fatal("off produced unused diagnostics")
+	}
+}
+
+func TestUnusedDirectiveUsageLocations(t *testing.T) {
+	name := "a"
+	for _, tc := range []struct {
+		name, source string
+		usage        DisableDirectiveUsage
+	}{
+		{"partial with Unicode and CRLF", "// 😀\r\nconst x = 1; /* eslint-disable a, b */\r\nx();", DisableDirectiveUsage{Line: 1, Column: 13, RuleID: &name}},
+		{"UTF-16 column", "\"😀\"; /* eslint-disable a, b */\nx();", DisableDirectiveUsage{Line: 0, Column: 6, RuleID: &name}},
+		{"wildcard", "/* eslint-disable */\nx();", DisableDirectiveUsage{Line: 0, Column: 0}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sf := parseCommentStoreSource(t, tc.source)
+			manager := NewDisableManager(sf, NewCommentStore(sf))
+			manager.Freeze(sf)
+			if err := manager.MarkUsedDirectives([]DisableDirectiveUsage{tc.usage, tc.usage}); err != nil {
+				t.Fatal(err)
+			}
+			diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil)
+			if tc.usage.RuleID == nil {
+				if len(diagnostics) != 0 {
+					t.Fatalf("used wildcard reported unused: %+v", diagnostics)
+				}
+			} else if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "'b'") || strings.Contains(diagnostics[0].Message.Description, "'a'") {
+				t.Fatalf("wrong partial usage: %+v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestUnusedDirectiveUsageRejectsUnknownEntriesAtomically(t *testing.T) {
+	source := "/* eslint-disable a, b */\nx();\n/* eslint-enable a */"
+	sf := parseCommentStoreSource(t, source)
+	name := "a"
+	for _, invalid := range []DisableDirectiveUsage{
+		{Line: -1, Column: 0, RuleID: &name},
+		{Line: 0, Column: 1, RuleID: &name},
+		{Line: 2, Column: 0, RuleID: &name},
+		{Line: 0, Column: 0},
+	} {
+		manager := NewDisableManager(sf, NewCommentStore(sf))
+		if err := manager.MarkUsedDirectives([]DisableDirectiveUsage{{Line: 0, Column: 0, RuleID: &name}, invalid}); err == nil {
+			t.Fatalf("accepted invalid summary: %+v", invalid)
+		}
+		diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil)
+		if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "'a' or 'b'") {
+			t.Fatalf("invalid summary partially marked usage: %+v", diagnostics)
+		}
+	}
+}
+
+func TestUnusedDirectiveUsageDecode(t *testing.T) {
+	for _, input := range []string{
+		`{}`, `{"line":0,"column":0}`, `{"line":null,"column":0,"ruleId":null}`,
+		`{"line":0,"column":-1,"ruleId":null}`, `{"line":0,"column":0,"ruleId":""}`,
+		`{"line":0,"column":0,"ruleId":1}`, `null`,
+	} {
+		var usage DisableDirectiveUsage
+		if err := json.Unmarshal([]byte(input), &usage); err == nil {
+			t.Fatalf("accepted malformed usage %s", input)
+		}
+	}
+	for _, input := range []string{`{"line":0,"column":0,"ruleId":null}`, `{"line":1,"column":3,"ruleId":"a"}`} {
+		var usage DisableDirectiveUsage
+		if err := json.Unmarshal([]byte(input), &usage); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

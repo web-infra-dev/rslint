@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -52,8 +53,13 @@ func prepareDirectiveStates(plan *LintPlan, generation Generation, policy Observ
 	for _, program := range plan.programs {
 		for _, file := range program.files {
 			source := file.file
-			// Avoid scanning comments or retaining state on the ordinary no-directive path.
-			if !file.hasDirectiveCandidate {
+			severity := rule.SeverityOff
+			if generation.Native.UnusedDirectiveSeverity != nil {
+				severity = generation.Native.UnusedDirectiveSeverity(source.FileName())
+			}
+			// Suppression stays lazy in native execution and local to Node. Only
+			// unused reporting needs a frozen state shared across producers.
+			if severity == rule.SeverityOff || !rule.MayContainDisableDirective(source.Text()) {
 				continue
 			}
 			manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
@@ -61,11 +67,7 @@ func prepareDirectiveStates(plan *LintPlan, generation Generation, policy Observ
 				manager.ValidateRules(func(name string) bool { return generation.Native.DirectiveRuleExists(source.FileName(), name) })
 			}
 			manager.Freeze(diagnosticTextSource(source))
-			severity := rule.SeverityOff
-			if generation.Native.UnusedDirectiveSeverity != nil {
-				severity = generation.Native.UnusedDirectiveSeverity(source.FileName())
-			}
-			f := &fileDirectives{manager: manager, path: projectTargetPath(generation.Target.Path, source.FileName()), severity: severity, demand: policy.Demand.Native | policy.Demand.Plugin, pluginDone: file.rules == nil || len(file.rules.plugins) == 0, ignored: file.skippedRules}
+			f := &fileDirectives{manager: manager, path: projectTargetPath(generation.Target.Path, source.FileName()), severity: severity, demand: policy.Demand.Native | policy.Demand.Plugin, pluginDone: file.rules == nil || len(file.rules.plugins) == 0, ignored: maps.Clone(file.skippedRules)}
 			if generation.Native.SkippedDirectiveRules != nil {
 				for _, name := range generation.Native.SkippedDirectiveRules(source.FileName()) {
 					if f.ignored == nil {
