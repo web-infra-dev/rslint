@@ -5,6 +5,7 @@ import { lint, type LintResponse } from '@rslint/core/internal';
 import assert from 'node:assert';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
+import { rejectFocusedCases } from '../src/util/reject-focused-cases';
 
 type TestLanguageOptions = NonNullable<RslintConfigEntry['languageOptions']>;
 
@@ -109,19 +110,14 @@ export class RuleTester {
     },
     testName = ruleName,
   ) {
+    rejectFocusedCases(cases);
     describe(testName, () => {
       const cwd = path.resolve(import.meta.dirname);
       const config = path.resolve(cwd, './rslint.config.mjs');
 
-      let hasOnly =
-        cases.valid.some((x) => typeof x === 'object' && x.only) ||
-        cases.invalid.some((x) => x.only);
-
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) continue;
-          if (hasOnly && (typeof validCase === 'string' || !validCase.only))
-            continue;
 
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
@@ -175,7 +171,6 @@ export class RuleTester {
       test('invalid', async () => {
         for (const item of cases.invalid) {
           if (item.skip) continue;
-          if (hasOnly && !item.only) continue;
 
           const {
             code,

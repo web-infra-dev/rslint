@@ -237,6 +237,26 @@ const defaultRuleTesterOptions: RuleTesterOptions = {
     },
   },
 };
+// All cases of a rule run inside one `test('valid')` and one `test('invalid')`,
+// so the test runner never sees a focused case. Honoring `only: true` here
+// would silently skip every other case of the rule while the run still passes,
+// so focused cases are rejected instead, matching the Go rule tester.
+// `packages/rslint-test-tools/tests/src/util/reject-focused-cases.ts` holds the
+// same check for the plugin-specific rule-testers.
+function rejectFocusedCases(cases: {
+  valid: ValidTestCase[];
+  invalid: InvalidTestCase[];
+}): void {
+  if (
+    cases.valid.some((x) => typeof x === 'object' && x.only) ||
+    cases.invalid.some((x) => x.only)
+  ) {
+    throw new Error(
+      "focused rule test cases (only) are not allowed; select tests with the test runner's filters instead",
+    );
+  }
+}
+
 export class RuleTester {
   options: RuleTesterOptions;
   constructor(options: RuleTesterOptions = defaultRuleTesterOptions) {
@@ -264,6 +284,7 @@ export class RuleTester {
       ? `${ruleName} - ${options.description}`
       : ruleName;
 
+    rejectFocusedCases(cases);
     describe(testSuiteName, () => {
       // Use the rule name as-is (no splitting)
       ruleName = '@typescript-eslint/' + ruleName;
@@ -272,27 +293,10 @@ export class RuleTester {
         process.cwd();
       const config = path.resolve(cwd, './rslint.config.mjs');
 
-      // test whether case has only
-      let hasOnly =
-        cases.valid.some((x) => {
-          if (typeof x === 'object' && x.only) {
-            return true;
-          } else {
-            return false;
-          }
-        }) || cases.invalid.some((x) => x.only);
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
             continue;
-          }
-          if (hasOnly) {
-            if (typeof validCase === 'string') {
-              continue;
-            }
-            if (!validCase.only) {
-              continue;
-            }
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
@@ -349,18 +353,8 @@ export class RuleTester {
       });
       test('invalid', async (t) => {
         for (const item of cases.invalid) {
-          const {
-            code,
-            errors,
-            only = false,
-            skip = false,
-            output,
-            options = [],
-          } = item;
+          const { code, errors, skip = false, output, options = [] } = item;
           if (skip) {
-            continue;
-          }
-          if (hasOnly && !only) {
             continue;
           }
           const languageOptions = mergeLanguageOptions(
