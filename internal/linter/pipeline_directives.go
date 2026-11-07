@@ -1,7 +1,6 @@
 package linter
 
 import (
-	"maps"
 	"sync"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -67,7 +66,15 @@ func prepareDirectiveStates(plan *LintPlan, generation Generation, policy Observ
 				manager.ValidateRules(func(name string) bool { return generation.Native.DirectiveRuleExists(source.FileName(), name) })
 			}
 			manager.Freeze(diagnosticTextSource(source))
-			f := &fileDirectives{manager: manager, path: projectTargetPath(generation.Target.Path, source.FileName()), severity: severity, demand: policy.Demand.Native | policy.Demand.Plugin, pluginDone: file.rules == nil || len(file.rules.plugins) == 0, ignored: maps.Clone(file.skippedRules)}
+			f := &fileDirectives{manager: manager, path: projectTargetPath(generation.Target.Path, source.FileName()), severity: severity, demand: policy.Demand.Native | policy.Demand.Plugin, pluginDone: file.rules == nil || len(file.rules.plugins) == 0}
+			for _, configured := range file.unfilteredRules {
+				if configured.RequiresTypeInfo {
+					if f.ignored == nil {
+						f.ignored = map[string]bool{}
+					}
+					f.ignored[configured.Name] = true
+				}
+			}
 			if generation.Native.SkippedDirectiveRules != nil {
 				for _, name := range generation.Native.SkippedDirectiveRules(source.FileName()) {
 					if f.ignored == nil {

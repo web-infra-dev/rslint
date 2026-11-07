@@ -447,6 +447,50 @@ test('disable filtering and usage attribution match the shared ESLint corpus', (
   expect(entries).toBeGreaterThan(0);
 });
 
+test('suppression normalizes exceptional positions in both collection modes', () => {
+  const source = 'x; /* eslint-disable a */\ny();';
+  const end = source.indexOf('*/') + 2;
+  const comments: Comment[] = [
+    {
+      type: 'Block',
+      value: ' eslint-disable a ',
+      range: [3, end],
+      loc: { start: { line: 1, column: 3 }, end: { line: 1, column: end } },
+    },
+  ];
+  for (const collectUsage of [false, true]) {
+    for (const [startPos, suppressed] of [
+      [0, false],
+      [-0, false],
+      [-1, false],
+      [2.9, false],
+      [3, true],
+      [3.9, true],
+      [source.length, true],
+      [Number.MAX_SAFE_INTEGER, true],
+      [NaN, false],
+      [Infinity, false],
+      [-Infinity, false],
+    ] as const) {
+      const result = applyDisableDirectives({
+        comments,
+        diagnostics: [
+          { ruleName: 'a', startPos, endPos: startPos, message: 'test' },
+        ],
+        lineStartOffsets: buildLineStartOffsets(source),
+        textLength: source.length,
+        collectUsage,
+      });
+      expect(result.diagnostics).toHaveLength(suppressed ? 0 : 1);
+      if (collectUsage) {
+        expect(result.usedDisableDirectives).toHaveLength(suppressed ? 1 : 0);
+      } else {
+        expect(result.usedDisableDirectives).toBeUndefined();
+      }
+    }
+  }
+});
+
 test('usage summary distinguishes partial, wildcard and repeated directives', () => {
   for (const prefix of ['eslint', 'rslint']) {
     for (const source of [

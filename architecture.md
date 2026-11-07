@@ -1447,7 +1447,10 @@ Native rules use a lazy Go `DisableManager`; Node plugin workers suppress
 reports before UTF-16-to-UTF-8 conversion and serialization. Both matchers use
 ESLint's block-before-line attribution and the same conformance corpus. Native
 line directives use a per-line lookup instead of scanning all directives for
-each report.
+each report. With reporting off, Go retains only rule names and block events in
+file-local state, without a lock or tracked entries. Node uses the scalar-state
+suppression loop; only reporting-enabled requests track the owning directive.
+Both paths share directive parsing and conformance tests.
 
 Unused reporting creates a frozen, text-only Go state only for files whose
 effective severity is enabled and whose text contains a directive candidate.

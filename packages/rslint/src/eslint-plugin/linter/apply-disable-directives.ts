@@ -48,26 +48,33 @@ export function applyDisableDirectives(options: Options): {
     if (comment.type !== 'Line' && comment.type !== 'Block') continue;
     const parsed = parser.parseDirective(comment.value);
     if (!parsed) continue;
-    const label = parsed.label.replace(/^rslint-/u, 'eslint-');
-    if (
-      label !== 'eslint-disable' &&
-      label !== 'eslint-enable' &&
-      label !== 'eslint-disable-line' &&
-      label !== 'eslint-disable-next-line'
-    ) {
-      continue;
+    let block = false;
+    let nextLine = false;
+    let type: 'disable' | 'enable' = 'disable';
+    switch (parsed.label) {
+      case 'eslint-disable':
+      case 'rslint-disable':
+        block = true;
+        break;
+      case 'eslint-enable':
+      case 'rslint-enable':
+        block = true;
+        type = 'enable';
+        break;
+      case 'eslint-disable-next-line':
+      case 'rslint-disable-next-line':
+        nextLine = true;
+        break;
+      case 'eslint-disable-line':
+      case 'rslint-disable-line':
+        if (comment.loc.start.line !== comment.loc.end.line) continue;
+        break;
+      default:
+        continue;
     }
-    const block = label === 'eslint-disable' || label === 'eslint-enable';
     if (block && comment.type !== 'Block') continue;
-    if (
-      label === 'eslint-disable-line' &&
-      comment.loc.start.line !== comment.loc.end.line
-    ) {
-      continue;
-    }
     const names = parseRuleNames(parsed.value);
     for (const ruleId of names.length ? names : [null]) {
-      const type = label === 'eslint-enable' ? 'enable' : 'disable';
       const usage =
         used && type === 'disable'
           ? {
@@ -77,19 +84,21 @@ export function applyDisableDirectives(options: Options): {
             }
           : undefined;
       if (block) {
-        blocks.push({ type, pos: comment.range[0], ruleId, usage });
+        const directive: Directive = { type, pos: comment.range[0], ruleId };
+        if (usage) directive.usage = usage;
+        blocks.push(directive);
       } else {
-        const target =
-          label === 'eslint-disable-line'
-            ? comment.loc.start.line
-            : comment.loc.end.line + 1;
+        const target = nextLine
+          ? comment.loc.end.line + 1
+          : comment.loc.start.line;
         // A nonexistent following line must not clear a disable at EOF.
-        lines.push({
+        const directive: Directive = {
           type: 'disable',
           pos: options.lineStartOffsets[target - 1] ?? Infinity,
           ruleId,
-          usage,
-        });
+        };
+        if (usage) directive.usage = usage;
+        lines.push(directive);
         lines.push({
           type: 'enable',
           pos: options.lineStartOffsets[target] ?? Infinity,
@@ -100,15 +109,37 @@ export function applyDisableDirectives(options: Options): {
   }
   blocks.sort((a, b) => a.pos - b.pos);
   lines.sort((a, b) => a.pos - b.pos);
+  if (
+    !used &&
+    ((blocks.length === 0 && lines.length === 0) ||
+      options.diagnostics.every(
+        (diagnostic) =>
+          Number.isInteger(diagnostic.startPos) &&
+          diagnostic.startPos >= 0 &&
+          diagnostic.startPos <= options.textLength,
+      ))
+  ) {
+    return {
+      diagnostics: filterSuppressed(
+        filterSuppressed(options.diagnostics, blocks),
+        lines,
+      ),
+    };
+  }
   // Block suppression gets usage attribution before line suppression. Stable
   // sorting preserves source ordering when line directives target the same line.
-  const afterBlocks = filter(
+  const afterBlocks = filterWithUsage(
     options.diagnostics,
     blocks,
     options.textLength,
     used,
   );
-  const diagnostics = filter(afterBlocks, lines, options.textLength, used);
+  const diagnostics = filterWithUsage(
+    afterBlocks,
+    lines,
+    options.textLength,
+    used,
+  );
   return {
     diagnostics,
     ...(used ? { usedDisableDirectives: [...used] } : {}),
@@ -116,22 +147,66 @@ export function applyDisableDirectives(options: Options): {
 }
 
 function parseRuleNames(value: string): string[] {
-  const names = new Set<string>();
-  for (const part of value.split(',')) {
-    let name = part.trim();
-    if (
-      name.length >= 2 &&
-      (name[0] === '"' || name[0] === "'") &&
-      name[name.length - 1] === name[0]
-    ) {
-      name = name.slice(1, -1);
-    }
-    if (name) names.add(name);
+  if (!value.includes(',')) {
+    const name = trimRuleName(value);
+    return name ? Object.keys({ [name]: true }) : [];
   }
-  return [...names];
+  const names: Record<string, true> = Object.create(null);
+  for (const part of value.split(',')) {
+    const name = trimRuleName(part);
+    if (name) names[name] = true;
+  }
+  return Object.keys(names);
 }
 
-function filter(
+function trimRuleName(value: string): string {
+  const name = value.trim();
+  if (
+    name.length >= 2 &&
+    (name[0] === '"' || name[0] === "'") &&
+    name[name.length - 1] === name[0]
+  ) {
+    return name.slice(1, -1);
+  }
+  return name;
+}
+
+function diagnosticPosition(
+  diagnostic: Diagnostic,
+  textLength: number,
+): number {
+  return Number.isFinite(diagnostic.startPos)
+    ? Math.min(textLength, Math.max(0, Math.trunc(diagnostic.startPos)))
+    : 0;
+}
+
+// Ordinary reports with reporting off keep the original scalar-state loop. It never reads an owner
+// or checks collection state while walking directives for each diagnostic.
+function filterSuppressed(
+  diagnostics: readonly Diagnostic[],
+  directives: readonly Directive[],
+): readonly Diagnostic[] {
+  if (directives.length === 0) return diagnostics;
+  const visible: Diagnostic[] = [];
+  for (const diagnostic of diagnostics) {
+    let active = 0;
+    for (let i = 0; i < directives.length; i++) {
+      const directive = directives[i];
+      if (directive.pos > diagnostic.startPos) break;
+      if (
+        directive.ruleId === null ||
+        directive.ruleId === diagnostic.ruleName
+      ) {
+        if (directive.type === 'disable') active++;
+        else active = 0;
+      }
+    }
+    if (active === 0) visible.push(diagnostic);
+  }
+  return visible;
+}
+
+function filterWithUsage(
   diagnostics: readonly Diagnostic[],
   directives: readonly Directive[],
   textLength: number,
@@ -141,9 +216,7 @@ function filter(
   const visible: Diagnostic[] = [];
   for (const diagnostic of diagnostics) {
     // Match the byte-boundary normalization applied to visible diagnostics.
-    const pos = Number.isFinite(diagnostic.startPos)
-      ? Math.min(textLength, Math.max(0, Math.trunc(diagnostic.startPos)))
-      : 0;
+    const pos = diagnosticPosition(diagnostic, textLength);
     let active: Directive | undefined;
     for (const directive of directives) {
       if (directive.pos > pos) break;

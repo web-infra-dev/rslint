@@ -37,24 +37,37 @@ var directivePrefixes = []directivePrefix{
 
 // DisableManager tracks which rules are disabled at different locations in a file
 type DisableManager struct {
+	sourceFile        ast.SourceFileLike
+	comments          *CommentStore
+	parsed            bool
+	blockDirectives   []suppressionBlock
+	lineDisabledRules map[int][]string
+	*directiveTracking
+}
+
+// Only reporting managers share state with plugin completion. Suppression-only
+// managers belong to one file's native shard and need neither a lock nor entries.
+type directiveTracking struct {
 	mu         sync.Mutex
 	tracked    []trackedDirective
 	blocks     []int
 	lines      map[int][]int
 	usageIndex map[directiveUsageKey]*directiveEntry
-	trackUsage bool
-	sourceFile ast.SourceFileLike
-	comments   *CommentStore
-	parsed     bool
+}
+
+type suppressionBlock struct {
+	pos      int
+	rules    []string
+	disabled bool
 }
 
 // NewDisableManager creates a manager whose directives are parsed on the first
 // disable check. The manager does not materialize comments without a directive.
 func NewDisableManager(sourceFile *ast.SourceFile, comments *CommentStore) *DisableManager {
 	return &DisableManager{
-		sourceFile: sourceFile,
-		comments:   comments,
-		trackUsage: true,
+		sourceFile:        sourceFile,
+		comments:          comments,
+		directiveTracking: &directiveTracking{},
 	}
 }
 
@@ -126,14 +139,35 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
+		if dm.directiveTracking == nil && (kind == directiveBlock || kind == directiveEnable) {
+			dm.blockDirectives = append(dm.blockDirectives, suppressionBlock{pos: comment.Pos(), rules: rules, disabled: kind == directiveBlock})
+			continue
+		}
 		lineNum, column := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
-		endLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.End())
+		endLine := lineNum
+		if comment.Kind == ast.KindMultiLineCommentTrivia && (kind == directiveLine || kind == directiveNextLine) {
+			endLine, _ = scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.End())
+		}
 		if kind == directiveLine && lineNum != endLine {
 			continue
 		}
 		targetLine := lineNum
 		if kind == directiveNextLine {
 			targetLine = endLine + 1
+		}
+		if dm.directiveTracking == nil {
+			if dm.lineDisabledRules == nil {
+				dm.lineDisabledRules = make(map[int][]string)
+			}
+			if len(rules) == 0 {
+				rules = []string{""}
+			}
+			if previous, exists := dm.lineDisabledRules[targetLine]; exists {
+				dm.lineDisabledRules[targetLine] = append(previous, rules...)
+			} else {
+				dm.lineDisabledRules[targetLine] = rules
+			}
+			continue
 		}
 		tracked := trackedDirective{kind: kind, location: core.NewTextRange(comment.Pos(), comment.End()), line: targetLine, sourceLine: lineNum, column: int(column)}
 		if len(rules) == 0 {
@@ -143,9 +177,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 				tracked.entries = append(tracked.entries, directiveEntry{name: name})
 			}
 		}
-		if dm.trackUsage {
-			tracked.locateEntries(text, commentContent)
-		}
+		tracked.locateEntries(text, commentContent)
 		index := len(dm.tracked)
 		dm.tracked = append(dm.tracked, tracked)
 		if kind == directiveBlock || kind == directiveEnable {
@@ -163,24 +195,31 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 // Returns the directive kind and any specified rule names.
 func matchDirective(commentContent string) (directiveKind, []string) {
 	for _, p := range directivePrefixes {
-		for _, candidate := range []struct {
-			keyword string
-			kind    directiveKind
-		}{
-			{p.disable + "-next-line", directiveNextLine}, {p.disable + "-line", directiveLine}, {p.disable, directiveBlock}, {p.enable, directiveEnable},
-		} {
-			if !strings.HasPrefix(commentContent, candidate.keyword) {
+		var rest string
+		var kind directiveKind
+		if strings.HasPrefix(commentContent, p.disable) {
+			rest = commentContent[len(p.disable):]
+			kind = directiveBlock
+			if strings.HasPrefix(rest, "-next-line") {
+				rest = rest[len("-next-line"):]
+				kind = directiveNextLine
+			} else if strings.HasPrefix(rest, "-line") {
+				rest = rest[len("-line"):]
+				kind = directiveLine
+			}
+		} else if strings.HasPrefix(commentContent, p.enable) {
+			rest = commentContent[len(p.enable):]
+			kind = directiveEnable
+		} else {
+			continue
+		}
+		if rest != "" {
+			first, _ := utf8.DecodeRuneInString(rest)
+			if !ecmascript.IsWhiteSpaceOrLineTerminator(first) {
 				continue
 			}
-			rest := commentContent[len(candidate.keyword):]
-			if rest != "" {
-				first, _ := utf8.DecodeRuneInString(rest)
-				if !ecmascript.IsWhiteSpaceOrLineTerminator(first) {
-					continue
-				}
-			}
-			return candidate.kind, parseRuleNames(rest)
 		}
+		return kind, parseRuleNames(rest)
 	}
 	return directiveNone, nil
 }
@@ -199,13 +238,17 @@ func parseRuleNames(rulesStr string) []string {
 		return nil
 	}
 
+	if !strings.Contains(rulesStr, ",") {
+		name := trimRuleName(rulesStr)
+		if name == "" {
+			return nil
+		}
+		return []string{name}
+	}
 	var rules []string
 	seen := map[string]bool{}
 	for _, rule := range strings.Split(rulesStr, ",") {
-		rule = ecmascript.StringTrim(rule)
-		if len(rule) >= 2 && (rule[0] == '\'' || rule[0] == '"') && rule[len(rule)-1] == rule[0] {
-			rule = rule[1 : len(rule)-1]
-		}
+		rule = trimRuleName(rule)
 		if rule != "" && !seen[rule] {
 			rules = append(rules, rule)
 			seen[rule] = true
@@ -214,9 +257,23 @@ func parseRuleNames(rulesStr string) []string {
 	return rules
 }
 
+func trimRuleName(name string) string {
+	name = ecmascript.StringTrim(name)
+	if len(name) >= 2 && (name[0] == '\'' || name[0] == '"') && name[len(name)-1] == name[0] {
+		return name[1 : len(name)-1]
+	}
+	return name
+}
+
 // IsRuleDisabled checks if a rule is disabled at the given position
 func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
-	if dm == nil || (dm.parsed && len(dm.tracked) == 0) {
+	if dm == nil {
+		return false
+	}
+	if dm.directiveTracking == nil {
+		return dm.isSuppressed(ruleName, pos)
+	}
+	if dm.parsed && len(dm.tracked) == 0 {
 		return false
 	}
 	dm.mu.Lock()
@@ -247,9 +304,7 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		}
 	}
 	if active != nil {
-		if dm.trackUsage {
-			active.used = true
-		}
+		active.used = true
 		return true
 	}
 	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
@@ -268,16 +323,52 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 		}
 	}
 	if active != nil {
-		if dm.trackUsage {
-			active.used = true
-		}
+		active.used = true
 		return true
+	}
+	return false
+}
+
+// isSuppressed is the file-local path: compact names, direct line lookup,
+// and no usage bookkeeping or synchronization in the report hot loop.
+func (dm *DisableManager) isSuppressed(ruleName string, pos int) bool {
+	dm.ensureParsed()
+	if len(dm.blockDirectives) == 0 && len(dm.lineDisabledRules) == 0 {
+		return false
+	}
+	disabled := false
+	for _, directive := range dm.blockDirectives {
+		if directive.pos > pos {
+			break
+		}
+		if len(directive.rules) == 0 {
+			disabled = directive.disabled
+		} else {
+			for _, name := range directive.rules {
+				if name == ruleName {
+					disabled = directive.disabled
+					break
+				}
+			}
+		}
+	}
+	if disabled {
+		return true
+	}
+	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
+	for _, name := range dm.lineDisabledRules[line] {
+		if name == "" || name == ruleName {
+			return true
+		}
 	}
 	return false
 }
 
 // ESLint recognizes a whitespace-delimited run of at least two hyphens.
 func directiveExplanationStart(text string) int {
+	if !strings.Contains(text, "--") {
+		return -1
+	}
 	for i := 1; i+2 < len(text); i++ {
 		if text[i] != '-' || text[i+1] != '-' {
 			continue

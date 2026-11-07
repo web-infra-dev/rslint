@@ -826,6 +826,36 @@ func TestPipelineUnusedReportingOffSkipsUsageState(t *testing.T) {
 	}
 }
 
+func TestPipelineUnusedDirectivesIgnoreSkippedTypeRules(t *testing.T) {
+	for _, name := range []string{"only-skipped", "mixed"} {
+		mixed := name == "mixed"
+		t.Run(name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			rules := []rule.ConfiguredRule{{Name: "needs-types", Severity: rule.SeverityError, RequiresTypeInfo: true}}
+			names := "needs-types"
+			if mixed {
+				names += ", plain"
+				rules = append(rules, rule.ConfiguredRule{Name: "plain", Severity: rule.SeverityError, Run: func(rule.RuleContext) rule.RuleListeners { return rule.RuleListeners{} }})
+			}
+			generation := pipelineTestGeneration(t, root, path, "/* eslint-disable "+names+" */\nx();", rules, nil)
+			generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+			result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics, _ := result.Observation.CompleteDiagnostics()
+			if !mixed {
+				if len(diagnostics) != 0 {
+					t.Fatalf("skipped type rule reported as unused: %+v", diagnostics)
+				}
+			} else if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "'plain'") || strings.Contains(diagnostics[0].Message.Description, "'needs-types'") {
+				t.Fatalf("wrong unused entries for mixed rules: %+v", diagnostics)
+			}
+		})
+	}
+}
+
 func TestPipelineDirectiveUsageSelectionIsPerFile(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	onPath := tspath.ResolvePath(root, "on.ts")

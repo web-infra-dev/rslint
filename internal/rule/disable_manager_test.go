@@ -925,6 +925,7 @@ func runDirectiveConformance(t *testing.T, corpus directivefixtures.Corpus) {
 					for _, reverse := range []bool{false, true} {
 						t.Run(fmt.Sprintf("%s/%s/noFix=%v/reverse=%v", prefix, variant.Severity, variant.DisableFixes, reverse), func(t *testing.T) {
 							manager := NewDisableManager(sf, NewCommentStore(sf))
+							suppression := NewSuppressionManager(sf, NewCommentStore(sf))
 							invalid := map[string]bool{}
 							for _, name := range tc.InvalidRules {
 								invalid[name] = true
@@ -937,6 +938,13 @@ func runDirectiveConformance(t *testing.T, corpus directivefixtures.Corpus) {
 								}
 								report := tc.Reports[i]
 								got := manager.IsRuleDisabled(report.RuleID, directivefixtures.ByteOffset(t, source, report.Pos))
+								// Unavailable rules cannot emit native reports. Every real
+								// report must agree in the compact and reporting paths.
+								if !invalid[report.RuleID] {
+									if suppressed := suppression.IsRuleDisabled(report.RuleID, directivefixtures.ByteOffset(t, source, report.Pos)); suppressed != report.Suppressed {
+										t.Errorf("suppression-only report %d (%s at %d): suppressed=%v, want %v", i, report.RuleID, report.Pos, suppressed, report.Suppressed)
+									}
+								}
 								if got != report.Suppressed {
 									t.Errorf("report %d (%s at %d): suppressed=%v, want %v", i, report.RuleID, report.Pos, got, report.Suppressed)
 								}
