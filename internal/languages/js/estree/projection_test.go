@@ -174,6 +174,18 @@ func TestProjectionExpressionChains(t *testing.T) {
 				t.Fatalf("chain retained intermediate records: wrappers=%d, list words=%d", wrappers, len(builder.p.lists))
 			}
 			t.Logf("source=%d bytes, frame=%d bytes, nodes=%d, list words=%d", len(fixture.text), len(data), len(builder.p.nodes), len(builder.p.lists))
+			if fixture.name == "comma" {
+				aliases := 0
+				typed, err := builder.Build(context.Background(), source("/chain.js", fixture.text), Options{SourceType: "module", RecordSequenceAlias: func(_ *ast.Node, _, _, _, _ uint32) { aliases++ }})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(data, typed) || aliases != count-2 || len(builder.p.lists) > fixture.maxListWords {
+					t.Fatalf("typed projection lost linear storage: equal=%t aliases=%d listWords=%d", bytes.Equal(data, typed), aliases, len(builder.p.lists))
+				}
+				t.Logf("typed frame=%d bytes (identical), aliases=%d, list words=%d", len(typed), aliases, len(builder.p.lists))
+			}
+
 		})
 	}
 }

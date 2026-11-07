@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -49,7 +50,24 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	query := Query{Generation: descriptor.Generation, Checker: descriptor.Checker, Op: "void"}
+	if _, err := session.BindTarget(file); err != nil {
+		t.Fatal(err)
+	}
+	table := encoder.GetNodeIndexTable(file)
+	missing := uint32(0)
+	for index, node := range table.Nodes {
+		if index > 0 && node == nil {
+			missing = uint32(index)
+			break
+		}
+	}
+	if missing == 0 {
+		t.Fatal("fixture has no node-list slot")
+	}
+	if _, err := session.Query(t.Context(), Query{Scope: Scope{descriptor.Generation, descriptor.Checker}, Request: &ResolveNameRequest{Name: "value", Node: &NodeRef{name, missing}}}); err == nil {
+		t.Fatal("node-list slot admitted as global resolveName location")
+	}
+	query := Query{Scope: Scope{Generation: descriptor.Generation, Checker: descriptor.Checker}, Request: &VoidRequest{}}
 	for range 2 {
 		if _, err := session.Query(t.Context(), query); err != nil {
 			t.Fatal(err)
@@ -68,7 +86,8 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 	}
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := session.Query(canceled, query); !errors.Is(err, context.Canceled) {
+	canceledQuery := Query{Scope: query.Scope, Request: &NodeRequest{Op: "type", Node: NodeRef{"not-owned", 1}}}
+	if _, err := session.Query(canceled, canceledQuery); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled query: %v", err)
 	}
 	if _, err := New(canceled, p, []*ast.SourceFile{file}); !errors.Is(err, context.Canceled) {
