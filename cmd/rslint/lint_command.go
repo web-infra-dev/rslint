@@ -407,8 +407,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
-	// Carry prepared fallback metadata from planning to initial acquisition only.
-	var pendingInitialFallback *loader.ProjectLoadPlan
 	createPrograms := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
 		defer session.ReleaseBuildCache()
 		var rebuilt loader.ProjectSet
@@ -427,6 +425,23 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			return loader.LoadResult{}, err
+		}
+		return binding, nil
+	}
+	initialBinding := func(ctx context.Context, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
+		binding, err := createPrograms(programSession, prepared)
+		if err != nil {
+			return loader.LoadResult{}, err
+		}
+		if err := activate(); err != nil {
+			return loader.LoadResult{}, err
+		}
+		if format == output.FormatDefault && mode != output.ModeLint {
+			summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
+				binding.Programs, targetPlan.Files, singleThreaded)
+			if err != nil {
+				return loader.LoadResult{}, err
+			}
 		}
 		return binding, nil
 	}
@@ -483,23 +498,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	provider := &cliGenerationProvider{
 		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
-			prepared := pendingInitialFallback
-			pendingInitialFallback = nil
-			binding, err := createPrograms(programSession, prepared)
-			if err != nil {
-				return loader.LoadResult{}, nil, err
-			}
-			if err := activate(); err != nil {
-				return loader.LoadResult{}, nil, err
-			}
-			if format == output.FormatDefault && mode != output.ModeLint {
-				summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
-					binding.Programs, targetPlan.Files, singleThreaded)
-				if err != nil {
-					return loader.LoadResult{}, nil, err
-				}
-			}
-			return binding, programSession.FS(), nil
+			binding, err := initialBinding(ctx, nil)
+			return binding, programSession.FS(), err
 		},
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error) {
 			if err := ctx.Err(); err != nil {
@@ -536,8 +536,15 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				return nil, err
 			}
 			if len(plan.Loads) == 0 {
-				pendingInitialFallback = &plan
-				return nil, nil
+				return []linter.GenerationLoad{lintLoader.GenerationLoad(
+					func(ctx context.Context) (loader.LoadResult, error) {
+						binding, err := initialBinding(ctx, &plan)
+						if err == nil {
+							provider.initial = nil
+						}
+						return binding, err
+					}, programSession.FS(), generationForBinding,
+				)}, nil
 			}
 			if err := activate(); err != nil {
 				return nil, err

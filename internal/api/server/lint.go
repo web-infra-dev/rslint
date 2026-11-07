@@ -489,8 +489,6 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
-	// Carry prepared fallback metadata from planning to initial acquisition only.
-	var pendingInitialFallback *loader.ProjectLoadPlan
 	buildBinding := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
 		var projects loader.ProjectSet
 		var buildErr error
@@ -562,9 +560,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	provider := &apiGenerationProvider{
 		initial: func(context.Context) (linter.Generation, error) {
-			prepared := pendingInitialFallback
-			pendingInitialFallback = nil
-			binding, err := buildBinding(programSession, prepared)
+			binding, err := buildBinding(programSession, nil)
 			if err != nil {
 				return linter.Generation{}, err
 			}
@@ -598,7 +594,15 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 				return nil, err
 			}
 			if len(plan.Loads) == 0 {
-				pendingInitialFallback = &plan
+				return []linter.GenerationLoad{lintLoader.GenerationLoad(
+					func(context.Context) (loader.LoadResult, error) {
+						binding, err := buildBinding(programSession, &plan)
+						if err == nil {
+							provider.initial = nil
+						}
+						return binding, err
+					}, programSession.FS(), generationForBinding,
+				)}, nil
 			}
 			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}

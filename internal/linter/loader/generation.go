@@ -10,9 +10,30 @@ import (
 	programLoader "github.com/web-infra-dev/rslint/internal/program/loader"
 )
 
-// GenerationLoads preserves deferred loading and projects each loaded binding
+// GenerationLoad preserves deferred loading and projects a complete binding
 // through the entry point's generation adapter. Request-owned Programs do not
 // carry a producer lease, so successful acquisition returns no ReleaseFunc.
+func GenerationLoad(
+	load func(context.Context) (programLoader.LoadResult, error),
+	fsys vfs.FS,
+	generation func(programLoader.LoadResult, vfs.FS) linter.Generation,
+) linter.GenerationLoad {
+	return linter.GenerationLoad{
+		Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
+			if err := ctx.Err(); err != nil {
+				return linter.Generation{}, nil, err
+			}
+			binding, err := load(ctx)
+			if err != nil {
+				return linter.Generation{}, nil, err
+			}
+			return generation(binding, fsys), nil, nil
+		},
+	}
+}
+
+// GenerationLoads maps independent Program loads to their admission metadata
+// and deferred generation acquisition.
 func GenerationLoads(
 	loads []programLoader.ProgramLoad,
 	fsys vfs.FS,
@@ -20,23 +41,12 @@ func GenerationLoads(
 ) []linter.GenerationLoad {
 	result := make([]linter.GenerationLoad, len(loads))
 	for index, load := range loads {
-		checkers := 0
+		result[index] = GenerationLoad(func(context.Context) (programLoader.LoadResult, error) {
+			return load.Load()
+		}, fsys, generation)
+		result[index].TargetCount = load.TargetCount
 		if load.Options != nil && load.Options.Checkers != nil {
-			checkers = max(1, *load.Options.Checkers)
-		}
-		result[index] = linter.GenerationLoad{
-			TargetCount:  load.TargetCount,
-			CheckerCount: checkers,
-			Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
-				if err := ctx.Err(); err != nil {
-					return linter.Generation{}, nil, err
-				}
-				binding, err := load.Load()
-				if err != nil {
-					return linter.Generation{}, nil, err
-				}
-				return generation(binding, fsys), nil, nil
-			},
+			result[index].CheckerCount = max(1, *load.Options.Checkers)
 		}
 	}
 	return result
