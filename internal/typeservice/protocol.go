@@ -66,7 +66,7 @@ type SignaturesRequest struct {
 type ResolveNameRequest struct {
 	Name           Name     `json:"name"`
 	Node           *NodeRef `json:"node"`
-	Kind           uint32   `json:"kind"`
+	Kind           int32    `json:"kind"` // JavaScript SymbolFlags.All is -1.
 	ExcludeGlobals bool     `json:"excludeGlobals"`
 }
 

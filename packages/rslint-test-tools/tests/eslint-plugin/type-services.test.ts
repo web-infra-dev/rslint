@@ -726,6 +726,55 @@ undefined;
       ),
     ).toEqual(['1', '"two"', 'true']);
 
+    const referenceChecker = upstream.services.program!.getTypeChecker();
+    const truthLocation = services.esTreeNodeToTSNodeMap.get(
+      variable('truth').id,
+    );
+    const referenceTruth = (upstream.ast.body as any[])
+      .flatMap((node) => node.declarations ?? [])
+      .find((entry) => entry.id.name === 'truth').id;
+    const referenceTruthLocation =
+      upstream.services.esTreeNodeToTSNodeMap!.get(referenceTruth);
+    for (const meaning of [
+      ts.SymbolFlags.Value,
+      ts.SymbolFlags.Type,
+      ts.SymbolFlags.All,
+    ]) {
+      const actual = checker.resolveName(
+        'truth',
+        truthLocation,
+        meaning,
+        false,
+      );
+      const expected = referenceChecker.resolveName(
+        'truth',
+        referenceTruthLocation,
+        meaning,
+        false,
+      );
+      expect([actual?.name, actual?.flags]).toEqual([
+        expected?.name,
+        expected?.flags,
+      ]);
+    }
+    const promise = checker.resolveName(
+      'Promise',
+      undefined,
+      ts.SymbolFlags.All,
+      false,
+    );
+    const referencePromise = referenceChecker.resolveName(
+      'Promise',
+      undefined,
+      ts.SymbolFlags.All,
+      false,
+    );
+    expect(referencePromise).toBeDefined();
+    expect([promise?.name, promise?.flags]).toEqual([
+      referencePromise?.name,
+      referencePromise?.flags,
+    ]);
+
     expect(
       services.getSymbolAtLocation(expression('Identifier')).declarations,
     ).toBeUndefined();
