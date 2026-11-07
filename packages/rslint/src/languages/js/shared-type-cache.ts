@@ -75,7 +75,7 @@ export class SharedTypeCacheReader {
 export class SharedTypeCacheOwner {
   readonly descriptor: SharedTypeCacheDescriptor;
   private control: Int32Array;
-  private bytes: Uint8Array;
+  private readonly bytes: Uint8Array;
   constructor(generation: number, budgetBytes: number, entries: number) {
     const start = (HEADER + entries * SLOT) * 4;
     if (

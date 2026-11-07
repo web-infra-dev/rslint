@@ -1817,6 +1817,8 @@ JavaScript checker. An injected synchronous transport returns versioned binary
 facts. Unsupported checker operations, stale handles and unavailable origins fail
 explicitly. The direct rule runner accepts an optional parser-services factory;
 production CLI, API, LSP and WorkerPool requests do not supply it yet.
+The core `build:js` and `dev` scripts build `@rslint/api` first, including its
+compiler syntax declarations, so direct package builds need no earlier workspace build.
 Meta-property keywords are scalar compiler fields, so their synthetic ESTree
 identifiers have no compiler node origin and reject semantic queries.
 
