@@ -27,7 +27,7 @@ var PreferStringSliceRule = rule.Rule{
 			call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 				Methods: []string{"substr", "substring"}, AllowOptionalCall: true, AllowOptionalMember: true,
 			})
-			if !ok || unicornutil.IsKnownNonStringSyntax(ctx, call.Object) {
+			if !ok || isKnownNonStringReceiver(ctx, call.Object) {
 				return
 			}
 			method := call.Property.Text()
@@ -61,6 +61,19 @@ var PreferStringSliceRule = rule.Rule{
 				// fix if that replacement would discard a comment.
 				aborted := false
 				replace := func(arg *ast.Node, text string) {
+					// Numeric serialization can introduce an identifier even when
+					// the original argument was a literal such as 1e400.
+					global := ""
+					switch text {
+					case "Infinity", "-Infinity":
+						global = "Infinity"
+					case "NaN":
+						global = "NaN"
+					}
+					if global != "" && !availableGlobals(ctx, node, global) {
+						aborted = true
+						return
+					}
 					span := utils.TrimNodeTextRange(ctx.SourceFile, arg)
 					if utils.HasCommentInSpan(ctx.Comments.All(), span.Pos(), span.End()) {
 						aborted = true
@@ -72,7 +85,7 @@ var PreferStringSliceRule = rule.Rule{
 					if !fixSubstrArguments(ctx, call, evaluator, replace, &fixes) {
 						return nil
 					}
-				} else if !fixSubstringArguments(ctx, args, evaluator, replace, &fixes) {
+				} else if !fixSubstringArguments(ctx, call, evaluator, replace, &fixes) {
 					return nil
 				}
 				if aborted {
@@ -120,7 +133,8 @@ func fixSubstrArguments(ctx rule.RuleContext, call unicornutil.DotMethodCall, ev
 	return true
 }
 
-func fixSubstringArguments(ctx rule.RuleContext, args []*ast.Node, evaluator *utils.StaticStringEvaluator, replace func(*ast.Node, string), fixes *[]rule.RuleFix) bool {
+func fixSubstringArguments(ctx rule.RuleContext, call unicornutil.DotMethodCall, evaluator *utils.StaticStringEvaluator, replace func(*ast.Node, string), fixes *[]rule.RuleFix) bool {
+	args := call.Call.Arguments()
 	first := utils.ESTreeRuntimeExpression(args[0])
 	start, knownStart := numericValue(first)
 	if len(args) == 1 {
@@ -130,6 +144,9 @@ func fixSubstringArguments(ctx rule.RuleContext, args []*ast.Node, evaluator *ut
 		if knownStart {
 			replace(args[0], ecmascript.NumberToString(math.Max(0, start)))
 		} else {
+			if !availableGlobals(ctx, call.Call, "Math") {
+				return false
+			}
 			// Wrapping preserves comments inside the existing parentheses.
 			*fixes = append(*fixes, rule.RuleFixReplace(ctx.SourceFile, args[0], "Math.max(0, "+utils.TrimmedNodeText(ctx.SourceFile, args[0])+")"))
 		}
@@ -150,6 +167,9 @@ func fixSubstringArguments(ctx rule.RuleContext, args []*ast.Node, evaluator *ut
 		return true
 	}
 	if (knownStart && start == 0) || (knownEnd && end == 0) {
+		if !availableGlobals(ctx, call.Call, "Math") {
+			return false
+		}
 		var text string
 		if knownEnd && end == 0 {
 			// A moved start is evaluated once and keeps undefined -> 0.
@@ -169,7 +189,8 @@ func fixSubstringArguments(ctx rule.RuleContext, args []*ast.Node, evaluator *ut
 }
 
 func coalescedEndText(ctx rule.RuleContext, arg *ast.Node, evaluator *utils.StaticStringEvaluator) (string, bool) {
-	if evaluator.HasSideEffect(arg, false) || containsSpreadOrTag(arg) {
+	if !availableGlobals(ctx, arg.Parent, "Math", "undefined", "Infinity") ||
+		evaluator.HasSideEffect(arg, true) || containsSpreadOrTag(arg) || !repeatableEnd(arg, evaluator) {
 		return "", false
 	}
 	text := utils.TrimmedNodeText(ctx.SourceFile, arg)
@@ -179,6 +200,101 @@ func coalescedEndText(ctx rule.RuleContext, arg *ast.Node, evaluator *utils.Stat
 	}
 	// Missing/undefined ends mean "to the end"; null still means zero.
 	return text + " === undefined ? Infinity : " + text, true
+}
+
+func availableGlobals(ctx rule.RuleContext, location *ast.Node, names ...string) bool {
+	for _, name := range names {
+		if !ctx.Globals.Access(name).IsDeclared() ||
+			(ctx.Refs != nil && ctx.Refs.IsNameDefinedInFile(location, name)) ||
+			(ctx.Refs == nil && utils.IsShadowed(location, name)) {
+			return false
+		}
+	}
+	return true
+}
+
+// The conditional reads its operand again only on the non-undefined branch.
+// Avoid getters and coercions such as +value that could execute user code on
+// both reads. Plain values are coerced only once, by the outer Math.max call.
+func repeatableEnd(node *ast.Node, evaluator *utils.StaticStringEvaluator) bool {
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindFunctionExpression, ast.KindArrowFunction:
+		return true
+	case ast.KindTypeOfExpression:
+		return repeatableEnd(node.Expression(), evaluator)
+	case ast.KindPrefixUnaryExpression:
+		if node.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
+			return repeatableEnd(node.AsPrefixUnaryExpression().Operand, evaluator)
+		}
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken,
+			ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindCommaToken:
+			return repeatableEnd(binary.Left, evaluator) && repeatableEnd(binary.Right, evaluator)
+		}
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return repeatableEnd(conditional.Condition, evaluator) && repeatableEnd(conditional.WhenTrue, evaluator) && repeatableEnd(conditional.WhenFalse, evaluator)
+	}
+	return unicornutil.IsStaticPrimitiveArgument(evaluator, node)
+}
+
+func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
+	if unicornutil.IsKnownNonStringSyntax(ctx, node) ||
+		(ctx.TypeChecker != nil && unicornutil.IsKnownNonString(ctx, node)) {
+		return true
+	}
+	node = utils.ESTreeRuntimeExpression(node)
+	if ast.IsCallExpression(node) && ast.IsOptionalChain(node) {
+		// Optional invocation does not change an authored return annotation.
+		// Classify a clone so the source tree and its chain boundaries stay intact.
+		ordinary := node.Clone(ast.NewNodeFactory(ast.NodeFactoryHooks{}))
+		ordinary.Flags &^= ast.NodeFlagsOptionalChain
+		return unicornutil.IsKnownNonStringSyntax(ctx, ordinary)
+	}
+	if !ast.IsIdentifier(node) || ctx.Refs == nil {
+		return false
+	}
+	symbol := ctx.Refs.ResolveInFile(node)
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return false
+	}
+	declaration := symbol.Declarations[0]
+	if declaration.Kind == ast.KindVariableDeclaration {
+		value := utils.ESTreeRuntimeExpression(declaration.AsVariableDeclaration().Initializer)
+		for value != nil && (value.Kind == ast.KindNonNullExpression || value.Kind == ast.KindSatisfiesExpression) {
+			value = utils.ESTreeRuntimeExpression(value.Expression())
+		}
+		if value != nil && (value.Kind == ast.KindAsExpression || value.Kind == ast.KindTypeAssertionExpression) {
+			return false
+		}
+	}
+	annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration)
+	return annotation != nil && utils.IsJSDocSyntaxNode(annotation) && nonStringAnnotation(annotation)
+}
+
+func nonStringAnnotation(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindParenthesizedType, ast.KindJSDocNonNullableType, ast.KindJSDocNullableType, ast.KindJSDocOptionalType:
+		return nonStringAnnotation(node.Type())
+	case ast.KindUnionType:
+		for _, part := range node.AsUnionTypeNode().Types.Nodes {
+			if !nonStringAnnotation(part) {
+				return false
+			}
+		}
+		return true
+	case ast.KindLiteralType:
+		return !ast.IsStringLiteralLike(node.AsLiteralTypeNode().Literal)
+	case ast.KindNumberKeyword, ast.KindBooleanKeyword, ast.KindBigIntKeyword, ast.KindSymbolKeyword,
+		ast.KindObjectKeyword, ast.KindVoidKeyword, ast.KindUndefinedKeyword, ast.KindNullKeyword,
+		ast.KindArrayType, ast.KindTupleType, ast.KindTypeLiteral, ast.KindJSDocTypeLiteral,
+		ast.KindFunctionType, ast.KindConstructorType:
+		return true
+	}
+	return false
 }
 
 func containsSpreadOrTag(node *ast.Node) bool {

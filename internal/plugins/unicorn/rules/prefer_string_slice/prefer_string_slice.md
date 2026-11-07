@@ -51,24 +51,22 @@ This rule has no options.
 
 ## Differences from upstream
 
-When TypeScript type information is enabled, upstream can skip custom methods
-based on the receiver's inferred type. rslint may still report these calls if
-there is no explicit type annotation. For example, rslint reports the last call
-below:
+rslint also honors explicit non-string JSDoc receiver types, including array
+annotations that upstream may ignore without a TypeScript project.
 
-```typescript
-class Collection {
-  substr(start: number) {
-    return String(start);
-  }
-}
+rslint reports calls without an automatic fix when converting them could read a
+getter or perform a coercion twice. For example, `text.substring(0, options.end)`
+and `text.substr(0, +value)` are left for manual review. Store the end in a local
+variable first to make an automatic fix available:
 
-const read = () => new Collection();
-read().substr(1);
+```javascript
+const end = options.end;
+text.substring(0, end);
 ```
 
-Annotate the function's return type as `const read = (): Collection => new
-Collection()` to keep this custom method call from being reported.
+Fixes that would introduce a locally shadowed or disabled global such as `Math`,
+`undefined`, or `Infinity` are also withheld. Rename the conflicting binding to
+allow the fix. Numeric rewrites that do not need those globals remain available.
 
 ## Original Documentation
 

@@ -1,0 +1,11 @@
+-- typed/tsconfig.json --
+{"compilerOptions":{"target":"esnext","module":"commonjs","strict":true},"files":["caller.ts","dep.ts"]}
+-- typed/caller.ts --
+export {};
+-- typed/dep.ts --
+export function read(): {substr(): string} {
+  return {substr() {return "custom";}};
+}
+export function readString(): string {
+  return "abc";
+}

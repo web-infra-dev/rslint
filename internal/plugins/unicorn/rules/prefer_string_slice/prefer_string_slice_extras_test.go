@@ -5,12 +5,19 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_slice"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreferStringSliceExtras(t *testing.T) {
@@ -39,6 +46,10 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "text.substring(obj[\"index\" satisfies string], obj.index + 1);", FileName: "file.ts"},
 			{Code: "text.substring((fn<number>).index, fn.index + 1);", FileName: "file.ts"},
 			{Code: "class Collection { substr(start: number) { return String(start); } }\nconst read = (): Collection => new Collection();\nread().substr(1);", FileName: "file.ts"},
+			// Available type information excludes inferred non-string receivers.
+			{Code: "const value = [1, 2]; value.substr(1);", FileName: "file.js"},
+			{Code: "const value = {substring() {}}; value.substring(1);", FileName: "file.js"},
+			{Code: "class Collection { substr(start: number) { return String(start); } }\nconst read = () => new Collection();\nread().substr(1);", FileName: "file.ts"},
 		}, []rule_tester.InvalidTestCase{
 			// Call and property shapes.
 			{Code: "((foo).substring)((-2));", FileName: "file.js", Output: []string{"((foo).slice)(0);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -66,12 +77,7 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "(value satisfies string).substring(1);", FileName: "file.ts", Output: []string{"(value satisfies string).slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
 			}},
-			{Code: "const value = [1, 2]; value.substr(1);", FileName: "file.js", Output: []string{"const value = [1, 2]; value.slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 38},
-			}},
-			{Code: "const value = {substring() {}}; value.substring(1);", FileName: "file.js", Output: []string{"const value = {substring() {}}; value.slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 33, EndLine: 1, EndColumn: 51},
-			}},
+
 			// Single-character reference comparisons.
 			{Code: "foo.substring(2 ** 53, 2 ** 53 + 1);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 36},
@@ -119,10 +125,12 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "foo.substr(0, foo.length - 1_000);", FileName: "file.js", Output: []string{"foo.slice(0, -1_000);"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 			}},
-			{Code: "foo.substr(0, foo.length - 9007199254740992);", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - 9007199254740992 === undefined ? Infinity : foo.length - 9007199254740992));"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - 9007199254740992);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 45},
 			}},
-			{Code: "(foo as string).substr(0, foo.length - 2);", FileName: "file.ts", Output: []string{"(foo as string).slice(0, Math.max(0, foo.length - 2 === undefined ? Infinity : foo.length - 2));"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "(foo as string).substr(0, foo.length - 2);", FileName: "file.ts", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 42},
 			}},
 			{Code: "\"ab\\u{63}\".substr(0, `abc`.length - 2);", FileName: "file.js", Output: []string{"\"ab\\u{63}\".slice(0, -2);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -131,7 +139,8 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "foo.substring(foo?.length);", FileName: "file.js", Output: []string{"foo.slice(Math.max(0, foo?.length));"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
 			}},
-			{Code: "foo.substr(0, foo?.length);", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo?.length === undefined ? Infinity : foo?.length));"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo?.length);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27},
 			}},
 			{Code: "foo.substring((--index));", FileName: "file.js", Output: []string{"foo.slice(Math.max(0, (--index)));"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -147,7 +156,8 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "foo.substring(0, (/* keep */ end));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
 			}},
-			{Code: "foo.substr(0, /* keep */ (foo.length - 2));", FileName: "file.js", Output: []string{"foo.slice(0, /* keep */ Math.max(0, (foo.length - 2) === undefined ? Infinity : (foo.length - 2)));"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, /* keep */ (foo.length - 2));", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 43},
 			}},
 			{Code: "foo.substring(0, \"/* text */\");", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, \"/* text */\" === undefined ? Infinity : \"/* text */\"));"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -198,7 +208,8 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "text.substring(0, value satisfies number);", FileName: "file.ts", Output: []string{"text.slice(0, Math.max(0, (value satisfies number) === undefined ? Infinity : (value satisfies number)));"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 42},
 			}},
-			{Code: "text.substring(0, a << b);", FileName: "file.js", Output: []string{"text.slice(0, Math.max(0, (a << b) === undefined ? Infinity : (a << b)));"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "text.substring(0, a << b);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 26},
 			}},
 			{Code: "text.substring(5 /* keep */, 2);", FileName: "file.js", Output: []string{"text.slice(2 /* keep */, 5);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -207,10 +218,59 @@ func TestPreferStringSliceExtras(t *testing.T) {
 			{Code: "text.substring((5 /* keep */), 2);", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 			}},
-			{Code: "class Collection { substr(start: number) { return String(start); } }\nconst read = () => new Collection();\nread().substr(1);", FileName: "file.ts", Output: []string{"class Collection { substr(start: number) { return String(start); } }\nconst read = () => new Collection();\nread().slice(1);"}, Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 3, Column: 1, EndLine: 3, EndColumn: 17},
+		})
+}
+
+func TestPreferStringSliceImportedReceivers(t *testing.T) {
+	directory := txtarfs.MustParseFile(t, "testdata/receivers.txtar").Materialize(t, "typed")
+	root := rule_tester.Root{Dir: tspath.NormalizePath(directory), FS: bundled.WrapFS(osvfs.FS())}
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &prefer_string_slice.PreferStringSliceRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "import {read} from './dep';\nread().substr();", FileName: "caller.ts"},
+			{Code: "import {read} from './dep';\nread?.().substr();", FileName: "caller.ts"},
+		}, []rule_tester.InvalidTestCase{
+			{Code: "import {readString as read} from './dep';\nread().substr();", FileName: "caller.ts", Output: []string{"import {readString as read} from './dep';\nread().slice();"}, Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 2, Column: 1, EndLine: 2, EndColumn: 16},
 			}},
 		})
+}
+
+func lintPreferStringSliceSourceOnly(t *testing.T, code, name string) []rule.RuleDiagnostic {
+	t.Helper()
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "review/"+name)
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	program, err := lintprogram.NewFromRoots(lintprogram.RootOptions{
+		RootFileNames: []string{fileName}, Host: utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: &core.CompilerOptions{Target: core.ScriptTargetESNext}, SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var diagnostics []rule.RuleDiagnostic
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs: []*lintprogram.Program{program}, TargetsByProgram: [][]string{{fileName}}, SingleThreaded: true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{Name: prefer_string_slice.PreferStringSliceRule.Name, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if ctx.TypeChecker != nil {
+						t.Fatal("source-only test received type information")
+					}
+					return prefer_string_slice.PreferStringSliceRule.Run(ctx, nil)
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = linter.RunLinter(linter.RunLinterOptions{LintPlan: plan, SingleThreaded: true,
+		Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return diagnostics
 }
 
 func TestPreferStringSliceArtifactsFollowDemand(t *testing.T) {
@@ -218,6 +278,8 @@ func TestPreferStringSliceArtifactsFollowDemand(t *testing.T) {
 		{"text.substr(2, 3);", "text.slice(2, 5);"},
 		{"text.substring(0, end);", "text.slice(0, Math.max(0, end === undefined ? Infinity : end));"},
 		{"text.substring(0, getEnd());", "text.substring(0, getEnd());"},
+		{"text.substring(0, options.end);", "text.substring(0, options.end);"},
+		{"function f(Math, start) { return text.substring(start); }", "function f(Math, start) { return text.substring(start); }"},
 	} {
 		t.Run(tc.source, func(t *testing.T) {
 			helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
@@ -268,6 +330,64 @@ func TestPreferStringSliceArtifactsFollowDemand(t *testing.T) {
 				if output != wantOutput || fixed != wantFix {
 					t.Errorf("demand %d: unexpected autofix %q", demand, output)
 				}
+			}
+		})
+	}
+}
+
+func TestPreferStringSliceReviewSourceOnly(t *testing.T) {
+	tests := []struct {
+		Code, FileName, Output string
+		Errors                 []rule_tester.InvalidTestCaseError
+	}{
+		{Code: "/** @type {{substring: function(): string}} */\nconst o = {substring() {return \"custom\";}};\no.substring();", FileName: "file.js", Output: "/** @type {{substring: function(): string}} */\nconst o = {substring() {return \"custom\";}};\no.substring();", Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: "/** @type {string} */\nconst o = \"abc\";\no.substring();", FileName: "file.js", Output: "/** @type {string} */\nconst o = \"abc\";\no.slice();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 3, Column: 1, EndLine: 3, EndColumn: 14}}},
+		{Code: "/** @param {{substring: function(): string}} o */\nfunction f(o) { o.substring(); }", FileName: "file.js", Output: "/** @param {{substring: function(): string}} o */\nfunction f(o) { o.substring(); }", Errors: []rule_tester.InvalidTestCaseError{}},
+		// An explicit array annotation excludes string receivers even without a project.
+		{Code: "/** @type {string[]} */\nconst o = [];\no.substring();", FileName: "file.js", Output: "/** @type {string[]} */\nconst o = [];\no.substring();", Errors: nil},
+		{Code: "const read = (): {substr(): string} => ({substr() {return \"custom\";}});\nread?.().substr();", FileName: "file.ts", Output: "const read = (): {substr(): string} => ({substr() {return \"custom\";}});\nread?.().substr();", Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: "const read = (): string => \"abc\";\nread?.().substr();", FileName: "file.ts", Output: "const read = (): string => \"abc\";\nread?.().slice();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 2, Column: 1, EndLine: 2, EndColumn: 18}}},
+		{Code: "class Collection { substr() {return \"custom\";} }\nconst read = (): Collection => new Collection();\nread?.().substr();", FileName: "file.ts", Output: "class Collection { substr() {return \"custom\";} }\nconst read = (): Collection => new Collection();\nread?.().substr();", Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: "/** @returns {{substr: function(): string}} */\nfunction read() {return {substr() {return \"custom\";}};}\nread?.().substr();", FileName: "file.js", Output: "/** @returns {{substr: function(): string}} */\nfunction read() {return {substr() {return \"custom\";}};}\nread?.().substr();", Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: "/** @returns {string} */\nfunction read() {return \"abc\";}\nread?.().substr();", FileName: "file.js", Output: "/** @returns {string} */\nfunction read() {return \"abc\";}\nread?.().slice();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 3, Column: 1, EndLine: 3, EndColumn: 18}}},
+		{Code: "/** @type {{substring(): string}} */\nconst value = item as string;\nvalue.substring();", FileName: "file.ts", Output: "/** @type {{substring(): string}} */\nconst value = item as string;\nvalue.slice();", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 3, Column: 1, EndLine: 3, EndColumn: 18}}},
+		{Code: "let n = 0; const o = {get end() {return ++n;}}; [\"abc\".substring(0, o.end), n];", FileName: "file.js", Output: "let n = 0; const o = {get end() {return ++n;}}; [\"abc\".substring(0, o.end), n];", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 50, EndLine: 1, EndColumn: 75}}},
+		{Code: "let n = 0; const o = {get end() {return ++n;}}; [\"abc\".substr(0, o.end), n];", FileName: "file.js", Output: "let n = 0; const o = {get end() {return ++n;}}; [\"abc\".substr(0, o.end), n];", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 50, EndLine: 1, EndColumn: 72}}},
+		{Code: "let n = 0; const value = {valueOf() {return ++n;}}; [\"abc\".substring(0, +value), n];", FileName: "file.js", Output: "let n = 0; const value = {valueOf() {return ++n;}}; [\"abc\".substring(0, +value), n];", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 54, EndLine: 1, EndColumn: 80}}},
+		{Code: "let n = 0; const value = {valueOf() {return ++n;}}; [\"abc\".substr(0, value + 0), n];", FileName: "file.js", Output: "let n = 0; const value = {valueOf() {return ++n;}}; [\"abc\".substr(0, value + 0), n];", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 54, EndLine: 1, EndColumn: 80}}},
+		{Code: "function f(Math, n) {return \"abc\".substring(n);} f(null, 1);", FileName: "file.js", Output: "function f(Math, n) {return \"abc\".substring(n);} f(null, 1);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 29, EndLine: 1, EndColumn: 47}}},
+		{Code: "function f(undefined, n) {return \"abc\".substring(0, n);} f(2, 2);", FileName: "file.js", Output: "function f(undefined, n) {return \"abc\".substring(0, n);} f(2, 2);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 34, EndLine: 1, EndColumn: 55}}},
+		{Code: "function f(Infinity, n) {return \"abc\".substr(0, n);} f(0);", FileName: "file.js", Output: "function f(Infinity, n) {return \"abc\".substr(0, n);} f(0);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 33, EndLine: 1, EndColumn: 51}}},
+		{Code: "function f(Infinity) {return text.substr(1, 1e400);}", FileName: "file.js", Output: "function f(Infinity) {return text.substr(1, 1e400);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 30, EndLine: 1, EndColumn: 51}}},
+		{Code: "function f(Infinity) {return text.substring(1e400);}", FileName: "file.js", Output: "function f(Infinity) {return text.substring(1e400);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 30, EndLine: 1, EndColumn: 51}}},
+		{Code: "function f(Infinity) {return text.substring(1, 1e400);}", FileName: "file.js", Output: "function f(Infinity) {return text.slice(1, 1e400);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 30, EndLine: 1, EndColumn: 54}}},
+		{Code: "function f(Math, undefined, Infinity) {return text.substr(1, 2);}", FileName: "file.js", Output: "function f(Math, undefined, Infinity) {return text.slice(1, 3);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 47, EndLine: 1, EndColumn: 64}}},
+		{Code: "function f(Math, undefined, Infinity) {return text.substring();}", FileName: "file.js", Output: "function f(Math, undefined, Infinity) {return text.slice();}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 47, EndLine: 1, EndColumn: 63}}},
+		{Code: "function f(Math, undefined, Infinity) {return text.substr(0, text.length - 2);}", FileName: "file.js", Output: "function f(Math, undefined, Infinity) {return text.slice(0, -2);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 47, EndLine: 1, EndColumn: 78}}},
+		{Code: "function f(Math, n) {return text.substring(n, 0);}", FileName: "file.js", Output: "function f(Math, n) {return text.substring(n, 0);}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 29, EndLine: 1, EndColumn: 49}}},
+		{Code: "function f(n) {return text.substring(n, 0);}", FileName: "file.js", Output: "function f(n) {return text.slice(0, Math.max(0, n));}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 43}}},
+		{Code: "function f(n) {return text.substring(0, n);}", FileName: "file.js", Output: "function f(n) {return text.slice(0, Math.max(0, n === undefined ? Infinity : n));}", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 43}}},
+		{Code: "text.substr(1, 1e400);", FileName: "file.js", Output: "text.slice(1, Infinity);", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22}}},
+		{Code: "text.substring(0, (Math) => Math);", FileName: "file.js", Output: "text.slice(0, Math.max(0, ((Math) => Math) === undefined ? Infinity : ((Math) => Math)));", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34}}},
+	}
+	for _, test := range tests {
+		t.Run(test.Code, func(t *testing.T) {
+			diagnostics := lintPreferStringSliceSourceOnly(t, test.Code, test.FileName)
+			if len(diagnostics) != len(test.Errors) {
+				t.Fatalf("got %d diagnostics, want %d: %+v", len(diagnostics), len(test.Errors), diagnostics)
+			}
+			for i, diagnostic := range diagnostics {
+				expected := test.Errors[i]
+				line, column := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
+				endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.End())
+				if diagnostic.Message.Id != expected.MessageId || diagnostic.Message.Description != expected.Message ||
+					line+1 != expected.Line || int(column)+1 != expected.Column || endLine+1 != expected.EndLine || int(endColumn)+1 != expected.EndColumn {
+					t.Fatalf("unexpected diagnostic: %+v at %d:%d-%d:%d", diagnostic.Message, line+1, column+1, endLine+1, endColumn+1)
+				}
+			}
+			output, _, fixed := linter.ApplyRuleFixes(test.Code, diagnostics)
+			if output != test.Output || fixed != (test.Output != test.Code) {
+				t.Fatalf("fixed=%v, output=%q, want %q", fixed, output, test.Output)
 			}
 		})
 	}

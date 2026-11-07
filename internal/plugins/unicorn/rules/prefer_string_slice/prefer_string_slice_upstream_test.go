@@ -154,37 +154,48 @@ func TestPreferStringSliceUpstream(t *testing.T) {
 			{Code: "\"foo\".substr(0, \"foo\".length - 2)", FileName: "file.js", Output: []string{"\"foo\".slice(0, -2)"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 			}},
-			{Code: "foo.bar.substr(0, foo.bar.length - 2)", FileName: "file.js", Output: []string{"foo.bar.slice(0, Math.max(0, foo.bar.length - 2 === undefined ? Infinity : foo.bar.length - 2))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.bar.substr(0, foo.bar.length - 2)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 38},
 			}},
-			{Code: "foo.substr(0, foo.length - count)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - count === undefined ? Infinity : foo.length - count))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - count)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34},
 			}},
-			{Code: "foo.substr(0, foo.length - 0)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - 0 === undefined ? Infinity : foo.length - 0))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - 0)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
 			}},
-			{Code: "foo.substr(0, foo.length - 2.5)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - 2.5 === undefined ? Infinity : foo.length - 2.5))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - 2.5)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 32},
 			}},
-			{Code: "foo.substr(0, foo.length - -1)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - -1 === undefined ? Infinity : foo.length - -1))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - -1)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 31},
 			}},
-			{Code: "foo.substr(0, bar.length - 2)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, bar.length - 2 === undefined ? Infinity : bar.length - 2))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, bar.length - 2)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
 			}},
-			{Code: "foo.substr(0, foo.length - /* comment */ 2)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, foo.length - /* comment */ 2 === undefined ? Infinity : foo.length - /* comment */ 2))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, foo.length - /* comment */ 2)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 44},
 			}},
-			{Code: "foo.substr(0, /* comment */ foo.length - 2)", FileName: "file.js", Output: []string{"foo.slice(0, /* comment */ Math.max(0, foo.length - 2 === undefined ? Infinity : foo.length - 2))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, /* comment */ foo.length - 2)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 44},
 			}},
-			{Code: "foo.substr(0, (/* comment */ foo.length - 2))", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, (/* comment */ foo.length - 2) === undefined ? Infinity : (/* comment */ foo.length - 2)))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, (/* comment */ foo.length - 2))", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 46},
 			}},
-			{Code: "foo.substr(0, (/* comment */ (foo.length - 2)))", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, (/* comment */ (foo.length - 2)) === undefined ? Infinity : (/* comment */ (foo.length - 2))))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, (/* comment */ (foo.length - 2)))", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 48},
 			}},
-			{Code: "foo.substr(0, /* comment */ (foo.length - 2))", FileName: "file.js", Output: []string{"foo.slice(0, /* comment */ Math.max(0, (foo.length - 2) === undefined ? Infinity : (foo.length - 2)))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substr(0, /* comment */ (foo.length - 2))", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substr", Message: "Prefer `String#slice()` over `String#substr()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 46},
 			}},
 			{Code: "foo.substring()", FileName: "file.js", Output: []string{"foo.slice()"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -355,13 +366,16 @@ func TestPreferStringSliceUpstream(t *testing.T) {
 			{Code: "foo.substring(0, a ?? b)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, (a ?? b) === undefined ? Infinity : (a ?? b)))"}, Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25},
 			}},
-			{Code: "foo.substring(0, a + b)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, a + b === undefined ? Infinity : a + b))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substring(0, a + b)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24},
 			}},
-			{Code: "foo.substring(0, a.b)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, a.b === undefined ? Infinity : a.b))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substring(0, a.b)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
 			}},
-			{Code: "foo.substring(0, -a)", FileName: "file.js", Output: []string{"foo.slice(0, Math.max(0, -a === undefined ? Infinity : -a))"}, Errors: []rule_tester.InvalidTestCaseError{
+			// Re-reading a getter or coercion is not safe; upstream still offers a fix.
+			{Code: "foo.substring(0, -a)", FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "substring", Message: "Prefer `String#slice()` over `String#substring()`.", Line: 1, Column: 1, EndLine: 1, EndColumn: 21},
 			}},
 			// Swapped arguments.
