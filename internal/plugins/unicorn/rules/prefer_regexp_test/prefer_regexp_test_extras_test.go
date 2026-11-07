@@ -195,6 +195,8 @@ func TestPreferRegexpTestArtifactsFollowDemand(t *testing.T) {
 		{`if (text.match(/x/g)) {}`, `if (/x/g.test(text)) {}`, false, true},
 		{`if (text.match(/x/)?.length > 0) {}`, `if (/x/.test(text)) {}`, false, true},
 		{`if (re.exec(text)) {}`, `if (re.test(text)) {}`, false, true},
+		{`const re = /x/; re[Symbol.match] = () => null; if ("x".match(re)) {}`, `const re = /x/; re[Symbol.match] = () => null; if (re.test("x")) {}`, false, true},
+		{`const re = /x/; re.compile("x", "g"); if ("x".match(re)) {}`, `const re = /x/; re.compile("x", "g"); if (re.test("x")) {}`, false, true},
 		{`text.search(/x/) /* keep */ !== -1;`, `text.search(/x/) /* keep */ !== -1;`, false, false},
 	} {
 		t.Run(tc.code, func(t *testing.T) {
@@ -466,6 +468,65 @@ func TestPreferRegexpTestReviewEdges(t *testing.T) {
 		}},
 		{Code: "const pattern = /x/; use(pattern); if (text.match(pattern)) {}", FileName: "case.js", Output: []string{"const pattern = /x/; use(pattern); if (pattern.test(text)) {}"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 40, EndLine: 1, EndColumn: 59, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+	})
+}
+
+// Mutation cases intentionally avoid upstream's unsafe automatic fixes.
+func TestPreferRegexpTestRegExpMutations(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_regexp_test.PreferRegexpTestRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "const re = /x/; re[Symbol.match] = () => null; const result = Boolean(\"x\".match(re));", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 71, EndLine: 1, EndColumn: 84, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; re[Symbol.match] = () => null; const result = Boolean(re.test(\"x\"));"}}},
+		}},
+		{Code: "const re = /x/; const alias = re; alias[Symbol.match] = () => null; if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 73, EndLine: 1, EndColumn: 86, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const alias = re; alias[Symbol.match] = () => null; if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = new RegExp(\"x\"); Object.defineProperty(re, Symbol.match, {value: () => null}); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 95, EndLine: 1, EndColumn: 108, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = new RegExp(\"x\"); Object.defineProperty(re, Symbol.match, {value: () => null}); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "let re = new RegExp(\"x\"); re.test = () => false; if (re.exec(\"x\")) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "regexp-exec", Message: "Prefer `.test(…)` over `.exec(…)`.", Line: 1, Column: 57, EndLine: 1, EndColumn: 61, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "let re = new RegExp(\"x\"); re.test = () => false; if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; re.compile(\"x\", \"g\"); const result = []; for (let i = 0; i < 2; i++) { result.push(Boolean(\"x\".match(re))); }", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 108, EndLine: 1, EndColumn: 121, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; re.compile(\"x\", \"g\"); const result = []; for (let i = 0; i < 2; i++) { result.push(Boolean(re.test(\"x\"))); }"}}},
+		}},
+		{Code: "const re = new RegExp(\"x\"); re.compile(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 55, EndLine: 1, EndColumn: 68, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = new RegExp(\"x\"); re.compile(\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; const alias = re; alias.compile(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 64, EndLine: 1, EndColumn: 77, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const alias = re; alias.compile(\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; const alias = re; re.compile(\"x\", \"g\"); if (\"x\".match(alias)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 61, EndLine: 1, EndColumn: 77, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const alias = re; re.compile(\"x\", \"g\"); if (alias.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; const first = re; const alias = first; re.compile(\"x\", \"g\"); if (\"x\".match(alias)) {} if (\"x\".match(first)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 82, EndLine: 1, EndColumn: 98, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const first = re; const alias = first; re.compile(\"x\", \"g\"); if (alias.test(\"x\")) {} if (\"x\".match(first)) {}"}}},
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 107, EndLine: 1, EndColumn: 123, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const first = re; const alias = first; re.compile(\"x\", \"g\"); if (\"x\".match(alias)) {} if (first.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; const name = \"com\" + \"pile\"; re[name](\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 70, EndLine: 1, EndColumn: 83, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; const name = \"com\" + \"pile\"; re[name](\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; re.compile?.(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 45, EndLine: 1, EndColumn: 58, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; re.compile?.(\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; (re as RegExp)!.compile(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.ts", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 56, EndLine: 1, EndColumn: 69, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; (re as RegExp)!.compile(\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; let alias; alias = re; alias.compile(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 69, EndLine: 1, EndColumn: 82, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; let alias; alias = re; alias.compile(\"x\", \"g\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; re.compile(\"x\", \"y\"); if (\"x\".search(re) !== -1) {}", FileName: "case.js", Output: []string{}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-search", Message: "Prefer `RegExp#test(…)` over `String#search(…)` when checking for existence.", Line: 1, Column: 43, EndLine: 1, EndColumn: 57, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "const re = /x/; re.compile(\"x\", \"y\"); if (re.test(\"x\")) {}"}}},
+		}},
+		{Code: "const re = /x/; other.compile(\"x\", \"g\"); if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{"const re = /x/; other.compile(\"x\", \"g\"); if (re.test(\"x\")) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 46, EndLine: 1, EndColumn: 59, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "const re = /x/; { const re = /y/; re.compile(\"y\", \"g\"); } if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{"const re = /x/; { const re = /y/; re.compile(\"y\", \"g\"); } if (re.test(\"x\")) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 63, EndLine: 1, EndColumn: 76, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+		}},
+		{Code: "const re = /x/; const alias = re; if (\"x\".match(alias)) {} if (\"x\".match(re)) {}", FileName: "case.js", Output: []string{"const re = /x/; const alias = re; if (alias.test(\"x\")) {} if (re.test(\"x\")) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 39, EndLine: 1, EndColumn: 55, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
+			{MessageId: "string-match", Message: "Prefer `RegExp#test(…)` over `String#match(…)`.", Line: 1, Column: 64, EndLine: 1, EndColumn: 77, Suggestions: []rule_tester.InvalidTestCaseSuggestion{}},
 		}},
 	})
 }

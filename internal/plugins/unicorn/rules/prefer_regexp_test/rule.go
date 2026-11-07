@@ -30,6 +30,7 @@ var PreferRegexpTestRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		evaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 		evaluator.GlobalAccess = ctx.Globals.Access
+		autofix := regexpAutofix{evaluator: evaluator, refs: ctx.Refs}
 		var types *expressionTypes
 		return rule.RuleListeners{ast.KindCallExpression: func(node *ast.Node) {
 			one := 1
@@ -88,7 +89,7 @@ var PreferRegexpTestRule = rule.Rule{
 			// Edit policy belongs to the rule. The evaluator only supplies a
 			// safe static RegExp value, without exposing its internal objects.
 			ctx.ReportNodeWithDeferredFixesAndSuggestions(report, message(id), func() []rule.RuleFix {
-				if length != nil || !canRemoveSearchTail(ctx, node, search) || !canAutofix(evaluator, regexpNode, search != nil) {
+				if length != nil || !canRemoveSearchTail(ctx, node, search) || !autofix.canFix(regexpNode, search != nil) {
 					return nil
 				}
 				return buildFix()
@@ -99,7 +100,7 @@ var PreferRegexpTestRule = rule.Rule{
 							return nil
 						}
 					}
-				} else if !canRemoveSearchTail(ctx, node, search) || canAutofix(evaluator, regexpNode, search != nil) {
+				} else if !canRemoveSearchTail(ctx, node, search) || autofix.canFix(regexpNode, search != nil) {
 					return nil
 				}
 				return []rule.RuleSuggestion{{Message: message("suggestion"), FixesArr: buildFix()}}
@@ -203,15 +204,87 @@ func canRemoveSearchTail(ctx rule.RuleContext, node, search *ast.Node) bool {
 	return search == nil || !utils.HasCommentInSpan(ctx.Comments.All(), parenthesizedEnd(node), search.End())
 }
 
-func canAutofix(evaluator *utils.StaticStringEvaluator, node *ast.Node, search bool) bool {
+type regexpAutofix struct {
+	evaluator *utils.StaticStringEvaluator
+	refs      *rule.RefStore
+	compiled  map[*ast.Symbol]bool
+}
+
+func (autofix *regexpAutofix) canFix(node *ast.Node, search bool) bool {
 	if node.Kind == ast.KindRegularExpressionLiteral {
 		_, flags := utils.ExtractRegexPatternAndFlags(node.Text())
 		if !strings.ContainsAny(flags, "gy") {
 			return true
 		}
 	}
-	_, flags, known := evaluator.EvalRegExp(node)
-	return known && !strings.ContainsRune(flags, 'g') && (!search || !strings.ContainsRune(flags, 'y'))
+	_, flags, known := autofix.evaluator.EvalRegExp(node)
+	return known && !strings.ContainsRune(flags, 'g') && (!search || !strings.ContainsRune(flags, 'y')) && !autofix.wasCompiled(node)
+}
+
+// compile() changes a RegExp's flags without assigning a property. Follow
+// direct variable aliases through the existing reference index, in either
+// direction, so a mutation through one name protects all names for that value.
+func (autofix *regexpAutofix) wasCompiled(node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsIdentifier(node) || autofix.refs == nil {
+		return false
+	}
+	symbol := autofix.refs.ResolveInFile(node)
+	if compiled, known := autofix.compiled[symbol]; known {
+		return compiled
+	}
+	visited := make(map[*ast.Symbol]bool)
+	pending := []*ast.Symbol{symbol}
+	compiled := false
+	for len(pending) > 0 && !compiled {
+		current := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+		if current == nil || visited[current] {
+			continue
+		}
+		visited[current] = true
+		for _, declaration := range current.Declarations {
+			if ast.IsVariableDeclaration(declaration) {
+				initializer := utils.SkipAssertionsAndParens(declaration.AsVariableDeclaration().Initializer)
+				if initializer != nil && ast.IsIdentifier(initializer) {
+					pending = append(pending, autofix.refs.ResolveInFile(initializer))
+				}
+			}
+		}
+		for _, reference := range autofix.refs.References(current) {
+			outer := reference
+			for outer.Parent != nil && ast.IsOuterExpression(outer.Parent, ast.OEKParentheses|ast.OEKAssertions) {
+				outer = outer.Parent
+			}
+			parent := outer.Parent
+			if parent == nil {
+				continue
+			}
+			if ast.IsAccessExpression(parent) && parent.Expression() == outer {
+				if name, known := autofix.evaluator.EvalAccessExpressionName(parent); known && name == "compile" {
+					compiled = true
+					break
+				}
+			}
+			if ast.IsVariableDeclaration(parent) && parent.AsVariableDeclaration().Initializer == outer && ast.IsIdentifier(parent.Name()) {
+				pending = append(pending, parent.Symbol())
+			}
+			if ast.IsBinaryExpression(parent) {
+				binary := parent.AsBinaryExpression()
+				left := utils.SkipAssertionsAndParens(binary.Left)
+				if binary.OperatorToken.Kind == ast.KindEqualsToken && binary.Right == outer && ast.IsIdentifier(left) {
+					pending = append(pending, autofix.refs.ResolveInFile(left))
+				}
+			}
+		}
+	}
+	if autofix.compiled == nil {
+		autofix.compiled = make(map[*ast.Symbol]bool)
+	}
+	for symbol := range visited {
+		autofix.compiled[symbol] = compiled
+	}
+	return compiled
 }
 
 // Parentheses end the optional chain. TS assertions do not, so follow only

@@ -48,6 +48,17 @@ function f(pattern: string & unknown) {
 }
 ```
 
+Regular expressions with modified properties or uses of `compile()` receive
+suggestions instead of automatic fixes, including when a variable alias is
+used. Changing matching hooks or flags can make `.test()` return different
+results:
+
+```javascript
+const re = /x/;
+re.compile('x', 'g');
+if ('x'.match(re)) {}
+```
+
 ## Original documentation
 
 - [eslint-plugin-unicorn: prefer-regexp-test](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/prefer-regexp-test.md)

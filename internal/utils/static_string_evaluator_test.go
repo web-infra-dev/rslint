@@ -510,6 +510,16 @@ func TestStaticStringEvaluatorRegExp(t *testing.T) {
 		let changed = /x/;
 		changed = /y/g;
 		const changedUse = changed;
+		const mutatedLiteral = /x/;
+		mutatedLiteral[Symbol.match] = () => null;
+		const mutatedLiteralUse = mutatedLiteral;
+		const aliasedLiteral = /x/;
+		const mutationAlias = aliasedLiteral;
+		mutationAlias[Symbol.match] = () => null;
+		const mutatedAliasUse = aliasedLiteral;
+		let mutatedConstructor = new RegExp("x");
+		Reflect.set(mutatedConstructor, "test", () => false);
+		const mutatedConstructorUse = mutatedConstructor;
 		const constructor = new RegExp("a" + "b", "u");
 		const copied = new RegExp(/a/gi);
 		const overridden = new RegExp(/a/g, "y");
@@ -563,6 +573,9 @@ func TestStaticStringEvaluatorRegExp(t *testing.T) {
 		{"primitive", "null", "", true},
 		{"unicodeSets", "[a&&b]", "v", true},
 		{"changedUse", "", "", false},
+		{"mutatedLiteralUse", "", "", false},
+		{"mutatedAliasUse", "", "", false},
+		{"mutatedConstructorUse", "", "", false},
 		{"invalidPattern", "", "", false},
 		{"duplicateFlags", "", "", false},
 		{"invalidFlags", "", "", false},

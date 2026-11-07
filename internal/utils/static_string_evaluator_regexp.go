@@ -27,7 +27,8 @@ func (staticEvaluator *StaticStringEvaluator) evalRegExp(node *ast.Node, visitin
 		}
 	}
 	if ast.IsIdentifier(node) {
-		if initializer, ok := staticEvaluator.ResolveIdentifierInitializer(node); ok {
+		initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
+		if ok && !staticEvaluator.hasPropertyMutation(symbol) {
 			return staticEvaluator.evalRegExp(initializer, visiting)
 		}
 		return "", "", false
