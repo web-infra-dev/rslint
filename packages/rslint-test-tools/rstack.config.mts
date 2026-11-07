@@ -919,6 +919,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-reflect-apply.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-regexp-test.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-has.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-set-size.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-single-call.test.ts',
