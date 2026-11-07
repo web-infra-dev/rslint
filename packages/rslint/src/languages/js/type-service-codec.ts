@@ -58,8 +58,9 @@ export function decodeTypePacket(bytes: Uint8Array): unknown {
         const result: Record<string, unknown> = Object.create(null);
         for (let i = 0; i < size; i++) {
           const key = read(depth + 1);
-          if (typeof key !== 'string' || Object.hasOwn(result, key)) invalid();
-          result[key as string] = read(depth + 1);
+          if (typeof key !== 'string') return invalid();
+          if (Object.hasOwn(result, key)) return invalid();
+          result[key] = read(depth + 1);
         }
         return result;
       }
