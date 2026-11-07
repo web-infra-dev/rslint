@@ -1,6 +1,10 @@
 package linter
 
 import (
+	"fmt"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/testutil/directivefixtures"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -253,8 +257,8 @@ func TestApplyRuleFixes(t *testing.T) {
 			name: "insertion followed by replacement starting at same position - should skip replacement",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
-				newMockDiagnostic(newInsertFix(0, "XXX")),      // Insert at 0
-				newMockDiagnostic(newReplaceFix(0, 3, "YYY")),  // Replace ABC with YYY
+				newMockDiagnostic(newInsertFix(0, "XXX")),     // Insert at 0
+				newMockDiagnostic(newReplaceFix(0, 3, "YYY")), // Replace ABC with YYY
 			},
 			expectedCode:        "XXXABCDEFGHIJ",
 			expectedUnapplied:   1,
@@ -441,5 +445,75 @@ func TestApplyRuleFixes_DuplicateInsertionRegression(t *testing.T) {
 	// Verify we don't have "async async async"
 	if result == " async  async  async function fetchData(): Promise<string> { return Promise.resolve('data'); }" {
 		t.Error("Regression: duplicate insertions were not prevented!")
+	}
+}
+
+func TestUnusedDirectiveESLintFixOutputs(t *testing.T) {
+	for _, file := range []string{"upstream.json", "source.json"} {
+		corpus := directivefixtures.Load(t, "../rule/testdata/eslint-directives/"+file)
+		for index, tc := range corpus.Cases {
+			t.Run(fmt.Sprintf("%s/%03d", file, index), func(t *testing.T) {
+				for _, prefix := range []string{"eslint", "rslint"} {
+					source := tc.Source
+					if prefix == "rslint" {
+						source = tc.RslintSource
+					}
+					sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/conformance.js", Path: "/conformance.js"}, source, core.ScriptKindJS)
+					for _, v := range tc.Variants {
+						t.Run(fmt.Sprintf("%s/%s/noFix=%v", prefix, v.Severity, v.DisableFixes), func(t *testing.T) {
+							manager := rule.NewDisableManager(sf, rule.NewCommentStore(sf))
+							invalid := map[string]bool{}
+							for _, name := range tc.InvalidRules {
+								invalid[name] = true
+							}
+							manager.ValidateRules(func(name string) bool { return !invalid[name] })
+							var diagnostics []rule.RuleDiagnostic
+							for _, report := range tc.Reports {
+								suppressed := manager.IsRuleDisabled(report.RuleID, directivefixtures.ByteOffset(t, source, report.Pos))
+								if suppressed != report.Suppressed {
+									t.Fatalf("%s: unexpected suppression for %s", tc.Name, report.RuleID)
+								}
+								if !suppressed && report.Fix != nil {
+									offset := func(pos int) int {
+										if pos == -1 {
+											return -1
+										}
+										return directivefixtures.ByteOffset(t, source, pos)
+									}
+									fixes := []rule.RuleFix{{Range: core.NewTextRange(offset(report.Fix.Range[0]), offset(report.Fix.Range[1])), Text: report.Fix.Text}}
+									diagnostics = append(diagnostics, rule.RuleDiagnostic{FixesPtr: &fixes})
+								}
+							}
+							ignored := map[string]bool{}
+							for _, name := range tc.Ignored {
+								ignored[name] = true
+							}
+							demand := rule.EditDemandAutofix
+							if v.DisableFixes {
+								demand = 0
+							}
+							diagnostics = append(diagnostics, manager.UnusedDiagnostics("/conformance.js", rule.ParseSeverity(v.Severity), demand, ignored)...)
+							code := source
+							if tc.BOM {
+								code = "\ufeff" + code
+							}
+							fixed, _, _ := ApplyRuleFixes(code, diagnostics)
+							want := v.Fixed
+							if prefix == "rslint" {
+								want = v.RslintFixed
+							}
+							// ESLint's later-round output is recorded only for adjacent deletions.
+							batched := v.BatchedFixed
+							if prefix == "rslint" {
+								batched = v.RslintBatchedFixed
+							}
+							if fixed != want && (batched == nil || fixed != *batched) {
+								t.Fatalf("%s\nfixed: %q\nwant:  %q", tc.Name, fixed, want)
+							}
+						})
+					}
+				}
+			})
+		}
 	}
 }

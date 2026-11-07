@@ -11,22 +11,24 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
 // package so each entry point can build it: parseLintFlags from argv, and
 // runCLI additionally from the IPC init-handshake payload.
 type lintArgs struct {
-	Init           bool
-	Fix            bool
-	TypeCheck      bool
-	TypeCheckOnly  bool
-	TraceOut       string
-	CpuprofOut     string
-	SingleThreaded bool
-	Format         string
-	NoColor        bool
-	ForceColor     bool
+	UnusedDirectiveSeverity *rule.DiagnosticSeverity
+	Init                    bool
+	Fix                     bool
+	TypeCheck               bool
+	TypeCheckOnly           bool
+	TraceOut                string
+	CpuprofOut              string
+	SingleThreaded          bool
+	Format                  string
+	NoColor                 bool
+	ForceColor              bool
 	// StdoutIsTTY is the TTY fact for the real output destination, reported
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
@@ -89,6 +91,10 @@ Options:
   --type-check-only     Run only TypeScript type checking (skip all lint rules)
   --no-color            Disable colored output
   --force-color         Force colored output
+  --report-unused-disable-directives
+                        Report unused disable directives as errors
+  --report-unused-disable-directives-severity <off|warn|error>
+                        Override unused directive reporting severity
   --quiet               Report errors only
   --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
@@ -137,6 +143,10 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
 	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
 	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	var unused bool
+	var unusedSeverity string
+	fs.BoolVar(&unused, "report-unused-disable-directives", false, "report unused disable directives as errors")
+	fs.StringVar(&unusedSeverity, "report-unused-disable-directives-severity", "", "unused directive severity: off, warn, error")
 	var timingValue string
 	fs.StringVar(&timingValue, "timing", "", "print a per-rule timing table: 'all' or a top rule count")
 	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
@@ -152,6 +162,29 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "report-unused-disable-directives" {
+			severity := rule.SeverityOff
+			if unused {
+				severity = rule.SeverityError
+			}
+			args.UnusedDirectiveSeverity = &severity
+		}
+	})
+	severitySet := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "report-unused-disable-directives-severity" {
+			severitySet = true
+		}
+	})
+	if severitySet {
+		if unusedSeverity != "off" && unusedSeverity != "warn" && unusedSeverity != "error" {
+			fmt.Fprintln(os.Stderr, "invalid unused directive severity: expected off, warn, or error")
+			return args, help, 2
+		}
+		severity := rule.ParseSeverity(unusedSeverity)
+		args.UnusedDirectiveSeverity = &severity
+	}
 
 	// The Node.js entry point fills in the default "all" when the user
 	// passes a bare --timing, so the value is always present here.

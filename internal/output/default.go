@@ -275,12 +275,14 @@ func (f *defaultFormatter) diagnostic(w *bufio.Writer, diagnostic *Diagnostic, r
 	codeboxEndLine := min(diagnosticEndLine+1, len(lineMap)-1)
 
 	w.WriteByte(' ')
-	if f.ruleLabel == "" || f.lastRule != diagnostic.RuleName {
-		f.lastRule = diagnostic.RuleName
-		f.ruleLabel = colors.RuleName(" %s ", diagnostic.RuleName)
+	if diagnostic.RuleName != "" {
+		if f.ruleLabel == "" || f.lastRule != diagnostic.RuleName {
+			f.lastRule = diagnostic.RuleName
+			f.ruleLabel = colors.RuleName(" %s ", diagnostic.RuleName)
+		}
+		w.WriteString(f.ruleLabel)
+		w.WriteString(" — ")
 	}
-	w.WriteString(f.ruleLabel)
-	w.WriteString(" — ")
 
 	severityColor := colors.WarnText
 	if diagnostic.Severity == SeverityError {

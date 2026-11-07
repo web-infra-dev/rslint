@@ -662,3 +662,131 @@ func TestPipelinePluginFailureAppliesToAllLoadedUnits(t *testing.T) {
 		})
 	}
 }
+
+func TestPipelineUnusedDirectives(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, tc := range []struct {
+			name, source         string
+			native, plugin, fail bool
+			unused               int
+		}{
+			{name: "zero rules", source: "/* eslint-disable */\nconst x = 1;", unused: 1},
+			{name: "mixed used", source: "/* eslint-disable native/check, plugin/check */\ndebugger;", native: true, plugin: true},
+			{name: "plugin only", source: "/* eslint-disable plugin/check */\ndebugger;", plugin: true},
+			{name: "partial", source: "/* eslint-disable native/check, plugin/check, unused */\ndebugger;", native: true, plugin: true, unused: 1},
+			{name: "plugin failure", source: "/* eslint-disable unused */\ndebugger;", plugin: true, fail: true},
+		} {
+			t.Run(fmt.Sprintf("%d/%s", mode, tc.name), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				path := tspath.ResolvePath(root, "source.ts")
+				var rules []rule.ConfiguredRule
+				if tc.native {
+					rules = append(rules, rule.ConfiguredRule{Name: "native/check", Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return rule.RuleListeners{ast.KindDebuggerStatement: func(node *ast.Node) { ctx.ReportNode(node, rule.RuleMessage{Description: "native"}) }}
+					}})
+				}
+				var config *EslintPluginFileConfig
+				if tc.plugin {
+					rules = append(rules, rule.ConfiguredRule{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true})
+					config = &EslintPluginFileConfig{}
+				}
+				generation := pipelineTestGeneration(t, root, path, tc.source, rules, config)
+				generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+				dispatch := EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					if tc.fail {
+						return nil, errors.New("plugin failed")
+					}
+					pos := strings.Index(tc.source, "debugger")
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, Diagnostics: []EslintPluginDiagnostic{{RuleName: "plugin/check", StartPos: pos, EndPos: pos + 8, Message: "plugin"}}}}}, nil
+				})
+				result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{Plugin: mode}, dispatch))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, _ := result.Observation.CompleteDiagnostics()
+				unused := 0
+				for _, d := range diagnostics {
+					if strings.HasPrefix(d.Message.Description, "Unused eslint-") {
+						unused++
+						if d.Severity != rule.SeverityWarning {
+							t.Fatal("wrong severity")
+						}
+					} else if !tc.fail {
+						t.Fatalf("unsuppressed diagnostic: %+v", d)
+					}
+				}
+				if unused != tc.unused {
+					t.Fatalf("got %d unused, want %d; diagnostics: %+v", unused, tc.unused, diagnostics)
+				}
+			})
+		}
+	}
+}
+
+func TestUnusedDirectiveCompletion(t *testing.T) {
+	for _, nativeFirst := range []bool{false, true} {
+		for _, fail := range []bool{false, true} {
+			t.Run(fmt.Sprintf("nativeFirst=%v/failure=%v", nativeFirst, fail), func(t *testing.T) {
+				source := pluginSyntax("/test.ts", "/* eslint-disable unused */\ndebugger;")
+				manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
+				manager.Freeze(newTextSourceFile(source.Text()))
+				state := &fileDirectives{manager: manager, path: "/test.ts", severity: rule.SeverityWarning, demand: rule.EditDemandAutofix}
+				if got := state.complete(nativeFirst, false, "/test.ts"); len(got) != 0 {
+					t.Fatal("premature unused report")
+				}
+				got := state.complete(!nativeFirst, fail, "/test.ts")
+				want := 1
+				if fail {
+					want = 0
+				}
+				if len(got) != want {
+					t.Fatalf("got %d reports, want %d", len(got), want)
+				}
+				if got := state.complete(nativeFirst, false, "/test.ts"); len(got) != 0 {
+					t.Fatal("duplicate finalization")
+				}
+			})
+		}
+	}
+}
+
+func TestUnusedDirectiveMultiplePluginBatches(t *testing.T) {
+	source := pluginSyntax("/test.ts", "/* eslint-disable unused */\nx();")
+	manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
+	manager.Freeze(newTextSourceFile(source.Text()))
+	state := &fileDirectives{manager: manager, path: "/test.ts", severity: rule.SeverityWarning, pendingPlugins: 2}
+	if got := state.complete(true, false, "/test.ts"); len(got) != 0 {
+		t.Fatal("native work finalized pending plugins")
+	}
+	if got := state.complete(false, false, "/test.ts"); len(got) != 0 {
+		t.Fatal("first batch finalized file")
+	}
+	if got := state.complete(false, false, "/test.ts"); len(got) != 1 {
+		t.Fatalf("last batch produced %d reports", len(got))
+	}
+}
+
+func TestPipelineUnusedDirectivePathProjectedOnce(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	sourcePath := tspath.ResolvePath(root, "source.ts")
+	targetPath := tspath.ResolvePath(root, "target.ts")
+	generation := pipelineTestGeneration(t, root, sourcePath, "/* eslint-disable */\nx();", nil, nil)
+	generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+	generation.Target.Path = func(path string) string {
+		if path == sourcePath {
+			return targetPath
+		}
+		if path == targetPath {
+			return tspath.ResolvePath(root, "incorrect.ts")
+		}
+		return path
+	}
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 1 || diagnostics[0].FilePath != targetPath {
+		t.Fatalf("unexpected projected diagnostics: %+v", diagnostics)
+	}
+}

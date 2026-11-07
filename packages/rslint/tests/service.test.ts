@@ -27,7 +27,7 @@ class ReverseLintBackend implements RslintServiceInterface {
     if (kind === 'handshake') {
       this.handshakes.push([...(data.capabilities ?? [])]);
       return {
-        version: '5.0.0',
+        version: '6.0.0',
         ok: true,
         capabilities: ['reversePluginLint'],
       };
@@ -208,7 +208,7 @@ class ReverseConfigBackend extends ReverseLintBackend {
     if (kind === 'handshake') {
       this.handshakeCapabilities = [...(data.capabilities ?? [])];
       return {
-        version: '5.0.0',
+        version: '6.0.0',
         ok: true,
         capabilities: [API_REVERSE_CONFIG_LOAD_CAPABILITY],
       };
@@ -365,7 +365,7 @@ describe('RSLintService reverse lint request scoping', () => {
     };
     const service = new RSLintService(backend);
     await expect(service.lint({ files: ['a.ts'] })).rejects.toThrow(
-      /protocol mismatch.*5\.0\.0.*1\.0\.0/,
+      /protocol mismatch.*6\.0\.0.*1\.0\.0/,
     );
     await service.close();
   });
@@ -374,7 +374,7 @@ describe('RSLintService reverse lint request scoping', () => {
     const backend = new ReverseLintBackend();
     backend.sendMessage = async (kind: string, data: any): Promise<any> => {
       if (kind === 'handshake') {
-        return { version: '5.0.0', ok: true, capabilities: [] };
+        return { version: '6.0.0', ok: true, capabilities: [] };
       }
       return ReverseLintBackend.prototype.sendMessage.call(backend, kind, data);
     };

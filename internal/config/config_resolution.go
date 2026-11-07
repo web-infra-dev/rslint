@@ -136,6 +136,10 @@ func (config RslintConfig) mergeConfigEntries(key configMatchKey, configDirector
 			))
 		}
 
+		if entry.LinterOptions != nil && entry.LinterOptions.ReportUnusedDisableDirectives != nil {
+			value := *entry.LinterOptions.ReportUnusedDisableDirectives
+			merged.LinterOptions = &LinterOptions{ReportUnusedDisableDirectives: &value}
+		}
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
 		if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
 			options := entry.LanguageOptions.ParserOptions

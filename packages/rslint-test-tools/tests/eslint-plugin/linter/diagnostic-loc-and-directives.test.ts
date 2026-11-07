@@ -256,3 +256,15 @@ describe('sourceCode.getDisableDirectives: rslint-* prefix recognition', () => {
     ]);
   });
 });
+
+test('returns suppressed plugin diagnostics for shared Go attribution', () => {
+  const loaded = makeReportingPlugin((ctx) => {
+    ctx.report({ loc: { line: 2, column: 0 }, message: 'reported to Go' });
+  });
+  const result = lintFile(
+    defaultRequest('/* eslint-disable stub/probe */\nconst x = 1;\n'),
+    loaded,
+  );
+  expect(result.diagnostics).toHaveLength(1);
+  expect(result.diagnostics[0].message).toBe('reported to Go');
+});

@@ -106,8 +106,8 @@ func TestMayContainDisableDirective(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := mayContainDisableDirective(test.text); got != test.want {
-				t.Fatalf("mayContainDisableDirective(%q) = %v, want %v", test.text, got, test.want)
+			if got := MayContainDisableDirective(test.text); got != test.want {
+				t.Fatalf("MayContainDisableDirective(%q) = %v, want %v", test.text, got, test.want)
 			}
 		})
 	}

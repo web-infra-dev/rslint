@@ -936,3 +936,18 @@ func createOutputTestDiagnostic(t *testing.T, severity Severity) (Diagnostic, ts
 		Severity: severity,
 	}, tspath.ComparePathsOptions{CurrentDirectory: dir, UseCaseSensitiveFileNames: true}
 }
+
+func TestRenderUnnamedLinterDiagnostic(t *testing.T) {
+	source, err := NewDiagnosticSource("/* eslint-disable */", []int{0})
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostic := Diagnostic{FilePath: "/repo/test.ts", Source: source, Severity: SeverityWarning, Message: "Unused eslint-disable directive (no problems were reported)."}
+	var rendered bytes.Buffer
+	if err := Render(&rendered, newTestReport([]Diagnostic{diagnostic}, Summary{}), Options{Format: FormatDefault}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(rendered.String(), " — ") || !strings.Contains(rendered.String(), diagnostic.Message) {
+		t.Fatalf("unexpected unnamed output: %q", rendered.String())
+	}
+}

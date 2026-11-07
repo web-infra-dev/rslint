@@ -1,0 +1,7483 @@
+[
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments without rules > keeps problems before the comment on the same line",
+    "sourceLine": 62,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 7,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 7],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 8
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 7,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments without rules > keeps problems on a previous line before the comment",
+    "sourceLine": 83,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [21, 27],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 28
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments without rules > filters problems at the same location as the comment",
+    "sourceLine": 104,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 8,
+          "ruleId": null
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 8,
+        "ruleId": null,
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments without rules > filters out problems after the comment on the same line",
+    "sourceLine": 136,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments without rules > filters out problems on a later line than the comment",
+    "sourceLine": 168,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments with rules > filters problems after the comment that have the same ruleId",
+    "sourceLine": 202,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments with rules > filters problems in the same location as the comment that have the same ruleId",
+    "sourceLine": 234,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 8,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments with rules > keeps problems after the comment that have a different ruleId",
+    "sourceLine": 266,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 3,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [26, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 3,
+        "ruleId": "not-foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > /* eslint-disable */ comments with rules > keeps problems before the comment that have the same ruleId",
+    "sourceLine": 287,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 7,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 7,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > keeps problems after the eslint-enable comment",
+    "sourceLine": 309,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 27,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 26],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 27
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [27, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 27,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > keeps problems in the same location as the eslint-enable comment",
+    "sourceLine": 338,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 26,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 25],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 26
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [26, 40],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 41
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 26,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > filters out problems before the eslint-enable comment",
+    "sourceLine": 367,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": -1
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > filter out problems if disable all then enable foo and then disable foo",
+    "sourceLine": 403,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [26, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [45, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 3,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j3"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > filter out problems if disable all then enable foo and then disable all",
+    "sourceLine": 449,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [45, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 3,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j3"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments without rules > keeps problems before the eslint-enable comment if there is no corresponding disable comment",
+    "sourceLine": 495,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 3,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [25, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 3,
+        "ruleId": "not-foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments with rules > keeps problems after the comment that have the same ruleId as the eslint-enable comment",
+    "sourceLine": 526,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 4,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 4,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments with rules > keeps problems in the same location as the comment that have the same ruleId as the eslint-enable comment",
+    "sourceLine": 555,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments with rules > filters problems after the comment that have a different ruleId as the eslint-enable comment",
+    "sourceLine": 584,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 4,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 44],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 45
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 4,
+        "ruleId": "not-foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-enable comments with rules > reenables reporting correctly even when followed by another enable comment",
+    "sourceLine": 622,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": -1
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 22,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": -1
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 46,
+          "ruleId": "bar",
+          "justification": "j3",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "foo"
+        },
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "bar"
+        },
+        {
+          "line": 1,
+          "column": 30,
+          "ruleId": "foo"
+        },
+        {
+          "line": 1,
+          "column": 30,
+          "ruleId": "bar"
+        },
+        {
+          "line": 1,
+          "column": 50,
+          "ruleId": "foo"
+        },
+        {
+          "line": 1,
+          "column": 50,
+          "ruleId": "bar"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "bar",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "line": 1,
+        "column": 30,
+        "ruleId": "foo"
+      },
+      {
+        "line": 1,
+        "column": 30,
+        "ruleId": "bar",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "line": 1,
+        "column": 50,
+        "ruleId": "foo"
+      },
+      {
+        "line": 1,
+        "column": 50,
+        "ruleId": "bar"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      },
+      {
+        "suppressed": true
+      },
+      {
+        "suppressed": false
+      },
+      {
+        "suppressed": true
+      },
+      {
+        "suppressed": false
+      },
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments without rules > keeps problems on a previous line",
+    "sourceLine": 693,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 5,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [6, 27],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 28
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 5,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments without rules > filters problems before the comment on the same line",
+    "sourceLine": 714,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 28],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 29
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments without rules > filters problems after the comment on the same line",
+    "sourceLine": 747,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 28],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 29
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments without rules > keeps problems on a following line",
+    "sourceLine": 780,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 34],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 35
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments with rules > filters problems on the current line that match the ruleId",
+    "sourceLine": 803,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 2,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 34],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 35
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 2,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments with rules > keeps problems on the current line that do not match the ruleId",
+    "sourceLine": 836,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 2,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 27],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 28
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 2,
+        "ruleId": "not-foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments with rules > filters problems on the current line that do not match the ruleId if preceded by a disable comment",
+    "sourceLine": 857,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 22,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 5,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [24, 28],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 29
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 5,
+        "ruleId": "not-foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-line comments with rules > handles consecutive comments appropriately",
+    "sourceLine": 895,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable-line",
+          "line": 2,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "disable-line",
+          "line": 3,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        },
+        {
+          "type": "disable-line",
+          "line": 4,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j4",
+          "parent": 3
+        },
+        {
+          "type": "disable-line",
+          "line": 5,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j5",
+          "parent": 4
+        },
+        {
+          "type": "disable-line",
+          "line": 6,
+          "column": 8,
+          "ruleId": "foo",
+          "justification": "j6",
+          "parent": 5
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [7, 34],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 35
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [38, 73],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 74
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [76, 111],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 112
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [114, 149],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 150
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [152, 187],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 188
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [190, 225],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 226
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments without rules > filters problems on the next line",
+    "sourceLine": 967,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 3,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments without rules > keeps problems on the same line",
+    "sourceLine": 1000,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 3,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments without rules > keeps problems after the next line",
+    "sourceLine": 1020,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 3,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 3,
+        "column": 3,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments without rules > filters problems on the next line even if there is an eslint-enable comment on the same line",
+    "sourceLine": 1041,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 31,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 2,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [31, 50],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 51
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 2,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments with rules > filters problems on the next line that match the ruleId",
+    "sourceLine": 1081,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > eslint-disable-next-line comments with rules > keeps problems on the next line that do not match the ruleId",
+    "sourceLine": 1113,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "not-foo"
+        }
+      ],
+      "parents": [
+        {
+          "node": {
+            "range": [0, 31],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 32
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "not-foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unrecognized directive types > throws a TypeError when it encounters an unrecognized directive",
+    "sourceLine": 1136,
+    "input": {
+      "directives": [
+        {
+          "type": "foo",
+          "line": 1,
+          "column": 4,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [],
+      "parents": [],
+      "ignored": []
+    },
+    "error": {
+      "name": "TypeError",
+      "message": "Unrecognized directive type 'foo'"
+    }
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable */",
+    "sourceLine": 1157,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not fix a problem for /* eslint-disable */ when disableFixes is enabled",
+    "sourceLine": 1191,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "disableFixes": true,
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for /* eslint-disable */ /* (problem) */",
+    "sourceLine": 1222,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */",
+    "sourceLine": 1255,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from another rule) */",
+    "sourceLine": 1290,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 20,
+          "ruleId": "not-foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 24],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 25
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 24],
+          "text": " "
+        }
+      },
+      {
+        "line": 1,
+        "column": 20,
+        "ruleId": "not-foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* (problem from foo) */ /* eslint-disable */ /* eslint-enable foo */",
+    "sourceLine": 1330,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 8,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 24,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 2,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 2,
+        "ruleId": "foo"
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 8,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable */ /* eslint-enable */",
+    "sourceLine": 1378,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 12,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 41],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 42
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds two problems for /* eslint-disable */ /* eslint-disable */",
+    "sourceLine": 1421,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 42],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 43
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 2,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [21, 42],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable */ /* eslint-disable */ /* (problem) */",
+    "sourceLine": 1476,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [22, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "line": 3,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          },
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* eslint-disable */ /* (problem from foo) */",
+    "sourceLine": 1528,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [22, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "line": 3,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          },
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for /* eslint-disable foo */ /* (problem from foo) */",
+    "sourceLine": 1580,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 6,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 6,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable */ /* eslint-disable foo */ /* (problem from foo) */",
+    "sourceLine": 1613,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [22, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "line": 3,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          },
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable */ /* eslint-disable foo */ /* (problem from another rule) */",
+    "sourceLine": 1665,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 1,
+          "ruleId": "bar"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 2,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [21, 45],
+          "text": " "
+        }
+      },
+      {
+        "line": 3,
+        "column": 1,
+        "ruleId": "bar",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* eslint-enable foo */ /* (problem from foo) */",
+    "sourceLine": 1716,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 30,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [25, 46],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 47
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      },
+      {
+        "line": 1,
+        "column": 30,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* eslint-enable */ /* (problem from foo) */",
+    "sourceLine": 1764,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 26,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 30,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 24],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 25
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [25, 49],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 50
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 24],
+          "text": " "
+        }
+      },
+      {
+        "line": 1,
+        "column": 30,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds two problems for /* eslint-disable */ /* eslint-disable foo */ /* eslint-enable foo */ /* (problem from foo) */",
+    "sourceLine": 1812,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 4,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [22, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [46, 69],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 70
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 2,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [22, 45],
+          "text": " "
+        }
+      },
+      {
+        "line": 4,
+        "column": 1,
+        "ruleId": "foo"
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": false
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-enable */",
+    "sourceLine": 1880,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 1,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not fix a problem for /* eslint-enable */ when disableFixes is enabled",
+    "sourceLine": 1914,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 1,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "disableFixes": true,
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 1,
+        "column": 1,
+        "severity": 2
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for /* eslint-disable */ /* (problem) */ /* eslint-enable */",
+    "sourceLine": 1945,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-enable foo */",
+    "sourceLine": 1985,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable not-foo */ /* (problem from not-foo) */ /* eslint-enable foo */",
+    "sourceLine": 2020,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "not-foo",
+          "justification": "justification",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "justification",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "not-foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 24],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 25
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [48, 72],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 73
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "not-foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [48, 72],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable */ /* eslint-enable */ /* eslint-enable foo */",
+    "sourceLine": 2074,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 2
+        },
+        {
+          "type": "enable",
+          "line": 5,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 3
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [42, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [63, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [84, 105],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 106
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [63, 84],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 5,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [84, 105],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable */ /* eslint-enable */",
+    "sourceLine": 2153,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [42, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [63, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [63, 84],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds two problems for /* eslint-enable */ /* eslint-enable */",
+    "sourceLine": 2212,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 42],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 43
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 2,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [21, 42],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-enable */ /* eslint-disable */  /* (problem) */ /* eslint-enable */",
+    "sourceLine": 2267,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "enable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "disable",
+          "line": 2,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [21, 42],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 43
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [63, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 21],
+          "text": " "
+        }
+      },
+      {
+        "line": 3,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable */ /* eslint-enable foo */",
+    "sourceLine": 2326,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [42, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [63, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [63, 84],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable foo */",
+    "sourceLine": 2385,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": -1
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable foo */ /* eslint-enable */",
+    "sourceLine": 2422,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 21],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 22
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [42, 63],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 64
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [63, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [63, 84],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable bar */ /* (problem from bar) */ /* eslint-enable foo */ /* eslint-enable */",
+    "sourceLine": 2481,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "bar",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "bar"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [60, 80],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 81
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [80, 100],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 101
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "bar",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [60, 80],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable foo */ /* eslint-enable */",
+    "sourceLine": 2540,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [60, 80],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 81
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [80, 100],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 101
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [80, 100],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds two problems for /* eslint-disable foo */ /* (problem from foo) */ /* eslint-enable foo */ /* eslint-enable foo */ /* eslint-enable */",
+    "sourceLine": 2599,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "type": "enable",
+          "line": 4,
+          "column": 1,
+          "ruleId": "foo",
+          "justification": "j3",
+          "parent": 2
+        },
+        {
+          "type": "enable",
+          "line": 5,
+          "column": 1,
+          "ruleId": null,
+          "justification": "j4",
+          "parent": 3
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [40, 60],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 61
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [60, 80],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 81
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [80, 100],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 101
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'foo').",
+        "line": 4,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [60, 80],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 5,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [80, 100],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-disable used */ /* (problem from used) */ /* eslint-enable used */ /* eslint-enable */",
+    "sourceLine": 2678,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 5,
+          "column": 1,
+          "justification": "j3",
+          "parent": 2
+        },
+        {
+          "ruleId": null,
+          "type": "enable",
+          "line": 6,
+          "column": 1,
+          "justification": "j4",
+          "parent": 3
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        },
+        {
+          "line": 4,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [40, 60],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 61
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [80, 100],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 101
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [100, 120],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 121
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "line": 4,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          },
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found).",
+        "line": 6,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [100, 120],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      },
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for // eslint-disable-line",
+    "sourceLine": 2757,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 22],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 23
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 22],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for // eslint-disable-line (problem)",
+    "sourceLine": 2792,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 1,
+          "column": 10,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 1,
+        "column": 10,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Adds a problem for // eslint-disable-next-line",
+    "sourceLine": 2825,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 2,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 27],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 28
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 2,
+        "severity": 2,
+        "fix": {
+          "range": [0, 27],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add a problem for // eslint-disable-next-line \\n (problem)",
+    "sourceLine": 2860,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": -1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 10,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [],
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 10,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "justification"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused directives > adds two problems for /* eslint-disable */ // eslint-disable-line",
+    "sourceLine": 2893,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "parent": 0
+        },
+        {
+          "type": "disable-line",
+          "line": 1,
+          "column": 22,
+          "ruleId": null,
+          "parent": 1
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 20],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 21
+              }
+            }
+          },
+          "ruleIds": []
+        },
+        {
+          "node": {
+            "range": [20, 43],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 44
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 22,
+        "severity": 2,
+        "fix": {
+          "range": [20, 43],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused directives > Does not add problems when reportUnusedDisableDirectives: \"off\" is used",
+    "sourceLine": 2946,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "type": "disable-next-line",
+          "line": 1,
+          "column": 1,
+          "ruleId": null,
+          "justification": "justification",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "off",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 27],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 28
+              }
+            }
+          },
+          "ruleIds": []
+        }
+      ],
+      "ignored": []
+    },
+    "output": [],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used, unused */",
+    "sourceLine": 2970,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused",
+          "type": "disable",
+          "line": 1,
+          "column": 22,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 32],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 33
+              }
+            }
+          },
+          "value": "used, unused",
+          "ruleIds": ["used", "unused"]
+        }
+      ],
+      "text": "/* eslint-disable used, unused */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused').",
+        "line": 1,
+        "column": 22,
+        "severity": 2,
+        "fix": {
+          "range": [22, 30],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used , unused , -- unused and used are ok */",
+    "sourceLine": 3029,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused",
+          "type": "disable",
+          "line": 1,
+          "column": 24,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 62],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 63
+              }
+            }
+          },
+          "value": "used , unused ,",
+          "ruleIds": ["used", "unused"]
+        }
+      ],
+      "text": "/* eslint-disable used , unused , -- unused and used are ok */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused').",
+        "line": 1,
+        "column": 24,
+        "severity": 2,
+        "fix": {
+          "range": [23, 32],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused, used */",
+    "sourceLine": 3089,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 25,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 32],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 33
+              }
+            }
+          },
+          "value": "unused, used",
+          "ruleIds": ["unused", "used"]
+        }
+      ],
+      "text": "/* eslint-disable unused, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [18, 26],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused,, ,, used */",
+    "sourceLine": 3149,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 29,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 37],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 38
+              }
+            }
+          },
+          "value": " unused,, ,, used ",
+          "ruleIds": ["unused", "used"]
+        }
+      ],
+      "text": "/* eslint-disable unused,, ,, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [18, 25],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused-1, unused-2, used */",
+    "sourceLine": 3209,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "disable",
+          "line": 1,
+          "column": 28,
+          "justification": "j2",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 38,
+          "justification": "j3",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 45],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 46
+              }
+            }
+          },
+          "value": "unused-1, unused-2, used",
+          "ruleIds": ["unused-1", "unused-2", "used"]
+        }
+      ],
+      "text": "/* eslint-disable unused-1, unused-2, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-1').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [18, 28],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-2').",
+        "line": 1,
+        "column": 28,
+        "severity": 2,
+        "fix": {
+          "range": [26, 36],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j3"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused-1, unused-2, used, unused-3 */",
+    "sourceLine": 3289,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "disable",
+          "line": 1,
+          "column": 28,
+          "justification": "j2",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 38,
+          "justification": "j3",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-3",
+          "type": "disable",
+          "line": 1,
+          "column": 43,
+          "justification": "j4",
+          "parent": 0
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 55],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 56
+              }
+            }
+          },
+          "value": "unused-1, unused-2, used, unused-3",
+          "ruleIds": ["unused-1", "unused-2", "used", "unused-3"]
+        }
+      ],
+      "text": "/* eslint-disable unused-1, unused-2, used, unused-3 */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-1').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [18, 28],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-2').",
+        "line": 1,
+        "column": 28,
+        "severity": 2,
+        "fix": {
+          "range": [26, 36],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-3').",
+        "line": 1,
+        "column": 43,
+        "severity": 2,
+        "fix": {
+          "range": [42, 52],
+          "text": ""
+        }
+      },
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j3"
+          }
+        ]
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused-1, unused-2 */",
+    "sourceLine": 3389,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "disable",
+          "line": 1,
+          "column": 28,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 39],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 40
+              }
+            }
+          },
+          "value": "unused-1, unused-2",
+          "ruleIds": ["unused-1", "unused-2"]
+        }
+      ],
+      "text": "/* eslint-disable unused-1, unused-2 */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-1' or 'unused-2').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [0, 39],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable unused-1, unused-2, unused-3 */",
+    "sourceLine": 3441,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "disable",
+          "line": 1,
+          "column": 18,
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "disable",
+          "line": 1,
+          "column": 28,
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-3",
+          "type": "disable",
+          "line": 1,
+          "column": 38,
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 49],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 50
+              }
+            }
+          },
+          "value": "unused-1, unused-2, unused-3",
+          "ruleIds": ["unused-1", "unused-2", "unused-3"]
+        }
+      ],
+      "text": "/* eslint-disable unused-1, unused-2, unused-3 */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'unused-1', 'unused-2', or 'unused-3').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [0, 49],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable foo */ \\n (problem from foo and bar) // eslint-disable-line foo, bar",
+    "sourceLine": 3498,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "foo",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "foo",
+          "type": "disable-line",
+          "line": 2,
+          "column": 11,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "bar",
+          "type": "disable-line",
+          "line": 2,
+          "column": 11,
+          "justification": "j2",
+          "parent": 2
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "bar"
+        },
+        {
+          "line": 2,
+          "column": 6,
+          "ruleId": "foo"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "foo",
+          "ruleIds": ["foo"]
+        },
+        {
+          "node": {
+            "range": [41, 81],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 82
+              }
+            }
+          },
+          "value": "foo, bar",
+          "ruleIds": ["foo", "bar"]
+        },
+        {
+          "node": {
+            "range": [41, 81],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 82
+              }
+            }
+          },
+          "value": "foo, bar",
+          "ruleIds": ["foo", "bar"]
+        }
+      ],
+      "text": "/* eslint-disable foo */ \n  (problem)    // eslint-disable-line foo, bar",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "bar",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      },
+      {
+        "line": 2,
+        "column": 6,
+        "ruleId": "foo",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          },
+          {
+            "kind": "directive",
+            "justification": "j2"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-disable directive (no problems were reported from 'foo').",
+        "line": 2,
+        "column": 11,
+        "severity": 2,
+        "fix": {
+          "range": [64, 69],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      },
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable used, unused */",
+    "sourceLine": 3584,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "unused",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "value": "used, unused",
+          "ruleIds": ["used", "unused"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable used, unused */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [73, 81],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable used , unused , -- unused and used are ok */",
+    "sourceLine": 3655,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "unused",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 113],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 114
+              }
+            }
+          },
+          "value": " eslint-enable used , unused , -- unused and used are ok ",
+          "ruleIds": ["used", "unused"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable used , unused , -- unused and used are ok */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [74, 83],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable unused, used */",
+    "sourceLine": 3727,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 84],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 85
+              }
+            }
+          },
+          "value": "unused, used",
+          "ruleIds": ["unused", "used"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable unused, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [69, 77],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable unused,, ,, used */",
+    "sourceLine": 3799,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 88],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 89
+              }
+            }
+          },
+          "value": "unused,, ,, used",
+          "ruleIds": ["unused", "used"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable unused,, ,, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [69, 76],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable unused-1, unused-2, used */",
+    "sourceLine": 3871,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-1",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j4",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 96],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 97
+              }
+            }
+          },
+          "value": "unused-1, unused-2, used",
+          "ruleIds": ["unused-1", "unused-2", "used"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable unused-1, unused-2, used */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-1').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [69, 79],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-2').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [77, 87],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-disable used */ /* (problem from used) */ /* eslint-enable unused-1, unused-2, used, unused-3 */",
+    "sourceLine": 3963,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "used",
+          "type": "disable",
+          "line": 1,
+          "column": 1,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-1",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j2",
+          "parent": 1
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j3",
+          "parent": 1
+        },
+        {
+          "ruleId": "used",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j4",
+          "parent": 1
+        },
+        {
+          "ruleId": "unused-3",
+          "type": "enable",
+          "line": 3,
+          "column": 1,
+          "justification": "j5",
+          "parent": 1
+        }
+      ],
+      "problems": [
+        {
+          "line": 2,
+          "column": 1,
+          "ruleId": "used"
+        }
+      ],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 29],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 30
+              }
+            }
+          },
+          "value": "used",
+          "ruleIds": ["used"]
+        },
+        {
+          "node": {
+            "range": [52, 106],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 107
+              }
+            }
+          },
+          "value": "unused-1, unused-2, used, unused-3",
+          "ruleIds": ["unused-1", "unused-2", "used", "unused-3"]
+        }
+      ],
+      "text": "/* eslint-disable used */\n/* (problem from used) */\n/* eslint-enable unused-1, unused-2, used, unused-3 */",
+      "ignored": []
+    },
+    "output": [
+      {
+        "line": 2,
+        "column": 1,
+        "ruleId": "used",
+        "suppressions": [
+          {
+            "kind": "directive",
+            "justification": "j1"
+          }
+        ]
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-1').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [69, 79],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-2').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [77, 87],
+          "text": ""
+        }
+      },
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-3').",
+        "line": 3,
+        "column": 1,
+        "severity": 2,
+        "fix": {
+          "range": [93, 103],
+          "text": ""
+        }
+      }
+    ],
+    "problemResults": [
+      {
+        "suppressed": true
+      }
+    ]
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-enable unused-1, unused-2 */",
+    "sourceLine": 4075,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "enable",
+          "line": 1,
+          "column": 18,
+          "justification": "j1",
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "enable",
+          "line": 1,
+          "column": 28,
+          "justification": "j2",
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 39],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 40
+              }
+            }
+          },
+          "value": " eslint-enable unused-1, unused-2 ",
+          "ruleIds": ["unused-1", "unused-2"]
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-1' or 'unused-2').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [0, 39],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  },
+  {
+    "name": "apply-disable-directives > unused rules within directives > Adds a problem for /* eslint-enable unused-1, unused-2, unused-3 */",
+    "sourceLine": 4124,
+    "input": {
+      "language": {
+        "lineStart": 1,
+        "columnStart": 0
+      },
+      "directives": [
+        {
+          "ruleId": "unused-1",
+          "type": "enable",
+          "line": 1,
+          "column": 18,
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-2",
+          "type": "enable",
+          "line": 1,
+          "column": 28,
+          "parent": 0
+        },
+        {
+          "ruleId": "unused-3",
+          "type": "enable",
+          "line": 1,
+          "column": 38,
+          "parent": 0
+        }
+      ],
+      "problems": [],
+      "reportUnusedDisableDirectives": "error",
+      "parents": [
+        {
+          "node": {
+            "range": [0, 49],
+            "loc": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 1,
+                "column": 50
+              }
+            }
+          },
+          "value": " eslint-enable unused-1, unused-2, unused-3 ",
+          "ruleIds": ["unused-1", "unused-2", "unused-3"]
+        }
+      ],
+      "ignored": []
+    },
+    "output": [
+      {
+        "ruleId": null,
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'unused-1', 'unused-2', or 'unused-3').",
+        "line": 1,
+        "column": 18,
+        "severity": 2,
+        "fix": {
+          "range": [0, 49],
+          "text": " "
+        }
+      }
+    ],
+    "problemResults": []
+  }
+]

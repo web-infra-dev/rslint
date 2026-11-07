@@ -148,6 +148,14 @@ describe('loadConfigFileFresh', () => {
 });
 
 describe('normalizeConfig', () => {
+  test('preserves per-file unused directive settings', () => {
+    const entry = {
+      files: ['**/*.ts'],
+      linterOptions: { reportUnusedDisableDirectives: 'warn' },
+    };
+    expect(normalizeConfig([entry])).toEqual([entry]);
+  });
+
   test('accepts a valid flat config array', () => {
     const result = normalizeConfig([
       { files: ['**/*.ts'], rules: { 'no-console': 'error' } },

@@ -64,7 +64,7 @@ const (
 )
 
 // Version is the IPC protocol version.
-const Version = "5.0.0"
+const Version = "6.0.0"
 
 const CapabilityReversePluginLint = "reversePluginLint"
 const CapabilityReverseConfigLoad = "reverseConfigLoadV1"

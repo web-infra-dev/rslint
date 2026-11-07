@@ -549,6 +549,9 @@ func buildOverrideFields(entry ConfigEntry, remainingRules Rules) string {
 		fields = append(fields, lo)
 	}
 
+	if entry.LinterOptions != nil {
+		fields = append(fields, "    linterOptions: "+formatJSON(entry.LinterOptions))
+	}
 	// settings
 	if len(entry.Settings) > 0 {
 		fields = append(fields, "    settings: "+formatJSON(entry.Settings))
