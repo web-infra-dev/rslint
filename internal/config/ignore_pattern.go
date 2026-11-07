@@ -598,39 +598,131 @@ func gitIgnoreNodeGlob(pattern *IgnorePattern) string {
 	return pattern.Glob[:pattern.GitNodeGlobEnd]
 }
 
+// buildDirectoryPatternFilters retains one necessary literal per positive
+// absolute pattern, in their original order. The original glob remains the
+// final matching authority. Storage is proportional to positive patterns,
+// never to visited directories; complex-only groups retain no filters.
+func buildDirectoryPatternFilters(patterns []IgnorePattern) []string {
+	count := 0
+	for _, pattern := range patterns {
+		if !pattern.Negated && pattern.Kind == dirAbsoluteBlock {
+			count++
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+	filters := make([]string, 0, count)
+	useful := false
+	for _, pattern := range patterns {
+		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
+			continue
+		}
+		literal := directoryPatternRequiredLiteral(pattern.Glob)
+		if pattern.CaseInsensitive {
+			literal = strings.ToLower(literal)
+		}
+		if literal == "x" {
+			// Every directory's synthetic child supplies this literal.
+			literal = ""
+		}
+		useful = useful || literal != ""
+		filters = append(filters, literal)
+	}
+	if !useful {
+		return nil
+	}
+	return filters
+}
+
+// directoryPatternRequiredLiteral uses the exact normalized glob received by
+// ignorePatternMatches. Outside braces, classes and escapes, */? cannot make a
+// literal optional. A run inside one segment must therefore occur in every
+// matching candidate; it cannot span a directory's final slash and synthetic x.
+// Non-ASCII patterns stay on the original path: doublestar compares runes, so
+// U+FFFD can match invalid UTF-8 bytes that a literal byte search would miss.
+func directoryPatternRequiredLiteral(glob string) string {
+	longest := ""
+	start := 0
+	for index := 0; index <= len(glob); index++ {
+		if index < len(glob) {
+			char := glob[index]
+			if char >= 0x80 || char == '[' || char == '{' || char == '\\' {
+				return ""
+			}
+			if char != '*' && char != '?' && char != '/' {
+				continue
+			}
+		}
+		if index-start > len(longest) {
+			longest = glob[start:index]
+		}
+		start = index + 1
+	}
+	return longest
+}
+
+func isDirAbsolutelyBlockedWithFilters(
+	dirPath string,
+	patterns []IgnorePattern,
+	filters []string,
+	minimumDepth int,
+) bool {
+	var candidates []string
+	firstPattern := true
+	literalPath := dirPath
+	lowered := false
+	filterIndex := 0
+	for _, pattern := range patterns {
+		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
+			continue
+		}
+		literal := ""
+		if filters != nil {
+			literal = filters[filterIndex]
+			filterIndex++
+		}
+		if literal != "" {
+			if pattern.CaseInsensitive && !lowered {
+				literalPath = strings.ToLower(dirPath)
+				lowered = true
+			}
+			path := dirPath
+			if pattern.CaseInsensitive {
+				path = literalPath
+			}
+			if !strings.Contains(path, literal) {
+				continue
+			}
+		}
+		if firstPattern && minimumDepth == 0 {
+			// Retain the allocation-free first-pattern path. Further surviving
+			// patterns share candidates as they do without filtering.
+			firstPattern = false
+			if directoryPatternAbsolutelyBlocks(pattern, dirPath) {
+				return true
+			}
+			continue
+		}
+		if candidates == nil {
+			candidates = directoryBlockCandidates(dirPath, minimumDepth)
+		}
+		for _, candidate := range candidates {
+			if ignorePatternMatches(pattern, candidate) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // isDirAbsolutelyBlocked reports whether dirPath (or an ancestor segment) is
 // matched by a positive directory-level pattern (`dir/**`, bare names). This is
 // the ESLint "directory blocking is absolute and cannot be negated" semantics —
 // `!` and file-level patterns are excluded by Kind. Shared by GetConfigForFile
 // (lint) and canPruneDir (walk).
 func isDirAbsolutelyBlocked(dirPath string, patterns []IgnorePattern) bool {
-	var candidates []string
-	firstPattern := true
-	for i := range patterns {
-		p := patterns[i]
-		if p.Negated || p.Kind != dirAbsoluteBlock {
-			continue
-		}
-		// Preserve the allocation-free early-match path for the common single
-		// pattern case. Build reusable candidates only when another positive
-		// directory pattern would otherwise repeat every synthetic `/x` value.
-		if firstPattern {
-			firstPattern = false
-			if directoryPatternAbsolutelyBlocks(p, dirPath) {
-				return true
-			}
-			continue
-		}
-		if candidates == nil {
-			candidates = directoryBlockCandidates(dirPath, 0)
-		}
-		for _, candidate := range candidates {
-			if ignorePatternMatches(p, candidate) {
-				return true
-			}
-		}
-	}
-	return false
+	return isDirAbsolutelyBlockedWithFilters(dirPath, patterns, nil, 0)
 }
 
 func directoryPatternAbsolutelyBlocks(pattern IgnorePattern, dirPath string) bool {
@@ -659,22 +751,7 @@ func isDirAbsolutelyBlockedAboveFloor(
 	patterns []IgnorePattern,
 	minimumDepth int,
 ) bool {
-	var candidates []string
-	for i := range patterns {
-		pattern := patterns[i]
-		if pattern.Negated || pattern.Kind != dirAbsoluteBlock {
-			continue
-		}
-		if candidates == nil {
-			candidates = directoryBlockCandidates(dirPath, minimumDepth)
-		}
-		for _, candidate := range candidates {
-			if ignorePatternMatches(pattern, candidate) {
-				return true
-			}
-		}
-	}
-	return false
+	return isDirAbsolutelyBlockedWithFilters(dirPath, patterns, nil, minimumDepth)
 }
 
 func directoryBlockCandidates(dirPath string, minimumDepth int) []string {
