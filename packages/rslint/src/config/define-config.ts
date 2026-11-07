@@ -22,6 +22,7 @@ const NATIVE_PLUGINS = [
   'promise',
   'react',
   'react-hooks',
+  'rslim',
   'rstest',
   'unicorn',
 ] as const;
