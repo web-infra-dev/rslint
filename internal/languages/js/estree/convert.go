@@ -16,6 +16,24 @@ import (
 )
 
 func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
+	if !p.recordOrigins {
+		return p.convertNode(node, pattern)
+	}
+	previous := p.origin
+	p.origin = node
+	id := p.convertNode(node, pattern)
+	p.origin = previous
+	p.registerReverse(node, id)
+	return id
+}
+
+func (p *estreeProjector) registerReverse(node *ast.Node, id uint32) {
+	if p.recordOrigins && node != nil && id != 0 && p.reverse[node] == 0 {
+		p.reverse[node] = id
+	}
+}
+
+func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 	if node == nil {
 		return 0
 	}
@@ -257,6 +275,10 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		keyword := scanner.TokenToString(n.KeywordToken)
 		meta := p.add("Identifier", start, start+uint32(len(keyword)),
 			p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
+		if p.recordOrigins {
+			// The compiler stores this keyword as an enum, not an AST node.
+			p.origins[meta-1] = nil
+		}
 		return p.addNode("MetaProperty", node,
 			nodeValue(meta), nodeValue(p.convert(n.Name(), false)))
 
@@ -384,7 +406,11 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 			nodeValue(p.convert(imported, false)), p.stringValue(kind), nodeValue(p.convert(n.Name(), false)))
 	case ast.KindImportClause:
 		name := node.AsImportClause().Name()
-		return p.addNode("ImportDefaultSpecifier", name, nodeValue(p.convert(name, false)))
+		id := p.addNode("ImportDefaultSpecifier", name, nodeValue(p.convert(name, false)))
+		if p.recordOrigins {
+			p.origins[id-1] = node
+		}
+		return id
 	case ast.KindImportAttribute:
 		n := node.AsImportAttribute()
 		return p.addNode("ImportAttribute", node,
@@ -489,7 +515,7 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 		return p.addNode("TSArrayType", node, nodeValue(p.convert(node.AsArrayTypeNode().ElementType, false)))
 	case ast.KindLiteralType:
 		if node.AsLiteralTypeNode().Literal.Kind == ast.KindNullKeyword {
-			return p.addNode("TSNullKeyword", node)
+			return p.addNode("TSNullKeyword", node.AsLiteralTypeNode().Literal)
 		}
 		return p.addNode("TSLiteralType", node, nodeValue(p.convert(node.AsLiteralTypeNode().Literal, false)))
 	case ast.KindTypeParameter:
@@ -646,6 +672,7 @@ func (p *estreeProjector) convertStatements(list *ast.NodeList, prologue bool) u
 		var id uint32
 		if prologue {
 			id = p.convertExpressionStatement(statement, true)
+			p.registerReverse(statement, id)
 		} else {
 			id = p.convertStatement(statement)
 		}
@@ -817,6 +844,7 @@ func (p *estreeProjector) convertParameters(parameters []*ast.Node) uint32 {
 	ids := make([]uint32, 0, len(parameters))
 	for _, parameter := range parameters {
 		if id := p.convertParameter(parameter); id != 0 {
+			p.registerReverse(parameter, id)
 			ids = append(ids, id)
 		}
 	}
@@ -824,6 +852,17 @@ func (p *estreeProjector) convertParameters(parameters []*ast.Node) uint32 {
 }
 
 func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
+	previous := p.origin
+	if p.recordOrigins {
+		p.origin = node
+	}
+	id := p.convertParameterNode(node)
+	p.origin = previous
+	p.registerReverse(node, id)
+	return id
+}
+
+func (p *estreeProjector) convertParameterNode(node *ast.Node) uint32 {
 	if node == nil || isJSDocCommentSyntax(node) {
 		return 0
 	}
@@ -922,13 +961,20 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 	p.recordTokenCover(n.OperatorToken, false)
 	operator := scanner.TokenToString(n.OperatorToken.Kind)
 	if n.OperatorToken.Kind == ast.KindCommaToken {
-		// Collect the native left spine before projecting it. Encoding every
-		// prefix would retain quadratic lists and detached sequence nodes.
+		// Collect the native left spine before projecting it. Syntax-only
+		// callers avoid detached prefixes; semantic maps preserve their aliases.
 		rights := []*ast.Node{n.Right}
+		var prefixes []*ast.Node
+		if p.recordOrigins {
+			prefixes = append(prefixes, node)
+		}
 		left := n.Left
 		for left.Kind == ast.KindBinaryExpression && left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
 			p.check()
 			nested := left.AsBinaryExpression()
+			if p.recordOrigins {
+				prefixes = append(prefixes, left)
+			}
 			rights = append(rights, nested.Right)
 			left = nested.Left
 		}
@@ -937,7 +983,12 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 		items := make([]uint32, len(rights)+1)
 		items[0] = p.convert(left, false)
 		for index := len(rights) - 1; index >= 0; index-- {
-			items[len(rights)-index] = p.convert(rights[index], false)
+			count := len(rights) - index
+			items[count] = p.convert(rights[index], false)
+			if p.recordOrigins && index > 0 {
+				id := p.addNode("SequenceExpression", prefixes[index], p.listValue(items[:count+1]))
+				p.registerReverse(prefixes[index], id)
+			}
 		}
 		return p.addNode("SequenceExpression", node, p.listValue(items))
 	}
@@ -1087,15 +1138,22 @@ func (p *estreeProjector) convertClass(node *ast.Node, declaration bool) uint32 
 				continue
 			}
 			for index, heritageNode := range clause.Types.Nodes {
+				previous := p.origin
+				if p.recordOrigins {
+					p.origin = heritageNode
+				}
 				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
 				if clause.Token == ast.KindExtendsKeyword && index == 0 {
 					superClass = p.convertHeritageName(heritageExpression)
 					superTypeArguments = p.typeParameters(heritageTypeArguments, false)
 				} else if clause.Token == ast.KindImplementsKeyword {
-					implements = append(implements, p.addNode("TSClassImplements", heritageNode,
+					id := p.addNode("TSClassImplements", heritageNode,
 						nodeValue(p.convertHeritageName(heritageExpression)),
-						p.typeParameters(heritageTypeArguments, false)))
+						p.typeParameters(heritageTypeArguments, false))
+					p.registerReverse(heritageNode, id)
+					implements = append(implements, id)
 				}
+				p.origin = previous
 			}
 		}
 	}
@@ -1324,10 +1382,17 @@ func (p *estreeProjector) convertInterface(node *ast.Node) uint32 {
 				continue
 			}
 			for _, heritageNode := range clause.Types.Nodes {
+				previous := p.origin
+				if p.recordOrigins {
+					p.origin = heritageNode
+				}
 				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
-				extends = append(extends, p.addNode("TSInterfaceHeritage", heritageNode,
+				id := p.addNode("TSInterfaceHeritage", heritageNode,
 					nodeValue(p.convertHeritageName(heritageExpression)),
-					p.typeParameters(heritageTypeArguments, false)))
+					p.typeParameters(heritageTypeArguments, false))
+				p.origin = previous
+				p.registerReverse(heritageNode, id)
+				extends = append(extends, id)
 			}
 		}
 	}
@@ -1521,14 +1586,24 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 	} else if global {
 		kind = "global"
 	}
-	name := p.convert(n.Name(), false)
+	// Upstream constructs namespace identifiers directly, without registering
+	// reverse aliases through child conversion. String module names use both maps.
+	var name uint32
+	if !global && n.Name().Kind == ast.KindIdentifier {
+		name = p.convertNode(n.Name(), false)
+	} else {
+		name = p.convert(n.Name(), false)
+	}
 	body := n.Body
 	declare := p.hasModifier(node, ast.ModifierFlagsAmbient)
 	// Dotted namespaces have one ESTree declaration and a qualified id.
 	for body != nil && body.Kind == ast.KindModuleDeclaration {
 		nested := body.AsModuleDeclaration()
-		right := p.convert(nested.Name(), false)
+		right := p.convertNode(nested.Name(), false)
 		name = p.add("TSQualifiedName", p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
+		if p.recordOrigins {
+			p.origins[name-1] = nested.Name()
+		}
 		declare = declare || p.hasModifier(body, ast.ModifierFlagsAmbient)
 		body = nested.Body
 	}
@@ -1536,6 +1611,17 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 }
 
 func (p *estreeProjector) convertJsxName(node *ast.Node) uint32 {
+	previous := p.origin
+	if p.recordOrigins {
+		p.origin = node
+	}
+	id := p.convertJsxNameNode(node)
+	p.origin = previous
+	p.registerReverse(node, id)
+	return id
+}
+
+func (p *estreeProjector) convertJsxNameNode(node *ast.Node) uint32 {
 	if node == nil {
 		return 0
 	}
@@ -1592,6 +1678,11 @@ func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 		return id, false
 	}
 	expression := p.values[record.valueStart] & payloadMask
+	// TypeScript's reverse map retains this detached wrapper. Keep its record
+	// when semantic identity is requested, even though traversal unwraps it.
+	if p.recordOrigins {
+		return expression, true
+	}
 	// The wrapper is the last record emitted by convert and has no users yet.
 	// Its parent consumes the inner expression, so reclaim it before proceeding.
 	p.nodes = p.nodes[:id-1]
@@ -1631,6 +1722,12 @@ func heritageParts(node *ast.Node) (*ast.Node, *ast.NodeList) {
 }
 
 func (p *estreeProjector) convertTypeQueryName(node *ast.Node) uint32 {
+	id := p.convertTypeQueryNameNode(node)
+	p.registerReverse(node, id)
+	return id
+}
+
+func (p *estreeProjector) convertTypeQueryNameNode(node *ast.Node) uint32 {
 	if node.Kind == ast.KindIdentifier && node.Text() == "this" {
 		p.check()
 		// Type queries encode this as an identifier in tsgo, including its
@@ -1648,6 +1745,12 @@ func (p *estreeProjector) convertTypeQueryName(node *ast.Node) uint32 {
 }
 
 func (p *estreeProjector) convertHeritageName(node *ast.Node) uint32 {
+	id := p.convertHeritageNameNode(node)
+	p.registerReverse(node, id)
+	return id
+}
+
+func (p *estreeProjector) convertHeritageNameNode(node *ast.Node) uint32 {
 	if node.Kind == ast.KindQualifiedName {
 		data := node.AsQualifiedName()
 		return p.addNode("MemberExpression", node, nodeValue(p.convertHeritageName(data.Left)), nodeValue(p.convert(data.Right, false)), boolValue(false), boolValue(false))
