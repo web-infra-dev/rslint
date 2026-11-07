@@ -13,8 +13,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// Expectations checked against the pinned v79.0.0 reference, with cases covering
-// AST wrappers, read/write accesses, comment safety, and JavaScript whitespace.
+// Expectations include the documented safety differences from v79.0.0, with
+// cases covering AST wrappers, read/write accesses, comments, and whitespace.
 func TestPreferQuerySelectorExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_query_selector.PreferQuerySelectorRule, []rule_tester.ValidTestCase{
 		{Code: "document?.getElementById(\"foo\");", FileName: "extras.js"},
@@ -59,16 +59,16 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "document.getElementById<string>(\"foo\");", FileName: "extras.ts", Output: []string{"document.querySelector<string>(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
 		}},
-		{Code: "(<div />).getElementsByName(\"foo\");", FileName: "extras.tsx", Output: []string{"(<div />).querySelectorAll(\":scope [name='foo']\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "(<div />).getElementsByName(\"foo\");", FileName: "extras.tsx", Output: []string{"(<div />).querySelectorAll(\"[name='foo']\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 28},
 		}},
-		{Code: "(void node).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"(void node).querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "(void node).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"(void node).querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 13, EndLine: 1, EndColumn: 27},
 		}},
-		{Code: "([], []).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"([], []).querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "([], []).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"([], []).querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
 		}},
-		{Code: "([] as any).getElementById(\"foo\");", FileName: "extras.ts", Output: []string{"([] as any).querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "([] as any).getElementById(\"foo\");", FileName: "extras.ts", Output: []string{"([] as any).querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 13, EndLine: 1, EndColumn: 27},
 		}},
 		{Code: "(document).getElementsByTagName(\"form\");", FileName: "extras.js", Output: []string{"(document).querySelectorAll(\"form\");"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -80,44 +80,44 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "globalThis.document.getElementById(\"foo\");", FileName: "extras.js", Output: []string{"globalThis.document.querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 21, EndLine: 1, EndColumn: 35},
 		}},
-		{Code: "window[\"document\"].getElementsByTagName(\"*\");", FileName: "extras.js", Output: []string{"window[\"document\"].querySelectorAll(\":scope *\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "window[\"document\"].getElementsByTagName(\"*\");", FileName: "extras.js", Output: []string{"window[\"document\"].querySelectorAll(\"*\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 20, EndLine: 1, EndColumn: 40},
 		}},
-		{Code: "self.document.getElementById(\"foo\");", FileName: "extras.js", Output: []string{"self.document.querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "self.document.getElementById(\"foo\");", FileName: "extras.js", Output: []string{"self.document.querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 15, EndLine: 1, EndColumn: 29},
 		}},
 		{Code: "window?.document.getElementById(\"foo\");", FileName: "extras.js", Output: []string{"window?.document.querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 18, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "(node?.child).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"(node?.child).querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "(node?.child).getElementById(\"foo\");", FileName: "extras.js", Output: []string{"(node?.child).querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 15, EndLine: 1, EndColumn: 29},
 		}},
 		{Code: "function f(document) { document.getElementById(\"foo\"); }", FileName: "extras.js", Output: []string{"function f(document) { document.querySelector(\"#foo\"); }"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 33, EndLine: 1, EndColumn: 47},
 		}},
-		{Code: "(document as Document).getElementById(\"foo\");", FileName: "extras.ts", Output: []string{"(document as Document).querySelector(\":scope #foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "(document as Document).getElementById(\"foo\");", FileName: "extras.ts", Output: []string{"(document as Document).querySelector(\"#foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 24, EndLine: 1, EndColumn: 38},
 		}},
-		{Code: "(document.getElementsByTagName(\"form\"))[0];", FileName: "extras.js", Output: []string{"(document.querySelector(\"form\"));"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 31},
+		{Code: "(document.getElementsByTagName(\"form\"))[0];", FileName: "extras.js", Output: []string{"(document.querySelectorAll(\"form\"))[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 31},
 		}},
-		{Code: "((document.getElementsByClassName(\"foo\")).at)(0);", FileName: "extras.js", Output: []string{"((document.querySelector(\".foo\")));"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByClassName()`.", Line: 1, Column: 12, EndLine: 1, EndColumn: 34},
+		{Code: "((document.getElementsByClassName(\"foo\")).at)(0);", FileName: "extras.js", Output: []string{"((document.querySelectorAll(\".foo\")).at)(0);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 12, EndLine: 1, EndColumn: 34},
 		}},
 		{Code: "(document.getElementsByName(\"foo\")).item((0));", FileName: "extras.js", Output: []string{"(document.querySelector(\"[name='foo']\"));"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByName()`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 28},
 		}},
-		{Code: "document.getElementsByTagName(\"form\")[0x0];", FileName: "extras.js", Output: []string{"document.querySelector(\"form\");"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName(\"form\")[0x0];", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")[0x0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "document.getElementsByTagName(\"form\").at(0.0);", FileName: "extras.js", Output: []string{"document.querySelector(\"form\");"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName(\"form\").at(0.0);", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\").at(0.0);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementsByTagName(\"form\").item(0e0);", FileName: "extras.js", Output: []string{"document.querySelector(\"form\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: `document.getElementsByTagName("form")[1e-999];`, FileName: "extras.js", Output: []string{`document.querySelector("form");`}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: `document.getElementsByTagName("form")[1e-999];`, FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")[1e-999];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementsByTagName(\"form\")[-0];", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")[-0];"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
@@ -143,8 +143,8 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "document.getElementsByTagName(\"form\").at?.(0);", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\").at?.(0);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "document.getElementsByTagName(\"form\")[0]?.submit();", FileName: "extras.js", Output: []string{"document.querySelector(\"form\")?.submit();"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName(\"form\")[0]?.submit();", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")[0]?.submit();"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementsByTagName(\"form\").at(0, other);", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\").at(0, other);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
@@ -158,11 +158,11 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "document.getElementsByTagName(\"form\")./* keep */ at(0);", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")./* keep */ at(0);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "((document.getElementsByTagName(\"form\") /* keep */))[0];", FileName: "extras.js", Output: []string{"((document.querySelector(\"form\") /* keep */));"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 12, EndLine: 1, EndColumn: 32},
+		{Code: "((document.getElementsByTagName(\"form\") /* keep */))[0];", FileName: "extras.js", Output: []string{"((document.querySelectorAll(\"form\") /* keep */))[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 12, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "document.getElementsByTagName(/* keep */ \"form\")[0];", FileName: "extras.js", Output: []string{"document.querySelector(/* keep */ \"form\");"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName(/* keep */ \"form\")[0];", FileName: "extras.js", Output: []string{"document.querySelectorAll(/* keep */ \"form\")[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementsByTagName(\"form\")[0] = value;", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"form\")[0] = value;"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
@@ -182,8 +182,8 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "({value: document.getElementsByTagName(\"form\")[0]} = object);", FileName: "extras.js", Output: []string{"({value: document.querySelectorAll(\"form\")[0]} = object);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 19, EndLine: 1, EndColumn: 39},
 		}},
-		{Code: `({[document.getElementsByTagName("form")[0]]: other} = object);`, FileName: "extras.js", Output: []string{`({[document.querySelector("form")]: other} = object);`}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 13, EndLine: 1, EndColumn: 33},
+		{Code: `({[document.getElementsByTagName("form")[0]]: other} = object);`, FileName: "extras.js", Output: []string{"({[document.querySelectorAll(\"form\")[0]]: other} = object);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 13, EndLine: 1, EndColumn: 33},
 		}},
 		{Code: "[...document.getElementsByTagName(\"form\")[0]] = values;", FileName: "extras.js", Output: []string{"[...document.querySelectorAll(\"form\")[0]] = values;"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 14, EndLine: 1, EndColumn: 34},
@@ -218,13 +218,13 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "document.getElementById(\"\\u0061\");", FileName: "extras.js", Output: []string{"document.querySelector(\"#a\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
 		}},
-		{Code: "element.getElementsByTagName(\"\\u0061\");", FileName: "extras.js", Output: []string{"element.querySelectorAll(\":scope a\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByTagName(\"\\u0061\");", FileName: "extras.js", Output: []string{"element.querySelectorAll(\"\\u0061\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 29},
 		}},
 		{Code: "document.getElementsByTagName(\"\\u0061\");", FileName: "extras.js", Output: []string{"document.querySelectorAll(\"\\u0061\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "element.getElementsByClassName(\"foo\uFEFFbar baz\");", FileName: "extras.js", Output: []string{"element.querySelectorAll(\":scope .foo.bar.baz\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByClassName(\"foo\uFEFFbar baz\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 31},
 		}},
 		{Code: "document.getElementsByClassName(\"foo\u0085bar\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -236,22 +236,22 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: "document.getElementsByName(\"\uFEFF\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
-		{Code: "element.getElementsByTagName(`*`);", FileName: "extras.js", Output: []string{"element.querySelectorAll(`:scope *`);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByTagName(`*`);", FileName: "extras.js", Output: []string{"element.querySelectorAll(`*`);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 29},
 		}},
-		{Code: "element.getElementsByName(`foo`);", FileName: "extras.js", Output: []string{"element.querySelectorAll(`:scope [name='foo']`);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByName(`foo`);", FileName: "extras.js", Output: []string{"element.querySelectorAll(`[name='foo']`);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26},
 		}},
-		{Code: "element.getElementsByName(\"foo\");", FileName: "extras.js", Output: []string{"element.querySelectorAll(\":scope [name='foo']\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByName(\"foo\");", FileName: "extras.js", Output: []string{"element.querySelectorAll(\"[name='foo']\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26},
 		}},
-		{Code: "element.getElementById(null);", FileName: "extras.js", Output: []string{"element.querySelector(null);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementById(null);", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 23},
 		}},
-		{Code: "element.getElementsByName(null)[0];", FileName: "extras.js", Output: []string{"element.querySelector(null);"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26},
+		{Code: "element.getElementsByName(null)[0];", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 26},
 		}},
-		{Code: "document.getElementById(null);", FileName: "extras.js", Output: []string{"document.querySelector(null);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "document.getElementById(null);", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
 		}},
 		{Code: "document.getElementsByName(\"f\\u006fo\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -309,26 +309,94 @@ func TestPreferQuerySelectorExtras(t *testing.T) {
 		{Code: `(window?.document.getElementsByTagName("form")).item(0);`, FileName: "extras.js", Output: []string{`(window?.document.querySelectorAll("form")).item(0);`}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 19, EndLine: 1, EndColumn: 39},
 		}},
-		{Code: `window?.document.getElementsByTagName("form")[0];`, FileName: "extras.js", Output: []string{`window?.document.querySelector("form");`}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 18, EndLine: 1, EndColumn: 38},
+		{Code: `window?.document.getElementsByTagName("form")[0];`, FileName: "extras.js", Output: []string{"window?.document.querySelectorAll(\"form\")[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 18, EndLine: 1, EndColumn: 38},
 		}},
-		{Code: `(window?.document).getElementsByTagName("form")[0];`, FileName: "extras.js", Output: []string{`(window?.document).querySelector(":scope form");`}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 20, EndLine: 1, EndColumn: 40},
+		{Code: `(window?.document).getElementsByTagName("form")[0];`, FileName: "extras.js", Output: []string{"(window?.document).querySelectorAll(\"form\")[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 20, EndLine: 1, EndColumn: 40},
 		}},
-		{Code: `(/** @type {NodeList} */ (document.getElementsByTagName("form")))[0];`, FileName: "extras.js", Output: []string{`(/** @type {NodeList} */ (document.querySelector("form")));`}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 36, EndLine: 1, EndColumn: 56},
+		{Code: `(/** @type {NodeList} */ (document.getElementsByTagName("form")))[0];`, FileName: "extras.js", Output: []string{"(/** @type {NodeList} */ (document.querySelectorAll(\"form\")))[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 36, EndLine: 1, EndColumn: 56},
 		}},
 		{Code: `(/** @type {NodeList} */ (window?.document.getElementsByTagName("form")))[0];`, FileName: "extras.js", Output: []string{`(/** @type {NodeList} */ (window?.document.querySelectorAll("form")))[0];`}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 44, EndLine: 1, EndColumn: 64},
+		}},
+		// Simple selectors work on fragments and shadow roots without :scope.
+		{Code: `fragment.getElementById("foo");`, FileName: "extras.js", Output: []string{`fragment.querySelector("#foo");`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
+		}},
+		{Code: `shadowRoot.getElementById("foo");`, FileName: "extras.js", Output: []string{`shadowRoot.querySelector("#foo");`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 12, EndLine: 1, EndColumn: 26},
+		}},
+		{Code: `document.getElementById((null as any)!);`, FileName: "extras.ts", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},
+		}},
+		{Code: `document.getElementsByName(null).item(0);`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		// Indexing an empty collection returns undefined; item(0) returns null.
+		{Code: `document.getElementsByTagName("missing")[0] === undefined;`, FileName: "extras.js", Output: []string{`document.querySelectorAll("missing")[0] === undefined;`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		}},
+		{Code: `document.getElementsByName("missing").at(0) === undefined;`, FileName: "extras.js", Output: []string{`document.querySelectorAll("[name='missing']").at(0) === undefined;`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		{Code: `document.getElementsByTagName("missing").item(0) === null;`, FileName: "extras.js", Output: []string{`document.querySelector("missing") === null;`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		}},
+		// Only DOM ASCII whitespace separates class tokens; VT and NBSP do not.
+		{Code: `document.getElementsByClassName("foo\tbar\n\f\r baz");`, FileName: "extras.js", Output: []string{`document.querySelectorAll(".foo.bar.baz");`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
+		}},
+		{Code: `document.getElementsByClassName("foo\u00a0bar");`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
+		}},
+		{Code: `document.getElementsByClassName("foo\vbar");`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
+		}},
+		// Actual source characters, rather than backslash escape spellings.
+		{Code: "document.getElementsByName(\"foo\fbar\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		{Code: "document.getElementsByName(\"foo\x00bar\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		{Code: "document.getElementsByName(`foo\fbar`);", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		{Code: "document.getElementsByName(`foo\x00bar`);", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		}},
+		// NodeList has no HTMLCollection.namedItem, including computed accesses.
+		{Code: `document.getElementsByTagName("div").namedItem("named");`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		}},
+		{Code: `document.getElementsByClassName("foo")["namedItem"]("named");`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
+		}},
+		{Code: "document.getElementsByTagName(\"div\")[`namedItem`](\"named\");", FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		}},
+		{Code: `(document.getElementsByTagName("div") as HTMLCollection).namedItem("named");`, FileName: "extras.ts", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 11, EndLine: 1, EndColumn: 31},
+		}},
+		{Code: `document.getElementsByTagName("div")?.namedItem?.("named");`, FileName: "extras.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		}},
+		{Code: `document.getElementsByTagName("div").length;`, FileName: "extras.js", Output: []string{`document.querySelectorAll("div").length;`}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 	})
 }
 
 func TestPreferQuerySelectorArtifactsFollowDemand(t *testing.T) {
 	for _, test := range []struct{ code, output string }{
-		{`element.getElementsByClassName("foo bar").at(0);`, `element.querySelector(":scope .foo.bar");`},
-		{`document.getElementsByTagName(null)[0];`, `document.querySelector(null);`},
+		{`element.getElementsByClassName("foo bar").at(0);`, `element.querySelectorAll(".foo.bar").at(0);`},
+		{`document.getElementsByTagName(null)[0];`, `document.querySelectorAll(null)[0];`},
 		{`document.getElementById("#foo");`, `document.getElementById("#foo");`},
+		{`element.getElementsByClassName("foo bar").item(0);`, `element.querySelector(".foo.bar");`},
+		{`document.getElementById(null);`, `document.getElementById(null);`},
+		{`document.getElementsByTagName("div").namedItem("named");`, `document.getElementsByTagName("div").namedItem("named");`},
 	} {
 		t.Run(test.code, func(t *testing.T) {
 			program, sourceFile, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(test.code, "edit-demand.js", "tsconfig.json")

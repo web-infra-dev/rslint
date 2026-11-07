@@ -1,5 +1,6 @@
 // Upstream tests and documentation: eslint-plugin-unicorn v79.0.0.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-query-selector.js
+// Inputs mirror upstream; expectations include the documented autofix safety differences.
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { lint } from '@rslint/core/internal';
@@ -167,7 +168,7 @@ const cases = {
     ),
     invalid(
       'element.getElementsByClassName("foo");',
-      'element.querySelectorAll(":scope .foo");',
+      'element.querySelectorAll(".foo");',
       [['getElementsByClassName', 'querySelectorAll', 1, 9]],
     ),
     invalid('element.getElementsByClassName(".foo");', null, [
@@ -193,7 +194,7 @@ const cases = {
     ),
     invalid(
       'element.getElementsByTagName("foo");',
-      'element.querySelectorAll(":scope foo");',
+      'element.querySelectorAll("foo");',
       [['getElementsByTagName', 'querySelectorAll', 1, 9]],
     ),
     invalid('element.getElementsByTagName("foo bar");', null, [
@@ -243,7 +244,7 @@ const cases = {
     ]),
     invalid(
       'element.getElementsByClassName(`foo`);',
-      'element.querySelectorAll(`:scope .foo`);',
+      'element.querySelectorAll(`.foo`);',
       [['getElementsByClassName', 'querySelectorAll', 1, 9]],
     ),
     invalid(
@@ -258,7 +259,7 @@ const cases = {
     ),
     invalid(
       'element.getElementsByTagName(`foo`);',
-      'element.querySelectorAll(`:scope foo`);',
+      'element.querySelectorAll(`foo`);',
       [['getElementsByTagName', 'querySelectorAll', 1, 9]],
     ),
     invalid('document.getElementsByTagName(``);', null, [
@@ -270,11 +271,9 @@ const cases = {
     invalid('document.getElementsByClassName(`foo ${undefined}`);', null, [
       ['getElementsByClassName', 'querySelectorAll', 1, 10],
     ]),
-    invalid(
-      'document.getElementsByClassName(null);',
-      'document.querySelectorAll(null);',
-      [['getElementsByClassName', 'querySelectorAll', 1, 10]],
-    ),
+    invalid('document.getElementsByClassName(null);', null, [
+      ['getElementsByClassName', 'querySelectorAll', 1, 10],
+    ]),
     invalid(
       'document.getElementsByTagName(null);',
       'document.querySelectorAll(null);',
@@ -291,7 +290,7 @@ const cases = {
     ]),
     invalid(
       'for (const div of document.body.getElementById("id").getElementsByClassName("class")) {\n\tconsole.log(div.getElementsByTagName("div"));\n}',
-      'for (const div of document.body.querySelector(":scope #id").querySelectorAll(":scope .class")) {\n\tconsole.log(div.querySelectorAll(":scope div"));\n}',
+      'for (const div of document.body.querySelector("#id").querySelectorAll(".class")) {\n\tconsole.log(div.querySelectorAll("div"));\n}',
       [
         ['getElementById', 'querySelector', 1, 33],
         ['getElementsByClassName', 'querySelectorAll', 1, 54],
@@ -319,11 +318,9 @@ const cases = {
     invalid("document.getElementsByName(`${'foo'}`);", null, [
       ['getElementsByName', 'querySelectorAll', 1, 10],
     ]),
-    invalid(
-      'document.getElementsByName(null);',
-      'document.querySelectorAll(null);',
-      [['getElementsByName', 'querySelectorAll', 1, 10]],
-    ),
+    invalid('document.getElementsByName(null);', null, [
+      ['getElementsByName', 'querySelectorAll', 1, 10],
+    ]),
     invalid('document.getElementsByName("");', null, [
       ['getElementsByName', 'querySelectorAll', 1, 10],
     ]),
@@ -359,8 +356,8 @@ const cases = {
     ),
     invalid(
       'document.getElementsByTagName("form")[0].addEventListener("submit", submitFunction);',
-      'document.querySelector("form").addEventListener("submit", submitFunction);',
-      [['getElementsByTagName', 'querySelector', 1, 10]],
+      'document.querySelectorAll("form")[0].addEventListener("submit", submitFunction);',
+      [['getElementsByTagName', 'querySelectorAll', 1, 10]],
     ),
     invalid(
       'document.getElementsByTagName("form").item(0).submit();',
@@ -369,13 +366,13 @@ const cases = {
     ),
     invalid(
       'document.getElementsByClassName("submit-button").at(0).click();',
-      'document.querySelector(".submit-button").click();',
-      [['getElementsByClassName', 'querySelector', 1, 10]],
+      'document.querySelectorAll(".submit-button").at(0).click();',
+      [['getElementsByClassName', 'querySelectorAll', 1, 10]],
     ),
     invalid(
       'document.getElementsByName("email")[0].focus();',
-      'document.querySelector("[name=\'email\']").focus();',
-      [['getElementsByName', 'querySelector', 1, 10]],
+      'document.querySelectorAll("[name=\'email\']")[0].focus();',
+      [['getElementsByName', 'querySelectorAll', 1, 10]],
     ),
     invalid(
       'document.getElementsByName("email").item(0).focus();',
@@ -459,7 +456,7 @@ const cases = {
     ),
     invalid(
       'document.getElementsByClassName(null);',
-      'document.querySelectorAll(null);',
+      null,
       [['getElementsByClassName', 'querySelectorAll', 1, 10]],
       [{ allowWithVariables: true }],
     ),
@@ -501,18 +498,18 @@ const cases = {
     ),
     invalid(
       'window.frame.getElementById("bar");',
-      'window.frame.querySelector(":scope #bar");',
+      'window.frame.querySelector("#bar");',
       [['getElementById', 'querySelector', 1, 14]],
     ),
     invalid(
       'class Foo { #document; bar() { return window.#document.getElementById("bar"); } }',
-      'class Foo { #document; bar() { return window.#document.querySelector(":scope #bar"); } }',
+      'class Foo { #document; bar() { return window.#document.querySelector("#bar"); } }',
       [['getElementById', 'querySelector', 1, 56]],
     ),
     invalid(
       'for (const element of document.getElementsByClassName("foo")[0]) {}',
-      'for (const element of document.querySelector(".foo")) {}',
-      [['getElementsByClassName', 'querySelector', 1, 32]],
+      'for (const element of document.querySelectorAll(".foo")[0]) {}',
+      [['getElementsByClassName', 'querySelectorAll', 1, 32]],
     ),
     // Upstream documentation examples.
     invalid(
@@ -542,8 +539,8 @@ const cases = {
     ),
     invalid(
       "document.getElementsByTagName('form')[0];",
-      "document.querySelector('form');",
-      [['getElementsByTagName', 'querySelector', 1, 10]],
+      "document.querySelectorAll('form')[0];",
+      [['getElementsByTagName', 'querySelectorAll', 1, 10]],
     ),
     invalid(
       "document.getElementById('foo');\ndocument.getElementsByClassName('foo');",

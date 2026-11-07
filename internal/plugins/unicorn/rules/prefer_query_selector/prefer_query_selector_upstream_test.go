@@ -1,5 +1,6 @@
 // Upstream source, tests, and documentation pinned to eslint-plugin-unicorn v79.0.0.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-query-selector.js
+// Inputs mirror upstream; expectations include the documented autofix safety differences.
 package prefer_query_selector_test
 
 import (
@@ -102,7 +103,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByClassName(\".foo\" as string);", FileName: "upstream.ts", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "element.getElementsByClassName(\"foo\");", FileName: "upstream.js", Output: []string{"element.querySelectorAll(\":scope .foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByClassName(\"foo\");", FileName: "upstream.js", Output: []string{"element.querySelectorAll(\".foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 31},
 		}},
 		{Code: "element.getElementsByClassName(\".foo\");", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -120,7 +121,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByTagName(\"*\");", FileName: "upstream.js", Output: []string{"document.querySelectorAll(\"*\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "element.getElementsByTagName(\"foo\");", FileName: "upstream.js", Output: []string{"element.querySelectorAll(\":scope foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByTagName(\"foo\");", FileName: "upstream.js", Output: []string{"element.querySelectorAll(\"foo\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 29},
 		}},
 		{Code: "element.getElementsByTagName(\"foo bar\");", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -156,7 +157,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByClassName(`.foo`);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "element.getElementsByClassName(`foo`);", FileName: "upstream.js", Output: []string{"element.querySelectorAll(`:scope .foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByClassName(`foo`);", FileName: "upstream.js", Output: []string{"element.querySelectorAll(`.foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 31},
 		}},
 		{Code: "document.getElementsByClassName(`foo bar`);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(`.foo.bar`);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -165,7 +166,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByTagName(`foo`);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(`foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "element.getElementsByTagName(`foo`);", FileName: "upstream.js", Output: []string{"element.querySelectorAll(`:scope foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "element.getElementsByTagName(`foo`);", FileName: "upstream.js", Output: []string{"element.querySelectorAll(`foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 9, EndLine: 1, EndColumn: 29},
 		}},
 		{Code: "document.getElementsByTagName(``);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -177,7 +178,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByClassName(`foo ${undefined}`);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "document.getElementsByClassName(null);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(null);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "document.getElementsByClassName(null);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
 		{Code: "document.getElementsByTagName(null);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(null);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -192,7 +193,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByClassName(foo + \"bar\");", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "for (const div of document.body.getElementById(\"id\").getElementsByClassName(\"class\")) {\n\tconsole.log(div.getElementsByTagName(\"div\"));\n}", FileName: "upstream.js", Output: []string{"for (const div of document.body.querySelector(\":scope #id\").querySelectorAll(\":scope .class\")) {\n\tconsole.log(div.querySelectorAll(\":scope div\"));\n}"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "for (const div of document.body.getElementById(\"id\").getElementsByClassName(\"class\")) {\n\tconsole.log(div.getElementsByTagName(\"div\"));\n}", FileName: "upstream.js", Output: []string{"for (const div of document.body.querySelector(\"#id\").querySelectorAll(\".class\")) {\n\tconsole.log(div.querySelectorAll(\"div\"));\n}"}, Errors: []rule_tester.InvalidTestCaseError{
 			// The Go harness observes outer-call-first traversal; public diagnostics are source-sorted.
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 54, EndLine: 1, EndColumn: 76},
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 33, EndLine: 1, EndColumn: 47},
@@ -213,7 +214,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByName(`${'foo'}`);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
-		{Code: "document.getElementsByName(null);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(null);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "document.getElementsByName(null);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
 		{Code: "document.getElementsByName(\"\");", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
@@ -243,17 +244,17 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByName(\"foo\\\\bar\" as string);", FileName: "upstream.ts", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
-		{Code: "document.getElementsByTagName(\"form\")[0].addEventListener(\"submit\", submitFunction);", FileName: "upstream.js", Output: []string{"document.querySelector(\"form\").addEventListener(\"submit\", submitFunction);"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName(\"form\")[0].addEventListener(\"submit\", submitFunction);", FileName: "upstream.js", Output: []string{"document.querySelectorAll(\"form\")[0].addEventListener(\"submit\", submitFunction);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementsByTagName(\"form\").item(0).submit();", FileName: "upstream.js", Output: []string{"document.querySelector(\"form\").submit();"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
-		{Code: "document.getElementsByClassName(\"submit-button\").at(0).click();", FileName: "upstream.js", Output: []string{"document.querySelector(\".submit-button\").click();"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
+		{Code: "document.getElementsByClassName(\"submit-button\").at(0).click();", FileName: "upstream.js", Output: []string{"document.querySelectorAll(\".submit-button\").at(0).click();"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "document.getElementsByName(\"email\")[0].focus();", FileName: "upstream.js", Output: []string{"document.querySelector(\"[name='email']\").focus();"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
+		{Code: "document.getElementsByName(\"email\")[0].focus();", FileName: "upstream.js", Output: []string{"document.querySelectorAll(\"[name='email']\")[0].focus();"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
 		{Code: "document.getElementsByName(\"email\").item(0).focus();", FileName: "upstream.js", Output: []string{"document.querySelector(\"[name='email']\").focus();"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
@@ -297,7 +298,7 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByName(someName);", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 27},
 		}},
-		{Code: "document.getElementsByClassName(null);", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Output: []string{"document.querySelectorAll(null);"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "document.getElementsByClassName(null);", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
 		{Code: "document.getElementsByClassName(`foo`);", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Output: []string{"document.querySelectorAll(`.foo`);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -318,14 +319,14 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "document.getElementsByClassName(`foo ${someClass}`);", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 32},
 		}},
-		{Code: "window.frame.getElementById(\"bar\");", FileName: "upstream.js", Output: []string{"window.frame.querySelector(\":scope #bar\");"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "window.frame.getElementById(\"bar\");", FileName: "upstream.js", Output: []string{"window.frame.querySelector(\"#bar\");"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 14, EndLine: 1, EndColumn: 28},
 		}},
-		{Code: "class Foo { #document; bar() { return window.#document.getElementById(\"bar\"); } }", FileName: "upstream.js", Output: []string{"class Foo { #document; bar() { return window.#document.querySelector(\":scope #bar\"); } }"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "class Foo { #document; bar() { return window.#document.getElementById(\"bar\"); } }", FileName: "upstream.js", Output: []string{"class Foo { #document; bar() { return window.#document.querySelector(\"#bar\"); } }"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 56, EndLine: 1, EndColumn: 70},
 		}},
-		{Code: "for (const element of document.getElementsByClassName(\"foo\")[0]) {}", FileName: "upstream.js", Output: []string{"for (const element of document.querySelector(\".foo\")) {}"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByClassName()`.", Line: 1, Column: 32, EndLine: 1, EndColumn: 54},
+		{Code: "for (const element of document.getElementsByClassName(\"foo\")[0]) {}", FileName: "upstream.js", Output: []string{"for (const element of document.querySelectorAll(\".foo\")[0]) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 1, Column: 32, EndLine: 1, EndColumn: 54},
 		}},
 		// docs/rules/prefer-query-selector.md.
 		{Code: "document.getElementById('foo');", FileName: "upstream.js", Output: []string{"document.querySelector('#foo');"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -343,8 +344,8 @@ func TestPreferQuerySelectorUpstream(t *testing.T) {
 		{Code: "const singleClassName = 'foo';\ndocument.getElementsByClassName(singleClassName);", FileName: "upstream.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByClassName()`.", Line: 2, Column: 10, EndLine: 2, EndColumn: 32},
 		}},
-		{Code: "document.getElementsByTagName('form')[0];", FileName: "upstream.js", Output: []string{"document.querySelector('form');"}, Errors: []rule_tester.InvalidTestCaseError{
-			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
+		{Code: "document.getElementsByTagName('form')[0];", FileName: "upstream.js", Output: []string{"document.querySelectorAll('form')[0];"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelectorAll()` over `.getElementsByTagName()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 30},
 		}},
 		{Code: "document.getElementById('foo');\ndocument.getElementsByClassName('foo');", FileName: "upstream.js", Options: map[string]any{"allowWithVariables": true}, Output: []string{"document.querySelector('#foo');\ndocument.querySelectorAll('.foo');"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "prefer-query-selector", Message: "Prefer `.querySelector()` over `.getElementById()`.", Line: 1, Column: 10, EndLine: 1, EndColumn: 24},

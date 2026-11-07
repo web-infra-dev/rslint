@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -90,29 +89,17 @@ func isNonLiteralArgument(node *ast.Node) bool {
 	return true
 }
 
-func isDocumentObject(node *ast.Node) bool {
-	// Parentheses terminating an optional chain expose a ChainExpression;
-	// an optional member inside a continuing chain remains a MemberExpression.
-	raw := node
-	node = utils.ESTreeRuntimeExpression(node)
-	if node == nil || (raw != node && ast.IsOptionalChain(node)) {
-		return false
-	}
-	if ast.IsIdentifier(node) {
-		return node.Text() == "document"
-	}
-	if !ast.IsPropertyAccessExpression(node) {
-		return false
-	}
-	member := node.AsPropertyAccessExpression()
-	object := utils.ESTreeRuntimeExpression(member.Expression)
-	return ast.IsIdentifier(object) && (object.Text() == "globalThis" || object.Text() == "window") &&
-		ast.IsIdentifier(member.Name()) && member.Name().Text() == "document"
-}
-
 func selectorFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, argument *ast.Node, method, replacement string, firstElement *ast.Node) []rule.RuleFix {
+	if (method == "getElementsByClassName" || method == "getElementsByTagName") && usesNamedItem(call.Call) {
+		return nil
+	}
 	value, static := utils.GetStaticStringLiteralValue(argument)
-	if argument.Kind != ast.KindNullKeyword {
+	if argument.Kind == ast.KindNullKeyword {
+		// Only a tag query preserves the DOMString coercion of null.
+		if method != "getElementsByTagName" {
+			return nil
+		}
+	} else {
 		if !static || ecmascript.IsBlank(value) {
 			return nil
 		}
@@ -126,7 +113,8 @@ func selectorFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, argumen
 				return nil
 			}
 		case "getElementsByClassName":
-			classes := strings.FieldsFunc(value, ecmascript.IsWhiteSpaceOrLineTerminator)
+			// DOM class tokens are separated by ASCII whitespace, excluding VT.
+			classes := strings.FieldsFunc(value, func(r rune) bool { return strings.ContainsRune(" \t\n\r\f", r) })
 			for _, class := range classes {
 				if !simpleCSSIdentifier.MatchString(class) {
 					return nil
@@ -135,15 +123,16 @@ func selectorFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, argumen
 			value = "." + strings.Join(classes, ".")
 		case "getElementsByName":
 			raw := utils.TrimmedNodeText(ctx.SourceFile, argument)
-			if strings.ContainsAny(value, "\n\r\"'\\\u2028\u2029") || strings.ContainsAny(raw, "\\\n\r\u2028\u2029") {
+			if strings.ContainsAny(value, "\x00\f\n\r\"'\\\u2028\u2029") || strings.ContainsAny(raw, "\\\n\r\u2028\u2029") {
 				return nil
 			}
 		}
 	}
 
 	fixes := []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, call.Property, replacement)}
-	scopeSelector := static && !isDocumentObject(call.Object)
-	if static && (scopeSelector || method != "getElementsByTagName") {
+	// Generated selectors are simple selectors, so element queries already
+	// restrict matches to descendants without :scope (which excludes fragments).
+	if static && method != "getElementsByTagName" {
 		raw := utils.TrimmedNodeText(ctx.SourceFile, argument)
 		quote := raw[:1]
 		switch method {
@@ -156,15 +145,10 @@ func selectorFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, argumen
 			}
 			value = "[name=" + innerQuote + value + innerQuote + "]"
 		}
-		if scopeSelector {
-			value = ":scope " + value
-		}
 		fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, argument, quote+value+quote))
 	}
 	if firstElement != nil {
-		if ast.IsElementAccessExpression(firstElement) {
-			fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(firstElement.Expression().End(), firstElement.End())))
-		} else if access, ok := unicornutil.MatchDotMethodCall(firstElement, unicornutil.DotMethodCallOptions{}); ok {
+		if access, ok := unicornutil.MatchDotMethodCall(firstElement, unicornutil.DotMethodCallOptions{}); ok {
 			fixes = append(fixes, unicornutil.RemoveMethodCallFixes(access)...)
 		}
 	}
@@ -173,29 +157,38 @@ func selectorFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, argumen
 
 func getFirstElementAccess(ctx rule.RuleContext, call *ast.Node) *ast.Node {
 	parent := utils.ESTreeParent(call)
-	if parent == nil || !ast.IsAccessExpression(parent) {
+	if parent == nil || !ast.IsPropertyAccessExpression(parent) {
 		return nil
 	}
 	object := parent.Expression()
 	if utils.ESTreeRuntimeExpression(object) != call || (object != call && ast.IsOptionalChain(call)) {
 		return nil
 	}
-	var access *ast.Node
-	if ast.IsElementAccessExpression(parent) && !ast.IsOptionalChainRoot(parent) && isZeroLiteral(parent.AsElementAccessExpression().ArgumentExpression) {
-		access = parent
-	} else if ast.IsPropertyAccessExpression(parent) {
-		oneArgument := 1
-		candidate := utils.ESTreeParent(parent)
-		if methodCall, ok := unicornutil.MatchDotMethodCall(candidate, unicornutil.DotMethodCallOptions{
-			Methods: []string{"at", "item"}, ArgumentsLength: &oneArgument, RejectSpreadElement: true,
-		}); ok && methodCall.Callee == parent && isZeroLiteral(candidate.Arguments()[0]) {
-			access = candidate
-		}
+	// Unlike [0] and .at(0), .item(0) returns null when nothing matches.
+	oneArgument := 1
+	access := utils.ESTreeParent(parent)
+	methodCall, ok := unicornutil.MatchDotMethodCall(access, unicornutil.DotMethodCallOptions{
+		Method: "item", ArgumentsLength: &oneArgument, RejectSpreadElement: true,
+	})
+	if !ok || methodCall.Callee != parent || !isZeroLiteral(access.Arguments()[0]) {
+		return nil
 	}
-	if access == nil || isReferenceTarget(access) || utils.HasCommentInSpan(ctx.Comments.All(), utils.OutermostParenthesizedExpression(call).End(), access.End()) {
+	if isReferenceTarget(access) || utils.HasCommentInSpan(ctx.Comments.All(), utils.OutermostParenthesizedExpression(call).End(), access.End()) {
 		return nil
 	}
 	return access
+}
+
+func usesNamedItem(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments); parent = node.Parent {
+		node = parent
+	}
+	parent := node.Parent
+	if parent == nil || !ast.IsAccessExpression(parent) || parent.Expression() != node {
+		return false
+	}
+	name, _ := utils.AccessExpressionStaticName(parent)
+	return name == "namedItem"
 }
 
 func isZeroLiteral(node *ast.Node) bool {
