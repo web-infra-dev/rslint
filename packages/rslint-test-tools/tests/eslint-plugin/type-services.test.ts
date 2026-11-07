@@ -12,7 +12,7 @@ import sonarPlugin from 'eslint-plugin-sonarjs';
 import effectorPlugin from 'eslint-plugin-effector';
 import ts from 'typescript';
 import {
-  TypeServiceClient,
+  FileTypeServiceClient,
   typeQueryKey,
   type TypeServiceDescriptor,
 } from '../../../rslint/src/languages/js/type-service.js';
@@ -22,6 +22,7 @@ import {
 } from '../../../rslint/src/languages/js/shared-type-cache.js';
 import { lintFile } from '../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../rslint/src/languages/js/frame.js';
+import { TypePacketReader } from '../../../rslint/src/languages/js/type-service-codec.js';
 import { VISITOR_KEYS } from '../../../rslint/src/languages/js/visitor-keys.js';
 
 const root = resolve(import.meta.dirname, '../../../..');
@@ -85,6 +86,16 @@ class Host {
     if (response.error) throw new Error(response.error);
     return response.result;
   }
+  source = (scope: { generation: number }, file: string) => {
+    const reply = this.request({
+      method: 'source',
+      generation: scope.generation,
+      file,
+    });
+    return reply
+      ? { fileName: reply.fileName, tree: Buffer.from(reply.tree, 'base64') }
+      : undefined;
+  };
   async close() {
     this.request({ method: 'close' });
     const stopped = new Promise<void>((done, reject) => {
@@ -343,9 +354,10 @@ describe('original npm typed rules over Go type services', () => {
               budget.entries,
             );
           for (let pass = 0; pass < 2; pass++) {
-            const client = new TypeServiceClient(
+            const client = new FileTypeServiceClient(
               enums,
               descriptor,
+              projection.binding,
               (query, key) => {
                 operations.add(query.op);
                 host.requests++;
@@ -356,11 +368,12 @@ describe('original npm typed rules over Go type services', () => {
                 cache?.publish(key, packet);
                 return packet;
               },
+              host.source,
               {
                 shared: cache
                   ? new SharedTypeCacheReader(cache.descriptor)
                   : undefined,
-                maxFacts: 4096,
+                maxFactsBytes: 1 << 20,
               },
             );
             const before = host.requests;
@@ -418,6 +431,7 @@ a?.b.c;
 f<string>("x");
 const __name = "\\uD800" as const;
 const truth = true as const;
+const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
 const view = <Box />;
 declare const Box: () => null;
 declare namespace N { const value: number; interface Item<T> {} }
@@ -471,36 +485,59 @@ undefined;
       1024,
     );
     const published = new Map<string, Uint8Array>();
-    const client = new TypeServiceClient(
-      enums,
-      descriptor,
-      (query, key) => {
-        const packet = Buffer.from(
-          host.request({ method: 'query', query }),
-          'base64',
-        );
-        published.set(key, packet);
-        cache.publish(key, packet);
-        return packet;
-      },
-      { maxFacts: 128, shared: new SharedTypeCacheReader(cache.descriptor) },
-    );
+    const makeClient = () =>
+      new FileTypeServiceClient(
+        enums,
+        descriptor,
+        projection.binding,
+        (query, key) => {
+          const packet = Buffer.from(
+            host.request({ method: 'query', query }),
+            'base64',
+          );
+          published.set(key, packet);
+          cache.publish(key, packet);
+          return packet;
+        },
+        host.source,
+        {
+          maxFactsBytes: 1 << 16,
+          shared: new SharedTypeCacheReader(cache.descriptor),
+        },
+      );
+    const client = makeClient();
+    const beforeSource = client.program.getSourceFile(file);
+    const beforeNodes = client.syntaxStats.nodes;
     const services = client.parserServices(
       frame,
       projection,
       file.replaceAll('\\', '/'),
     ) as any;
+    expect(client.program.getSourceFile(file)).toBe(beforeSource);
+    expect(client.syntaxStats.nodes).toBe(beforeNodes);
+    expect(client.syntaxStats.aliases).toBe(0);
+    expect(services.esTreeNodeToTSNodeMap.has(frame.ast)).toBe(true);
+    expect(client.syntaxStats.nodes).toBe(beforeNodes);
+    expect(() =>
+      client.parserServices(frame, projection, file.replaceAll('\\', '/')),
+    ).toThrow('already attached');
+
     const other = host.request({
       method: 'project',
       file: resolve(directory, 'other.tsx'),
     });
-    expect(() =>
-      client.parserServices(
-        frame,
-        { ...other, tree: Buffer.from(other.tree, 'base64') },
-        file.replaceAll('\\', '/'),
-      ),
-    ).toThrow('different source');
+    const mismatch = makeClient();
+    try {
+      expect(() =>
+        mismatch.parserServices(
+          frame,
+          { ...other, tree: Buffer.from(other.tree, 'base64') },
+          file.replaceAll('\\', '/'),
+        ),
+      ).toThrow('different source');
+    } finally {
+      mismatch.close();
+    }
     const upstream = tsParser.parseForESLint(code, {
       filePath: file,
       project: config,
@@ -588,15 +625,38 @@ undefined;
     expect(services.tsNodeToESTreeNodeMap.get(innerTS).type).toBe(
       'ChainExpression',
     );
-    const sequence = services.esTreeNodeToTSNodeMap.get(
-      expression('SequenceExpression'),
-    );
+    const canonical = expression('SequenceExpression');
+    const sequence = services.esTreeNodeToTSNodeMap.get(canonical);
+    const members = canonical.expressions;
+    canonical.expressions = [members[2]];
+    expect(services.tsNodeToESTreeNodeMap.has(sequence.left)).toBe(true);
+    expect(client.syntaxStats.aliases).toBe(0);
     const detached = services.tsNodeToESTreeNodeMap.get(sequence.left);
+    expect(client.syntaxStats.aliases).toBe(1);
+    expect(services.tsNodeToESTreeNodeMap.get(sequence.left)).toBe(detached);
+    expect(services.esTreeNodeToTSNodeMap.get(detached)).toBe(sequence.left);
+    const upstreamSequence = (upstream.ast.body as any[]).find(
+      (node) =>
+        node.type === 'ExpressionStatement' &&
+        node.expression.type === 'SequenceExpression',
+    ).expression;
+    const upstreamNative =
+      upstream.services.esTreeNodeToTSNodeMap!.get(upstreamSequence);
+    const upstreamAlias = upstream.services.tsNodeToESTreeNodeMap!.get(
+      (upstreamNative as ts.BinaryExpression).left,
+    );
+    expect([detached.range, detached.loc]).toEqual([
+      upstreamAlias.range,
+      upstreamAlias.loc,
+    ]);
     expect(detached.type).toBe('SequenceExpression');
     expect(detached.expressions.map((node: any) => node.name)).toEqual([
       'first',
       'second',
     ]);
+    detached.expressions = [members[0]];
+    expect(detached.expressions).toEqual([members[0]]);
+    canonical.expressions = members;
     const options = services.program.getCompilerOptions();
     const referenceOptions = upstream.services.program!.getCompilerOptions();
     for (const key of [
@@ -619,6 +679,29 @@ undefined;
     const declaration = variable('__name');
     const stringType = services.getTypeAtLocation(declaration.id);
     expect(stringType.value).toBe('\uD800');
+    const factKey = typeQueryKey({
+      ...projection.binding,
+      op: 'typeRecord',
+      args: { id: stringType.id },
+    });
+    const rawPacket = published.get(factKey)!;
+    const ownedPacket = Uint8Array.from(rawPacket);
+    rawPacket.fill(0);
+    const beforeLocal = client.stats.localHits;
+    expect(stringType.flags & ts.TypeFlags.StringLiteral).toBeTruthy();
+    expect(client.stats.localHits).toBeGreaterThan(beforeLocal);
+    rawPacket.set(ownedPacket);
+    const lazy = new TypePacketReader(ownedPacket);
+    expect(lazy.stats).toEqual({ strings: 0, lists: 0 });
+    lazy.typeField('symbol');
+    expect(lazy.stats).toEqual({ strings: 0, lists: 0 });
+    expect(lazy.typeField('value')).toBe('\uD800');
+    expect(lazy.typeField('value')).toBe('\uD800');
+    expect(lazy.stats.strings).toBe(1);
+    lazy.close();
+    expect(lazy.retainedBytes).toBe(0);
+    expect(() => lazy.typeField('symbol')).toThrow('closed');
+
     const symbol = services.getSymbolAtLocation(declaration.id);
     expect([symbol.name, symbol.escapedName]).toEqual(['__name', '___name']);
     expect(services.esTreeNodeToTSNodeMap.get(declaration.id).escapedText).toBe(
@@ -628,6 +711,21 @@ undefined;
     expect(booleanType.intrinsicName).toBe('true');
     expect(booleanType.isLiteral()).toBe(false);
     expect(booleanType.value).toBeUndefined();
+    const keyDeclaration = variable('surrogateKeys');
+    const keyType = services.getTypeAtLocation(keyDeclaration.id);
+    const checker = services.program.getTypeChecker();
+    const keyLocation = services.esTreeNodeToTSNodeMap.get(keyDeclaration.id);
+    expect(
+      ['\uD800', '\uD801', '\uFFFD'].map((name) =>
+        checker.typeToString(
+          checker.getTypeOfSymbolAtLocation(
+            checker.getPropertyOfType(keyType, name),
+            keyLocation,
+          ),
+        ),
+      ),
+    ).toEqual(['1', '"two"', 'true']);
+
     expect(
       services.getSymbolAtLocation(expression('Identifier')).declarations,
     ).toBeUndefined();
@@ -643,7 +741,8 @@ undefined;
     const query = {
       generation: descriptor.generation,
       checker: descriptor.checker,
-      op: 'void',
+      op: 'void' as const,
+      args: {},
     };
     const voidType = services.program.getTypeChecker().getVoidType();
     const key = typeQueryKey(query);
@@ -668,7 +767,12 @@ undefined;
     expect(Atomics.load(control, 1)).toBe(1);
     await reader.terminate();
     const saved = services.program.getCompilerOptions;
+    const savedFlags = voidType.isUnion;
+    expect(client.stats.factBytes).toBeLessThanOrEqual(1 << 16);
     client.close();
+    expect(client.stats.factBytes).toBe(0);
+    expect(client.syntaxStats.sourceBytes).toBe(0);
+    expect(() => savedFlags()).toThrow('closed');
     expect(cache.readers).toBe(0);
     expect(() => voidType.flags).toThrow('closed');
     expect(() => saved()).toThrow('closed');
@@ -682,8 +786,43 @@ undefined;
     host.request({ method: 'close' });
     expect(() => host.request({ method: 'query', query })).toThrow('closed');
     cache.close();
+    expect(cache.retainedBytes).toBe(0);
+    const replacement = host.request({ method: 'init', config });
+    expect(replacement.generation).not.toBe(descriptor.generation);
+    expect(() => host.source(projection.binding, file)).toThrow('stale');
   } finally {
     await host.close();
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('shared cache capacity and publication stay bounded', () => {
+  const owner = new SharedTypeCacheOwner(1, 1 << 16, 8),
+    reader = new SharedTypeCacheReader(owner.descriptor);
+  const packet = new Uint8Array([1, 2, 3]);
+  expect(owner.publish('too-large', new Uint8Array(1 << 17))).toBe(false);
+  const unicode = new SharedTypeCacheOwner(2, 1 << 16, 16),
+    unicodeReader = new SharedTypeCacheReader(unicode.descriptor);
+  for (const [i, key] of ['\uD800', '\uD801', '\uFFFD'].entries())
+    expect(unicode.publish(key, new Uint8Array([i]))).toBe(true);
+  expect(
+    ['\uD800', '\uD801', '\uFFFD'].map((key) => unicodeReader.get(key)![0]),
+  ).toEqual([0, 1, 2]);
+  unicodeReader.close();
+  unicode.close();
+
+  for (let i = 0; i < 4; i++)
+    expect(owner.publish(`fact-${i}`, packet)).toBe(true);
+  const used = owner.usedBytes,
+    entries = owner.entries;
+  expect(owner.publish('fact-0', packet)).toBe(true);
+  expect([owner.usedBytes, owner.entries]).toEqual([used, entries]);
+  const probes = owner.stats.probes;
+  for (let i = 0; i < 100; i++)
+    expect(owner.publish(`overflow-${i}`, packet)).toBe(false);
+  expect(owner.stats.probes - probes).toBeLessThanOrEqual(100 * 16);
+  expect([...reader.get('fact-0')!]).toEqual([...packet]);
+  reader.close();
+  owner.close();
+  expect([reader.retainedBytes, owner.retainedBytes]).toEqual([0, 0]);
 });

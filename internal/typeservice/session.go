@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -14,7 +13,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
-	"github.com/web-infra-dev/rslint/internal/languages/js/estree"
 	"github.com/web-infra-dev/rslint/internal/program"
 )
 
@@ -52,15 +50,38 @@ type Source struct {
 	External       bool     `json:"external"`
 	DefaultLibrary bool     `json:"defaultLibrary"`
 }
-type Projection struct {
+
+// Binding authorizes one eligible lint target. Dependency nodes remain valid
+// semantic operands; binding identity is not part of immutable fact cache keys.
+type Binding struct {
+	Scope
 	SourceFileName string `json:"sourceFileName"`
-	Frame          []byte `json:"frame"`
-	Tree           []byte `json:"tree"`
-	// Origin IDs are exact encoder indices. A zero denotes a synthetic record
-	// whose compiler node is deliberately unavailable; consumers must reject it.
-	Origins    []uint32          `json:"origins"`
-	Reverse    map[uint32]uint32 `json:"reverse"`
-	Generation uint32            `json:"generation"`
+}
+
+func (s *Session) BindTarget(file *ast.SourceFile) (Binding, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.program == nil {
+		return Binding{}, ErrClosed
+	}
+	if !s.eligible[file] {
+		return Binding{}, errors.New("source is not eligible for typed rules")
+	}
+	return Binding{Scope{s.generation, 1}, file.FileName()}, nil
+}
+
+// Source captures an exact immutable source under a brief generation check.
+// Callers encode/project it after this method returns, outside every lease.
+func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.program == nil {
+		return nil, ErrClosed
+	}
+	if generation != s.generation {
+		return nil, errors.New("stale type service generation")
+	}
+	return s.program.GetSourceFile(name), nil //nolint:nilnil // A missing Program source is a legitimate result.
 }
 
 // New accepts exact Program sources that the caller has explicitly admitted
@@ -138,65 +159,79 @@ func (s *Session) source(f *ast.SourceFile) Source {
 	return Source{FileName: f.FileName(), Path: string(f.Path()), Packages: s.program.PackageNamesForSourceFile(f), External: s.program.IsSourceFileFromExternalLibrary(f), DefaultLibrary: s.program.IsSourceFileDefaultLibrary(f)}
 }
 
-func (s *Session) Project(ctx context.Context, file *ast.SourceFile, options estree.Options) (Projection, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.program == nil {
-		return Projection{}, ErrClosed
-	}
-	if !s.eligible[file] {
-		return Projection{}, errors.New("source is not eligible for typed rules")
-	}
-	tree, table, err := encoder.EncodeSourceFile(file)
-	if err != nil {
-		return Projection{}, err
-	}
-	result := Projection{SourceFileName: file.FileName(), Tree: tree, Generation: s.generation, Origins: []uint32{0}, Reverse: make(map[uint32]uint32)}
-	options.RecordOrigin = func(id uint32, node *ast.Node) {
-		if int(id) != len(result.Origins) {
-			panic("unordered projection origins")
-		}
-		index := uint32(0)
-		if node != nil {
-			index = table.GetIndex(node)
-		}
-		result.Origins = append(result.Origins, index)
-
-	}
-	options.RecordReverse = func(node *ast.Node, id uint32) {
-		if index := table.GetIndex(node); index != 0 {
-			result.Reverse[index] = id
-		}
-	}
-	var b estree.Builder
-	result.Frame, err = b.Build(ctx, file, options)
-	return result, err
-}
-
-// Query carries every semantic argument. ID is scoped to Generation, Checker
-// and the operation's object kind. File/Index identify original Program nodes.
-type Query struct {
-	Generation     uint32 `json:"generation"`
-	Checker        uint32 `json:"checker"`
-	Op             string `json:"op"`
-	ID             uint32 `json:"id,omitempty"`
-	File           string `json:"file,omitempty"`
-	Index          uint32 `json:"index,omitempty"`
-	Name           string `json:"name,omitempty"`
-	Kind           uint32 `json:"kind,omitempty"`
-	ExcludeGlobals bool   `json:"excludeGlobals,omitempty"`
-}
-
-// Query returns a binary value or an explicit error. Cached JS/shared facts
-// have the same ownership and must be invalidated when their session closes.
+// Query copies checker facts while exclusively leased. Source indexing and
+// serialization happen afterward; they cannot delay another checker borrower.
 func (s *Session) Query(ctx context.Context, q Query) (packet []byte, err error) {
+	var op Operation
+	defer func() {
+		if value := recover(); value != nil {
+			packet = nil
+			err = fmt.Errorf("type service %s: %v", op, value)
+		}
+	}()
+	s.mu.Lock()
+	if s.program == nil {
+		s.mu.Unlock()
+		return nil, ErrClosed
+	}
+	if q.Generation != s.generation || q.Checker != 1 {
+		s.mu.Unlock()
+		return nil, errors.New("stale or foreign type service handle")
+	}
+	p := s.program
+	s.mu.Unlock()
+	if q.Request == nil {
+		return nil, errors.New("missing type service request")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	op = q.Request.operation()
+	node := requestNode(q.Request)
+	var native *ast.Node
+	if node != nil {
+		f := p.GetSourceFile(node.File)
+		if f == nil {
+			return nil, errors.New("foreign source handle")
+		}
+		table := encoder.GetNodeIndexTable(f)
+		if node.Index == 0 || int(node.Index) >= len(table.Nodes) {
+			return nil, errors.New("invalid compiler node handle")
+		}
+		native = table.Nodes[node.Index]
+		if native == nil {
+			return nil, errors.New("invalid compiler node handle")
+		}
+	}
+	result, err := s.check(ctx, q.Request, native)
+	if err != nil {
+		return nil, err
+	}
+	switch fact := result.(type) {
+	case *SymbolFact:
+		if fact.nodes != nil {
+			fact.Declarations = make([]NodeRef, 0, len(fact.nodes))
+			for _, node := range fact.nodes {
+				fact.Declarations = append(fact.Declarations, *nodeReference(p, node))
+			}
+		}
+		fact.ValueDeclaration = nodeReference(p, fact.valueNode)
+		fact.nodes = nil
+		fact.valueNode = nil
+	case *SignatureFact:
+		fact.Declaration = nodeReference(p, fact.node)
+		fact.node = nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return EncodePacket(result)
+}
+func (s *Session) check(ctx context.Context, request Request, native *ast.Node) (Result, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.program == nil {
 		return nil, ErrClosed
-	}
-	if q.Generation != s.generation || q.Checker != 1 {
-		return nil, errors.New("stale or foreign type service handle")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -209,32 +244,21 @@ func (s *Session) Query(ctx context.Context, q Query) (packet []byte, err error)
 	if c != s.checker {
 		return nil, errors.New("type service checker identity changed")
 	}
-	// Upstream compiler assertions remain failures, never empty query results.
-	defer func() {
-		if value := recover(); value != nil {
-			packet = nil
-			err = fmt.Errorf("type service %s: %v", q.Op, value)
-		}
-	}()
-	value, err := s.execute(c, q)
-	if err != nil {
-		return nil, err
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return EncodePacket(value)
+	return s.execute(c, request, native)
 }
-func (s *Session) node(q Query) *ast.Node {
-	f := s.program.GetSourceFile(q.File)
-	if f == nil {
-		panic("foreign source handle")
+func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
+	if n == nil {
+		return nil
 	}
-	table := encoder.GetNodeIndexTable(f)
-	if q.Index == 0 || int(q.Index) >= len(table.Nodes) || table.Nodes[q.Index] == nil {
-		panic("invalid compiler node handle")
+	f := ast.GetSourceFileOfNode(n)
+	if !p.OwnsSourceFile(f) {
+		panic("declaration is outside Program")
 	}
-	return table.Nodes[q.Index]
+	index := encoder.GetNodeIndexTable(f).GetIndex(n)
+	if index == 0 {
+		panic("declaration has no compiler node handle")
+	}
+	return &NodeRef{f.FileName(), index}
 }
 func (s *Session) typeByID(id uint32) *checker.Type {
 	t := s.types[id]
@@ -281,141 +305,132 @@ func (s *Session) signatureID(v *checker.Signature) uint32 {
 	s.signatures[id] = v
 	return id
 }
-func (s *Session) nodeRef(n *ast.Node) any {
-	if n == nil {
-		return nil
-	}
-	f := ast.GetSourceFileOfNode(n)
-	if !s.program.OwnsSourceFile(f) {
-		panic("declaration is outside Program")
-	}
-	return map[string]any{"file": f.FileName(), "index": encoder.GetNodeIndexTable(f).GetIndex(n)}
-}
-func (s *Session) execute(c *checker.Checker, q Query) (any, error) {
-	switch q.Op {
-	case "source":
-		f := s.program.GetSourceFile(q.File)
-		if f == nil {
-			return nil, nil //nolint:nilnil // TypeScript getSourceFile returns undefined for a missing file.
+func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node) (Result, error) {
+	switch r := request.(type) {
+	case *NodeRequest:
+		switch r.Op {
+		case "type":
+			return Handle(s.typeID(c.GetTypeAtLocation(native))), nil
+		case "fromTypeNode":
+			return Handle(s.typeID(c.GetTypeFromTypeNode(native))), nil
+		case "context":
+			return Handle(s.typeID(c.GetContextualType(native, checker.ContextFlagsNone))), nil
+		case "symbol":
+			return Handle(s.symbolID(c.GetSymbolAtLocation(native))), nil
+		case "signature":
+			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
+		case "resolvedSignature":
+			return Handle(s.signatureID(c.GetResolvedSignature(native))), nil
 		}
-		tree, _, err := encoder.EncodeSourceFile(f)
-		if err != nil {
-			return nil, err
+	case *TypeRequest:
+		switch r.Op {
+		case "constraint":
+			return Handle(s.typeID(c.GetBaseConstraintOfType(s.typeByID(r.ID)))), nil
+		case "apparent":
+			return Handle(s.typeID(c.GetApparentType(s.typeByID(r.ID)))), nil
+		case "baseLiteral":
+			return Handle(s.typeID(c.GetBaseTypeOfLiteralType(s.typeByID(r.ID)))), nil
+		case "nonNullable":
+			return Handle(s.typeID(c.GetNonNullableType(s.typeByID(r.ID)))), nil
+		case "typeString":
+			return Text(c.TypeToString(s.typeByID(r.ID))), nil
+		case "properties":
+			ids := Handles{}
+			for _, v := range c.GetPropertiesOfType(s.typeByID(r.ID)) {
+				ids = append(ids, s.symbolID(v))
+			}
+			return ids, nil
+		case "typeArguments":
+			ids := Handles{}
+			for _, v := range c.GetTypeArguments(s.typeByID(r.ID)) {
+				ids = append(ids, s.typeID(v))
+			}
+			return ids, nil
+		case "isArray":
+			return Boolean(c.IsArrayType(s.typeByID(r.ID))), nil
+		case "isTuple":
+			return Boolean(checker.IsTupleType(s.typeByID(r.ID))), nil
+		case "typeRecord":
+			t := s.typeByID(r.ID)
+			fact := &TypeFact{Flags: checker.FormatTypeFlags(t.Flags()), Symbol: s.symbolID(t.Symbol()), AliasSymbol: s.symbolID(t.Alias().Symbol())}
+			if t.Flags()&checker.TypeFlagsIntrinsic != 0 {
+				fact.IntrinsicName = t.AsIntrinsicType().IntrinsicName()
+			}
+			if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
+				fact.Types = []uint32{}
+				for _, v := range t.Types() {
+					fact.Types = append(fact.Types, s.typeID(v))
+				}
+			}
+			if t.Flags()&checker.TypeFlagsBooleanLiteral != 0 {
+				fact.IntrinsicName = fmt.Sprint(t.AsLiteralType().Value())
+			}
+			if t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) != 0 {
+				switch value := t.AsLiteralType().Value().(type) {
+				case string:
+					fact.Literal = Literal{Kind: 1, Text: value}
+				case jsnum.Number:
+					fact.Literal = Literal{Kind: 2, Number: float64(value)}
+				case jsnum.PseudoBigInt:
+					text := value.Base10Value
+					if text == "" {
+						text = "0"
+					}
+					fact.Literal = Literal{Kind: 3, Text: text, Negative: value.Negative}
+				case nil: // Computed enum members have no literal value.
+				default:
+					return nil, fmt.Errorf("unsupported compiler literal %T", value)
+				}
+			}
+
+			return fact, nil
 		}
-		return map[string]any{"tree": tree, "fileName": f.FileName()}, nil
-	case "type":
-		return s.typeID(c.GetTypeAtLocation(s.node(q))), nil
-	case "fromTypeNode":
-		return s.typeID(c.GetTypeFromTypeNode(s.node(q))), nil
-	case "context":
-		return s.typeID(c.GetContextualType(s.node(q), checker.ContextFlagsNone)), nil
-	case "void":
-		return s.typeID(c.GetVoidType()), nil
-	case "constraint":
-		return s.typeID(c.GetBaseConstraintOfType(s.typeByID(q.ID))), nil
-	case "apparent":
-		return s.typeID(c.GetApparentType(s.typeByID(q.ID))), nil
-	case "baseLiteral":
-		return s.typeID(c.GetBaseTypeOfLiteralType(s.typeByID(q.ID))), nil
-	case "nonNullable":
-		return s.typeID(c.GetNonNullableType(s.typeByID(q.ID))), nil
-	case "typeString":
-		return c.TypeToString(s.typeByID(q.ID)), nil
-	case "symbol":
-		return s.symbolID(c.GetSymbolAtLocation(s.node(q))), nil
-	case "resolveName":
-		var location *ast.Node
-		if q.File != "" {
-			location = s.node(q)
+	case *SymbolRequest:
+		switch r.Op {
+		case "aliasedSymbol":
+			return Handle(s.symbolID(c.GetAliasedSymbol(s.symbolByID(r.ID)))), nil
+		case "declaredType":
+			return Handle(s.typeID(c.GetDeclaredTypeOfSymbol(s.symbolByID(r.ID)))), nil
+		case "symbolRecord":
+			sym := s.symbolByID(r.ID)
+			return &SymbolFact{Name: ast.EscapeInternalSymbolName(ast.SymbolName(sym)), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
 		}
-		return s.symbolID(c.ResolveName(q.Name, location, ast.SymbolFlags(q.Kind), q.ExcludeGlobals)), nil
-	case "aliasedSymbol":
-		return s.symbolID(c.GetAliasedSymbol(s.symbolByID(q.ID))), nil
-	case "symbolType":
-		return s.typeID(c.GetTypeOfSymbolAtLocation(s.symbolByID(q.ID), s.node(q))), nil
-	case "declaredType":
-		return s.typeID(c.GetDeclaredTypeOfSymbol(s.symbolByID(q.ID))), nil
-	case "property":
-		return s.symbolID(c.GetPropertyOfType(s.typeByID(q.ID), q.Name)), nil
-	case "properties":
-		ids := []uint32{}
-		for _, v := range c.GetPropertiesOfType(s.typeByID(q.ID)) {
-			ids = append(ids, s.symbolID(v))
+	case *SignatureRequest:
+		switch r.Op {
+		case "returnType":
+			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
+		case "signatureRecord":
+			sig := s.signatureByID(r.ID)
+			ids := []uint32{}
+			for _, parameter := range sig.Parameters() {
+				ids = append(ids, s.symbolID(parameter))
+			}
+			return &SignatureFact{Parameters: ids, node: sig.Declaration()}, nil
 		}
-		return ids, nil
-	case "typeArguments":
-		ids := []uint32{}
-		for _, v := range c.GetTypeArguments(s.typeByID(q.ID)) {
-			ids = append(ids, s.typeID(v))
-		}
-		return ids, nil
-	case "isArray":
-		return c.IsArrayType(s.typeByID(q.ID)), nil
-	case "isTuple":
-		return checker.IsTupleType(s.typeByID(q.ID)), nil
-	case "signature":
-		return s.signatureID(c.GetSignatureFromDeclaration(s.node(q))), nil
-	case "resolvedSignature":
-		return s.signatureID(c.GetResolvedSignature(s.node(q))), nil
-	case "returnType":
-		return s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(q.ID))), nil
-	case "signatures":
-		if q.Kind > 1 {
+	case *VoidRequest:
+		return Handle(s.typeID(c.GetVoidType())), nil
+	case *PropertyRequest:
+		return Handle(s.symbolID(c.GetPropertyOfType(s.typeByID(r.ID), string(r.Name)))), nil
+	case *SymbolTypeRequest:
+		return Handle(s.typeID(c.GetTypeOfSymbolAtLocation(s.symbolByID(r.ID), native))), nil
+	case *ResolveNameRequest:
+		return Handle(s.symbolID(c.ResolveName(string(r.Name), native, ast.SymbolFlags(r.Kind), r.ExcludeGlobals))), nil
+	case *SignaturesRequest:
+		if r.Kind > 1 {
 			return nil, errors.New("invalid signature kind")
 		}
-		ids := []uint32{}
-		for _, v := range c.GetSignaturesOfType(s.typeByID(q.ID), checker.SignatureKind(q.Kind)) {
+		ids := Handles{}
+		for _, v := range c.GetSignaturesOfType(s.typeByID(r.ID), checker.SignatureKind(r.Kind)) {
 			ids = append(ids, s.signatureID(v))
 		}
 		return ids, nil
-	case "typeRecord":
-		t := s.typeByID(q.ID)
-		r := map[string]any{"flags": checker.FormatTypeFlags(t.Flags()), "symbol": s.symbolID(t.Symbol()), "aliasSymbol": s.symbolID(t.Alias().Symbol())}
-		if t.Flags()&checker.TypeFlagsIntrinsic != 0 {
-			r["intrinsicName"] = t.AsIntrinsicType().IntrinsicName()
-		}
-		if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
-			ids := []uint32{}
-			for _, v := range t.Types() {
-				ids = append(ids, s.typeID(v))
-			}
-			r["types"] = ids
-		}
-		if t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) != 0 {
-			value := t.AsLiteralType().Value()
-			if bigint, ok := value.(jsnum.PseudoBigInt); ok {
-				base10 := bigint.Base10Value
-				if base10 == "" {
-					base10 = "0"
-				}
-				value = map[string]any{"negative": bigint.Negative, "base10Value": base10}
-			}
-			r["value"] = value
-
-		}
-		if t.Flags()&checker.TypeFlagsBooleanLiteral != 0 {
-			r["intrinsicName"] = fmt.Sprint(t.AsLiteralType().Value())
-		}
-		return r, nil
-	case "symbolRecord":
-		sym := s.symbolByID(q.ID)
-		var declarations any
-		if sym.Declarations != nil {
-			decls := make([]any, 0, len(sym.Declarations))
-			for _, n := range sym.Declarations {
-				decls = append(decls, s.nodeRef(n))
-			}
-			declarations = decls
-		}
-		return map[string]any{"name": ast.EscapeInternalSymbolName(ast.SymbolName(sym)), "escapedName": ast.EscapeSymbolName(sym.Name), "flags": uint32(sym.Flags), "declarations": declarations, "valueDeclaration": s.nodeRef(sym.ValueDeclaration)}, nil
-	case "signatureRecord":
-		sig := s.signatureByID(q.ID)
-		ids := []uint32{}
-		for _, p := range sig.Parameters() {
-			ids = append(ids, s.symbolID(p))
-		}
-		return map[string]any{"parameters": ids, "declaration": s.nodeRef(sig.Declaration())}, nil
-	default:
-		return nil, fmt.Errorf("unsupported type service operation %q", strings.TrimSpace(q.Op))
 	}
+	return nil, fmt.Errorf("unsupported type service operation %q", request.operation())
+}
+
+func appendNodes(nodes []*ast.Node) []*ast.Node {
+	if nodes == nil {
+		return nil
+	}
+	return append(make([]*ast.Node, 0, len(nodes)), nodes...)
 }
