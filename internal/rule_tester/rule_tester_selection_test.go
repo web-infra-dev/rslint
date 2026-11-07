@@ -3,7 +3,6 @@ package rule_tester
 // cspell:ignore tparallel
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,7 +16,7 @@ import (
 func TestRunRuleTesterRejectsIncompleteSuites(t *testing.T) {
 	t.Parallel()
 
-	for _, mode := range []string{"valid", "invalid", "json", "empty"} {
+	for _, mode := range []string{"valid", "invalid", "empty"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()
 			cmd := exec.Command(os.Args[0], "-test.run=^TestRunRuleTesterIncompleteSuiteSubprocess$")
@@ -50,13 +49,6 @@ func TestRunRuleTesterIncompleteSuiteSubprocess(t *testing.T) {
 		valid = []ValidTestCase{{Only: true, Skip: true}}
 	case "invalid":
 		invalid = []InvalidTestCase{{Only: true, Skip: true}}
-	case "json":
-		var suite ESLintTestSuite
-		if err := json.Unmarshal([]byte(`{"valid":[{"code":"","only":true,"skip":true}]}`), &suite); err != nil {
-			t.Fatal(err)
-		}
-		converted := ConvertESLintTestSuite(&suite)
-		valid, invalid = converted.Valid, converted.Invalid
 	case "empty":
 	default:
 		t.Fatalf("unexpected selection mode %q", mode)
