@@ -53,7 +53,7 @@ func TestAnchorHasContentUpstream(t *testing.T) {
 			Code: `<a />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -62,7 +62,7 @@ func TestAnchorHasContentUpstream(t *testing.T) {
 			Code: `<a><Bar aria-hidden /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -72,7 +72,7 @@ func TestAnchorHasContentUpstream(t *testing.T) {
 			Code: `<a>{undefined}</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -82,7 +82,7 @@ func TestAnchorHasContentUpstream(t *testing.T) {
 			Tsx:      true,
 			Settings: linkSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 	})

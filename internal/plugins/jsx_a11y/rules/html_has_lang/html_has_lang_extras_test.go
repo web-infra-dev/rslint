@@ -483,14 +483,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 		//      since the rule only checks truthiness, not validity). ----
 		{Code: `<html lang="en" />`, Tsx: true},
 		{Code: `<html lang="en-US" />`, Tsx: true},
-		{Code: `<html lang="en-GB-oed" />`, Tsx: true},                        // grandfathered
-		{Code: `<html lang="zh-Hant-TW" />`, Tsx: true},                       // script + region
-		{Code: `<html lang="cmn-Hans-CN" />`, Tsx: true},                      // macrolanguage
-		{Code: `<html lang="sl-rozaj-biske-1994" />`, Tsx: true},              // multi-variant
-		{Code: `<html lang="en-US-x-twain" />`, Tsx: true},                    // private use
-		{Code: `<html lang="x-pseudo" />`, Tsx: true},                         // private-only
-		{Code: `<html lang="i-default" />`, Tsx: true},                        // grandfathered
-		{Code: `<html lang="art-x-pirate" />`, Tsx: true},                     // artificial + private
+		{Code: `<html lang="en-GB-oed" />`, Tsx: true},           // grandfathered
+		{Code: `<html lang="zh-Hant-TW" />`, Tsx: true},          // script + region
+		{Code: `<html lang="cmn-Hans-CN" />`, Tsx: true},         // macrolanguage
+		{Code: `<html lang="sl-rozaj-biske-1994" />`, Tsx: true}, // multi-variant
+		{Code: `<html lang="en-US-x-twain" />`, Tsx: true},       // private use
+		{Code: `<html lang="x-pseudo" />`, Tsx: true},            // private-only
+		{Code: `<html lang="i-default" />`, Tsx: true},           // grandfathered
+		{Code: `<html lang="art-x-pirate" />`, Tsx: true},        // artificial + private
 
 		// ---- Common HTML attribute combinations on root. ----
 		{Code: `<html lang="en" dir="ltr" />`, Tsx: true},
@@ -506,12 +506,12 @@ func TestHtmlHasLangExtras(t *testing.T) {
 		{Code: `<html lang={"" + lang} />`, Tsx: true},
 
 		// ---- Numeric edge cases (lang doesn't validate, just truthy). ----
-		{Code: `<html lang={0o10} />`, Tsx: true}, // octal 8
-		{Code: `<html lang={0xff} />`, Tsx: true}, // hex 255
-		{Code: `<html lang={0b10} />`, Tsx: true}, // binary 2
-		{Code: `<html lang={1e2} />`, Tsx: true},  // 100
+		{Code: `<html lang={0o10} />`, Tsx: true},  // octal 8
+		{Code: `<html lang={0xff} />`, Tsx: true},  // hex 255
+		{Code: `<html lang={0b10} />`, Tsx: true},  // binary 2
+		{Code: `<html lang={1e2} />`, Tsx: true},   // 100
 		{Code: `<html lang={1_000} />`, Tsx: true}, // numeric separator
-		{Code: `<html lang={1.5} />`, Tsx: true},  // float
+		{Code: `<html lang={1.5} />`, Tsx: true},   // float
 
 		// ---- BigInt non-zero variants. ----
 		{Code: `<html lang={123n} />`, Tsx: true},
@@ -638,7 +638,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -647,7 +647,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html className="root"></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -658,7 +658,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Empty string via JsxExpression-wrapped string literal.
@@ -666,7 +666,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// null literal → falsy.
@@ -674,7 +674,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// boolean false → falsy.
@@ -682,7 +682,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Numeric 0 → falsy. (Atypical for lang but locks in the truthiness
@@ -691,7 +691,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// String literal "false" — jsx-ast-utils' Literal extractor
@@ -701,14 +701,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang="false" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang="FALSE" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Empty JsxExpression `{}` — tsgo synthesizes for malformed input.
@@ -717,7 +717,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// `void 0` → undefined → falsy.
@@ -725,7 +725,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={void 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -736,14 +736,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={undefined as any} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={(undefined)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -757,7 +757,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={"en" satisfies string} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -769,7 +769,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `  <html />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage,
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.",
 					Line: 1, Column: 3, EndLine: 1, EndColumn: 11},
 			},
 		},
@@ -780,7 +780,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage,
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.",
 					Line: 1, Column: 1, EndLine: 1, EndColumn: 9},
 			},
 		},
@@ -792,7 +792,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage,
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.",
 					Line: 1, Column: 1, EndLine: 1, EndColumn: 7},
 			},
 		},
@@ -806,7 +806,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html\n  className=\"root\"\n>\n</html>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage,
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.",
 					Line: 1, Column: 1, EndLine: 3, EndColumn: 2},
 			},
 		},
@@ -817,7 +817,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -825,7 +825,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -835,8 +835,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<><html /><html lang="en" /><html /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 29},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 3},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 29},
 			},
 		},
 
@@ -845,7 +845,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `cond ? <html /> : <html lang="en" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 8},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 8},
 			},
 		},
 
@@ -858,7 +858,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{lang: undefined}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -868,7 +868,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{lang: ""}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -878,7 +878,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: htmlTopSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -889,8 +889,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><html /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 7},
 			},
 		},
 
@@ -901,7 +901,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang="en"><html /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 17},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 17},
 			},
 		},
 
@@ -911,7 +911,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><html lang="en" /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -922,7 +922,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<div>{<html />}</div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 7},
 			},
 		},
 
@@ -933,7 +933,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<X render={() => <html />} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 18},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 18},
 			},
 		},
 
@@ -943,8 +943,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<><html /><html /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 11},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 3},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 11},
 			},
 		},
 
@@ -961,7 +961,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{"lang": "en"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -971,7 +971,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{'lang': 'en'}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -982,7 +982,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{["lang"]: "en"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -993,7 +993,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{0: "en"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1009,7 +1009,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={null ?? ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1018,7 +1018,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={cond ? "" : null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1028,7 +1028,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={false || ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1038,7 +1038,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={typeof x} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1048,7 +1048,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={x++} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1057,7 +1057,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={-0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1079,7 +1079,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={undefined}><body /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1088,7 +1088,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={undefined ?? ""}><body /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1097,7 +1097,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html className="dark" data-theme={theme}><body /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1106,7 +1106,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><body lang="en">{children}</body></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1121,7 +1121,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `function Layout() { return <html />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 28},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 28},
 			},
 		},
 
@@ -1130,7 +1130,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `const Layout = () => <html />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 22},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 22},
 			},
 		},
 
@@ -1139,7 +1139,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `class Layout { render() { return <html />; } }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 34},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 34},
 			},
 		},
 
@@ -1148,7 +1148,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `withRouter(({ children }) => <html>{children}</html>)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 30},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 30},
 			},
 		},
 
@@ -1157,7 +1157,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `async function Layout() { return <html />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 34},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 34},
 			},
 		},
 
@@ -1167,7 +1167,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html\t/>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1185,7 +1185,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${\"en\"}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Numeric-literal substitution → "" → falsy.
@@ -1193,7 +1193,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${0}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Boolean-literal substitution → "" → falsy.
@@ -1201,14 +1201,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${false}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: "<html lang={`${true}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Null-literal substitution → "" → falsy.
@@ -1216,7 +1216,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${null}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// JSX-element substitution → ESTree JSXElement, no "Expression" → "".
@@ -1224,7 +1224,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${<x />}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// JSX-fragment substitution → ESTree JSXFragment, no "Expression" → "".
@@ -1232,7 +1232,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${<></>}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Empty template (no substitutions, no quasi text) → "" → falsy.
@@ -1240,7 +1240,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={``} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Template with empty head/tail and pure-literal sub:
@@ -1249,7 +1249,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: "<html lang={`${\"\"}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1264,7 +1264,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...spreadFn()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of MemberAccessExpression.
@@ -1272,7 +1272,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...obj.spread} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of NewExpression.
@@ -1280,7 +1280,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...new Foo()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of ElementAccessExpression.
@@ -1288,7 +1288,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...arr[0]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of ConditionalExpression.
@@ -1296,7 +1296,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...(cond ? a : b)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of LogicalExpression.
@@ -1304,7 +1304,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...(props || defaults)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of TS-wrapped object — TSAsExpression is opaque per
@@ -1314,14 +1314,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...({lang: "en"} as any)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html {...({lang: "en"})!} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1333,21 +1333,21 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={0o0} />`, // octal zero
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={0x0} />`, // hex zero
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={0b0} />`, // binary zero
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Float zero.
@@ -1355,7 +1355,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={0.0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// BigInt zero.
@@ -1363,7 +1363,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={0n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1375,7 +1375,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={"" + ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Subtraction yielding zero.
@@ -1383,7 +1383,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={1 - 1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Multiplication yielding zero.
@@ -1391,7 +1391,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={5 * 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Division yielding zero.
@@ -1399,7 +1399,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={0 / 5} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Modulo yielding zero.
@@ -1407,7 +1407,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={6 % 3} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Comparison yielding boolean false.
@@ -1415,14 +1415,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={1 > 2} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={2 < 1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// `!` of truthy.
@@ -1430,14 +1430,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={!"x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={!1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Negation yielding negative zero (which is falsy).
@@ -1445,7 +1445,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={-0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1458,7 +1458,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `function RootLayout({ children }) { return <html><body>{children}</body></html>; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 44},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 44},
 			},
 		},
 
@@ -1467,7 +1467,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `export default async function Layout({ children }) { return <html>{children}</html>; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 61},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 61},
 			},
 		},
 
@@ -1477,7 +1477,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html language="en" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Lang on body instead of html.
@@ -1485,7 +1485,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><body lang="en">{children}</body></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Lang in style attribute instead of lang prop (very wrong).
@@ -1493,7 +1493,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html style={{lang: "en"}}>{children}</html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1506,9 +1506,9 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><html><html /></html></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 7},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 13},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 7},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 13},
 			},
 		},
 
@@ -1517,8 +1517,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html><html lang="en"><html /></html></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 23},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 23},
 			},
 		},
 
@@ -1528,7 +1528,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<>{["en", "de", "fr"].map(l => <html />)}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 32},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 32},
 			},
 		},
 
@@ -1537,7 +1537,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `function f() { try { return <html />; } catch { return null; } }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 29},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 29},
 			},
 		},
 
@@ -1546,7 +1546,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `function f(k) { switch (k) { case 0: return <html />; default: return null; } }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 45},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 45},
 			},
 		},
 
@@ -1555,7 +1555,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `export default () => <html />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 22},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 22},
 			},
 		},
 
@@ -1564,7 +1564,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `function* g() { yield <html />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 23},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 23},
 			},
 		},
 
@@ -1573,7 +1573,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `async function* g() { yield <html />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 29},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 29},
 			},
 		},
 
@@ -1582,8 +1582,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `cond ? <html /> : <html />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 8},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 19},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 8},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 19},
 			},
 		},
 
@@ -1592,14 +1592,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `cond && <html />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 9},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 9},
 			},
 		},
 		{
 			Code: `cond || <html />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 9},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 9},
 			},
 		},
 
@@ -1608,8 +1608,8 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `[<html />, <html lang="en" />, <html />]`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 2},
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 32},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 2},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 32},
 			},
 		},
 
@@ -1618,7 +1618,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `({ root: <html /> })`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 10},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 10},
 			},
 		},
 
@@ -1632,7 +1632,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={"" || "" || false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1641,14 +1641,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={true ? "" : "en"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang={false ? "en" : ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1657,7 +1657,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang={!1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1666,14 +1666,14 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html lang="False" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<html lang="fAlSe" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1690,7 +1690,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{[propName]: "en"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Computed key referencing a constant.
@@ -1698,7 +1698,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{[LANG_KEY]: "en"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of nested literal — outer's properties contain
@@ -1709,7 +1709,7 @@ func TestHtmlHasLangExtras(t *testing.T) {
 			Code: `<html {...{...{lang: "en"}}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "htmlHasLang", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "htmlHasLang", Message: "<html> elements must have the lang prop.", Line: 1, Column: 1},
 			},
 		},
 	})

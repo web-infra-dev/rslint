@@ -152,7 +152,7 @@ console.log(y);`,
 func unassignedError(name string, line int, column int, endLine int, endColumn int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "unassigned",
-		Message:   messageUnassigned(name).Description,
+		Message:   "'" + name + "' is always 'undefined' because it's never assigned.",
 		Line:      line,
 		Column:    column,
 		EndLine:   endLine,

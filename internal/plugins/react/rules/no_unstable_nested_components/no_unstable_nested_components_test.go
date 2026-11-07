@@ -2237,8 +2237,8 @@ func TestNoUnstableNestedComponentsAncestorTracking(t *testing.T) {
       `,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{Message: generateErrorMessageWithParentName("FirstParent"), Line: 3, Column: 11},
-					{Message: generateErrorMessageWithParentName("SecondParent"), Line: 7, Column: 11},
+					{Message: "Do not define components during render. React will see a new component type on every render and destroy the entire subtree’s DOM nodes and state (https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, move this component definition out of the parent component “FirstParent” and pass data as props.", Line: 3, Column: 11},
+					{Message: "Do not define components during render. React will see a new component type on every render and destroy the entire subtree’s DOM nodes and state (https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, move this component definition out of the parent component “SecondParent” and pass data as props.", Line: 7, Column: 11},
 				},
 			},
 			{
@@ -2255,7 +2255,7 @@ func TestNoUnstableNestedComponentsAncestorTracking(t *testing.T) {
       `,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{Message: generateErrorMessageWithParentName("NamedInner"), Line: 5, Column: 15},
+					{Message: "Do not define components during render. React will see a new component type on every render and destroy the entire subtree’s DOM nodes and state (https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, move this component definition out of the parent component “NamedInner” and pass data as props.", Line: 5, Column: 15},
 				},
 			},
 			{

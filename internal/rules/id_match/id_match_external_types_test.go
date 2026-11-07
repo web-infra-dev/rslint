@@ -148,7 +148,7 @@ func TestIdMatchExternalTypeAndNamespaceReferences(t *testing.T) {
 				t.Fatalf("diagnostic names = %q, want %q", got, test.want)
 			}
 			for index, want := range test.want {
-				wantMessage := messageNotMatch(want, `^[^_]+$`).Description
+				wantMessage := "Identifier '" + want + "' does not match the pattern '^[^_]+$'."
 				if got[index] != wantMessage {
 					t.Errorf("diagnostic %d = %q, want %q", index+1, got[index], wantMessage)
 				}

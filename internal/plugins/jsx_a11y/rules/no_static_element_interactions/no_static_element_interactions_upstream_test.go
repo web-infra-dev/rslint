@@ -11,7 +11,7 @@ import (
 // produces. Shared with the extras suite via package scope.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noStaticElementInteractions",
-	Message:   errorMessage,
+	Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 }
 
 // componentsSettings mirrors upstream's

@@ -12,7 +12,7 @@ import (
 // tabindex_no_positive_extras_test.go via package scope.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "tabIndexNoPositive",
-	Message:   errorMessage,
+	Message:   "Avoid positive integer values for tabIndex.",
 }
 
 // TestTabindexNoPositiveUpstream mirrors the full valid/invalid suite from

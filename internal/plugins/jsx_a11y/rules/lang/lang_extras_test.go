@@ -476,14 +476,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="qq" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="xx-YY" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -492,7 +492,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -504,14 +504,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en_US" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="zh_Hans" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -524,14 +524,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="-en" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en@US" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -541,7 +541,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en US" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -550,7 +550,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={"foo"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -559,7 +559,7 @@ func TestLangExtras(t *testing.T) {
 			Code: "<html lang={`zz-LL`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -569,7 +569,7 @@ func TestLangExtras(t *testing.T) {
 			Code: "<html lang={`en-${region}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -578,7 +578,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html LANG="foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -597,7 +597,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -606,14 +606,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={true} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -623,14 +623,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="true" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="FALSE" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -639,14 +639,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang={0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -655,7 +655,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={1n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -664,7 +664,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={["en"]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -679,7 +679,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -697,8 +697,8 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="qq"><html lang="qq-XX" /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 23},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 23},
 			},
 		},
 
@@ -707,7 +707,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<><div /><html lang="zz-LL" /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 16},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 16},
 			},
 		},
 
@@ -717,7 +717,7 @@ func TestLangExtras(t *testing.T) {
 			Code: "<html\n  lang=\"foo\"\n/>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 2, Column: 3},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 2, Column: 3},
 			},
 		},
 
@@ -727,7 +727,7 @@ func TestLangExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: htmlRemapSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 11},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 11},
 			},
 		},
 
@@ -742,7 +742,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `function Root() { return <html lang="bogus" />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 32},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 32},
 			},
 		},
 
@@ -755,7 +755,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang='foo' />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -764,7 +764,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang = "foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -773,7 +773,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html /* a */ lang="foo" /* b */ />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 15},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 15},
 			},
 		},
 
@@ -784,7 +784,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="&#x66;oo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		// Decimal-encoded `&#102;&#111;&#111;` = "foo".
@@ -792,7 +792,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="&#102;&#111;&#111;" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -803,14 +803,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="日本語" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="中文" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		// Latin-1 supplement char (`é`) — invalid for BCP-47.
@@ -818,7 +818,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="café" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		// Zero-width space (U+200B) hidden inside an otherwise valid-looking tag.
@@ -826,7 +826,7 @@ func TestLangExtras(t *testing.T) {
 			Code: "<html lang=\"en\u200b\" />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -835,14 +835,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="english" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en-aaaaaaaaa" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -851,14 +851,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="a" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -871,21 +871,21 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en-x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en-u" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en-x-" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -894,7 +894,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="123" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -904,8 +904,8 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="foo" lang="zz-LL" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 18},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 18},
 			},
 		},
 
@@ -915,7 +915,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en" lang="foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 17},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 17},
 			},
 		},
 
@@ -925,14 +925,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html {...props} lang="foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 18},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 18},
 			},
 		},
 		{
 			Code: `<html lang="zz-LL" {...props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -946,7 +946,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<X r1={() => <Y r2={() => <html lang="bogus" />} />} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 33},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 33},
 			},
 		},
 
@@ -955,14 +955,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<>{cond && <html lang="foo" />}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 18},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 18},
 			},
 		},
 		{
 			Code: `<>{cond ? <html lang="foo" /> : <div />}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 17},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 17},
 			},
 		},
 		// Both branches of ternary contain html, both invalid. "qq" and
@@ -971,8 +971,8 @@ func TestLangExtras(t *testing.T) {
 			Code: `<>{cond ? <html lang="qq" /> : <html lang="zz-LL" />}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 17},
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 38},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 17},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 38},
 			},
 		},
 
@@ -981,7 +981,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<>{[<html lang="foo" key="x" />]}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 11},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 11},
 			},
 		},
 
@@ -995,7 +995,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `export default function RootLayout({ children }) { return <html lang="enUS"><body>{children}</body></html>; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 65},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 65},
 			},
 		},
 
@@ -1004,7 +1004,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en.US"><body /></html>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1013,7 +1013,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en/US" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1022,14 +1022,14 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="english" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="english-us" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1049,7 +1049,7 @@ func TestLangExtras(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 16},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 16},
 			},
 		},
 
@@ -1066,7 +1066,7 @@ func TestLangExtras(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 11},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 11},
 			},
 		},
 
@@ -1085,28 +1085,28 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="i-klingon" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en-gb-oed" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="zh-min-nan" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="no-bok" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		// Case-insensitive match — uppercase variants of the grandfathered
@@ -1115,7 +1115,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="I-Klingon" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1128,28 +1128,28 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="hi-Deva" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="ja-Jpan" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="en-Latn" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="fr-Latn" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		// With region after Suppress-Script — the violation still triggers
@@ -1158,7 +1158,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en-Latn-US" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1170,21 +1170,21 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="x-foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="x-private" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1196,7 +1196,7 @@ func TestLangExtras(t *testing.T) {
 			Code: `<html lang="en-US-POSIX" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 	})

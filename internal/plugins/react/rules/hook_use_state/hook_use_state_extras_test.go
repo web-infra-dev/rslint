@@ -97,15 +97,15 @@ func TestHookUseStateExtras(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		// Locks in upstream CallExpression arm 1: an immediate return is ignored; non-return expression reports.
 		hookUseStateError(`import { useState } from 'react';
-useState()`, useStateErrorText, 2, 1),
+useState()`, "useState call is not destructured into value + setter pair", 2, 1),
 		// A hook-shaped local alias remains recognized upstream.
 		hookUseStateError(`import { useState as useStore } from 'react';
-const result = useStore()`, useStateErrorText, 2, 16),
+const result = useStore()`, "useState call is not destructured into value + setter pair", 2, 16),
 		// Locks in upstream symmetric-pair arm: a transposed acronym setter is rejected.
 		{
 			Code: `import { useState } from 'react';
 const [rgb, setRBG] = useState()`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair", Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
 const [rgb, setRgb] = useState()`}}}}, Tsx: true,
 		},
@@ -113,37 +113,37 @@ const [rgb, setRgb] = useState()`}}}}, Tsx: true,
 		{
 			Code: `import { useState } from 'react';
 const [value, {setValue}] = useState()`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair", Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
 const [value, setValue] = useState()`}}}}, Tsx: true,
 		},
 		// Optional calls are still React hook calls upstream.
 		hookUseStateError(`import { useState } from 'react';
-const [value, setValue] = useState?.()`, useStateErrorText, 2, 27),
+const [value, setValue] = useState?.()`, "useState call is not destructured into value + setter pair", 2, 27),
 		// Direct optional member calls are also React hook calls upstream.
 		hookUseStateError(`import React from 'react';
-const result = React?.useState()`, useStateErrorText, 2, 16),
+const result = React?.useState()`, "useState call is not destructured into value + setter pair", 2, 16),
 		// ESTree represents either defaulted binding element as an AssignmentPattern.
 		hookUseStateError(`import { useState } from 'react';
-const [value = initialValue, setValue] = useState()`, useStateErrorText, 2, 7),
+const [value = initialValue, setValue] = useState()`, "useState call is not destructured into value + setter pair", 2, 7),
 		{
 			Code: `import { useState } from 'react';
 const [value, setValue = initialSetter] = useState()`,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText, Line: 2, Column: 7,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair", Line: 2, Column: 7,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestPair", Output: `import { useState } from 'react';
 const [value, setValue] = useState()`}},
 			}}, Tsx: true,
 		},
 		// ---- Dimension 4: nested array value has option-specific diagnostic ----
 		hookUseStateError(`import { useState } from 'react';
-const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
+const [[first], setFirst] = useState([1])`, `useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)`, 2, 7),
 		// Components chooses the first default React import for the memo suggestion.
 		{
 			Code: `import A from 'react'; import B from 'react'; import { useState } from 'react'; const [color] = useState(value)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import A from 'react'; import B from 'react'; import { useState, useMemo } from 'react'; const color = A.useMemo(() => value, [])`},
 					{MessageId: "suggestPair", Output: `import A from 'react'; import B from 'react'; import { useState } from 'react'; const [color, setColor] = useState(value)`},
@@ -155,7 +155,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 			Code: `import React, { useState } from 'react'; const [color] = useState(value)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import React, { useState, useMemo } from 'react'; const color = React.useMemo(() => value, [])`},
 					{MessageId: "suggestPair", Output: `import React, { useState } from 'react'; const [color, setColor] = useState(value)`},
@@ -167,7 +167,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 			Code: `import { useState as useFirst, useState as useSecond } from 'react'; const [value] = useSecond(initial)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import { useState as useFirst, useMemo, useState as useSecond } from 'react'; const value = useMemo(() => initial, [])`},
 					{MessageId: "suggestPair", Output: `import { useState as useFirst, useState as useSecond } from 'react'; const [value, setValue] = useSecond(initial)`},
@@ -179,7 +179,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 			Code: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const [value] = useState(initial)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const value = memo1(() => initial, [])`},
 					{MessageId: "suggestPair", Output: `import { useState, useMemo as memo1, useMemo as memo2 } from 'react'; const [value, setValue] = useState(initial)`},
@@ -191,7 +191,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 			Code: `import { useState } from 'react'; const [value] = useState((initial))`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestMemo", Output: `import { useState, useMemo } from 'react'; const value = useMemo(() => initial, [])`},
 					{MessageId: "suggestPair", Output: `import { useState } from 'react'; const [value, setValue] = useState((initial))`},
@@ -201,32 +201,32 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 		// Components selects the first hook-shaped reference in the current scope,
 		// even when the current callee is shadowed by a later local declaration.
 		hookUseStateError(`import { useFoo, useState } from 'react';
-	function f() { useFoo(); function useState() {} const result = useState() }`, useStateErrorText, 2, 65),
+	function f() { useFoo(); function useState() {} const result = useState() }`, "useState call is not destructured into value + setter pair", 2, 65),
 		// Components falls back to the bare callee spelling after selecting an
 		// earlier hook-shaped reference in the scope.
 		hookUseStateError(`import { useEffect } from 'react';
 	useEffect();
-	const result = useState()`, useStateErrorText, 3, 17),
+	const result = useState()`, "useState call is not destructured into value + setter pair", 3, 17),
 		// Components uses the first default React reference in the function
 		// scope, even when a later body declaration shadows the same spelling.
 		{
 			Code:   `import React from 'react'; function f(x = React) { const React = {}; const result = React.useState(); }`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair"}},
 		},
 		// An omitted first binding is falsy in the upstream truthiness check and
 		// must not receive the single-getter memo suggestion.
 		{
 			Code:   `import { useState } from 'react'; const [,] = useState(initial)`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: useStateErrorText}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair"}},
 		},
 		// A single non-identifier binding still receives the upstream memo suggestion.
 		{
 			Code: `import { useState } from 'react'; const [value = fallback] = useState(initial)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "suggestMemo",
 					Output:    `import { useState, useMemo } from 'react'; const undefined = useMemo(() => initial, [])`,
@@ -237,7 +237,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 			Code: `import { useState } from 'react'; const [...value] = useState(initial)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "suggestMemo",
 					Output:    `import { useState, useMemo } from 'react'; const undefined = useMemo(() => initial, [])`,
@@ -249,7 +249,7 @@ const [[first], setFirst] = useState([1])`, destructuredStateErrorText, 2, 7),
 
 func hookUseStateError(code, message string, line, column int) rule_tester.InvalidTestCase {
 	messageID := "useStateErrorMessage"
-	if message == destructuredStateErrorText {
+	if message == `useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)` {
 		messageID = "useStateErrorMessageOrAddOption"
 	}
 	return rule_tester.InvalidTestCase{
@@ -286,7 +286,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; const result = React[useState]();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 43, EndLine: 1, EndColumn: 60,
 				},
 			},
@@ -294,7 +294,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React, { useState as useStore } from 'react'; const result = React.useStore();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 69, EndLine: 1, EndColumn: 85,
 				},
 			},
@@ -302,7 +302,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; const result=React[(useState)]();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 41, EndLine: 1, EndColumn: 60,
 				},
 			},
@@ -310,7 +310,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; const [x]=React[useState](initial);", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 34, EndLine: 1, EndColumn: 37,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React from 'react'; const x=React.useMemo(() => initial, []);"},
@@ -322,7 +322,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; const [x,setX]=React?.[useState]();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 43, EndLine: 1, EndColumn: 62,
 				},
 			},
@@ -331,7 +331,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 			Code: "import { useState } from 'react'; const [x]: [number] = useState(initial);", Tsx: true,
 			Options: map[string]any{"allowDestructuredState": false},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 41, EndLine: 1, EndColumn: 54,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import { useState, useMemo } from 'react'; const x = useMemo(() => initial, []);"},
@@ -343,7 +343,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState} from 'react'; const [x,wrong] /*note*/ : [number,any] = useState(initial);", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 39, EndLine: 1, EndColumn: 72,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestPair", Output: "import {useState} from 'react'; const [x, setX] = useState(initial);"},
@@ -354,7 +354,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState} from 'react'; const [{x},setX]:[any,any]=useState(initial);", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessageOrAddOption", Message: destructuredStateErrorText,
+				{MessageId: "useStateErrorMessageOrAddOption", Message: `useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)`,
 					Line: 1, Column: 39, EndLine: 1, EndColumn: 59,
 				},
 			},
@@ -362,7 +362,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useEffect} from 'react'; type T=typeof useEffect; const result=useState();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 72, EndLine: 1, EndColumn: 82,
 				},
 			},
@@ -370,7 +370,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useEffect} from 'react'; interface T {x:typeof useEffect}; const result=useState();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 81, EndLine: 1, EndColumn: 91,
 				},
 			},
@@ -378,7 +378,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useEffect} from 'react'; function f() { type T=typeof useEffect; const result=useState(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 87, EndLine: 1, EndColumn: 97,
 				},
 			},
@@ -386,7 +386,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "declare module 'custom' { import React from 'react'; const result=React.useState(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 67, EndLine: 1, EndColumn: 83,
 				},
 			},
@@ -394,7 +394,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "declare module 'custom' { import {useState as useStore} from 'react'; const result=useStore(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 84, EndLine: 1, EndColumn: 94,
 				},
 			},
@@ -402,7 +402,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; declare module 'custom' { import React from 'other'; const result=React.useState(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 94, EndLine: 1, EndColumn: 110,
 				},
 			},
@@ -410,10 +410,10 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState} from 'react'; useState(); declare module 'custom' { import {useState as useStore} from 'react'; const result=useStore(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 33, EndLine: 1, EndColumn: 43,
 				},
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 128, EndLine: 1, EndColumn: 138,
 				},
 			},
@@ -421,10 +421,10 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState} from 'react'; useState(); import {useState as useStore} from 'react'; const result=useStore();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 33, EndLine: 1, EndColumn: 43,
 				},
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 102, EndLine: 1, EndColumn: 112,
 				},
 			},
@@ -432,10 +432,10 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import React from 'react'; React.useState(); declare module 'custom' { import {useState} from 'react'; const result=useState(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 28, EndLine: 1, EndColumn: 44,
 				},
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 117, EndLine: 1, EndColumn: 127,
 				},
 			},
@@ -443,10 +443,10 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState} from 'react'; const result=useState(); import React from 'react'; const result2=React.useState();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 46, EndLine: 1, EndColumn: 56,
 				},
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 99, EndLine: 1, EndColumn: 115,
 				},
 			},
@@ -454,7 +454,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useState as useStore} from 'react'; useStore(); declare module 'custom' { import {useEffect as useStore} from 'react'; const result=useStore(); }", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 45, EndLine: 1, EndColumn: 55,
 				},
 			},
@@ -462,7 +462,7 @@ func TestHookUseStateCompatibility(t *testing.T) {
 		{
 			Code: "import {useEffect} from 'react'; type T = any extends any ? 1 : typeof useEffect; const result=useState();", Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 96, EndLine: 1, EndColumn: 106,
 				},
 			},
@@ -482,7 +482,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = (/** @type {any} */ (useState))(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = React.useMemo(() => initial, []);"},
@@ -492,13 +492,13 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const result = (/** @satisfies {any} */ (useState))(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 66, EndLine: 1, EndColumn: 111,
 				},
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = (/** @type {any} */ (React.useState))(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = React.useMemo(() => initial, []);"},
@@ -508,13 +508,13 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const result = (/** @type {any} */ (React).useState)(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 66, EndLine: 1, EndColumn: 112,
 				},
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = (React[/** @type {any} */ (useState)])(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = React.useMemo(() => initial, []);"},
@@ -524,7 +524,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = /** @type {any} */ (useState(initial));", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = /** @type {any} */ (React.useMemo(() => initial, []));"},
@@ -534,7 +534,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = /** @satisfies {any} */ (React.useState(initial));", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = /** @satisfies {any} */ (React.useMemo(() => initial, []));"},
@@ -544,7 +544,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import React, {useState, useEffect} from 'react'; const [x] = useState(/** @type {any} */ (initial));", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 57, EndLine: 1, EndColumn: 60,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import React, {useState, useMemo, useEffect} from 'react'; const x = React.useMemo(() => initial, []);"},
@@ -554,7 +554,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import {useState} from 'react'; /** @type {[number]} */ const [x] = useState(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 63, EndLine: 1, EndColumn: 66,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestMemo", Output: "import {useState, useMemo} from 'react'; /** @type {[number]} */ const x = useMemo(() => initial, []);"},
@@ -564,7 +564,7 @@ func TestHookUseStateJSDoc(t *testing.T) {
 			}},
 		{Code: "import {useState} from 'react'; /** @type {[number, any]} */ const [x,wrong] = useState(initial);", FileName: "audit.js",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useStateErrorMessage", Message: useStateErrorText,
+				{MessageId: "useStateErrorMessage", Message: "useState call is not destructured into value + setter pair",
 					Line: 1, Column: 68, EndLine: 1, EndColumn: 77,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "suggestPair", Output: "import {useState} from 'react'; /** @type {[number, any]} */ const [x, setX] = useState(initial);"},

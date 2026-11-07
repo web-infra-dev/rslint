@@ -12,7 +12,7 @@ import (
 // error-text tweak touches one place.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noNoninteractiveElementInteractions",
-	Message:   errorMessage,
+	Message:   "Non-interactive elements should not be assigned mouse or keyboard event listeners.",
 	Line:      1,
 	Column:    1,
 }

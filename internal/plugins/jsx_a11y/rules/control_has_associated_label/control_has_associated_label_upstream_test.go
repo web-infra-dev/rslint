@@ -18,7 +18,7 @@ import (
 // message tweak touches one place.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "controlHasAssociatedLabel",
-	Message:   errorMessage,
+	Message:   "A control must be associated with a text label.",
 }
 
 // recommendedOptions mirrors `configs.recommended.rules[ruleName][1]` /

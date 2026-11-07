@@ -79,7 +79,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -87,7 +87,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -95,7 +95,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -103,7 +103,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -112,7 +112,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Options: map[string]interface{}{"inputComponents": []interface{}{"Bar"}},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -121,7 +121,7 @@ func TestAutocompleteValidUpstream(t *testing.T) {
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 	}

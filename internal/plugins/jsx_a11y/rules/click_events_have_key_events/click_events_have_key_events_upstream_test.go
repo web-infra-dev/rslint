@@ -13,7 +13,7 @@ import (
 // package scope.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "clickEventsHaveKeyEvents",
-	Message:   errorMessage,
+	Message:   "Visible, non-interactive elements with click handlers must have at least one keyboard listener.",
 	Line:      1,
 	Column:    1,
 }

@@ -770,14 +770,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={3.14} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Hex / octal / binary numerics — all jvNumber.
@@ -785,14 +785,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={0xff} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={1e2} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -801,14 +801,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={1n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={123n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -817,14 +817,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={{}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={{ value: "x" }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -833,14 +833,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={[]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={["x"]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -850,21 +850,21 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={() => "x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={function () { return "x"; }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={class {}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -874,14 +874,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={new String("x")} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={new Foo()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -890,7 +890,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={/regex/} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -902,56 +902,56 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={Math} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={Array} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={Number} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={Object} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={String} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={Date} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={Infinity} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={-Infinity} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -964,7 +964,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -973,7 +973,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Negative zero is falsy.
@@ -981,7 +981,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={-0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -990,7 +990,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={-1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1003,35 +1003,35 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title="true" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title="false" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title="True" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title="TRUE" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title="FALSE" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1042,7 +1042,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1051,14 +1051,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={typeof x} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={void 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1067,7 +1067,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={delete x.y} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1076,14 +1076,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={!""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={!!"x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1092,7 +1092,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={~0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1102,7 +1102,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={x++} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1113,14 +1113,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={undefined as any} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={(undefined)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1132,7 +1132,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={"x" satisfies string} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1145,7 +1145,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage,
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.",
 					Line: 1, Column: 1, EndLine: 1, EndColumn: 11},
 			},
 		},
@@ -1156,7 +1156,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `  <iframe />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage,
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.",
 					Line: 1, Column: 3, EndLine: 1, EndColumn: 13},
 			},
 		},
@@ -1167,7 +1167,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe></iframe>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage,
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.",
 					Line: 1, Column: 1, EndLine: 1, EndColumn: 9},
 			},
 		},
@@ -1178,7 +1178,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe\n  className=\"x\"\n>\n</iframe>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage,
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.",
 					Line: 1, Column: 1, EndLine: 3, EndColumn: 2},
 			},
 		},
@@ -1192,7 +1192,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...spreadFn()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of MemberExpression.
@@ -1200,7 +1200,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...obj.spread} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Spread of NewExpression.
@@ -1208,7 +1208,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...new Foo()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1224,7 +1224,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{"title": "x"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1233,7 +1233,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{["title"]: "x"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1246,7 +1246,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: undefined}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Spread carrying title="" inside literal spread. ----
@@ -1254,7 +1254,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: ""}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Spread carrying title={42} (non-string truthy). ----
@@ -1262,7 +1262,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: 42}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Spread carrying title={true} (non-string truthy). ----
@@ -1270,7 +1270,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: true}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1284,7 +1284,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- componentMap remap + title={false}. ----
@@ -1293,7 +1293,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- componentMap remap + title={42}. ----
@@ -1302,7 +1302,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1312,7 +1312,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -1320,7 +1320,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -1328,7 +1328,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1338,8 +1338,8 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe /><iframe title="x" /><iframe /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 33},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 3},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 33},
 			},
 		},
 
@@ -1348,7 +1348,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `cond ? <iframe /> : <iframe title="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 8},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 8},
 			},
 		},
 
@@ -1358,8 +1358,8 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe><iframe /></iframe>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 9},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 9},
 			},
 		},
 		// ---- Dimension 2: nested — outer has title, inner missing. ----
@@ -1367,7 +1367,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title="x"><iframe /></iframe>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 19},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 19},
 			},
 		},
 
@@ -1377,7 +1377,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<div>{<iframe />}</div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 7},
 			},
 		},
 
@@ -1387,7 +1387,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<X render={() => <iframe />} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 18},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 18},
 			},
 		},
 
@@ -1396,8 +1396,8 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe /><iframe /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 13},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 3},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 13},
 			},
 		},
 
@@ -1413,7 +1413,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={`${\"en\"}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Numeric-literal substitution → "" → falsy.
@@ -1421,7 +1421,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={`${0}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Boolean-literal substitution → "" → falsy.
@@ -1429,7 +1429,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={`${true}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Null-literal substitution → "" → falsy.
@@ -1437,7 +1437,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={`${null}`} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Empty template (no substitutions, no quasi text) → "" → falsy.
@@ -1445,7 +1445,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={``} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// Tagged template with empty template → empty inner → "" → falsy.
@@ -1453,7 +1453,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe title={tag``} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1466,7 +1466,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe src="https://example.com" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1475,7 +1475,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={undefined ?? ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1484,7 +1484,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<div title="x"><iframe /></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 16},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 16},
 			},
 		},
 
@@ -1493,7 +1493,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `function Video() { return <iframe />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 27},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 27},
 			},
 		},
 
@@ -1502,7 +1502,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `const Video = () => <iframe />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 21},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 21},
 			},
 		},
 
@@ -1513,7 +1513,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe src="https://example.com" title={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1525,7 +1525,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1541,14 +1541,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={await getTitle()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={await Promise.resolve("x")} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Yield inside generator function body. Listener fires on
@@ -1557,7 +1557,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `function* gen() { return <iframe title={yield getTitle()} />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 26},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 26},
 			},
 		},
 
@@ -1572,35 +1572,35 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={0o10} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={0b10} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={1_000} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={1.5} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={0xffn} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// BigInt zero — falsy AND not string.
@@ -1608,7 +1608,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={0n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1623,21 +1623,21 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe aria-label="Frame label" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe aria-labelledby="label-id" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe aria-describedby="desc-id" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// `name` attribute is a frame-target name, not an accessible label.
@@ -1645,7 +1645,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe name="frame-name" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// `alt` is for img/area/input, not iframe.
@@ -1653,7 +1653,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe alt="alt text" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// `id` doesn't help.
@@ -1661,7 +1661,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe id="frame-id" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// `role` doesn't help.
@@ -1669,7 +1669,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe role="application" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1685,14 +1685,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={(0, "x")} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={(a, b, c)} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1703,14 +1703,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={{ ...x }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={{ ...x, ...y }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1719,14 +1719,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={[1, 2, 3]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={["a", "b"]} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1735,21 +1735,21 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={function* () { yield 1; }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={async function () { return "x"; }} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={async () => "x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1765,7 +1765,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{[1]: "x"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Template literal computed key. ----
@@ -1773,7 +1773,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe {...{[`title`]: \"x\"}} />",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Mixed-case String literal key — upstream's strict guard
@@ -1782,7 +1782,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{"TITLE": "x"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Symbol-style computed key. The inner expression is a
@@ -1794,7 +1794,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{[Symbol.for("title")]: "x"}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1805,21 +1805,21 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{[title]: undefined}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe {...{[title]: 42}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe {...{[title]: ""}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1836,7 +1836,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: undefined}} title="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Two literal spreads, both with title=undefined. ----
@@ -1844,7 +1844,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: undefined}} {...{title: undefined}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Literal spread title=42 (truthy non-string) BEFORE
@@ -1853,7 +1853,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: 42}} title="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Literal spread with title=false BEFORE explicit. ----
@@ -1861,7 +1861,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe {...{title: false}} title="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1875,7 +1875,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<>{frames.map(f => <iframe key={f.id} src={f.src} />)}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 20},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 20},
 			},
 		},
 		// ---- Mixed valid + invalid in fragment. ----
@@ -1883,8 +1883,8 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe /><iframe title="ok" /><iframe /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 34},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 3},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 34},
 			},
 		},
 		// ---- Three invalid in a row. ----
@@ -1892,9 +1892,9 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe /><iframe /><iframe /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 13},
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 23},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 3},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 13},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 23},
 			},
 		},
 
@@ -1907,7 +1907,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<div><section><article><iframe /></article></section></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 24},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 24},
 			},
 		},
 		// ---- Outer iframe valid, inner missing. ----
@@ -1915,7 +1915,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe title="A"><iframe /></iframe></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 21},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 21},
 			},
 		},
 		// ---- Three-level nesting, only middle missing. ----
@@ -1923,7 +1923,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title="L1"><iframe><iframe title="L3" /></iframe></iframe>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 20},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 20},
 			},
 		},
 
@@ -1936,14 +1936,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={null ?? ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={undefined ?? null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- Conditional that resolves to a non-string in chosen branch. ----
@@ -1951,14 +1951,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={true ? 42 : "x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={false ? "x" : 42} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- LogicalAnd resolves to non-string. ----
@@ -1966,14 +1966,14 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<iframe title={true && 42} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<iframe title={"x" && false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 
@@ -1988,7 +1988,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe\n  title=\"\"\n/>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage,
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.",
 					Line: 1, Column: 1, EndLine: 3, EndColumn: 3},
 			},
 		},
@@ -1997,7 +1997,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: "<iframe\t/>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 1},
 			},
 		},
 		// ---- iframe followed immediately by another token. ----
@@ -2005,7 +2005,7 @@ func TestIframeHasTitleExtras(t *testing.T) {
 			Code: `<><iframe /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "iframeHasTitle", Message: errorMessage, Line: 1, Column: 3},
+				{MessageId: "iframeHasTitle", Message: "<iframe> elements must have a unique title property.", Line: 1, Column: 3},
 			},
 		},
 	})

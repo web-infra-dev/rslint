@@ -57,31 +57,31 @@ func TestIframeMissingSandboxUpstream(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `<iframe></iframe>;`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 9}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 9}},
 		},
 		{
 			Code: `<iframe/>;`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 10}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 10}},
 		},
 		{
 			Code: `React.createElement("iframe");`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}},
 		},
 		{
 			Code: `React.createElement("iframe", {});`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 34}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 34}},
 		},
 		{
 			Code: `React.createElement("iframe", null);`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 36}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 36}},
 		},
 
 		// Documentation's warning examples.
 		{
 			Code: `var React = require('react'); var Frame = () => (<div><iframe></iframe>{React.createElement('iframe')}</div>);`, Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 55, EndLine: 1, EndColumn: 63},
-				{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 73, EndLine: 1, EndColumn: 102},
+				{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 55, EndLine: 1, EndColumn: 63},
+				{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 73, EndLine: 1, EndColumn: 102},
 			},
 		},
 		{
@@ -109,11 +109,11 @@ func TestIframeMissingSandboxUpstream(t *testing.T) {
 		},
 		{
 			Code: `<iframe sandbox="allow-scripts allow-same-origin"></iframe>;`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidCombination", Message: msgInvalidCombination, Line: 1, Column: 1, EndLine: 1, EndColumn: 51}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidCombination", Message: "An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid", Line: 1, Column: 1, EndLine: 1, EndColumn: 51}},
 		},
 		{
 			Code: `<iframe sandbox="allow-same-origin allow-scripts"/>;`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidCombination", Message: msgInvalidCombination, Line: 1, Column: 1, EndLine: 1, EndColumn: 52}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidCombination", Message: "An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid", Line: 1, Column: 1, EndLine: 1, EndColumn: 52}},
 		},
 	})
 }

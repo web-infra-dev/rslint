@@ -470,7 +470,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in upstream branch: `<img alt={false} />` is invalid (literal
@@ -479,7 +479,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in img branch where presentation role short-circuits the
@@ -488,7 +488,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img role="presentation" aria-label="something" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferAlt", Message: msgPreferAlt, Line: 1, Column: 1},
+				{MessageId: "preferAlt", Message: `Prefer alt="" over a presentational role. First rule of aria is to not use aria if it can be achieved via native HTML.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in upstream area branch: `area` with `<area alt="" />` is
@@ -497,7 +497,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<area alt={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// Locks in input[type="image"] alt validity branch.
@@ -505,7 +505,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type="image" alt={null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// Locks in TS-wrapper unwrap in AttributeIsExplicitUndefined:
@@ -515,7 +515,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={undefined as any} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in numeric falsy normalization: `<img alt={0.0} />` evaluates
@@ -525,7 +525,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={0.0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in numeric falsy normalization across hex: `<img alt={0x0} />`
@@ -534,7 +534,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={0x0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in BigInt falsy: `<img alt={0n} />` is falsy → invalid.
@@ -542,7 +542,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={0n} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in PrefixUnary `!` truthiness: `!"x"` is `false` → falsy →
@@ -551,7 +551,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={!"x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in ConditionalExpression with both falsy branches: invalid.
@@ -559,7 +559,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={cond ? false : null} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Locks in JsxFragment-as-child NOT counting as accessible (matches
@@ -568,7 +568,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><>x</></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Locks in paired-tag aria-hidden inspection: `<div aria-hidden></div>`
@@ -577,7 +577,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden></div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Locks in paired-tag `<input type="hidden">` short-circuit on
@@ -586,7 +586,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><input type="hidden" /></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Locks in spread-object literal-property match for the negative
@@ -599,7 +599,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img {...{"aria-label": ""}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 
@@ -609,7 +609,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={false && "x"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `"x" && false` → false (left truthy → take right) → falsy → invalid.
@@ -617,7 +617,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={"x" && false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `null ?? false` → false (null is nullish → take right) → falsy → invalid.
@@ -625,7 +625,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={null ?? false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Nested chain: `a && (b || (c && ""))` — c truthy → take "", then
@@ -637,7 +637,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={(a && false) || false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// PrefixUnary `!1` → false → invalid.
@@ -645,7 +645,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={!1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Numeric arithmetic: `0 + 0` → 0 → falsy → invalid.
@@ -653,7 +653,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={0 + 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -663,7 +663,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={1 < 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `0 | 0` → 0 → falsy → invalid (this is the case that DID diverge
@@ -672,7 +672,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={0 | 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `1 === 2` → false → invalid.
@@ -680,7 +680,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={1 === 2} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -690,7 +690,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={undefined && t("key")} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Optional chain that resolves to undefined when receiver is
@@ -707,7 +707,7 @@ func TestAltTextExtras(t *testing.T) {
 			/>`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		// Two unrelated invalid elements in same source — independent
@@ -716,8 +716,8 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<div><img /><object /></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 6},
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 13},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 6},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 13},
 			},
 		},
 
@@ -726,7 +726,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img></img>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 
@@ -737,7 +737,7 @@ func TestAltTextExtras(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"elements": []interface{}{"img"}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 6},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 6},
 			},
 		},
 
@@ -760,7 +760,7 @@ func TestAltTextExtras(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 
@@ -769,7 +769,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img {...{alt: undefined}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -785,7 +785,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden={"true"}>x</div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Same but for direct StringLiteral attribute: `aria-hidden="true"`.
@@ -793,7 +793,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden="true">x</div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 
@@ -804,7 +804,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={undefined as any} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `undefined satisfies undefined` — same.
@@ -812,7 +812,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={undefined satisfies undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// `"foo" satisfies string` — even a truthy literal under `satisfies`
@@ -825,7 +825,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={"foo" satisfies string} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -836,7 +836,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type={"image" + ""} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// `type={cond ? "image" : "text"}` — cond is identifier "cond" →
@@ -845,7 +845,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type={cond ? "image" : "text"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// Logical `||` resolving to "image".
@@ -853,7 +853,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type={"" || "image"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// `&&` short-circuit resolving to "image".
@@ -861,7 +861,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type={"x" && "image"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		// TS wrapper around "image".
@@ -869,7 +869,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<input type={"image" as string} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -878,21 +878,21 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object title={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object title={0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object title={NaN} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Identifier (non-undefined) — getLiteralPropValue returns null → falsy.
@@ -900,7 +900,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object title={someVar} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// `Math` is in JS_RESERVED but getLiteralPropValue still maps non-
@@ -910,7 +910,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object title={Math} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// Empty string title → not truthy → invalid.
@@ -918,7 +918,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object title="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// CallExpression / MemberExpression in title → noop in LITERAL_TYPES → null → falsy.
@@ -926,14 +926,14 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object title={getTitle()} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object title={obj.title} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 
@@ -942,21 +942,21 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt="false" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt="False" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={"false"} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		// Verified: `<img alt={false}>` (boolean literal) is also invalid —
@@ -970,7 +970,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden={cond ? true : true}>x</div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// `aria-hidden={"" || true}` — left falsy → right truthy bool → hidden.
@@ -978,7 +978,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden={"" || true}>x</div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		// `aria-hidden={true as any}` — TS-wrapped boolean true → hidden.
@@ -986,7 +986,7 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<object><div aria-hidden={true as any}>x</div></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 
@@ -996,14 +996,14 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `async function fn() { return <img alt={await x} />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 30},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 30},
 			},
 		},
 		{
 			Code: `function* gen() { return <img alt={yield x} />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 26},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 26},
 			},
 		},
 
@@ -1012,28 +1012,28 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={x++} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={++x} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={x--} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={--x} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -1042,14 +1042,14 @@ func TestAltTextExtras(t *testing.T) {
 			Code: `<img alt={typeof x} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={void 0} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 
@@ -1064,7 +1064,7 @@ func TestAltTextExtras(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		// Polymorphic with literal "img" — replaces, then check fires (no alt).
@@ -1078,7 +1078,7 @@ func TestAltTextExtras(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 	})

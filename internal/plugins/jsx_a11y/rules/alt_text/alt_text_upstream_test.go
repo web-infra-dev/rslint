@@ -148,105 +148,105 @@ func TestAltTextUpstream(t *testing.T) {
 			Code: `<img />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={undefined} />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img src="xyz" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img role />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img {...this.props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("img"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={false || false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt={undefined} role="presentation" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img alt role="presentation" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for img. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img role="presentation" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferAlt", Message: msgPreferAlt, Line: 1, Column: 1},
+				{MessageId: "preferAlt", Message: `Prefer alt="" over a presentational role. First rule of aria is to not use aria if it can be achieved via native HTML.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img role="none" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferAlt", Message: msgPreferAlt, Line: 1, Column: 1},
+				{MessageId: "preferAlt", Message: `Prefer alt="" over a presentational role. First rule of aria is to not use aria if it can be achieved via native HTML.`, Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img aria-label={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ariaLabelValue", Message: msgAriaLabelEmpty, Line: 1, Column: 1},
+				{MessageId: "ariaLabelValue", Message: "The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img aria-labelledby={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ariaLabelledByValue", Message: msgAriaLabelledByEmpty, Line: 1, Column: 1},
+				{MessageId: "ariaLabelledByValue", Message: "The aria-labelledby attribute must have a value. The alt attribute is preferred over aria-labelledby for images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img aria-label="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ariaLabelValue", Message: msgAriaLabelEmpty, Line: 1, Column: 1},
+				{MessageId: "ariaLabelValue", Message: "The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<img aria-labelledby="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ariaLabelledByValue", Message: msgAriaLabelledByEmpty, Line: 1, Column: 1},
+				{MessageId: "ariaLabelledByValue", Message: "The aria-labelledby attribute must have a value. The alt attribute is preferred over aria-labelledby for images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -254,7 +254,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ariaLabelValue", Message: msgAriaLabelEmpty, Line: 1, Column: 1},
+				{MessageId: "ariaLabelValue", Message: "The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.", Line: 1, Column: 1},
 			},
 		},
 
@@ -263,49 +263,49 @@ func TestAltTextUpstream(t *testing.T) {
 			Code: `<object />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object><div aria-hidden /></object>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object title={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object aria-label="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object aria-labelledby="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object aria-label={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<object aria-labelledby={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 
@@ -314,63 +314,63 @@ func TestAltTextUpstream(t *testing.T) {
 			Code: `<area />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area alt />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area alt={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area src="xyz" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area {...this.props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area aria-label="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area aria-label={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area aria-labelledby="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<area aria-labelledby={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -379,63 +379,63 @@ func TestAltTextUpstream(t *testing.T) {
 			Code: `<input type="image" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" alt />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" alt={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image">Foo</input>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" {...this.props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" aria-label="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" aria-label={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" aria-labelledby="" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<input type="image" aria-labelledby={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 
@@ -445,7 +445,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Thumbnail"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -453,7 +453,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("Thumbnail"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for Thumbnail. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
@@ -461,7 +461,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("Thumbnail"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for Thumbnail. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
@@ -469,7 +469,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Thumbnail"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -477,7 +477,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Thumbnail"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -485,7 +485,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Image"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -493,7 +493,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("Image"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for Image. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
@@ -501,7 +501,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("Image"), Line: 1, Column: 1},
+				{MessageId: "altValue", Message: `Invalid alt value for Image. Use alt="" for presentational images.`, Line: 1, Column: 1},
 			},
 		},
 		{
@@ -509,7 +509,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Image"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -517,7 +517,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingProp", Message: missingPropMessage("Image"), Line: 1, Column: 1},
+				{MessageId: "missingProp", Message: "Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -525,7 +525,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -533,7 +533,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -541,7 +541,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "object", Message: msgObject, Line: 1, Column: 1},
+				{MessageId: "object", Message: "Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -549,7 +549,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -557,7 +557,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -565,7 +565,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -573,7 +573,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -581,7 +581,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "area", Message: msgArea, Line: 1, Column: 1},
+				{MessageId: "area", Message: "Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -589,7 +589,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -597,7 +597,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -605,7 +605,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -613,7 +613,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -621,7 +621,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: arrayOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -629,7 +629,7 @@ func TestAltTextUpstream(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "inputImage", Message: msgInputImage, Line: 1, Column: 1},
+				{MessageId: "inputImage", Message: "<input> elements with type=\"image\" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.", Line: 1, Column: 1},
 			},
 		},
 	})

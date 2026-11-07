@@ -225,7 +225,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "img", "img", true),
+					Message:   "The attribute aria-checked is not supported by the role img. This role is implicit on the element img.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -241,7 +241,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Settings: polymorphicSettings,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -256,7 +256,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -275,7 +275,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      2, Column: 5,
 				}},
 			},
@@ -291,12 +291,12 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "role-supports-aria-props",
-						Message:   errorMessage("aria-checked", "link", "a", true),
+						Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 						Line:      1, Column: 1,
 					},
 					{
 						MessageId: "role-supports-aria-props",
-						Message:   errorMessage("aria-pressed", "link", "a", true),
+						Message:   "The attribute aria-pressed is not supported by the role link. This role is implicit on the element a.",
 						Line:      1, Column: 1,
 					},
 				},
@@ -314,7 +314,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "div", false),
+					Message:   "The attribute aria-checked is not supported by the role link.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -330,7 +330,7 @@ func TestRoleSupportsAriaPropsExtras(t *testing.T) {
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "Foo", false),
+					Message:   "The attribute aria-checked is not supported by the role link.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -720,7 +720,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -737,7 +737,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -747,7 +747,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -757,7 +757,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -767,7 +767,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -778,7 +778,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -789,7 +789,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -806,7 +806,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "div", false),
+					Message:   "The attribute aria-checked is not supported by the role link.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -819,12 +819,12 @@ const Heading = React.memo(({ level, children }) => (
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "role-supports-aria-props",
-						Message:   errorMessage("aria-checked", "button", "div", false),
+						Message:   "The attribute aria-checked is not supported by the role button.",
 						Line:      1, Column: 1,
 					},
 					{
 						MessageId: "role-supports-aria-props",
-						Message:   errorMessage("aria-selected", "button", "div", false),
+						Message:   "The attribute aria-selected is not supported by the role button.",
 						Line:      1, Column: 1,
 					},
 				},
@@ -842,7 +842,7 @@ const Heading = React.memo(({ level, children }) => (
 				Settings: componentsSettingsLink,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "img", "img", true),
+					Message:   "The attribute aria-checked is not supported by the role img. This role is implicit on the element img.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -854,7 +854,7 @@ const Heading = React.memo(({ level, children }) => (
 				Settings: componentsAndPolymorphic,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -866,7 +866,7 @@ const Heading = React.memo(({ level, children }) => (
 				Settings: componentsAndPolymorphic,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -887,7 +887,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      3, Column: 3,
 				}},
 			},
@@ -906,7 +906,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "presentation", "div", false),
+					Message:   "The attribute aria-checked is not supported by the role presentation.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -920,7 +920,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-busy", "none", "div", false),
+					Message:   "The attribute aria-busy is not supported by the role none.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -936,7 +936,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "listbox", "select", true),
+					Message:   "The attribute aria-checked is not supported by the role listbox. This role is implicit on the element select.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -946,7 +946,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "listbox", "select", true),
+					Message:   "The attribute aria-checked is not supported by the role listbox. This role is implicit on the element select.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -956,7 +956,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "img", "img", true),
+					Message:   "The attribute aria-checked is not supported by the role img. This role is implicit on the element img.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -967,7 +967,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "button", "button", true),
+					Message:   "The attribute aria-checked is not supported by the role button. This role is implicit on the element button.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -978,7 +978,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "listbox", "datalist", true),
+					Message:   "The attribute aria-checked is not supported by the role listbox. This role is implicit on the element datalist.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -988,7 +988,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "group", "details", true),
+					Message:   "The attribute aria-checked is not supported by the role group. This role is implicit on the element details.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -1005,7 +1005,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -1024,7 +1024,7 @@ const Heading = React.memo(({ level, children }) => (
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage("aria-checked", "link", "a", true),
+					Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 					Line:      2, Column: 1,
 				}},
 			},

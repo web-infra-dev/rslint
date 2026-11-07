@@ -270,7 +270,7 @@ func TestLabelHasAssociatedControl_LockInExtras(t *testing.T) {
 			{Code: `<label htmlFor="x" />`, Tsx: true, Options: []interface{}{map[string]interface{}{"assert": "either"}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "accessibleLabel",
-					Message:   msgAccessibleLabel,
+					Message:   "A form label must have accessible text.",
 					Line:      1,
 					Column:    1,
 					EndLine:   1,
@@ -282,7 +282,7 @@ func TestLabelHasAssociatedControl_LockInExtras(t *testing.T) {
 				Tsx: true, Options: []interface{}{map[string]interface{}{"assert": "either"}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "accessibleLabel",
-					Message:   msgAccessibleLabel,
+					Message:   "A form label must have accessible text.",
 					Line:      2,
 					Column:    1,
 					EndLine:   4,

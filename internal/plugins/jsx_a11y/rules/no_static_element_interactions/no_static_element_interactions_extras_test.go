@@ -22,7 +22,7 @@ func TestNoStaticElementInteractionsPositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noStaticElementInteractions",
-				Message:   errorMessage,
+				Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 27,
 			}},
 		},
@@ -32,7 +32,7 @@ func TestNoStaticElementInteractionsPositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noStaticElementInteractions",
-				Message:   errorMessage,
+				Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 25,
 			}},
 		},
@@ -42,7 +42,7 @@ func TestNoStaticElementInteractionsPositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noStaticElementInteractions",
-				Message:   errorMessage,
+				Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 				Line:      1, Column: 1, EndLine: 3, EndColumn: 3,
 			}},
 		},
@@ -52,7 +52,7 @@ func TestNoStaticElementInteractionsPositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noStaticElementInteractions",
-				Message:   errorMessage,
+				Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 				Line:      1, Column: 1, EndLine: 3, EndColumn: 2,
 			}},
 		},
@@ -72,9 +72,9 @@ func TestNoStaticElementInteractionsListenerBoundary(t *testing.T) {
 			Code: "<div onClick={() => {}}>\n  <span onClick={() => {}}>\n    <a onClick={() => {}} />\n  </span>\n</div>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1},
-				{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 2, Column: 3},
-				{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 3, Column: 5},
+				{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1},
+				{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 2, Column: 3},
+				{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 3, Column: 5},
 			},
 		},
 	})
@@ -125,7 +125,7 @@ func TestNoStaticElementInteractionsHandlersOption(t *testing.T) {
 				Options: customHandlersBareObject,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noStaticElementInteractions",
-					Message:   errorMessage,
+					Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -135,7 +135,7 @@ func TestNoStaticElementInteractionsHandlersOption(t *testing.T) {
 				Options: customHandlersArrayWrapped,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noStaticElementInteractions",
-					Message:   errorMessage,
+					Message:   "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.",
 					Line:      1, Column: 1,
 				}},
 			},
@@ -193,7 +193,7 @@ func TestNoStaticElementInteractionsAllowExpressionValuesMatrix(t *testing.T) {
 				Code:    `<div role={ROLE} onClick={() => {}} />`,
 				Tsx:     true,
 				Options: allowFalse,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `<div role={undefined}>` — upstream's IsNonLiteralProperty
 			// short-circuits on `Identifier 'undefined'` to FALSE (literal-equivalent).
@@ -203,7 +203,7 @@ func TestNoStaticElementInteractionsAllowExpressionValuesMatrix(t *testing.T) {
 				Code:    `<div role={undefined} onClick={() => {}} />`,
 				Tsx:     true,
 				Options: allowTrue,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `role="..."` (direct StringLiteral attribute) — IsNonLiteralProperty
 			// short-circuits to FALSE (literal). The string is "button"
@@ -213,7 +213,7 @@ func TestNoStaticElementInteractionsAllowExpressionValuesMatrix(t *testing.T) {
 				Code:    `<div role="notarole" onClick={() => {}} />`,
 				Tsx:     true,
 				Options: allowTrue,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -279,35 +279,35 @@ func TestNoStaticElementInteractionsEdgeShapes(t *testing.T) {
 			{
 				Code:   `<div onClick />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// onFocus is in the default focus+keyboard+mouse list (only
 			// reported under :strict / no-options).
 			{
 				Code:   `<div onFocus={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `<header>` always reports — IsNonInteractiveElement returns
 			// false (upstream's banner-landmark-context guard).
 			{
 				Code:   `<header onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Space-separated roles where the first valid role is unknown
 			// — falls through every classification → REPORT.
 			{
 				Code:   `<div role="notarole" onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Multiple handlers on the same element — ONE diagnostic per
 			// element (rule reports on the element node, not per-handler).
 			{
 				Code:   `<div onClick={() => {}} onKeyDown={() => {}} onMouseUp={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -340,21 +340,21 @@ func TestNoStaticElementInteractionsOptionParsing(t *testing.T) {
 				Code:    `<div onClick={() => {}} />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"allowExpressionValues": false},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Array-wrapped form (multi-element rule_tester shape).
 			{
 				Code:    `<div onClick={() => {}} />`,
 				Tsx:     true,
 				Options: []interface{}{map[string]interface{}{"allowExpressionValues": false}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `handlers: ["onCustomClick"]` matches and reports.
 			{
 				Code:    `<div onCustomClick={() => {}} />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"handlers": []interface{}{"onCustomClick"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -396,20 +396,20 @@ func TestNoStaticElementInteractionsTSWrappers(t *testing.T) {
 			{
 				Code:   `<div role={"button" as any} onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `role` through non-null assertion → same as `as` cast.
 			{
 				Code:   `<div role={"button"!} onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Parenthesized handler on static element — resolves through
 			// the paren → onClick != null → REPORT.
 			{
 				Code:   `<div onClick={((() => {}))} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -466,7 +466,7 @@ func TestNoStaticElementInteractionsUpstreamBranchLockIns(t *testing.T) {
 			{
 				Code:   `<div role="" onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 
 			// Locks in upstream's IsInteractiveRole "first valid role" walk
@@ -476,7 +476,7 @@ func TestNoStaticElementInteractionsUpstreamBranchLockIns(t *testing.T) {
 			{
 				Code:   `<div role="invalid notarole" onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 
 			// Locks the listener distinguishing self-closing from paired form
@@ -485,7 +485,7 @@ func TestNoStaticElementInteractionsUpstreamBranchLockIns(t *testing.T) {
 			{
 				Code:   `<div onClick={() => {}}></div>`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1, EndLine: 1, EndColumn: 25}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}},
 			},
 		},
 	)
@@ -547,69 +547,69 @@ func TestNoStaticElementInteractionsRealHandlerShapes(t *testing.T) {
 			{
 				Code:   `<div onClick={this.handleClick} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Deep member access (handlers.section.onClick).
 			{
 				Code:   `<div onClick={handlers.section.onClick} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Computed member access (`handlers[name]`).
 			{
 				Code:   `<div onClick={handlers[name]} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Call expression (the useCallback / useMemo / withErrorBoundary
 			// pattern). staticEval returns jvString "(call)" → REPORT.
 			{
 				Code:   `<div onClick={getHandler()} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			{
 				Code:   `<div onClick={useCallback(() => {}, [])} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Bound method — CallExpression of `.bind(this)`.
 			{
 				Code:   `<div onClick={this.handler.bind(this)} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Optional chain on member — tsgo flags the optional, kind is
 			// still PropertyAccessExpression → jvString → REPORT.
 			{
 				Code:   `<div onClick={handlers?.onClick} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Async arrow function — ArrowFunction kind → jvFn → REPORT.
 			{
 				Code:   `<div onClick={async () => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Function expression.
 			{
 				Code:   `<div onClick={function() {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Named function expression.
 			{
 				Code:   `<div onClick={function named() {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Identifier alone (most common real-world shape — destructured
 			// handler bound at the top of the component).
 			{
 				Code:   `<div onClick={memoizedHandler} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Conditional with non-null arms — both arms are truthy via
 			// Identifier resolution; ConditionalExpression eagerly evaluates
@@ -617,7 +617,7 @@ func TestNoStaticElementInteractionsRealHandlerShapes(t *testing.T) {
 			{
 				Code:   `<div onClick={cond ? handler1 : handler2} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Logical `&&` with non-null left — staticEvalBinary's `&&`
 			// returns the right when left truthy; Identifier left → truthy
@@ -625,33 +625,33 @@ func TestNoStaticElementInteractionsRealHandlerShapes(t *testing.T) {
 			{
 				Code:   `<div onClick={cond && handler} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Logical `||` — returns left if truthy; Identifier left truthy
 			// → returns left → jvString → REPORT.
 			{
 				Code:   `<div onClick={handler || defaultHandler} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Nullish coalesce — left is non-null Identifier (jvString) →
 			// staticEvalBinary returns left → REPORT.
 			{
 				Code:   `<div onClick={handler ?? defaultHandler} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// New expression — staticEval returns jsTruthy → not nullish.
 			{
 				Code:   `<div onClick={new Handler()} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Inline arrow with side-effect body.
 			{
 				Code:   `<div onClick={(e) => { e.stopPropagation(); handler(e); }} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -708,28 +708,28 @@ func TestNoStaticElementInteractionsPolymorphicSettings(t *testing.T) {
 				Code:     `<Foo as="div" onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: asPolymorphic,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `<Foo as="span">` — span is static → REPORT.
 			{
 				Code:     `<Foo as="span" onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: asPolymorphic,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// AllowList: Box is in the list, resolves to "div" → REPORT.
 			{
 				Code:     `<Box as="div" onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: asPolymorphicAllowList,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Custom polymorphic prop name `is`.
 			{
 				Code:     `<Foo is="span" onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: isPolymorphic,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -778,14 +778,14 @@ func TestNoStaticElementInteractionsComponentsRemapping(t *testing.T) {
 				Code:     `<Box onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: componentsMap,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// TextLink → a (no href, no role) → REPORT.
 			{
 				Code:     `<TextLink onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: componentsMap,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Stack → section (without aria-label, falls through non-interactive
 			// schema) → REPORT.
@@ -793,7 +793,7 @@ func TestNoStaticElementInteractionsComponentsRemapping(t *testing.T) {
 				Code:     `<Stack onClick={() => {}} />`,
 				Tsx:      true,
 				Settings: componentsMap,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -846,19 +846,19 @@ func TestNoStaticElementInteractionsRoleSemantics(t *testing.T) {
 			{
 				Code:   `<div role="" onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// All invalid role names.
 			{
 				Code:   `<div role="bogus another-bogus" onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Whitespace-only role.
 			{
 				Code:   `<div role="   " onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -886,32 +886,32 @@ func TestNoStaticElementInteractionsAriaHiddenVariants(t *testing.T) {
 			{
 				Code:   `<div onClick={() => {}} aria-hidden={false} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `aria-hidden="false"` — string coerces to bool false → NOT hidden → REPORT.
 			{
 				Code:   `<div onClick={() => {}} aria-hidden="false" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `aria-hidden={1}` — number 1 is NOT strict `=== true` → NOT hidden → REPORT.
 			{
 				Code:   `<div onClick={() => {}} aria-hidden={1} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `aria-hidden={someVar}` — Identifier resolves to jvString (not bool)
 			// → NOT hidden → REPORT.
 			{
 				Code:   `<div onClick={() => {}} aria-hidden={isHidden} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `aria-hidden={null}` — null is NOT strict true → NOT hidden → REPORT.
 			{
 				Code:   `<div onClick={() => {}} aria-hidden={null} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -994,33 +994,33 @@ func TestNoStaticElementInteractionsMultiHandlerCombinations(t *testing.T) {
 			{
 				Code:   `<div onClick={() => {}} onMouseDown={null} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Later handler non-null also wins (handler iteration order).
 			{
 				Code:   `<div onClick={null} onMouseDown={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// All handlers non-null — only one report on the element.
 			{
 				Code:   `<div onClick={() => {}} onKeyDown={() => {}} onMouseDown={() => {}} onKeyUp={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Mixed null/non-null where the FIRST listed in attrs is null,
 			// later one is non-null.
 			{
 				Code:   `<div onKeyDown={null} onClick={null} onMouseUp={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Non-handler-list prop is non-null but a handler-list prop is also
 			// non-null → REPORT.
 			{
 				Code:   `<div onChange={() => {}} onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)
@@ -1052,15 +1052,15 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 			{
 				Code:   `<><div onClick={() => {}} /></>`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 3}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 3}},
 			},
 			// Fragment with two reportable children — two reports.
 			{
 				Code: `<><div onClick={() => {}} /><span onClick={() => {}} /></>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 3},
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 29},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 3},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 29},
 				},
 			},
 			// Ternary-rendered JSX where only the static branch qualifies.
@@ -1070,7 +1070,7 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 				Code: `<>{cond ? <button onClick={() => {}} /> : <div onClick={() => {}} />}</>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 43},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 43},
 				},
 			},
 			// Attribute-level comment between handler attrs — comments are
@@ -1078,15 +1078,15 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 			{
 				Code:   "<div /* a */ onClick={() => {}} /* b */ />",
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// Sibling reportable elements at different lines.
 			{
 				Code: "<div>\n  <div onClick={() => {}} />\n  <span onClick={() => {}} />\n</div>",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 2, Column: 3},
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 3, Column: 3},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 2, Column: 3},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 3, Column: 3},
 				},
 			},
 			// Conditional rendering: `{cond && <span onClick={...} />}` inside
@@ -1095,7 +1095,7 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 				Code: `<div>{cond && <span onClick={() => {}} />}</div>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 15},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 15},
 				},
 			},
 			// Logical OR rendering pattern.
@@ -1103,7 +1103,7 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 				Code: `<div>{primary || <span onClick={() => {}} />}</div>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 18},
+					{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 18},
 				},
 			},
 		},
@@ -1144,13 +1144,13 @@ func TestNoStaticElementInteractionsAnchorSchemaVariants(t *testing.T) {
 			{
 				Code:   `<a onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 			// `<area>` with no href — same.
 			{
 				Code:   `<area onClick={() => {}} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: errorMessage, Line: 1, Column: 1}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noStaticElementInteractions", Message: "Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.", Line: 1, Column: 1}},
 			},
 		},
 	)

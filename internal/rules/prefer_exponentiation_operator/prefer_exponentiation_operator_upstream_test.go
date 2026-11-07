@@ -322,7 +322,7 @@ func expectedErrors(code string) []rule_tester.InvalidTestCaseError {
 			endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.End())
 			errors = append(errors, rule_tester.InvalidTestCaseError{
 				MessageId: "useExponentiation",
-				Message:   messageUseExponentiation,
+				Message:   "Use the '**' operator instead of 'Math.pow'.",
 				Line:      line + 1,
 				Column:    int(column) + 1,
 				EndLine:   endLine + 1,
@@ -370,7 +370,7 @@ func expectedFirstCallError(code string) []rule_tester.InvalidTestCaseError {
 	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, rng.End())
 	return []rule_tester.InvalidTestCaseError{{
 		MessageId: "useExponentiation",
-		Message:   messageUseExponentiation,
+		Message:   "Use the '**' operator instead of 'Math.pow'.",
 		Line:      line + 1,
 		Column:    int(column) + 1,
 		EndLine:   endLine + 1,

@@ -8,9 +8,7 @@ import (
 )
 
 // defaultMessage is the diagnostic emitted under the rule's default wordlist.
-// Computed once so every upstream-mirrored invalid case stays in lock-step
-// with the message helper.
-var defaultMessage = errorMessage(defaultAmbiguousWords)
+const defaultMessage = `Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.`
 
 // linkComponentSettings mirrors upstream's
 // `settings: { 'jsx-a11y': { components: { Link: 'a' } } }`. The componentMap
@@ -175,7 +173,7 @@ func TestAnchorAmbiguousTextUpstream(t *testing.T) {
 			Tsx:     true,
 			Options: customWordsOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorAmbiguousText", Message: errorMessage([]string{"a disallowed word"}), Line: 1, Column: 1},
+				{MessageId: "anchorAmbiguousText", Message: `Ambiguous text within anchor. Screen reader users rely on link text for context; the words "a disallowed word" are ambiguous and do not provide enough context.`, Line: 1, Column: 1},
 			},
 		},
 	})
