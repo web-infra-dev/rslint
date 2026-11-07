@@ -33,8 +33,8 @@
   "scripts": {
     "build:bin": "node ../../scripts/place-host-build.mjs bin",
     "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
-    "build:js": "rs lib",
-    "dev": "rs lib --watch",
+    "build:js": "pnpm --filter @rslint/api build && rs lib",
+    "dev": "pnpm --filter @rslint/api build && rs lib --watch",
     "build": "pnpm build:bin && pnpm build:js",
     "test": "rs test",
     "test:update": "rs test -u"
