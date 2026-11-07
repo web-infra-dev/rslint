@@ -97,7 +97,7 @@ function translateFlags(flags: number, from: object, to: object): number {
       continue;
     const mapped = (to as Record<string, unknown>)[name];
     if (typeof mapped !== 'number') unsupported(`enum.${name}`);
-    result |= mapped as number;
+    result |= mapped;
   }
   return result;
 }
@@ -109,12 +109,12 @@ function translateFlags(flags: number, from: object, to: object): number {
  */
 export class TypeServiceClient {
   private closed = false;
-  private facts = new Map<string, unknown>();
-  private objects = new Map<string, Bag>();
+  private readonly facts = new Map<string, unknown>();
+  private readonly objects = new Map<string, Bag>();
   private rawNodes = new WeakMap<object, RemoteNode>();
   private wrappedNodes = new WeakMap<RemoteNode, object>();
-  private sources = new Map<string, RemoteSourceFile>();
-  private brands = new WeakMap<object, { kind: string; id: number }>();
+  private readonly sources = new Map<string, RemoteSourceFile>();
+  private readonly brands = new WeakMap<object, { kind: string; id: number }>();
   readonly stats = { queries: 0, localHits: 0, sharedHits: 0 };
   readonly program: Bag;
   readonly checker: Bag;
@@ -227,7 +227,9 @@ export class TypeServiceClient {
             this.query('signatures', { id: this.id(t, 'type'), kind }),
           ),
       },
-      () => this.ensure(),
+      () => {
+        this.ensure();
+      },
       'checker',
     );
     const compilerOptions = { ...descriptor.compilerOptions };
@@ -263,7 +265,9 @@ export class TypeServiceClient {
         isSourceFileDefaultLibrary: (source: object) =>
           this.sourceMetadata(source).defaultLibrary,
       },
-      () => this.ensure(),
+      () => {
+        this.ensure();
+      },
       'program',
     );
   }
@@ -444,12 +448,13 @@ export class TypeServiceClient {
           ].includes(key)
         )
           unsupported(`node.${key}`);
-        const member = Reflect.get(raw, key, raw);
+        const member: unknown = Reflect.get(raw, key, raw);
         if (typeof member === 'function')
           return (...args: unknown[]) => {
             this.ensure();
             return this.wrap(
-              member.apply(
+              Reflect.apply(
+                member,
                 raw,
                 args.map((a) =>
                   typeof a === 'object' && a !== null
@@ -492,7 +497,13 @@ export class TypeServiceClient {
     const key = `${kind}:${id}`,
       old = this.objects.get(key);
     if (old) return old;
-    const object = guarded(create(), () => this.ensure(), kind);
+    const object = guarded(
+      create(),
+      () => {
+        this.ensure();
+      },
+      kind,
+    );
     this.brands.set(object, { kind, id });
     this.objects.set(key, object);
     return object;
@@ -560,7 +571,11 @@ export class TypeServiceClient {
       const record = (): Bag => this.query('symbolRecord', { id }) as Bag;
       const escapedName = (): string => record().escapedName as string;
       const name = (): string => record().name as string;
-      const thisClient = this;
+      const declarations = () =>
+        (record().declarations as unknown[] | undefined)?.map((value) =>
+          this.nodeRef(value),
+        );
+      const valueDeclaration = () => this.nodeRef(record().valueDeclaration);
       return {
         id,
         get name() {
@@ -573,18 +588,13 @@ export class TypeServiceClient {
           return record().flags;
         },
         get declarations() {
-          return (record().declarations as unknown[] | undefined)?.map(
-            (value) => thisClient.nodeRef(value),
-          );
+          return declarations();
         },
         get valueDeclaration() {
-          return thisClient.nodeRef(record().valueDeclaration);
+          return valueDeclaration();
         },
         getName: name,
-        getDeclarations: () =>
-          (record().declarations as unknown[] | undefined)?.map((value) =>
-            this.nodeRef(value),
-          ),
+        getDeclarations: declarations,
         getFlags: () => record().flags,
       };
     });
@@ -592,17 +602,18 @@ export class TypeServiceClient {
   private signature(id: number): Bag | undefined {
     return this.object('signature', id, () => {
       const record = (): Bag => this.query('signatureRecord', { id }) as Bag;
-      const client = this;
+      const parameters = () => this.symbols(record().parameters);
+      const declaration = () => this.nodeRef(record().declaration);
       return {
         id,
         get parameters() {
-          return client.symbols(record().parameters);
+          return parameters();
         },
         get declaration() {
-          return client.nodeRef(record().declaration);
+          return declaration();
         },
-        getParameters: () => this.symbols(record().parameters),
-        getDeclaration: () => this.nodeRef(record().declaration),
+        getParameters: parameters,
+        getDeclaration: declaration,
         getReturnType: () =>
           this.type(this.query('returnType', { id }) as number),
       };
