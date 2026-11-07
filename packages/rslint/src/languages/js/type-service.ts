@@ -1,61 +1,117 @@
-/* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
-import {
-  RemoteSourceFile,
-  RemoteNode,
-  SyntaxKind,
-  NodeFlags,
-  Wtf8Decoder,
-} from '@rslint/api';
 import type ts from 'typescript';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
-import { decodeTypePacket } from './type-service-codec.js';
 import type { SharedTypeCacheReader } from './shared-type-cache.js';
+import { TypePacketReader } from './type-service-codec.js';
+import { FileSyntaxViews } from './type-service-syntax.js';
+import {
+  typeQueryKey,
+  nameToUnits,
+  type FileBinding,
+  type TypeServiceDescriptor,
+  type TypeServiceProjection,
+  type QueryTransport,
+  type SyntaxSource,
+  type QueryResults,
+  type TypeServiceQuery,
+  type TypeFact,
+  type SymbolFact,
+  type SignatureFact,
+  type ServiceRequest,
+  type ScalarRequest,
+} from './type-service-protocol.js';
+export { typeQueryKey } from './type-service-protocol.js';
+export type {
+  TypeServiceDescriptor,
+  TypeServiceProjection,
+  TypeServiceQuery,
+} from './type-service-protocol.js';
 
-type Bag = Record<string, unknown>;
-export interface TypeServiceDescriptor {
-  generation: number;
-  checker: number;
-  currentDirectory: string;
-  compilerOptions: Bag;
-  sources: Array<{
-    fileName: string;
-    path: string;
-    packages?: string[];
-    external: boolean;
-    defaultLibrary: boolean;
-  }>;
+export interface TypeView {
+  readonly id: number;
+  readonly flags: number;
+  readonly symbol: SymbolView | undefined;
+  readonly aliasSymbol: SymbolView | undefined;
+  readonly intrinsicName: string | undefined;
+  readonly value: TypeFact['value'];
+  readonly types: readonly TypeView[] | undefined;
+  getSymbol(): SymbolView | undefined;
+  isUnion(): boolean;
+  isIntersection(): boolean;
+  isUnionOrIntersection(): boolean;
+  isLiteral(): boolean;
+  isStringLiteral(): boolean;
+  isNumberLiteral(): boolean;
+  isTypeParameter(): boolean;
+  getCallSignatures(): readonly SignatureView[];
+  getConstructSignatures(): readonly SignatureView[];
+  getProperties(): readonly SymbolView[];
+  getProperty(name: string): SymbolView | undefined;
+  getNonNullableType(): TypeView | undefined;
+  getConstraint(): TypeView | undefined;
 }
-export interface TypeServiceProjection {
-  sourceFileName: string;
-  tree: Uint8Array;
-  origins: number[];
-  reverse: Record<string, number>;
-  generation: number;
+export interface SymbolView {
+  readonly id: number;
+  readonly name: string;
+  readonly escapedName: string;
+  readonly flags: number;
+  readonly declarations: readonly object[] | undefined;
+  readonly valueDeclaration: object | undefined;
+  getName(): string;
+  getFlags(): number;
+  getDeclarations(): readonly object[] | undefined;
 }
-export interface TypeServiceQuery {
-  generation: number;
-  checker: number;
-  op: string;
-  id?: number;
-  file?: string;
-  index?: number;
-  name?: string;
-  kind?: number;
-  excludeGlobals?: boolean;
+export interface SignatureView {
+  readonly id: number;
+  readonly parameters: readonly SymbolView[];
+  readonly declaration: object | undefined;
+  getParameters(): readonly SymbolView[];
+  getDeclaration(): object | undefined;
+  getReturnType(): TypeView | undefined;
 }
-export function typeQueryKey(q: TypeServiceQuery): string {
-  return JSON.stringify([
-    q.generation,
-    q.checker,
-    q.op,
-    q.id ?? 0,
-    q.file ?? '',
-    q.index ?? 0,
-    q.name ?? '',
-    q.kind ?? 0,
-    q.excludeGlobals ?? false,
-  ]);
+export interface CheckerView {
+  getTypeAtLocation(n: object): TypeView | undefined;
+  getTypeFromTypeNode(n: object): TypeView | undefined;
+  getContextualType(n: object): TypeView | undefined;
+  getVoidType(): TypeView | undefined;
+  getBaseConstraintOfType(t: object): TypeView | undefined;
+  getApparentType(t: object): TypeView | undefined;
+  getBaseTypeOfLiteralType(t: object): TypeView | undefined;
+  getNonNullableType(t: object): TypeView | undefined;
+  typeToString(t: object, enclosing?: object, flags?: number): string;
+  getSymbolAtLocation(n: object): SymbolView | undefined;
+  resolveName(
+    name: string,
+    location: object | undefined,
+    meaning: number,
+    excludeGlobals: boolean,
+  ): SymbolView | undefined;
+  getAliasedSymbol(s: object): SymbolView | undefined;
+  getTypeOfSymbolAtLocation(s: object, n: object): TypeView | undefined;
+  getDeclaredTypeOfSymbol(s: object): TypeView | undefined;
+  getPropertiesOfType(t: object): readonly SymbolView[];
+  getPropertyOfType(t: object, name: string): SymbolView | undefined;
+  getTypeArguments(t: object): readonly TypeView[];
+  isArrayType(t: object): boolean;
+  isTupleType(t: object): boolean;
+  getSignatureFromDeclaration(n: object): SignatureView | undefined;
+  getResolvedSignature(
+    n: object,
+    candidates?: unknown,
+    argumentCount?: unknown,
+  ): SignatureView | undefined;
+  getReturnTypeOfSignature(s: object): TypeView | undefined;
+  getSignaturesOfType(t: object, kind: number): readonly SignatureView[];
+}
+export interface ProgramView {
+  getTypeChecker(): CheckerView;
+  getCompilerOptions(): Readonly<Record<string, unknown>>;
+  getCurrentDirectory(): string;
+  getSourceFile(name: string): object | undefined;
+  getSourceFiles(): readonly object[];
+  sourceFileToPackageName: { get(path: string): string | undefined };
+  isSourceFileFromExternalLibrary(source: object): boolean;
+  isSourceFileDefaultLibrary(source: object): boolean;
 }
 function unsupported(surface: string): never {
   throw new Error(`unsupported TypeScript operation: ${surface}`);
@@ -75,7 +131,7 @@ function guarded<T extends object>(
         key !== 'toJSON'
       )
         unsupported(`${surface}.${key}`);
-      const value = Reflect.get(target, key, receiver);
+      const value: unknown = Reflect.get(target, key, receiver);
       return typeof value === 'function'
         ? (...args: unknown[]) => {
             ensure();
@@ -85,146 +141,193 @@ function guarded<T extends object>(
     },
   });
 }
-function translateFlags(flags: number, from: object, to: object): number {
-  let result = 0;
-  for (const [name, value] of Object.entries(from)) {
-    if (
-      typeof value !== 'number' ||
-      value <= 0 ||
-      (value & (value - 1)) !== 0 ||
-      !(flags & value)
-    )
-      continue;
-    const mapped = (to as Record<string, unknown>)[name];
-    if (typeof mapped !== 'number') unsupported(`enum.${name}`);
-    result |= mapped;
-  }
-  return result;
+// The wrapper caches decoded values only. This closure never captures a packet
+// reader, shared byte view, request lease, or syntax transport reply.
+function memo<T>(ensure: () => void, read: () => T): () => T {
+  let cached: { value: T } | undefined;
+  return () => {
+    ensure();
+    return (cached ??= { value: read() }).value;
+  };
 }
+type ObjectKind = 'type' | 'symbol' | 'signature';
+type TypeScriptEnums = Pick<
+  typeof ts,
+  'SyntaxKind' | 'TypeFlags' | 'NodeFlags' | 'JsxEmit' | 'ModuleDetectionKind'
+>;
 
-/** One client owns stable wrapper identity and bounded local facts. The host
- * injects a synchronous transport and owns Session/cache lifetime. Closing a
- * client invalidates retained wrappers; closing shared storage invalidates all
- * attached clients. No transport, native binding or scheduler is imported here.
- */
-export class TypeServiceClient {
+/** Exactly one eligible file-lint invocation owns this client. Close it in
+ * finally after the rule run. Stable wrappers/requested arrays live until close;
+ * maxFactsBytes bounds disposable packet readers, not plugin-retained objects or
+ * independently owned syntax views. The Go Session may outlive many clients. */
+export class FileTypeServiceClient {
   private closed = false;
-  private readonly facts = new Map<string, unknown>();
-  private readonly objects = new Map<string, Bag>();
-  private rawNodes = new WeakMap<object, RemoteNode>();
-  private wrappedNodes = new WeakMap<RemoteNode, object>();
-  private readonly sources = new Map<string, RemoteSourceFile>();
-  private readonly brands = new WeakMap<object, { kind: string; id: number }>();
-  readonly stats = { queries: 0, localHits: 0, sharedHits: 0 };
-  readonly program: Bag;
-  readonly checker: Bag;
+  private readonly facts = new Map<string, TypePacketReader>();
+  private readonly types = new Map<number, TypeView>();
+  private readonly symbols = new Map<number, SymbolView>();
+  private readonly signatures = new Map<number, SignatureView>();
+  private readonly brands = new WeakMap<
+    object,
+    { kind: ObjectKind; id: number }
+  >();
+  private shared: SharedTypeCacheReader | undefined;
+  private readonly maxFactsBytes: number;
+  private readonly syntax: FileSyntaxViews;
+  readonly stats = { queries: 0, localHits: 0, sharedHits: 0, factBytes: 0 };
+  readonly program: ProgramView;
+  readonly checker: CheckerView;
   constructor(
-    private readonly typescript: Pick<
-      typeof ts,
-      | 'SyntaxKind'
-      | 'TypeFlags'
-      | 'NodeFlags'
-      | 'JsxEmit'
-      | 'ModuleDetectionKind'
-    >,
+    private readonly typescript: TypeScriptEnums,
     readonly descriptor: TypeServiceDescriptor,
-    private transport:
-      ((query: TypeServiceQuery, key: string) => Uint8Array) | undefined,
-    private readonly options: {
-      shared?: SharedTypeCacheReader;
-      maxFacts: number;
-    },
+    readonly binding: FileBinding,
+    private transport: QueryTransport | undefined,
+    syntax: SyntaxSource,
+    options: { maxFactsBytes: number; shared?: SharedTypeCacheReader },
   ) {
-    this.options = { ...options };
-    if (!Number.isSafeInteger(options.maxFacts) || options.maxFacts < 0)
-      throw new Error('invalid type service client budget');
     if (
-      options.shared &&
-      options.shared.descriptor.generation !== descriptor.generation
+      binding.generation !== descriptor.generation ||
+      binding.checker !== descriptor.checker
     )
+      throw new Error('foreign file binding');
+    if (
+      !Number.isSafeInteger(options.maxFactsBytes) ||
+      options.maxFactsBytes < 0
+    )
+      throw new Error('invalid type service client budget');
+    this.maxFactsBytes = options.maxFactsBytes;
+    this.shared = options.shared;
+    if (this.shared && this.shared.descriptor.generation !== binding.generation)
       throw new Error('foreign shared type cache');
-    const nodeType = (op: string, node: object): unknown =>
-      this.type(this.query(op, this.location(node)) as number);
-    const typeType = (op: string, type: object): unknown =>
-      this.type(this.query(op, { id: this.id(type, 'type') }) as number);
-    this.checker = guarded(
+    this.syntax = new FileSyntaxViews(
+      typescript,
+      descriptor,
+      binding,
+      syntax,
+      () => {
+        this.ensure();
+      },
+    );
+    const nodeType = (op: 'type' | 'fromTypeNode' | 'context', n: object) =>
+      this.type(
+        this.query({ op: op, args: { node: this.syntax.location(n) } }),
+      );
+    const typeType = (
+      op: 'constraint' | 'apparent' | 'baseLiteral' | 'nonNullable',
+      t: object,
+    ) => this.type(this.query({ op: op, args: { id: this.id(t, 'type') } }));
+    this.checker = guarded<CheckerView>(
       {
-        getTypeAtLocation: (n: object) => nodeType('type', n),
-        getTypeFromTypeNode: (n: object) => nodeType('fromTypeNode', n),
-        getContextualType: (n: object) => nodeType('context', n),
-        getVoidType: () => this.type(this.query('void') as number),
-        getBaseConstraintOfType: (t: object) => typeType('constraint', t),
-        getApparentType: (t: object) => typeType('apparent', t),
-        getBaseTypeOfLiteralType: (t: object) => typeType('baseLiteral', t),
-        getNonNullableType: (t: object) => typeType('nonNullable', t),
-        typeToString: (t: object, enclosing?: object, flags?: number) => {
+        getTypeAtLocation: (n) => nodeType('type', n),
+        getTypeFromTypeNode: (n) => nodeType('fromTypeNode', n),
+        getContextualType: (n) => nodeType('context', n),
+        getVoidType: () => this.type(this.query({ op: 'void', args: {} })),
+        getBaseConstraintOfType: (t) => typeType('constraint', t),
+        getApparentType: (t) => typeType('apparent', t),
+        getBaseTypeOfLiteralType: (t) => typeType('baseLiteral', t),
+        getNonNullableType: (t) => typeType('nonNullable', t),
+        typeToString: (t, enclosing, flags) => {
           if (enclosing !== undefined || flags !== undefined)
             unsupported('checker.typeToString formatting arguments');
-          return this.query('typeString', { id: this.id(t, 'type') });
+          return this.query({
+            op: 'typeString',
+            args: { id: this.id(t, 'type') },
+          });
         },
-        getSymbolAtLocation: (n: object) =>
-          this.symbol(this.query('symbol', this.location(n)) as number),
-        resolveName: (
-          name: string,
-          location: object | undefined,
-          meaning: number,
-          excludeGlobals: boolean,
-        ) =>
+        getSymbolAtLocation: (n) =>
           this.symbol(
-            this.query('resolveName', {
-              name,
-              ...(location ? this.location(location) : {}),
-              kind: meaning,
-              excludeGlobals,
-            }) as number,
+            this.query({
+              op: 'symbol',
+              args: { node: this.syntax.location(n) },
+            }),
           ),
-        getAliasedSymbol: (s: object) =>
+        resolveName: (name, location, kind, excludeGlobals) =>
           this.symbol(
-            this.query('aliasedSymbol', { id: this.id(s, 'symbol') }) as number,
+            this.query({
+              op: 'resolveName',
+              args: {
+                name: nameToUnits(name),
+                node: location ? this.syntax.location(location) : undefined,
+                kind,
+                excludeGlobals,
+              },
+            }),
           ),
-        getTypeOfSymbolAtLocation: (s: object, n: object) =>
+        getAliasedSymbol: (s) =>
+          this.symbol(
+            this.query({
+              op: 'aliasedSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        getTypeOfSymbolAtLocation: (s, n) =>
           this.type(
-            this.query('symbolType', {
-              id: this.id(s, 'symbol'),
-              ...this.location(n),
-            }) as number,
+            this.query({
+              op: 'symbolType',
+              args: {
+                id: this.id(s, 'symbol'),
+                node: this.syntax.location(n),
+              },
+            }),
           ),
-        getDeclaredTypeOfSymbol: (s: object) =>
+        getDeclaredTypeOfSymbol: (s) =>
           this.type(
-            this.query('declaredType', { id: this.id(s, 'symbol') }) as number,
+            this.query({
+              op: 'declaredType',
+              args: { id: this.id(s, 'symbol') },
+            }),
           ),
-        getPropertiesOfType: (t: object) =>
-          this.symbols(this.query('properties', { id: this.id(t, 'type') })),
-        getPropertyOfType: (t: object, name: string) =>
+        getPropertiesOfType: (t) =>
+          this.symbolsFor(
+            this.query({ op: 'properties', args: { id: this.id(t, 'type') } }),
+          ),
+        getPropertyOfType: (t, name) =>
           this.symbol(
-            this.query('property', { id: this.id(t, 'type'), name }) as number,
+            this.query({
+              op: 'property',
+              args: { id: this.id(t, 'type'), name: nameToUnits(name) },
+            }),
           ),
-        getTypeArguments: (t: object) =>
-          this.types(this.query('typeArguments', { id: this.id(t, 'type') })),
-        isArrayType: (t: object) =>
-          this.query('isArray', { id: this.id(t, 'type') }),
-        isTupleType: (t: object) =>
-          this.query('isTuple', { id: this.id(t, 'type') }),
-        getSignatureFromDeclaration: (n: object) =>
-          this.signature(this.query('signature', this.location(n)) as number),
-        getResolvedSignature: (
-          n: object,
-          candidates?: unknown,
-          argumentCount?: unknown,
-        ) => {
+        getTypeArguments: (t) =>
+          this.typesFor(
+            this.query({
+              op: 'typeArguments',
+              args: { id: this.id(t, 'type') },
+            }),
+          ),
+        isArrayType: (t) =>
+          this.query({ op: 'isArray', args: { id: this.id(t, 'type') } }),
+        isTupleType: (t) =>
+          this.query({ op: 'isTuple', args: { id: this.id(t, 'type') } }),
+        getSignatureFromDeclaration: (n) =>
+          this.signature(
+            this.query({
+              op: 'signature',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getResolvedSignature: (n, candidates, argumentCount) => {
           if (candidates !== undefined || argumentCount !== undefined)
             unsupported('checker.getResolvedSignature optional arguments');
           return this.signature(
-            this.query('resolvedSignature', this.location(n)) as number,
+            this.query({
+              op: 'resolvedSignature',
+              args: { node: this.syntax.location(n) },
+            }),
           );
         },
-        getReturnTypeOfSignature: (s: object) =>
+        getReturnTypeOfSignature: (s) =>
           this.type(
-            this.query('returnType', { id: this.id(s, 'signature') }) as number,
+            this.query({
+              op: 'returnType',
+              args: { id: this.id(s, 'signature') },
+            }),
           ),
-        getSignaturesOfType: (t: object, kind: number) =>
-          this.signatures(
-            this.query('signatures', { id: this.id(t, 'type'), kind }),
+        getSignaturesOfType: (t, kind) =>
+          this.signaturesFor(
+            this.query({
+              op: 'signatures',
+              args: { id: this.id(t, 'type'), kind },
+            }),
           ),
       },
       () => {
@@ -239,31 +342,35 @@ export class TypeServiceClient {
     ] as const) {
       const value = compilerOptions[key];
       if (typeof value === 'string') {
-        const translated = group[value as keyof typeof group];
+        const translated: unknown = Reflect.get(group, value);
         if (typeof translated !== 'number')
           unsupported(`compilerOptions.${key}.${value}`);
         compilerOptions[key] = translated;
       }
     }
-    this.program = guarded(
+    this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
         getCompilerOptions: () => ({ ...compilerOptions }),
         getCurrentDirectory: () => descriptor.currentDirectory,
-        getSourceFile: (name: string) => this.wrap(this.source(name)),
+        getSourceFile: (name) => this.syntax.sourceView(name),
         getSourceFiles: () =>
-          descriptor.sources.map((s) => this.wrap(this.source(s.fileName))),
+          descriptor.sources.map((s) => {
+            const source = this.syntax.sourceView(s.fileName);
+            if (!source) throw new Error('Program source unavailable');
+            return source;
+          }),
         sourceFileToPackageName: {
-          get: (path: string) => {
+          get: (path) => {
             this.ensure();
             return descriptor.sources.find((s) => s.path === path)
               ?.packages?.[0];
           },
         },
-        isSourceFileFromExternalLibrary: (source: object) =>
-          this.sourceMetadata(source).external,
-        isSourceFileDefaultLibrary: (source: object) =>
-          this.sourceMetadata(source).defaultLibrary,
+        isSourceFileFromExternalLibrary: (source) =>
+          this.syntax.metadata(source).external,
+        isSourceFileDefaultLibrary: (source) =>
+          this.syntax.metadata(source).defaultLibrary,
       },
       () => {
         this.ensure();
@@ -271,231 +378,115 @@ export class TypeServiceClient {
       'program',
     );
   }
+  get syntaxStats() {
+    return this.syntax.stats;
+  }
   private ensure(): void {
     if (this.closed) throw new Error('type service client is closed');
-    this.options.shared?.assertOpen();
+    this.shared?.assertOpen();
   }
   close(): void {
     this.closed = true;
+    for (const reader of this.facts.values()) reader.close();
     this.facts.clear();
-    this.objects.clear();
-    this.sources.clear();
-    this.options.shared?.close();
-    this.options.shared = undefined;
+    this.stats.factBytes = 0;
+    this.types.clear();
+    this.symbols.clear();
+    this.signatures.clear();
+    this.syntax.close();
+    this.shared?.close();
+    this.shared = undefined;
     this.transport = undefined;
-    this.rawNodes = new WeakMap();
-    this.wrappedNodes = new WeakMap();
   }
-  private query(op: string, args: Partial<TypeServiceQuery> = {}): unknown {
+  private read<K>(
+    request: ServiceRequest,
+    read: (packet: TypePacketReader) => K,
+  ): K {
     this.ensure();
-    const q: TypeServiceQuery = {
-      generation: this.descriptor.generation,
-      checker: this.descriptor.checker,
-      op,
-      ...args,
+    const query: TypeServiceQuery = {
+      generation: this.binding.generation,
+      checker: this.binding.checker,
+      ...request,
     };
-    const key = typeQueryKey(q);
-    if (this.facts.has(key)) {
+    const key = typeQueryKey(query);
+    let reader = this.facts.get(key),
+      retained = true;
+    if (reader) {
       this.stats.localHits++;
-      return this.facts.get(key);
+      this.facts.delete(key);
+      this.facts.set(key, reader);
+    } else {
+      let bytes = this.shared?.get(key);
+      if (bytes) this.stats.sharedHits++;
+      else {
+        this.stats.queries++;
+        bytes = Uint8Array.from(this.transport!(query, key));
+      }
+      reader = new TypePacketReader(bytes);
+      retained = reader.retainedBytes <= this.maxFactsBytes;
+      if (retained) {
+        while (
+          this.stats.factBytes + reader.retainedBytes >
+          this.maxFactsBytes
+        ) {
+          const oldest = this.facts.keys().next().value!;
+          const evicted = this.facts.get(oldest)!;
+          this.stats.factBytes -= evicted.retainedBytes;
+          evicted.close();
+          this.facts.delete(oldest);
+        }
+        this.facts.set(key, reader);
+        this.stats.factBytes += reader.retainedBytes;
+      }
     }
-    let bytes = this.options.shared?.get(key);
-    if (bytes) this.stats.sharedHits++;
-    else {
-      this.stats.queries++;
-      bytes = this.transport!(q, key);
+    try {
+      return read(reader);
+    } finally {
+      if (!retained) reader.close();
     }
-    const value = decodeTypePacket(bytes);
-    if (this.options.maxFacts > 0) {
-      if (this.facts.size === this.options.maxFacts)
-        this.facts.delete(this.facts.keys().next().value!);
-      this.facts.set(key, value);
-    }
-    return value;
   }
-  private id(object: object, kind: string): number {
+  private query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']] {
+    return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
+  }
+  private typeField<K extends keyof TypeFact>(
+    id: number,
+    field: K,
+  ): TypeFact[K] {
+    return this.read({ op: 'typeRecord', args: { id } }, (packet) =>
+      packet.typeField(field),
+    );
+  }
+  private symbolField<K extends keyof SymbolFact>(
+    id: number,
+    field: K,
+  ): SymbolFact[K] {
+    return this.read({ op: 'symbolRecord', args: { id } }, (packet) =>
+      packet.symbolField(field),
+    );
+  }
+  private signatureField<K extends keyof SignatureFact>(
+    id: number,
+    field: K,
+  ): SignatureFact[K] {
+    return this.read({ op: 'signatureRecord', args: { id } }, (packet) =>
+      packet.signatureField(field),
+    );
+  }
+  private id(object: object, kind: ObjectKind): number {
     this.ensure();
     const brand = this.brands.get(object);
     if (brand?.kind !== kind) throw new Error(`foreign ${kind} handle`);
     return brand.id;
   }
-  private location(node: object): { file: string; index: number } {
-    this.ensure();
-    const raw = this.rawNodes.get(node);
-    if (!raw) throw new Error('foreign compiler node handle');
-    return {
-      file: raw.getSourceFile().fileName,
-      index: (raw as unknown as { index: number }).index,
-    };
-  }
-  private sourceMetadata(source: object) {
-    const { file } = this.location(source);
-    const metadata = this.descriptor.sources.find((s) => s.fileName === file);
-    if (!metadata) throw new Error('foreign source');
-    return metadata;
-  }
-  private source(file: string): RemoteSourceFile | undefined {
-    let source = this.sources.get(file);
-    if (!source) {
-      const record = this.query('source', { file }) as
-        { tree: Uint8Array; fileName: string } | undefined;
-      if (!record) return undefined;
-      const existing = this.sources.get(record.fileName);
-      if (existing) {
-        this.sources.set(file, existing);
-        return existing;
-      }
-      source = new RemoteSourceFile(
-        record.tree,
-        new Wtf8Decoder('utf-8', { ignoreBOM: true }),
-      );
-      this.sources.set(file, source);
-      this.sources.set(record.fileName, source);
-    }
-    return source;
-  }
-  private wrap(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      const list = value.map((v) => this.wrap(v));
-      for (const key of ['pos', 'end', 'hasTrailingComma'])
-        if (key in value)
-          Object.defineProperty(list, key, {
-            value: (value as unknown as Bag)[key],
-            enumerable: true,
-          });
-      return list;
-    }
-    if (!(value instanceof RemoteNode)) return value;
-    const old = this.wrappedNodes.get(value);
-    if (old) return old;
-    // tsgo represents type-only heritage as TypeReference/QualifiedName.
-    // Expose TS's expression view while keeping the original compiler handle.
-    const heritageReference =
-      value.kind === SyntaxKind.TypeReference &&
-      value.parent?.kind === SyntaxKind.HeritageClause;
-    let nameOwner = value;
-    while (
-      nameOwner.kind === SyntaxKind.QualifiedName &&
-      nameOwner.parent?.kind === SyntaxKind.QualifiedName
-    )
-      nameOwner = nameOwner.parent as RemoteNode;
-    const heritageName =
-      value.kind === SyntaxKind.QualifiedName &&
-      nameOwner.parent?.kind === SyntaxKind.TypeReference &&
-      nameOwner.parent.parent?.kind === SyntaxKind.HeritageClause;
-    const wrapped = new Proxy(value, {
-      get: (raw, key) => {
-        this.ensure();
-        if (key === 'kind' && heritageReference)
-          return this.typescript.SyntaxKind.ExpressionWithTypeArguments;
-        if (key === 'kind' && heritageName)
-          return this.typescript.SyntaxKind.PropertyAccessExpression;
-        if (key === 'expression' && heritageReference)
-          return this.wrap(Reflect.get(raw, 'typeName', raw));
-        if (heritageName && (key === 'expression' || key === 'name'))
-          return this.wrap(
-            Reflect.get(raw, key === 'expression' ? 'left' : 'right', raw),
-          );
-        if (
-          key === 'kind' ||
-          key === 'operator' ||
-          key === 'token' ||
-          key === 'keywordToken' ||
-          key === 'keyword' ||
-          key === 'phaseModifier'
-        ) {
-          const native = Reflect.get(raw, key, raw) as number;
-          if (native === undefined) return undefined;
-          const name = SyntaxKind[native];
-          const kind =
-            this.typescript.SyntaxKind[name as keyof typeof ts.SyntaxKind];
-          if (typeof kind !== 'number') unsupported(`SyntaxKind.${name}`);
-          return kind;
-        }
-        if (key === 'flags')
-          return translateFlags(
-            raw.flags,
-            NodeFlags,
-            this.typescript.NodeFlags,
-          );
-        if (
-          key === 'escapedText' &&
-          (raw.kind === SyntaxKind.Identifier ||
-            raw.kind === SyntaxKind.PrivateIdentifier)
-        ) {
-          const text = (raw as unknown as { text: string }).text;
-          return text.startsWith('__') ? `_${text}` : text;
-        }
-        if (key === 'forEachChild')
-          return (
-            cb: (node: unknown) => unknown,
-            cbNodes?: (nodes: unknown) => unknown,
-          ) => {
-            this.ensure();
-            return raw.forEachChild(
-              (n) => cb(this.wrap(n)),
-              cbNodes ? (nodes) => cbNodes(this.wrap(nodes)) : undefined,
-            );
-          };
-        if (
-          typeof key === 'string' &&
-          [
-            'getChildren',
-            'getFirstToken',
-            'getLastToken',
-            'getChildAt',
-            'getChildCount',
-          ].includes(key)
-        )
-          unsupported(`node.${key}`);
-        const member: unknown = Reflect.get(raw, key, raw);
-        if (typeof member === 'function')
-          return (...args: unknown[]) => {
-            this.ensure();
-            return this.wrap(
-              Reflect.apply(
-                member,
-                raw,
-                args.map((a) =>
-                  typeof a === 'object' && a !== null
-                    ? (this.rawNodes.get(a) ?? a)
-                    : a,
-                ),
-              ),
-            );
-          };
-        if (
-          member === undefined &&
-          typeof key === 'string' &&
-          /^(get|is|forEach)/.test(key)
-        )
-          unsupported(`node.${key}`);
-        return this.wrap(member);
-      },
-    });
-    this.rawNodes.set(wrapped, value);
-    this.wrappedNodes.set(value, wrapped);
-    return wrapped;
-  }
-  private nodeRef(value: unknown): unknown {
-    if (!value) return undefined;
-    const ref = value as { file: string; index: number };
-    return this.wrap(this.source(ref.file)!.getOrCreateNodeAtIndex(ref.index));
-  }
-  private types(value: unknown): unknown[] {
-    return (value as number[]).map((id) => this.type(id));
-  }
-  private symbols(value: unknown): unknown[] {
-    return (value as number[]).map((id) => this.symbol(id));
-  }
-  private signatures(value: unknown): unknown[] {
-    return (value as number[]).map((id) => this.signature(id));
-  }
-  private object(kind: string, id: number, create: () => Bag): Bag | undefined {
+  private intern<T extends object>(
+    map: Map<number, T>,
+    kind: ObjectKind,
+    id: number,
+    create: () => T,
+  ): T | undefined {
     this.ensure();
     if (!id) return undefined;
-    const key = `${kind}:${id}`,
-      old = this.objects.get(key);
+    const old = map.get(id);
     if (old) return old;
     const object = guarded(
       create(),
@@ -505,105 +496,160 @@ export class TypeServiceClient {
       kind,
     );
     this.brands.set(object, { kind, id });
-    this.objects.set(key, object);
+    map.set(id, object);
     return object;
   }
-  private type(id: number): Bag | undefined {
-    return this.object('type', id, () => {
-      const record = (): Bag => this.query('typeRecord', { id }) as Bag;
-      const flags = (): number =>
-        (record().flags as string[]).reduce((value, name) => {
-          const translated =
-            this.typescript.TypeFlags[name as keyof typeof ts.TypeFlags];
-          if (typeof translated !== 'number') unsupported(`TypeFlags.${name}`);
-          return value | (translated as number);
-        }, 0);
-      const object: Bag = {
+  private typesFor(ids: readonly number[]): TypeView[] {
+    return ids.map((id) => this.type(id)!);
+  }
+  private symbolsFor(ids: readonly number[]): SymbolView[] {
+    return ids.map((id) => this.symbol(id)!);
+  }
+  private signaturesFor(ids: readonly number[]): SignatureView[] {
+    return ids.map((id) => this.signature(id)!);
+  }
+  private type(id: number): TypeView | undefined {
+    return this.intern(this.types, 'type', id, () => {
+      const ensure = () => {
+        this.ensure();
+      };
+      const flags = memo(ensure, () =>
+        this.typeField(id, 'flags').reduce((value, name) => {
+          const flag = Reflect.get(this.typescript.TypeFlags, name);
+          if (typeof flag !== 'number') unsupported(`TypeFlags.${name}`);
+          return value | flag;
+        }, 0),
+      );
+      const symbol = memo(ensure, () =>
+          this.symbol(this.typeField(id, 'symbol')),
+        ),
+        alias = memo(ensure, () =>
+          this.symbol(this.typeField(id, 'aliasSymbol')),
+        );
+      const intrinsic = memo(ensure, () => this.typeField(id, 'intrinsicName')),
+        value = memo(ensure, () => this.typeField(id, 'value'));
+      const types = memo(ensure, () => {
+        const ids = this.typeField(id, 'types');
+        return ids ? this.typesFor(ids) : undefined;
+      });
+      const calls = memo(ensure, () =>
+          this.signaturesFor(
+            this.query({ op: 'signatures', args: { id, kind: 0 } }),
+          ),
+        ),
+        constructs = memo(ensure, () =>
+          this.signaturesFor(
+            this.query({ op: 'signatures', args: { id, kind: 1 } }),
+          ),
+        );
+      const properties = memo(ensure, () =>
+          this.symbolsFor(this.query({ op: 'properties', args: { id } })),
+        ),
+        nonNullable = memo(ensure, () =>
+          this.type(this.query({ op: 'nonNullable', args: { id } })),
+        ),
+        constraint = memo(ensure, () =>
+          this.type(this.query({ op: 'constraint', args: { id } })),
+        );
+      const flag = (mask: number) => Boolean(flags() & mask),
+        tf = this.typescript.TypeFlags;
+      return {
         id,
         get flags() {
           return flags();
         },
-        getSymbol: () => this.symbol(record().symbol as number),
-        isUnion: () => Boolean(flags() & this.typescript.TypeFlags.Union),
-        isIntersection: () =>
-          Boolean(flags() & this.typescript.TypeFlags.Intersection),
-        isUnionOrIntersection: () =>
-          Boolean(flags() & this.typescript.TypeFlags.UnionOrIntersection),
+        get symbol() {
+          return symbol();
+        },
+        get aliasSymbol() {
+          return alias();
+        },
+        get intrinsicName() {
+          return intrinsic();
+        },
+        get value() {
+          return value();
+        },
+        get types() {
+          return types();
+        },
+        getSymbol: symbol,
+        isUnion: () => flag(tf.Union),
+        isIntersection: () => flag(tf.Intersection),
+        isUnionOrIntersection: () => flag(tf.UnionOrIntersection),
         isLiteral: () =>
-          Boolean(
-            flags() &
-            (this.typescript.TypeFlags.StringLiteral |
-              this.typescript.TypeFlags.NumberLiteral |
-              this.typescript.TypeFlags.BigIntLiteral),
+          flag(tf.StringLiteral | tf.NumberLiteral | tf.BigIntLiteral),
+        isStringLiteral: () => flag(tf.StringLiteral),
+        isNumberLiteral: () => flag(tf.NumberLiteral),
+        isTypeParameter: () => flag(tf.TypeParameter),
+        getCallSignatures: calls,
+        getConstructSignatures: constructs,
+        getProperties: properties,
+        getProperty: (name) =>
+          this.symbol(
+            this.query({
+              op: 'property',
+              args: { id, name: nameToUnits(name) },
+            }),
           ),
-        isStringLiteral: () =>
-          Boolean(flags() & this.typescript.TypeFlags.StringLiteral),
-        isNumberLiteral: () =>
-          Boolean(flags() & this.typescript.TypeFlags.NumberLiteral),
-        isTypeParameter: () =>
-          Boolean(flags() & this.typescript.TypeFlags.TypeParameter),
-        getCallSignatures: () =>
-          this.signatures(this.query('signatures', { id, kind: 0 })),
-        getConstructSignatures: () =>
-          this.signatures(this.query('signatures', { id, kind: 1 })),
-        getProperties: () => this.symbols(this.query('properties', { id })),
-        getProperty: (name: string) =>
-          this.symbol(this.query('property', { id, name }) as number),
-        getNonNullableType: () =>
-          this.type(this.query('nonNullable', { id }) as number),
-        getConstraint: () =>
-          this.type(this.query('constraint', { id }) as number),
+        getNonNullableType: nonNullable,
+        getConstraint: constraint,
       };
-      for (const key of ['intrinsicName', 'value'])
-        Object.defineProperty(object, key, { get: () => record()[key] });
-      for (const key of ['symbol', 'aliasSymbol'])
-        Object.defineProperty(object, key, {
-          get: () => this.symbol(record()[key] as number),
-        });
-      Object.defineProperty(object, 'types', {
-        get: () => (record().types ? this.types(record().types) : undefined),
-      });
-      return object;
     });
   }
-  private symbol(id: number): Bag | undefined {
-    return this.object('symbol', id, () => {
-      const record = (): Bag => this.query('symbolRecord', { id }) as Bag;
-      const escapedName = (): string => record().escapedName as string;
-      const name = (): string => record().name as string;
-      const declarations = () =>
-        (record().declarations as unknown[] | undefined)?.map((value) =>
-          this.nodeRef(value),
-        );
-      const valueDeclaration = () => this.nodeRef(record().valueDeclaration);
+  private symbol(id: number): SymbolView | undefined {
+    return this.intern(this.symbols, 'symbol', id, () => {
+      const ensure = () => {
+        this.ensure();
+      };
+      const name = memo(ensure, () => this.symbolField(id, 'name')),
+        escaped = memo(ensure, () => this.symbolField(id, 'escapedName')),
+        flags = memo(ensure, () => this.symbolField(id, 'flags'));
+      const declarations = memo(ensure, () =>
+        this.symbolField(id, 'declarations')?.map((node) =>
+          this.syntax.nodeRef(node)!,
+        ),
+      );
+      const value = memo(ensure, () =>
+        this.syntax.nodeRef(this.symbolField(id, 'valueDeclaration')),
+      );
       return {
         id,
         get name() {
           return name();
         },
         get escapedName() {
-          return escapedName();
+          return escaped();
         },
         get flags() {
-          return record().flags;
+          return flags();
         },
         get declarations() {
           return declarations();
         },
         get valueDeclaration() {
-          return valueDeclaration();
+          return value();
         },
         getName: name,
+        getFlags: flags,
         getDeclarations: declarations,
-        getFlags: () => record().flags,
       };
     });
   }
-  private signature(id: number): Bag | undefined {
-    return this.object('signature', id, () => {
-      const record = (): Bag => this.query('signatureRecord', { id }) as Bag;
-      const parameters = () => this.symbols(record().parameters);
-      const declaration = () => this.nodeRef(record().declaration);
+  private signature(id: number): SignatureView | undefined {
+    return this.intern(this.signatures, 'signature', id, () => {
+      const ensure = () => {
+          this.ensure();
+        },
+        parameters = memo(ensure, () =>
+          this.symbolsFor(this.signatureField(id, 'parameters')),
+        ),
+        declaration = memo(ensure, () =>
+          this.syntax.nodeRef(this.signatureField(id, 'declaration')),
+        ),
+        returned = memo(ensure, () =>
+          this.type(this.query({ op: 'returnType', args: { id } })),
+        );
       return {
         id,
         get parameters() {
@@ -614,8 +660,7 @@ export class TypeServiceClient {
         },
         getParameters: parameters,
         getDeclaration: declaration,
-        getReturnType: () =>
-          this.type(this.query('returnType', { id }) as number),
+        getReturnType: returned,
       };
     });
   }
@@ -623,70 +668,23 @@ export class TypeServiceClient {
     frame: DecodedFrame,
     projection: TypeServiceProjection,
     sourceFileName: string,
-  ): Bag {
-    this.ensure();
-    if (
-      projection.generation !== this.descriptor.generation ||
-      projection.origins.length !== frame.nodes.length
-    )
-      throw new Error('stale or incompatible projection origins');
-    const source = new RemoteSourceFile(
-      projection.tree,
-      new Wtf8Decoder('utf-8', { ignoreBOM: true }),
-    );
-    const file = source.fileName;
-    if (
-      file !== projection.sourceFileName ||
-      file !== sourceFileName ||
-      source.text !== frame.text
-    )
-      throw new Error('type service projection belongs to a different source');
-    const existing = this.sources.get(file);
-    if (!existing) this.sources.set(file, source);
-    const original = existing ?? source;
-    const forward = new WeakMap<ESTreeNode, object>(),
-      reverse = new WeakMap<object, ESTreeNode>();
-    for (let id = 1; id < frame.nodes.length; id++) {
-      const index = projection.origins[id];
-      if (index)
-        forward.set(
-          frame.nodes[id]!,
-          this.wrap(original.getOrCreateNodeAtIndex(index)) as object,
-        );
-    }
-    for (const [index, id] of Object.entries(projection.reverse))
-      reverse.set(
-        this.wrap(original.getOrCreateNodeAtIndex(Number(index))) as object,
-        frame.nodes[id]!,
-      );
-    const map = <K extends object, V>(values: WeakMap<K, V>) => ({
-      get: (key: K): V | undefined => {
-        this.ensure();
-        return values.get(key);
-      },
-      has: (key: K): boolean => {
-        this.ensure();
-        return values.has(key);
-      },
-    });
+  ) {
+    this.syntax.attach(frame, projection, sourceFileName);
     const toTS = (node: ESTreeNode): object => {
-      this.ensure();
-      const tsNode = forward.get(node);
-      if (!tsNode)
+      const native = this.syntax.esTreeNodeToTSNodeMap.get(node);
+      if (!native)
         throw new Error(`ESTree node has no compiler origin: ${node.type}`);
-      return tsNode;
+      return native;
     };
     const options = this.descriptor.compilerOptions;
     return {
       program: this.program,
-      esTreeNodeToTSNodeMap: map(forward),
-      tsNodeToESTreeNodeMap: map(reverse),
+      esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
+      tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
       getTypeAtLocation: (node: ESTreeNode) =>
-        (this.checker.getTypeAtLocation as (n: object) => unknown)(toTS(node)),
+        this.checker.getTypeAtLocation(toTS(node)),
       getSymbolAtLocation: (node: ESTreeNode) =>
-        (this.checker.getSymbolAtLocation as (n: object) => unknown)(
-          toTS(node),
-        ),
+        this.checker.getSymbolAtLocation(toTS(node)),
       emitDecoratorMetadata: options.emitDecoratorMetadata === true,
       experimentalDecorators: options.experimentalDecorators === true,
       isolatedDeclarations: options.isolatedDeclarations === true,

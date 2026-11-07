@@ -67,6 +67,7 @@ type estreeProjector struct {
 	origin           *ast.Node
 	origins          []*ast.Node
 	reverse          map[*ast.Node]uint32
+	sequenceAliases  []sequenceAlias
 	recordOrigins    bool
 }
 
@@ -81,6 +82,14 @@ type Options struct {
 	// RecordReverse receives preferred reverse mappings, including compiler
 	// aliases that share a projected node (such as parenthesized expressions).
 	RecordReverse func(node *ast.Node, id uint32)
+	// RecordSequenceAlias describes a flattened comma prefix without encoding
+	// another growing expression list. It is materialized only on reverse lookup.
+	RecordSequenceAlias func(node *ast.Node, sequenceID, count, start, end uint32)
+}
+
+type sequenceAlias struct {
+	node              *ast.Node
+	sequenceID, count uint32
 }
 
 // Builder reuses scratch for sequential projections. Build returns
@@ -168,7 +177,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.file = file
 	p.text = file.Text()
 	p.sourceType = options.SourceType
-	p.recordOrigins = options.RecordOrigin != nil || options.RecordReverse != nil
+	p.recordOrigins = options.RecordOrigin != nil || options.RecordReverse != nil || options.RecordSequenceAlias != nil
 	p.origins = p.origins[:0]
 	if p.recordOrigins {
 		p.reverse = make(map[*ast.Node]uint32)
@@ -209,6 +218,12 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 			options.RecordReverse(node, id)
 		}
 	}
+	if options.RecordSequenceAlias != nil {
+		for _, alias := range p.sequenceAliases {
+			start, end := p.rangeOf(alias.node)
+			options.RecordSequenceAlias(alias.node, alias.sequenceID, alias.count, start, end)
+		}
+	}
 	return b.encode(root, options.HasBOM, allocate)
 }
 
@@ -223,6 +238,8 @@ func (p *estreeProjector) clearSource() {
 	clear(p.origins)
 	p.origins = nil
 	p.reverse = nil
+	clear(p.sequenceAliases)
+	p.sequenceAliases = nil
 	p.recordOrigins = false
 	p.file = nil
 	p.text = ""

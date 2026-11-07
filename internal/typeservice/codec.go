@@ -1,101 +1,156 @@
-// Package typeservice exposes a closeable, caller-owned view of one bound
-// Program's checker to JavaScript. It does not select projects or execute rules.
+// Package typeservice exposes caller-owned checker sessions without selecting
+// projects or executing rules.
 package typeservice
 
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math"
-	"reflect"
-	"sort"
 
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// EncodePacket produces independently owned, versioned binary facts. Objects
-// contain only values and handles, never Go pointers. The injected transport
-// owns these bytes until its consumer has copied or decoded them.
-func EncodePacket(value any) ([]byte, error) {
-	data := []byte{'R', 'T', 'S', 1}
-	var encode func(reflect.Value, int) error
-	word := func(n uint32) { data = binary.LittleEndian.AppendUint32(data, n) }
-	encode = func(v reflect.Value, depth int) error {
-		if depth > 128 {
-			return errors.New("type packet nesting exceeds 128")
-		}
-		if !v.IsValid() || ((v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer) && v.IsNil()) {
-			data = append(data, 0)
-			return nil
-		}
-		if v.Kind() == reflect.Interface || v.Kind() == reflect.Pointer {
-			return encode(v.Elem(), depth)
-		}
-		switch v.Kind() {
-		case reflect.Bool:
-			if v.Bool() {
-				data = append(data, 2)
-			} else {
-				data = append(data, 1)
-			}
-		case reflect.String:
-			s := ecmascript.StringCodeUnits(v.String())
-			if uint64(len(s)) > math.MaxUint32 {
-				return errors.New("type packet string too large")
-			}
-			data = append(data, 3)
-			word(uint32(len(s)))
-			for _, unit := range s {
-				data = binary.LittleEndian.AppendUint16(data, unit)
-			}
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float32, reflect.Float64:
-			n := float64(0)
-			if v.Kind() >= reflect.Uint && v.Kind() <= reflect.Uint64 {
-				n = float64(v.Uint())
-			} else if v.Kind() >= reflect.Int && v.Kind() <= reflect.Int64 {
-				n = float64(v.Int())
-			} else {
-				n = v.Float()
-			}
-			data = append(data, 4)
-			data = binary.LittleEndian.AppendUint64(data, math.Float64bits(n))
-		case reflect.Slice, reflect.Array:
-			if v.Type() == reflect.TypeFor[[]byte]() {
-				data = append(data, 7)
-				word(uint32(v.Len()))
-				data = append(data, v.Bytes()...)
-				return nil
-			}
-			data = append(data, 5)
-			word(uint32(v.Len()))
-			for i := range v.Len() {
-				if err := encode(v.Index(i), depth+1); err != nil {
-					return err
-				}
-			}
-		case reflect.Map:
-			if v.Type().Key().Kind() != reflect.String {
-				return errors.New("type packet requires string keys")
-			}
-			keys := v.MapKeys()
-			sort.Slice(keys, func(i, j int) bool { return keys[i].String() < keys[j].String() })
-			data = append(data, 6)
-			word(uint32(len(keys)))
-			for _, key := range keys {
-				if err := encode(key, depth+1); err != nil {
-					return err
-				}
-				if err := encode(v.MapIndex(key), depth+1); err != nil {
-					return err
-				}
-			}
-		default:
-			return fmt.Errorf("unsupported type packet value %v", v.Type())
-		}
-		return nil
+const (
+	packetHandle uint32 = iota + 1
+	packetBoolean
+	packetText
+	packetHandles
+	packetType
+	packetSymbol
+	packetSignature
+)
+
+// EncodePacket has a finite record layout: header/kind, fixed fields, then
+// offset-addressed lists and an interned UTF-16 string pool. No arbitrary map,
+// recursive value graph, reflection, or Go pointer enters a packet.
+// These bytes are owned. A transport may lease them only for its call; a client
+// copies fallback packets before retaining them in its disposable fact store.
+func EncodePacket(result Result) ([]byte, error) {
+	var kind, words uint32
+	switch result.(type) {
+	case Handle:
+		kind, words = packetHandle, 1
+	case Boolean:
+		kind, words = packetBoolean, 1
+	case Text:
+		kind, words = packetText, 1
+	case Handles:
+		kind, words = packetHandles, 1
+	case *TypeFact:
+		kind, words = packetType, 7
+	case *SymbolFact:
+		kind, words = packetSymbol, 5
+	case *SignatureFact:
+		kind, words = packetSignature, 2
+	default:
+		return nil, errors.New("unsupported semantic fact")
 	}
-	if err := encode(reflect.ValueOf(value), 0); err != nil {
-		return nil, err
+	w := packetWriter{data: make([]byte, 8+words*4), strings: make(map[string]uint32)}
+	copy(w.data, "RTS2")
+	w.put(4, kind)
+	switch fact := result.(type) {
+	case Handle:
+		w.put(8, uint32(fact))
+	case Boolean:
+		if fact {
+			w.put(8, 1)
+		}
+	case Text:
+		w.put(8, w.text(string(fact)))
+	case Handles:
+		w.put(8, w.ids(fact))
+	case *TypeFact:
+		flags := make([]uint32, 0, len(fact.Flags))
+		for _, flag := range fact.Flags {
+			flags = append(flags, w.text(flag))
+		}
+		w.put(8, w.ids(flags))
+		w.put(12, fact.Symbol)
+		w.put(16, fact.AliasSymbol)
+		if fact.IntrinsicName != "" {
+			w.put(20, w.text(fact.IntrinsicName))
+		}
+		w.put(24, fact.Literal.Kind)
+		switch fact.Literal.Kind {
+		case 1:
+			w.put(28, w.text(fact.Literal.Text))
+		case 2:
+			offset := uint32(len(w.data))
+			w.data = binary.LittleEndian.AppendUint64(w.data, math.Float64bits(fact.Literal.Number))
+			w.put(28, offset)
+		case 3:
+			offset := uint32(len(w.data))
+			w.data = append(w.data, make([]byte, 8)...)
+			if fact.Literal.Negative {
+				w.put(offset, 1)
+			}
+			w.put(offset+4, w.text(fact.Literal.Text))
+			w.put(28, offset)
+		}
+		w.put(32, w.ids(fact.Types))
+	case *SymbolFact:
+		w.put(8, w.text(fact.Name))
+		w.put(12, w.text(fact.EscapedName))
+		w.put(16, fact.Flags)
+		if fact.Declarations != nil {
+			offset := uint32(len(w.data))
+			w.data = append(w.data, make([]byte, 4+len(fact.Declarations)*8)...)
+			w.put(offset, uint32(len(fact.Declarations)))
+			for i, node := range fact.Declarations {
+				at := offset + 4 + uint32(i)*8
+				w.put(at, w.text(node.File))
+				w.put(at+4, node.Index)
+			}
+			w.put(20, offset)
+		}
+		w.put(24, w.node(fact.ValueDeclaration))
+	case *SignatureFact:
+		w.put(8, w.ids(fact.Parameters))
+		w.put(12, w.node(fact.Declaration))
 	}
-	return data, nil
+	if uint64(len(w.data)) > math.MaxUint32 {
+		return nil, errors.New("semantic fact exceeds packet limit")
+	}
+	return w.data, nil
+}
+
+type packetWriter struct {
+	data    []byte
+	strings map[string]uint32
+}
+
+func (w *packetWriter) put(at, value uint32) { binary.LittleEndian.PutUint32(w.data[at:], value) }
+func (w *packetWriter) text(text string) uint32 {
+	if offset, ok := w.strings[text]; ok {
+		return offset
+	}
+	offset := uint32(len(w.data))
+	units := ecmascript.StringCodeUnits(text)
+	w.data = binary.LittleEndian.AppendUint32(w.data, uint32(len(units)))
+	for _, unit := range units {
+		w.data = binary.LittleEndian.AppendUint16(w.data, unit)
+	}
+	w.strings[text] = offset
+	return offset
+}
+func (w *packetWriter) ids(ids []uint32) uint32 {
+	if ids == nil {
+		return 0
+	}
+	offset := uint32(len(w.data))
+	w.data = binary.LittleEndian.AppendUint32(w.data, uint32(len(ids)))
+	for _, id := range ids {
+		w.data = binary.LittleEndian.AppendUint32(w.data, id)
+	}
+	return offset
+}
+func (w *packetWriter) node(node *NodeRef) uint32 {
+	if node == nil {
+		return 0
+	}
+	offset := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 8)...)
+	w.put(offset, w.text(node.File))
+	w.put(offset+4, node.Index)
+	return offset
 }
