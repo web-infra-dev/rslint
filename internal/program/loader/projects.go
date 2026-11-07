@@ -330,7 +330,12 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 	if err != nil {
 		return ProjectSet{}, err
 	}
+	return s.buildProjects(plan, request)
+}
+
+func (s *Session) buildProjects(plan projectPlan, request ProjectBuildRequest) (ProjectSet, error) {
 	var set ProjectSet
+	var err error
 	if request.Scope == AllDeclared {
 		set, err = s.executeProjectPlan(plan, request.SingleThreaded)
 	} else {

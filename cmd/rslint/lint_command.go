@@ -407,9 +407,15 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
-	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
+	createPrograms := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
 		defer session.ReleaseBuildCache()
-		rebuilt, err := session.BuildProjects(projectRequest)
+		var rebuilt loader.ProjectSet
+		var err error
+		if prepared != nil {
+			rebuilt, err = prepared.BuildProjects()
+		} else {
+			rebuilt, err = session.BuildProjects(projectRequest)
+		}
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
@@ -419,6 +425,23 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
 			return loader.LoadResult{}, err
+		}
+		return binding, nil
+	}
+	initialBinding := func(ctx context.Context, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
+		binding, err := createPrograms(programSession, prepared)
+		if err != nil {
+			return loader.LoadResult{}, err
+		}
+		if err := activate(); err != nil {
+			return loader.LoadResult{}, err
+		}
+		if format == output.FormatDefault && mode != output.ModeLint {
+			summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
+				binding.Programs, targetPlan.Files, singleThreaded)
+			if err != nil {
+				return loader.LoadResult{}, err
+			}
 		}
 		return binding, nil
 	}
@@ -475,21 +498,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 
 	provider := &cliGenerationProvider{
 		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
-			binding, err := createPrograms(programSession)
-			if err != nil {
-				return loader.LoadResult{}, nil, err
-			}
-			if err := activate(); err != nil {
-				return loader.LoadResult{}, nil, err
-			}
-			if format == output.FormatDefault && mode != output.ModeLint {
-				summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
-					binding.Programs, targetPlan.Files, singleThreaded)
-				if err != nil {
-					return loader.LoadResult{}, nil, err
-				}
-			}
-			return binding, programSession.FS(), nil
+			binding, err := initialBinding(ctx, nil)
+			return binding, programSession.FS(), err
 		},
 		rebuild: func(ctx context.Context, snapshot linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error) {
 			if err := ctx.Err(); err != nil {
@@ -505,7 +515,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				}
 			}
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
-			binding, err := createPrograms(roundSession)
+			binding, err := createPrograms(roundSession, nil)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
 			}
@@ -521,14 +531,25 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// lint admits disjoint bindings independently, regardless of rule backend.
 	if !fix {
 		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
-			loads, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
-			if err != nil || len(loads) == 0 {
+			plan, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
+			if err != nil {
 				return nil, err
+			}
+			if len(plan.Loads) == 0 {
+				return []linter.GenerationLoad{lintLoader.GenerationLoad(
+					func(ctx context.Context) (loader.LoadResult, error) {
+						binding, err := initialBinding(ctx, &plan)
+						if err == nil {
+							provider.initial = nil
+						}
+						return binding, err
+					}, programSession.FS(), generationForBinding,
+				)}, nil
 			}
 			if err := activate(); err != nil {
 				return nil, err
 			}
-			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 

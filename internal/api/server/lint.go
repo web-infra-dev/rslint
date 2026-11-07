@@ -489,8 +489,14 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	// A plain API lint only needs type information when at least one target is
 	// selected. The stable target/config plan is reused while each source
 	// snapshot gets a fresh request-local Program generation.
-	buildBinding := func(session *loader.Session) (loader.LoadResult, error) {
-		projects, buildErr := session.BuildProjects(projectRequest)
+	buildBinding := func(session *loader.Session, prepared *loader.ProjectLoadPlan) (loader.LoadResult, error) {
+		var projects loader.ProjectSet
+		var buildErr error
+		if prepared != nil {
+			projects, buildErr = prepared.BuildProjects()
+		} else {
+			projects, buildErr = session.BuildProjects(projectRequest)
+		}
 		if buildErr != nil {
 			return loader.LoadResult{}, buildErr
 		}
@@ -554,7 +560,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	provider := &apiGenerationProvider{
 		initial: func(context.Context) (linter.Generation, error) {
-			binding, err := buildBinding(programSession)
+			binding, err := buildBinding(programSession, nil)
 			if err != nil {
 				return linter.Generation{}, err
 			}
@@ -571,7 +577,7 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 			}
 			addEquivalentFileContentPaths(overrides, configDirectory, currentDirectory, sourceFS, canonicalPaths)
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
-			roundBinding, rebuildErr := buildBinding(roundSession)
+			roundBinding, rebuildErr := buildBinding(roundSession, nil)
 			if rebuildErr != nil {
 				return linter.Generation{}, rebuildErr
 			}
@@ -583,11 +589,22 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 	}
 	if !req.Fix {
 		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
-			loads, err := programSession.PlanLoads(projectRequest, configDirectory, true)
+			plan, err := programSession.PlanLoads(projectRequest, configDirectory, true)
 			if err != nil {
 				return nil, err
 			}
-			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			if len(plan.Loads) == 0 {
+				return []linter.GenerationLoad{lintLoader.GenerationLoad(
+					func(context.Context) (loader.LoadResult, error) {
+						binding, err := buildBinding(programSession, &plan)
+						if err == nil {
+							provider.initial = nil
+						}
+						return binding, err
+					}, programSession.FS(), generationForBinding,
+				)}, nil
+			}
+			return lintLoader.GenerationLoads(plan.Loads, programSession.FS(), generationForBinding), nil
 		}
 	}
 
