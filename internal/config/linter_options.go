@@ -2,7 +2,7 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -24,7 +24,7 @@ func (s *UnusedDirectiveSeverity) UnmarshalJSON(data []byte) error {
 	case float64(2), "error":
 		*s = "error"
 	default:
-		return fmt.Errorf("linterOptions.reportUnusedDisableDirectives: expected off, warn, error, 0, 1, 2, or a boolean")
+		return errors.New("linterOptions.reportUnusedDisableDirectives: expected off, warn, error, 0, 1, 2, or a boolean")
 	}
 	return nil
 }
@@ -46,7 +46,7 @@ func (options *LinterOptions) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if object == nil {
-		return fmt.Errorf("linterOptions: expected an object")
+		return errors.New("linterOptions: expected an object")
 	}
 	if value, present := object["reportUnusedDisableDirectives"]; present {
 		var severity UnusedDirectiveSeverity

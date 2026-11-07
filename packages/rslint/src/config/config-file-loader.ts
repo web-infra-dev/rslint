@@ -236,8 +236,8 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     ) {
       const severity = entry.linterOptions.reportUnusedDisableDirectives;
       if (
-        ![false, true, 0, 1, 2, 'off', 'warn', 'error'].includes(
-          severity as never,
+        ![false, true, 0, 1, 2, 'off', 'warn', 'error'].some(
+          (allowed) => allowed === severity,
         )
       ) {
         throw new Error(

@@ -75,7 +75,7 @@ func (dm *DisableManager) UnusedDiagnostics(path string, severity DiagnosticSeve
 	for _, d := range dm.tracked {
 		var unused []string
 		for _, e := range d.entries {
-			if !e.invalid && !e.used && !ignored[e.name] && !(e.name == "" && len(ignored) > 0) {
+			if !e.invalid && !e.used && !ignored[e.name] && (e.name != "" || len(ignored) == 0) {
 				unused = append(unused, e.name)
 			}
 		}

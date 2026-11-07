@@ -689,7 +689,6 @@ func TestUnusedDisableDirectives(t *testing.T) {
 // blockDirective represents a block-level disable or enable event at a source location
 type blockDirective struct {
 	line      int
-	column    core.UTF16Offset
 	isDisable bool     // true = disable, false = enable
 	rules     []string // nil means all rules (wildcard)
 }
@@ -725,16 +724,20 @@ func managerForDirectiveEvents(t *testing.T, events []blockDirective, lines, nex
 // Fixtures use ESLint 10.14.0's pinned directive engine; see the generator.
 func TestUnusedDirectiveESLintConformance(t *testing.T) {
 	var cases []struct {
-		Name, Source, Fixed string
-		Reports             []string
-		Diagnostics         []struct {
-			Message                string
-			Line, Column, Severity int
-			Fix                    struct {
-				Range [2]int
-				Text  string
-			}
-		}
+		Name        string   `json:"name"`
+		Source      string   `json:"source"`
+		Fixed       string   `json:"fixed"`
+		Reports     []string `json:"reports"`
+		Diagnostics []struct {
+			Message  string `json:"message"`
+			Line     int    `json:"line"`
+			Column   int    `json:"column"`
+			Severity int    `json:"severity"`
+			Fix      struct {
+				Range [2]int `json:"range"`
+				Text  string `json:"text"`
+			} `json:"fix"`
+		} `json:"diagnostics"`
 	}
 	data, err := os.ReadFile("testdata/unused-directives.json")
 	if err != nil {

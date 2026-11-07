@@ -11,48 +11,59 @@ import (
 const Revision = "bdd4b1da21dca81d50933edef0a015216059d877"
 
 type Fix struct {
-	Range [2]int
-	Text  string
+	Range [2]int `json:"range"`
+	Text  string `json:"text"`
 }
 
 type Diagnostic struct {
-	Message                string
-	Line, Column, Severity int
-	Fix                    *Fix
+	Message  string `json:"message"`
+	Line     int    `json:"line"`
+	Column   int    `json:"column"`
+	Severity int    `json:"severity"`
+	Fix      *Fix   `json:"fix"`
 }
 
 type Report struct {
-	Fix        *Fix
+	Fix        *Fix   `json:"fix"`
 	RuleID     string `json:"ruleId"`
-	Pos        int
-	Suppressed bool
+	Pos        int    `json:"pos"`
+	Suppressed bool   `json:"suppressed"`
 }
 
 type Variant struct {
-	Severity                         string
-	DisableFixes                     bool
-	Diagnostics                      []Diagnostic
-	Fixed, RslintFixed               string
-	BatchedFixed, RslintBatchedFixed *string
+	Severity           string       `json:"severity"`
+	DisableFixes       bool         `json:"disableFixes"`
+	Diagnostics        []Diagnostic `json:"diagnostics"`
+	Fixed              string       `json:"fixed"`
+	RslintFixed        string       `json:"rslintFixed"`
+	BatchedFixed       *string      `json:"batchedFixed"`
+	RslintBatchedFixed *string      `json:"rslintBatchedFixed"`
 }
 
 type Case struct {
-	BOM                        bool
-	Name, Source, RslintSource string
-	SourceLine                 int
-	Reports                    []Report
-	Ignored                    []string
-	InvalidRules               []string
-	Variants                   []Variant
+	BOM          bool      `json:"bom"`
+	Name         string    `json:"name"`
+	Source       string    `json:"source"`
+	RslintSource string    `json:"rslintSource"`
+	SourceLine   int       `json:"sourceLine"`
+	Reports      []Report  `json:"reports"`
+	Ignored      []string  `json:"ignored"`
+	InvalidRules []string  `json:"invalidRules"`
+	Variants     []Variant `json:"variants"`
 }
 
 type Corpus struct {
 	Manifest struct {
-		Revision                                   string
-		UpstreamTests, ImportedCases, VariantCount int
-		Exceptions                                 []struct{ Name, Reason string }
-	}
-	Cases []Case
+		Revision      string `json:"revision"`
+		UpstreamTests int    `json:"upstreamTests"`
+		ImportedCases int    `json:"importedCases"`
+		VariantCount  int    `json:"variantCount"`
+		Exceptions    []struct {
+			Name   string `json:"name"`
+			Reason string `json:"reason"`
+		} `json:"exceptions"`
+	} `json:"manifest"`
+	Cases []Case `json:"cases"`
 }
 
 func Load(t *testing.T, path string) Corpus {
