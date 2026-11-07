@@ -51,7 +51,11 @@ func TestNoUselessContinueRemovalBoundaries(t *testing.T) {
 	for _, newline := range []string{"\n", "\r\n", "\r"} {
 		for _, whitespace := range []string{"", " \t\v\f", "\u00a0\u1680\u2000\u200a\u202f\u205f\u3000\ufeff", "\u2028\u2029"} {
 			for _, statement := range []string{"continue;", "continue"} {
-				add("while (ready) {"+newline+whitespace+statement+whitespace+newline+"}", "while (ready) {"+newline+"}", 1)
+				output := "while (ready) {" + newline + "}"
+				if whitespace == "\u2028\u2029" {
+					output = "while (ready) {" + newline + "\u2028\u2028\u2029" + newline + "}"
+				}
+				add("while (ready) {"+newline+whitespace+statement+whitespace+newline+"}", output, 1)
 			}
 		}
 	}
@@ -63,10 +67,10 @@ func TestNoUselessContinueRemovalBoundaries(t *testing.T) {
 		{"while (ready) {\n\tcontinue\n;\n}", "while (ready) {\n}"},
 		{"while (ready) {\r\n\tcontinue\r\n;\r\n}", "while (ready) {\r\n}"},
 		{"while (ready) {\n\tcontinue; }", "while (ready) {\n\t }"},
-		// Preserve the existing treatment of Unicode separators around a statement.
-		{"\ufeff" + "while (ready) {\u2028\tcontinue;\u2029}", "\ufeff" + "while (ready) {\u2028\t\u2029}"},
-		{"while (ready) {\n\tcontinue;\u2028// after\n}", "while (ready) {\n\t\u2028// after\n}"},
-		{"while (ready) {\n// before\u2028\tcontinue;\n}", "while (ready) {\n// before\u2028\t\n}"},
+		// Unicode separators delimit source lines just as LF and CR do.
+		{"\ufeff" + "while (ready) {\u2028\tcontinue;\u2029}", "\ufeff" + "while (ready) {\u2029}"},
+		{"while (ready) {\n\tcontinue;\u2028// after\n}", "while (ready) {\u2028// after\n}"},
+		{"while (ready) {\n// before\u2028\tcontinue;\n}", "while (ready) {\n// before\n}"},
 	} {
 		add(testCase.source, testCase.output, 1)
 	}

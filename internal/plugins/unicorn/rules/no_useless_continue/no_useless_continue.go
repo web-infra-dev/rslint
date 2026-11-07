@@ -1,13 +1,10 @@
 package no_useless_continue
 
 import (
-	"unicode/utf8"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var NoUselessContinueRule = rule.Rule{
@@ -25,7 +22,7 @@ var NoUselessContinueRule = rule.Rule{
 					Id:          "no-useless-continue",
 					Description: "Unnecessary `continue` statement.",
 				}, func() []rule.RuleFix {
-					return []rule.RuleFix{rule.RuleFixRemoveRange(statementRemovalRange(ctx.SourceFile.Text(), textRange))}
+					return []rule.RuleFix{rule.RuleFixRemoveRange(unicornutil.StatementRemovalRange(ctx.SourceFile, textRange))}
 				})
 			},
 		}
@@ -66,45 +63,4 @@ func isUselessContinue(node *ast.Node) bool {
 		}
 	}
 	return false
-}
-
-// statementRemovalRange mirrors Unicorn's removeStatement: remove a whole
-// otherwise empty line, but leave leading and trailing comments intact.
-func statementRemovalRange(text string, statement core.TextRange) core.TextRange {
-	start, end := statement.Pos(), statement.End()
-	// Only whitespace can extend the removal range. Stop at the first token
-	// or comment instead of scanning the whole line for each continue.
-	lineStart := start
-	for lineStart > 0 && text[lineStart-1] != '\r' && text[lineStart-1] != '\n' {
-		r, size := utf8.DecodeLastRuneInString(text[:lineStart])
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return statement
-		}
-		lineStart -= size
-	}
-	lineEnd := end
-	for lineEnd < len(text) && text[lineEnd] != '\r' && text[lineEnd] != '\n' {
-		r, size := utf8.DecodeRuneInString(text[lineEnd:])
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return statement
-		}
-		lineEnd += size
-	}
-
-	end = lineEnd
-	if start == 0 {
-		if end < len(text) {
-			if text[end] == '\r' && end+1 < len(text) && text[end+1] == '\n' {
-				end += 2
-			} else {
-				end++
-			}
-		}
-	} else {
-		start = lineStart - 1
-		if start > 0 && text[start-1] == '\r' && text[start] == '\n' {
-			start--
-		}
-	}
-	return core.NewTextRange(start, end)
 }
