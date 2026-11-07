@@ -39,15 +39,8 @@ func isDefinitelyNotDOMNode(ctx rule.RuleContext, node *ast.Node) bool {
 	if node.Kind == ast.KindVoidExpression {
 		return true
 	}
-	switch node.Kind {
-	case ast.KindArrayLiteralExpression, ast.KindArrowFunction, ast.KindClassExpression, ast.KindFunctionExpression,
-		ast.KindObjectLiteralExpression, ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral, ast.KindRegularExpressionLiteral,
-		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
-		return true
-	}
 	if utils.IsUndefinedIdentifier(node) {
 		return unicornutil.IsGlobalReference(ctx, node)
 	}
-	return false
+	return unicornutil.IsNonDOMNodeExpression(node)
 }
