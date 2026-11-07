@@ -1802,6 +1802,37 @@ queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
 
+The independent `internal/typeservice` foundation accepts an already bound
+Program and explicitly eligible sources. It owns one anchored checker namespace
+and acquires exclusive API-lifetime checker access only during each query,
+checking identity on reacquisition. Session generation, object kind and ID scope
+type, symbol and signature handles. The closeable session retains its Program
+directly; it never enters the Program's weak derived cache.
+
+For these callers, ESTree projection can emit exact forward origins and preferred
+reverse aliases from the original compiler AST, including synthetic-node gaps.
+The source-internal `languages/js/type-service` facade uses the pinned compiler's
+binary syntax views and caller-supplied TypeScript enums, without constructing a
+JavaScript checker. An injected synchronous transport returns versioned binary
+facts. Unsupported checker operations, stale handles and unavailable origins fail
+explicitly. The direct rule runner accepts an optional parser-services factory;
+production CLI, API, LSP and WorkerPool requests do not supply it yet.
+Meta-property keywords are scalar compiler fields, so their synthetic ESTree
+identifiers have no compiler node origin and reject semantic queries.
+
+A query broker can copy these packets into `SharedTypeCacheOwner`, a portable
+JavaScript-owned SharedArrayBuffer with explicit byte and index budgets. One
+publisher writes immutable bytes before atomically publishing an index entry.
+Independent clients decode their own objects, reuse shared facts, and continue
+with binary replies when either budget fills. Disposable local facts have a
+separate finite budget; stable wrapper identity lasts until client close.
+Closing invalidates semantic access and detaches transport/shared-reader
+references. Retained node wrappers can retain their independently owned syntax
+views. Shared storage is reclaimed when its owner, readers and descriptors become
+unreachable. This cache does not retain request attachment leases or use the
+research prototype's Go-mapped V8 backing store. Entrypoint admission, scheduling,
+generation transfer and editor integration remain separate follow-up work.
+
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
 shared within the current enter or exit phase. Simple listeners do not copy
