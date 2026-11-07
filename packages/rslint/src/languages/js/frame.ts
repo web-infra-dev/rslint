@@ -123,6 +123,8 @@ export function checkFrameCancellation(flag?: Int32Array): void {
 
 export interface DecodedFrame {
   ast: ESTreeNode;
+  /** One-based projection IDs, for an optional exact compiler origin table. */
+  nodes: ReadonlyArray<ESTreeNode | undefined>;
   text: string;
   /** Original byte positions when source decoding replaces invalid bytes. */
   utf16ToByte?: number[];
@@ -455,6 +457,7 @@ export function decodeFrame(
   checkFrameCancellation(cancelFlag);
   return {
     ast: nodes[root],
+    nodes,
     text,
     utf16ToByte,
     hasBOM: flags === 1,

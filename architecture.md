@@ -1802,6 +1802,53 @@ queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
 
+The independent `internal/typeservice` foundation accepts an already bound
+Program and explicitly eligible sources. `BindTarget` authorizes one canonical
+source identity and session generation; dependency declarations remain valid
+semantic operands. One anchored checker supplies stable type, symbol and
+signature handles. Queries resolve source indices before acquiring the checker,
+copy typed facts during a short exclusive lease, then resolve declaration
+indices and encode packets after releasing it. The session retains its Program
+directly until close, outside the Program's weak derived cache.
+
+The reusable ESTree `Builder.Project` owns syntax encoding and exact numeric
+forward origins and preferred reverse aliases from the original compiler AST.
+Flattened comma prefixes use compact reverse-only metadata referencing one
+canonical sequence, without serialized prefix lists. The file client snapshots
+that sequence's original membership once and creates an ordinary writable alias
+array only when a caller requests the reverse mapping. Native compiler nodes and
+proxies resolve on map lookup through the pinned binary syntax reader.
+
+`FileTypeServiceClient` belongs to exactly one eligible file-lint invocation;
+callers close it in `finally`. An injected synchronous semantic transport uses a
+finite request/fact protocol and offset-addressed binary records. Property/name
+arguments and packet strings preserve UTF-16 code units. Packet fields decode
+on demand; wrappers cache requested immutable values and translated flags, never
+packet readers. The disposable packet LRU has an explicit byte budget. Binary
+fallback packets and compiler syntax replies are copied into exact owned
+buffers before retention. A separate syntax-source callback captures the exact
+session generation and encodes immutable sources outside checker leases.
+
+A broker may publish immutable packets into `SharedTypeCacheOwner`, a portable
+JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. Bounded
+probe walks deduplicate keys, preserve existing hits at capacity, and fall back
+to binary replies when insertion cannot proceed. Independent clients decode
+their own requested values; decoded objects are not shared. Closing a client
+clears packet storage, transports, shared-reader references and syntax registries.
+Stable wrappers and requested arrays have file-client lifetime, rather than a
+claimed global heap bound. Plugins retaining syntax nodes or decoded values may
+retain their independently owned graphs after close; semantic access rejects.
+Shared storage is reclaimed when its owner/readers/descriptors are unreachable.
+This cache retains no native attachment lease or research Go-mapped V8 store.
+
+The optional parser-services factory is available to the direct rule runner;
+production CLI, API, LSP and WorkerPool requests do not supply it yet. Entrypoint
+admission, scheduling, generation transfer and editor integration remain follow-up
+work. Meta-property keywords are scalar compiler fields, so their synthetic
+ESTree identifiers have no compiler node origin and reject semantic queries.
+The core `build:js` and `dev` scripts build `@rslint/api` first, including its
+compiler syntax declarations, so direct builds need no earlier workspace build.
+
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
 shared within the current enter or exit phase. Simple listeners do not copy
