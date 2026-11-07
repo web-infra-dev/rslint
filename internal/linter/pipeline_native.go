@@ -35,12 +35,13 @@ func prepareNativeObservation(
 ) (*nativeObservationWork, error) {
 	native := generation.Native
 	options := RunLinterOptions{
-		LintPlan:       plan,
-		SingleThreaded: native.SingleThreaded,
-		Cwd:            native.Cwd,
-		TypeCheck:      native.TypeCheck,
-		Timing:         native.Timing,
-		Consumer:       rule.DiagnosticConsumer{Demand: demand},
+		LintPlan:        plan,
+		SingleThreaded:  native.SingleThreaded,
+		Cwd:             native.Cwd,
+		TypeCheck:       native.TypeCheck,
+		Timing:          native.Timing,
+		Consumer:        rule.DiagnosticConsumer{Demand: demand},
+		ProjectAnalysis: native.ProjectAnalysis,
 	}
 	if plan == nil {
 		options.TypeCheckOnlyPrograms = native.Programs

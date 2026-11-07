@@ -48,6 +48,9 @@ type programRunOptions struct {
 	SingleThreaded       bool
 	Timing               *TimingCollector
 	reservation          *programReservation
+	// generation is the pass-wide rule scope; nil when the pass provides no
+	// project analysis.
+	generation *rule.GenerationScope
 }
 
 // Keep checker-free lint shards large enough to amortize their goroutine,
@@ -188,7 +191,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
-		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
+		fileCache := rule.NewLintFileCache(opts.Cwd, opts.generation)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
 			Settings:        environment.Settings,

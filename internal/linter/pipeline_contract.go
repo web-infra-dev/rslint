@@ -141,6 +141,9 @@ type NativeGeneration struct {
 	TypeCheck        bool
 	SingleThreaded   bool
 	Timing           *TimingCollector
+	// ProjectAnalysis lets rules share pass-wide analysis across this
+	// generation's Programs; see RunLinterOptions.ProjectAnalysis.
+	ProjectAnalysis bool
 }
 
 // TargetProjection binds Program-facing paths to the stable target identity

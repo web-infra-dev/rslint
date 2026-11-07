@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/module"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/moduleresolver"
@@ -26,7 +27,13 @@ type importResolver struct {
 // services. Configuration policy stays here; filesystem lookup stays in the
 // shared resolver and the Program. It is constructed once per rule invocation.
 type ImportResolver struct {
-	ctx       rule.RuleContext
+	// ctx is set only for a resolver bound to the linted file; checks that
+	// need that file's references, such as EquivalentNodeCandidate, use it.
+	ctx       *rule.RuleContext
+	program   *program.Program
+	importer  *ast.SourceFile
+	owned     bool
+	settings  map[string]any
 	resolvers []importResolver
 	core      []string
 	err       string
@@ -34,10 +41,36 @@ type ImportResolver struct {
 }
 
 func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
-	r := &ImportResolver{ctx: ctx, core: settingsStringList(ctx.Settings, "import/core-modules")}
-	raw := ctx.Settings["import/resolver"]
+	cwd := ctx.ProcessCurrentDirectory()
+	if cwd == "" {
+		cwd = ctx.Program().CurrentDirectory()
+	}
+	r := newImportResolver(ctx.Program(), ctx.SourceFile, true, ctx.Settings, cwd)
+	r.ctx = &ctx
+	return r
+}
+
+// NewImportResolverForFile resolves requests written in importer with the same
+// import/ settings as a rule on another file. owned states whether sourceProgram
+// owns importer: only then do its compiler options, such as tsconfig paths,
+// describe the importer, so only then is TypeScript project resolution used.
+// An unowned importer still gets Node resolution and the TypeScript resolver's
+// filesystem lookup, without any project's paths.
+func NewImportResolverForFile(sourceProgram *program.Program, importer *ast.SourceFile, owned bool, settings map[string]any, cwd string) *ImportResolver {
+	return newImportResolver(sourceProgram, importer, owned, settings, cwd)
+}
+
+func newImportResolver(sourceProgram *program.Program, importer *ast.SourceFile, owned bool, settings map[string]any, cwd string) *ImportResolver {
+	r := &ImportResolver{
+		program:  sourceProgram,
+		importer: importer,
+		owned:    owned,
+		settings: settings,
+		core:     settingsStringList(settings, "import/core-modules"),
+	}
+	raw := settings["import/resolver"]
 	if raw == nil || raw == false || raw == "" {
-		if legacy := ctx.Settings["import/resolve"]; legacy != nil {
+		if legacy := settings["import/resolve"]; legacy != nil {
 			raw = map[string]any{"node": legacy}
 		} else {
 			// Unlike upstream's node-only default, let the TypeScript project
@@ -49,7 +82,7 @@ func NewImportResolver(ctx rule.RuleContext) *ImportResolver {
 	set := func(name string, config map[string]any) {
 		entry := importResolver{name: name, defaultConfig: len(config) == 0}
 		if name == "node" || name == "eslint-import-resolver-node" {
-			entry.options = nodeResolveOptions(ctx, config)
+			entry.options = nodeResolveOptions(cwd, config)
 		}
 		// Upstream reduces settings into a Map: the last configuration wins
 		// without changing the resolver's original position.
@@ -109,14 +142,14 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			fileName := r.ctx.SourceFile.FileName()
+			fileName := r.importer.FileName()
 			if !resolver.options.PreserveSymlinks {
 				// Node resolves from the real importer directory as well as
 				// returning the real target when symlink preservation is off.
-				directory := r.ctx.Program().FS().Realpath(tspath.GetDirectoryPath(fileName))
+				directory := r.program.FS().Realpath(tspath.GetDirectoryPath(fileName))
 				fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
 			}
-			result := moduleresolver.Resolve(r.ctx.Program(), name, fileName, resolver.options)
+			result := moduleresolver.Resolve(r.program, name, fileName, resolver.options)
 			if result.Error == "" {
 				return result.Path, true, ""
 			}
@@ -124,8 +157,10 @@ func (r *ImportResolver) ResolveName(name string, source modules.Source) (string
 			if modules.IsNodeBuiltin(name) {
 				return "", true, ""
 			}
-			if path, _, ok := r.ctx.Program().ResolveModuleNameAt(r.ctx.SourceFile, name, source); ok {
-				return path, true, ""
+			if r.owned {
+				if path, _, ok := r.program.ResolveModuleNameAt(r.importer, name, source); ok {
+					return path, true, ""
+				}
 			}
 			if path, ok := r.resolveTypeScriptFallback(name); ok {
 				return path, true, ""
@@ -180,8 +215,8 @@ func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 	if i := strings.IndexAny(name[start:], "?#"); i >= 0 {
 		name = name[:start+i]
 	}
-	p := r.ctx.Program()
-	fileName := r.ctx.SourceFile.FileName()
+	p := r.program
+	fileName := r.importer.FileName()
 	directory := p.FS().Realpath(tspath.GetDirectoryPath(fileName))
 	fileName = tspath.ResolvePath(directory, tspath.GetBaseFileName(fileName))
 	resolve := func(request string) (string, bool) {
@@ -189,7 +224,7 @@ func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 		return result.Path, result.Error == "" && result.Path != ""
 	}
 	options := p.Options()
-	if options != nil && options.Paths.Size() > 0 && !tspath.IsExternalModuleNameRelative(name) {
+	if r.owned && options != nil && options.Paths.Size() > 0 && !tspath.IsExternalModuleNameRelative(name) {
 		if r.patterns == nil {
 			r.patterns = module.TryParsePatterns(options.Paths)
 		}
@@ -206,7 +241,7 @@ func (r *ImportResolver) resolveTypeScriptFallback(name string) (string, bool) {
 	return resolve(name)
 }
 
-func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresolver.Options {
+func nodeResolveOptions(cwd string, config map[string]any) moduleresolver.Options {
 	opts := moduleresolver.Options{
 		Extensions:    []string{".mjs", ".js", ".json", ".node"},
 		IgnoreExports: true, LiteralPaths: true, PreserveSymlinks: true,
@@ -229,10 +264,6 @@ func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresol
 	} else if _, ok := config["moduleDirectory"]; ok {
 		opts.Modules = settingsStringList(config, "moduleDirectory")
 	}
-	cwd := ctx.ProcessCurrentDirectory()
-	if cwd == "" {
-		cwd = ctx.Program().CurrentDirectory()
-	}
 	for _, path := range settingsStringList(config, "paths") {
 		opts.Modules = append(opts.Modules, tspath.ResolvePath(cwd, path))
 	}
@@ -243,6 +274,9 @@ func nodeResolveOptions(ctx rule.RuleContext, config map[string]any) moduleresol
 // Node resolution, independently of the legacy import resolver's exports-blind
 // lookup. Unknown runtime policy is a reason to omit a suggestion, not to guess.
 func (r *ImportResolver) EquivalentNodeCandidate(source modules.Source, candidate, packageRoot string) bool {
+	if r.ctx == nil {
+		return false
+	}
 	configured := r.ctx.Settings["import/resolver"]
 	// The implicit TypeScript fallback does not alter this independent Node
 	// runtime check. Explicit resolver chains retain their unknown policy.
