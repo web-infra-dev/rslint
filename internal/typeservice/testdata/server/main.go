@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -22,10 +23,11 @@ import (
 )
 
 type request struct {
-	Method string            `json:"method"`
-	Config string            `json:"config"`
-	File   string            `json:"file"`
-	Query  typeservice.Query `json:"query"`
+	Method     string            `json:"method"`
+	Config     string            `json:"config"`
+	File       string            `json:"file"`
+	Query      typeservice.Query `json:"query"`
+	Generation uint32            `json:"generation"`
 }
 
 func main() {
@@ -34,6 +36,7 @@ func main() {
 	output := json.NewEncoder(os.Stdout)
 	var session *typeservice.Session
 	var p *program.Program
+	var projector estree.Builder
 	defer func() {
 		if session != nil {
 			session.Close()
@@ -98,7 +101,32 @@ func main() {
 					err = errors.New("missing source")
 					return
 				}
-				value, err = session.Project(context.Background(), f, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(f.Text(), "\ufeff")})
+				binding, bindErr := session.BindTarget(f)
+				if bindErr != nil {
+					err = bindErr
+					return
+				}
+				projection, projectErr := projector.Project(context.Background(), f, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(f.Text(), "\ufeff")})
+				projector.Reset()
+				value = struct {
+					estree.Projection
+					Binding typeservice.Binding `json:"binding"`
+				}{projection, binding}
+				err = projectErr
+			case "source":
+				f, sourceErr := session.Source(req.Generation, tspath.NormalizePath(req.File))
+				if sourceErr != nil {
+					err = sourceErr
+					return
+				}
+				if f != nil {
+					tree, _, encodeErr := encoder.EncodeSourceFile(f)
+					err = encodeErr
+					value = struct {
+						FileName string `json:"fileName"`
+						Tree     []byte `json:"tree"`
+					}{f.FileName(), tree}
+				}
 			case "query":
 				if session == nil {
 					err = errors.New("session not initialized")

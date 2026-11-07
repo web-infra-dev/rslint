@@ -1,7 +1,4 @@
-/** A bounded cache of immutable Go packets, owned by the query broker.
- * Publication copies bytes once into portable JS-owned shared storage. This
- * does not retain native request leases or share decoded JavaScript objects.
- */
+/** Immutable Go facts published by one broker into bounded portable storage. */
 export interface SharedTypeCacheDescriptor {
   buffer: SharedArrayBuffer;
   generation: number;
@@ -9,73 +6,100 @@ export interface SharedTypeCacheDescriptor {
 }
 const HEADER = 8,
   SLOT = 4;
-const encoder = new TextEncoder();
+export const MAX_SHARED_TYPE_PROBES = 16;
+function keyBytes(key: string): Uint8Array {
+  const bytes = new Uint8Array(key.length * 2);
+  for (let i = 0; i < key.length; i++) {
+    const unit = key.charCodeAt(i);
+    bytes[i * 2] = unit & 255;
+    bytes[i * 2 + 1] = unit >>> 8;
+  }
+  return bytes;
+}
 function hash(bytes: Uint8Array): number {
   let value = 2166136261;
   for (const byte of bytes) value = Math.imul(value ^ byte, 16777619);
   return value | 0 || 1;
 }
+interface Storage {
+  descriptor: SharedTypeCacheDescriptor;
+  control: Int32Array;
+  bytes: Uint8Array;
+}
+function storage(descriptor: SharedTypeCacheDescriptor): Storage {
+  const { buffer, entries, generation } = descriptor;
+  if (
+    !Number.isSafeInteger(entries) ||
+    entries < 1 ||
+    buffer.byteLength < (HEADER + entries * SLOT) * 4
+  )
+    throw new Error('invalid shared type cache');
+  const control = new Int32Array(buffer, 0, HEADER + entries * SLOT);
+  if (Atomics.load(control, 1) !== generation)
+    throw new Error('foreign shared type cache generation');
+  return { descriptor, control, bytes: new Uint8Array(buffer) };
+}
 export class SharedTypeCacheReader {
-  protected control: Int32Array;
-  protected bytes: Uint8Array;
-  private closed = false;
-  constructor(readonly descriptor: SharedTypeCacheDescriptor) {
-    const { buffer, entries, generation } = descriptor;
-    if (
-      !Number.isSafeInteger(entries) ||
-      entries < 1 ||
-      buffer.byteLength < (HEADER + entries * SLOT) * 4
-    )
-      throw new Error('invalid shared type cache');
-    this.control = new Int32Array(buffer, 0, HEADER + entries * SLOT);
-    this.bytes = new Uint8Array(buffer);
-    if (Atomics.load(this.control, 1) !== generation)
-      throw new Error('foreign shared type cache generation');
+  private storage: Storage | undefined;
+  readonly stats = { probes: 0 };
+  constructor(descriptor: SharedTypeCacheDescriptor) {
+    this.storage = storage(descriptor);
     this.assertOpen();
-    Atomics.add(this.control, 3, 1);
+    Atomics.add(this.storage.control, 3, 1);
+  }
+  get descriptor(): SharedTypeCacheDescriptor {
+    return this.open().descriptor;
+  }
+  get retainedBytes(): number {
+    return this.storage?.bytes.byteLength ?? 0;
+  }
+  private open(): Storage {
+    const current = this.storage;
+    if (!current || Atomics.load(current.control, 0) !== 1)
+      throw new Error('shared type cache is closed');
+    return current;
   }
   assertOpen(): void {
-    if (this.closed || Atomics.load(this.control, 0) !== 1)
-      throw new Error('shared type cache is closed');
+    this.open();
   }
   get(key: string): Uint8Array | undefined {
-    this.assertOpen();
-    const encoded = encoder.encode(key),
+    const { descriptor, control, bytes } = this.open();
+    const encoded = keyBytes(key),
       value = hash(encoded);
-    for (let step = 0; step < this.descriptor.entries; step++) {
+    for (
+      let step = 0;
+      step < Math.min(descriptor.entries, MAX_SHARED_TYPE_PROBES);
+      step++
+    ) {
+      this.stats.probes++;
       const slot =
-        HEADER + (((value >>> 0) + step) % this.descriptor.entries) * SLOT;
-      const found = Atomics.load(this.control, slot);
+        HEADER + (((value >>> 0) + step) % descriptor.entries) * SLOT;
+      const found = Atomics.load(control, slot);
       if (found === 0) return undefined;
       if (found !== value) continue;
-      const offset = this.control[slot + 1],
-        length = this.control[slot + 2],
-        keyLength = this.control[slot + 3];
-      if (keyLength !== encoded.length) continue;
-      if (encoded.every((byte, i) => this.bytes[offset + i] === byte))
-        return this.bytes.subarray(
-          offset + keyLength,
-          offset + keyLength + length,
-        );
+      const offset = control[slot + 1],
+        length = control[slot + 2],
+        keyLength = control[slot + 3];
+      if (
+        keyLength === encoded.length &&
+        encoded.every((byte, i) => bytes[offset + i] === byte)
+      )
+        return bytes.subarray(offset + keyLength, offset + keyLength + length);
     }
     return undefined;
   }
   close(): void {
-    if (!this.closed) {
-      this.closed = true;
-      Atomics.sub(this.control, 3, 1);
+    if (this.storage) {
+      Atomics.sub(this.storage.control, 3, 1);
+      this.storage = undefined;
     }
   }
 }
-
-/** Exactly one broker may publish. Readers may live in different workers.
- * close invalidates readers immediately; SAB storage is reclaimed by JS after
- * the last reader/descriptor releases it. No lazy plugin value aliases it.
- */
+/** Existing hits survive saturation. A collision only declines that insertion.
+ * JavaScript wrappers never receive these shared byte views. */
 export class SharedTypeCacheOwner {
-  readonly descriptor: SharedTypeCacheDescriptor;
-  private control: Int32Array;
-  private readonly bytes: Uint8Array;
+  private storage: Storage | undefined;
+  readonly stats = { probes: 0 };
   constructor(generation: number, budgetBytes: number, entries: number) {
     const start = (HEADER + entries * SLOT) * 4;
     if (
@@ -89,44 +113,82 @@ export class SharedTypeCacheOwner {
       generation > 0x7fffffff
     )
       throw new Error('invalid shared type cache budget');
-    const buffer = new SharedArrayBuffer(budgetBytes);
-    this.descriptor = { buffer, entries, generation };
-    this.control = new Int32Array(buffer, 0, HEADER + entries * SLOT);
-    this.bytes = new Uint8Array(buffer);
-    this.control[1] = generation;
-    this.control[2] = start;
-    Atomics.store(this.control, 0, 1);
+    const descriptor = {
+      buffer: new SharedArrayBuffer(budgetBytes),
+      entries,
+      generation,
+    };
+    const control = new Int32Array(
+      descriptor.buffer,
+      0,
+      HEADER + entries * SLOT,
+    );
+    control[1] = generation;
+    control[2] = start;
+    Atomics.store(control, 0, 1);
+    this.storage = storage(descriptor);
+  }
+  private open(): Storage {
+    if (!this.storage) throw new Error('shared type cache is closed');
+    return this.storage;
+  }
+  get descriptor(): SharedTypeCacheDescriptor {
+    return this.open().descriptor;
   }
   publish(key: string, packet: Uint8Array): boolean {
-    if (Atomics.load(this.control, 0) !== 1)
-      throw new Error('shared type cache is closed');
-    const encoded = encoder.encode(key),
+    const { descriptor, control, bytes } = this.open();
+    const encoded = keyBytes(key),
       value = hash(encoded);
-    for (let step = 0; step < this.descriptor.entries; step++) {
+    let available = -1;
+    for (
+      let step = 0;
+      step < Math.min(descriptor.entries, MAX_SHARED_TYPE_PROBES);
+      step++
+    ) {
+      this.stats.probes++;
       const slot =
-        HEADER + (((value >>> 0) + step) % this.descriptor.entries) * SLOT;
-      if (Atomics.load(this.control, slot) !== 0) continue;
-      const offset = this.control[2],
-        end = offset + encoded.length + packet.length;
-      if (end > this.bytes.length) return false;
-      this.bytes.set(encoded, offset);
-      this.bytes.set(packet, offset + encoded.length);
-      this.control[slot + 1] = offset;
-      this.control[slot + 2] = packet.length;
-      this.control[slot + 3] = encoded.length;
-      this.control[2] = end;
-      Atomics.store(this.control, slot, value);
-      return true;
+        HEADER + (((value >>> 0) + step) % descriptor.entries) * SLOT;
+      const found = Atomics.load(control, slot);
+      if (found === 0) {
+        available = slot;
+        break;
+      }
+      if (found !== value || control[slot + 3] !== encoded.length) continue;
+      const offset = control[slot + 1];
+      if (encoded.every((byte, i) => bytes[offset + i] === byte)) return true;
     }
-    return false;
+    if (control[5] || available < 0) return false;
+    if (control[4] >= Math.max(1, Math.floor(descriptor.entries / 2))) {
+      control[5] = 1;
+      return false;
+    }
+    const offset = control[2],
+      end = offset + encoded.length + packet.length;
+    if (end > bytes.length) return false;
+    bytes.set(encoded, offset);
+    bytes.set(packet, offset + encoded.length);
+    control[available + 1] = offset;
+    control[available + 2] = packet.length;
+    control[available + 3] = encoded.length;
+    control[2] = end;
+    control[4]++;
+    Atomics.store(control, available, value);
+    return true;
   }
   close(): void {
-    Atomics.store(this.control, 0, 0);
+    if (this.storage) Atomics.store(this.storage.control, 0, 0);
+    this.storage = undefined;
   }
   get readers(): number {
-    return Atomics.load(this.control, 3);
+    return Atomics.load(this.open().control, 3);
   }
   get usedBytes(): number {
-    return this.control[2];
+    return this.open().control[2];
+  }
+  get entries(): number {
+    return this.open().control[4];
+  }
+  get retainedBytes(): number {
+    return this.storage?.bytes.byteLength ?? 0;
   }
 }

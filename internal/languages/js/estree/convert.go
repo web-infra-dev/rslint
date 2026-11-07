@@ -985,12 +985,12 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 		for index := len(rights) - 1; index >= 0; index-- {
 			count := len(rights) - index
 			items[count] = p.convert(rights[index], false)
-			if p.recordOrigins && index > 0 {
-				id := p.addNode("SequenceExpression", prefixes[index], p.listValue(items[:count+1]))
-				p.registerReverse(prefixes[index], id)
-			}
 		}
-		return p.addNode("SequenceExpression", node, p.listValue(items))
+		id := p.addNode("SequenceExpression", node, p.listValue(items))
+		for index := 1; index < len(prefixes); index++ {
+			p.sequenceAliases = append(p.sequenceAliases, sequenceAlias{prefixes[index], id, uint32(len(items) - index)})
+		}
+		return id
 	}
 	typeName := "BinaryExpression"
 	if n.OperatorToken.Kind >= ast.KindFirstAssignment && n.OperatorToken.Kind <= ast.KindLastAssignment {
