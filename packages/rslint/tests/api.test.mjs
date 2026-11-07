@@ -140,3 +140,27 @@ describe('encoded source files', async (t) => {
     expect(source).toBe(fileContent);
   });
 });
+
+test('unused directives in zero-rule API files support configuration and fixes', async () => {
+  const cwd = path.resolve(import.meta.dirname, '../fixtures');
+  const file = path.resolve(cwd, 'src/unused-directive.ts');
+  const request = {
+    files: [file],
+    workingDirectory: cwd,
+    configDirectory: cwd,
+    config: [
+      {
+        files: ['**/*.ts'],
+        linterOptions: { reportUnusedDisableDirectives: 'warn' },
+      },
+    ],
+    fileContents: { [file]: '/* eslint-disable */\nconst x = 1;\n' },
+  };
+  const result = await lint(request);
+  expect(result.diagnostics).toHaveLength(1);
+  expect(result.errorCount).toBe(0);
+  expect(result.warningCount).toBe(1);
+  const fixed = await lint({ ...request, fix: true });
+  expect(fixed.diagnostics).toEqual([]);
+  expect(fixed.output).toBeDefined();
+});

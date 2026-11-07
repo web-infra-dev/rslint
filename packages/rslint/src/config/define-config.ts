@@ -201,6 +201,11 @@ export interface ESLintPlugin {
  * different file globs and are merged at lint time.
  */
 export interface RslintConfigEntry {
+  /** Report unused disable and enable comments. Defaults to off. */
+  linterOptions?: {
+    reportUnusedDisableDirectives?:
+      boolean | 0 | 1 | 2 | 'off' | 'warn' | 'error';
+  };
   /** Optional human-readable name for this config entry. */
   name?: string;
   /**

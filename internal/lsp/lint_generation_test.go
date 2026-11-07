@@ -306,3 +306,22 @@ func TestLSPProjectConfigErrorClassification(t *testing.T) {
 		}
 	})
 }
+
+func TestLSPUnusedDirectiveConfigurationWithoutRules(t *testing.T) {
+	directory, file, program, fsys := programOver(t, "/* eslint-disable */\nconst x = 1;\n")
+	source := sourceFileForPath(program, file, fsys)
+	severity := config.UnusedDirectiveSeverity("warn")
+	snapshot := documentLintSnapshot{resolvedConfig: config.ResolvedFileConfig{MergedConfig: &config.MergedConfig{LinterOptions: &config.LinterOptions{ReportUnusedDisableDirectives: &severity}}}}
+	generation := buildDocumentGeneration(program, source, lspConfigTarget(file, directory, fsys), directory, true, snapshot)
+	result, err := runLSPGenerationForTest(context.Background(), generation, nil, linter.ArtifactDemand{Native: rule.EditDemandAutofix})
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 1 || diagnostics[0].Severity != rule.SeverityWarning || len(diagnostics[0].Fixes()) != 1 {
+		t.Fatalf("unexpected unused diagnostics: %+v", diagnostics)
+	}
+	if diagnostics[0].RuleName != "" {
+		t.Fatal("unused directive must not be an ordinary rule diagnostic")
+	}
+}

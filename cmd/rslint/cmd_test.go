@@ -2647,3 +2647,28 @@ func TestParseLintFlagsTiming(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLintFlagsUnusedDirectives(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{}, "default"},
+		{[]string{"--report-unused-disable-directives"}, "error"},
+		{[]string{"--report-unused-disable-directives=false"}, "off"},
+		{[]string{"--report-unused-disable-directives", "--report-unused-disable-directives-severity", "warn"}, "warn"},
+		{[]string{"--report-unused-disable-directives-severity=off", "--report-unused-disable-directives"}, "off"},
+	} {
+		args, _, code := parseLintFlags(tc.args)
+		if code != 0 {
+			t.Fatalf("%v: exit %d", tc.args, code)
+		}
+		got := "default"
+		if args.UnusedDirectiveSeverity != nil {
+			got = args.UnusedDirectiveSeverity.String()
+		}
+		if got != tc.want {
+			t.Fatalf("%v: got %s, want %s", tc.args, got, tc.want)
+		}
+	}
+}

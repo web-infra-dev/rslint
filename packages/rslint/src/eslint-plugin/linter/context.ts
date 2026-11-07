@@ -131,7 +131,7 @@ export interface CreateContextOptions {
   lsoCache?: number[];
   /**
    * The SourceCode for this file, built once by `lintFile` (carrying the Go-projected
-   * token/comment streams) and shared across every rule + `applyDisableDirectives` so they
+   * token/comment streams) and shared across every rule so they
    * all hit the same lazy caches (tokens/comments/scopeManager). Required — per ESLint v10 a
    * RuleContext always has a SourceCode; there is no token-less mode.
    */

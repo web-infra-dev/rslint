@@ -100,10 +100,12 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 			diagnosticsWait.Wait()
 		}
 	}
-	if !work.preserveSourceIdentity {
+	if !work.preserveSourceIdentity || len(work.execution.options.directives) > 0 {
 		report := consumer.Report
 		consumer.Report = func(diagnostic rule.RuleDiagnostic) {
-			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+			if !work.preserveSourceIdentity || work.execution.options.directives[diagnostic.FilePath] != nil {
+				diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+			}
 			report(diagnostic)
 		}
 	}
@@ -112,6 +114,9 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 	defer finish()
 	lintResult := work.execution.run(consumer)
 	finish()
+	for sourcePath, state := range work.execution.options.directives {
+		diagnostics = append(diagnostics, state.complete(true, ctx.Err() != nil, sourcePath)...)
+	}
 
 	for index := range diagnostics {
 		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)

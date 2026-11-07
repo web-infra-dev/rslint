@@ -165,7 +165,8 @@ var errPluginWindowFull = errors.New("plugin ESTree window is full")
 // EslintPluginFileInput is the linter's generation-local representation of one
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
-	Path string
+	directives *fileDirectives
+	Path       string
 	// Text is the complete generation snapshot, including its original BOM.
 	// It stays Go-local for projection validation and detached diagnostics.
 	Text *string
@@ -853,6 +854,7 @@ func applyEslintPluginResults(
 	for _, f := range batch {
 		fr, ok := byPath[f.Path]
 		if !ok {
+			f.directives.complete(false, true, f.Path)
 			if onNotice != nil {
 				onNotice(EslintPluginProtocolNotice{
 					Kind:     EslintPluginMissingFileResult,
@@ -862,6 +864,7 @@ func applyEslintPluginResults(
 			continue
 		}
 		if fr.Cancelled {
+			f.directives.complete(false, true, f.Path)
 			return context.Canceled
 		}
 		if timing != nil && len(fr.RuleTimes) > 0 {
@@ -900,6 +903,7 @@ func applyEslintPluginResults(
 		// use this existing error field and must remain visible. The sole benign
 		// value is the "shutdown" sentinel (graceful pool teardown racing a task).
 		if fr.ParseError != "" {
+			f.directives.complete(false, true, f.Path)
 			if fr.ParseError != eslintPluginShutdownSentinel {
 				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
 					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
@@ -926,6 +930,9 @@ func applyEslintPluginResults(
 				}
 			}
 			start := clamp(d.StartPos)
+			if f.directives != nil && f.directives.manager.IsRuleDisabled(d.RuleName, start) {
+				continue
+			}
 			end := clamp(d.EndPos)
 			if end < start {
 				end = start
@@ -941,6 +948,9 @@ func applyEslintPluginResults(
 				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, text, clamp),
 			}
 			onDiagnostic(rd)
+		}
+		for _, diagnostic := range f.directives.complete(false, len(fr.RuleErrors) > 0, f.Path) {
+			onDiagnostic(diagnostic)
 		}
 	}
 	return nil

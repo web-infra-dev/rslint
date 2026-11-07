@@ -1896,3 +1896,19 @@ func TestMergePluginDiagnosticsRetargetedAliasRejectsInvalidPolicy(t *testing.T)
 		})
 	}
 }
+
+func TestUnusedDirectiveLSPPresentationAndActions(t *testing.T) {
+	diagnostic := pluginDiag("/* eslint-disable */", "", "Unused eslint-disable directive (no problems were reported).", 0, 0)
+	fixes := []rule.RuleFix{{Range: core.NewTextRange(0, 20), Text: " "}}
+	diagnostic.FixesPtr = &fixes
+	converted := convertRuleDiagnosticToLSP(diagnostic, false)
+	if converted.Message.String == nil || *converted.Message.String != diagnostic.Message.Description {
+		t.Fatalf("unexpected message: %+v", converted.Message)
+	}
+	if actions := createDisableRuleActions(diagnostic, "file:///test.ts", false); len(actions) != 0 {
+		t.Fatal("unused directives must not offer wildcard disable actions")
+	}
+	if action := createCodeActionFromRuleDiagnostic(diagnostic, "file:///test.ts", false); action == nil {
+		t.Fatal("missing unused directive quick fix")
+	}
+}

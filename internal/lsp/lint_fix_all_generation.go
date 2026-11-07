@@ -12,6 +12,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // speculativeLintEnvironment captures the base filesystem identity, process
@@ -85,7 +86,7 @@ func acquireSpeculativeGeneration(
 			}
 			return content, nil
 		}
-		return newLintGeneration(
+		generation := newLintGeneration(
 			program,
 			sourceFile,
 			target,
@@ -95,6 +96,27 @@ func acquireSpeculativeGeneration(
 			pluginFileConfigForLintSnapshot(snapshot),
 			readText,
 		)
+		generation.Native.DirectiveRuleExists = func(_ string, name string) bool {
+			if snapshot.ruleCatalog == nil {
+				return true
+			}
+			if _, ok := snapshot.ruleCatalog.Lookup(name); !ok {
+				return false
+			}
+			namespace := rule.Namespace(name)
+			if namespace == "" {
+				return true
+			}
+			if snapshot.resolvedConfig.MergedConfig == nil {
+				return false
+			}
+			_, ok := snapshot.resolvedConfig.MergedConfig.Plugins[namespace]
+			return ok
+		}
+		generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity {
+			return snapshot.resolvedConfig.MergedConfig.UnusedDirectiveSeverity()
+		}
+		return generation
 	}
 	if sourceFile == nil {
 		return emptyLintGeneration(environment.processCwd), nil, nil

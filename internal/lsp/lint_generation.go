@@ -83,7 +83,7 @@ func buildDocumentGeneration(
 	hasTypeInfo bool,
 	snapshot documentLintSnapshot,
 ) linter.Generation {
-	return newLintGeneration(
+	generation := newLintGeneration(
 		program,
 		sourceFile,
 		target,
@@ -93,6 +93,27 @@ func buildDocumentGeneration(
 		pluginFileConfigForLintSnapshot(snapshot),
 		nil,
 	)
+	generation.Native.DirectiveRuleExists = func(_ string, name string) bool {
+		if snapshot.ruleCatalog == nil {
+			return true
+		}
+		if _, ok := snapshot.ruleCatalog.Lookup(name); !ok {
+			return false
+		}
+		namespace := rule.Namespace(name)
+		if namespace == "" {
+			return true
+		}
+		if snapshot.resolvedConfig.MergedConfig == nil {
+			return false
+		}
+		_, ok := snapshot.resolvedConfig.MergedConfig.Plugins[namespace]
+		return ok
+	}
+	generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity {
+		return snapshot.resolvedConfig.MergedConfig.UnusedDirectiveSeverity()
+	}
+	return generation
 }
 
 func (p *documentGenerationProvider) AcquireGeneration(
@@ -242,6 +263,19 @@ func newLintGeneration(
 			TargetsByProgram: [][]string{{sourcePath}},
 			SingleThreaded:   true,
 			Cwd:              processCwd,
+			SkippedDirectiveRules: func(string) []string {
+				selected := map[string]bool{}
+				for _, r := range servedRules {
+					selected[r.Name] = true
+				}
+				var skipped []string
+				for _, r := range enabledRules {
+					if !selected[r.Name] {
+						skipped = append(skipped, r.Name)
+					}
+				}
+				return skipped
+			},
 			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return servedRules
 			},

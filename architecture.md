@@ -1443,10 +1443,23 @@ Rslint supports inline directives with both `rslint-` and `eslint-` prefixes:
 - `/* rslint-disable @typescript-eslint/no-unsafe-assignment */`
 - `// eslint-disable-next-line`
 
-The `DisableManager` in `internal/rule/disable_manager.go` applies these
-directives before diagnostics are emitted. It defers parsing until the first
-disable check and uses an exact directive-text candidate check, so files without a
-supported directive retain an empty manager without scanning comments.
+The Go `DisableManager` owns directive parsing, suppression attribution, and
+unused reporting for native and Node plugin diagnostics. One state belongs to
+one file and execution round. Native rules consult it before building fixes;
+Node returns unfiltered diagnostics and Go applies the same state after position
+conversion. Files without candidate directive text do not scan comments.
+
+The pipeline freezes directive data with a text-only source frame while syntax
+is leased. Native and plugin completion join per file; finalization happens
+once, including zero-rule files. Failure, missing plugin results, and cancellation
+suppress unused reports. Each source-changing fix round creates new state.
+Progressive LSP continuations retain no Program or AST through this state and
+publish through the existing source-version checks.
+
+`linterOptions.reportUnusedDisableDirectives` is resolved per file independently
+of its enabled rules. Explicit CLI settings override it. Reporting defaults to
+off. API protocol 6 and config-discovery protocol 4 require matching peers for
+the changed unfiltered plugin-result contract.
 
 ## 9. CLI Flow
 
@@ -1813,7 +1826,7 @@ inline as base64 through its existing JSON-RPC route. The host resolves bytes
 and forwards configuration keys; workers own configuration lookup. Neither the
 plugin adapter nor Node IPC performs a separate canonical base64 validation
 pass. Native mapping bounds, publication generations and exact release
-acknowledgements remain transport invariants. API protocol 5.0.0 requires
+acknowledgements remain transport invariants. API protocol 6.0.0 requires
 matching peers, with no old text-input negotiation or parser fallback. Detached
 LSP continuations contain owned frames, diagnostic text and cloned JSON
 metadata, with no SourceFile, checker, mutable observer or native rule graph.

@@ -9,12 +9,12 @@ const configPath = path.resolve(process.argv[2]);
 const mode = process.argv[3];
 const transactionId = 'cli-worker-warmup';
 const selection = {
-  protocolVersion: 3,
+  protocolVersion: 4,
   transactionId,
   effectiveConfigIds: ['root'],
 };
 const load = {
-  protocolVersion: 3,
+  protocolVersion: 4,
   transactionId,
   loadMode: 'cached',
   candidates: [

@@ -330,7 +330,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 
 // Helper function to create disable rule actions for diagnostics without fixes
 func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, editorHasBOM bool) []lsproto.CommandOrCodeAction {
-	if ruleDiag.Origin == rule.DiagnosticOriginTypeScript {
+	if ruleDiag.Origin == rule.DiagnosticOriginTypeScript || ruleDiag.RuleName == "" {
 		return nil
 	}
 	var actions []lsproto.CommandOrCodeAction

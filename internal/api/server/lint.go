@@ -535,10 +535,12 @@ func (h *Handler) handleLint(ctx context.Context, req api.LintRequest, dispatch 
 		}
 		return linter.Generation{
 			Native: linter.NativeGeneration{
-				Programs:         binding.Programs,
-				TargetsByProgram: binding.TargetsByProgram,
-				SingleThreaded:   false, // Don't use single-threaded mode for IPC
-				Cwd:              currentDirectory,
+				Programs:                binding.Programs,
+				TargetsByProgram:        binding.TargetsByProgram,
+				SingleThreaded:          false, // Don't use single-threaded mode for IPC
+				Cwd:                     currentDirectory,
+				UnusedDirectiveSeverity: fileConfigResolver.UnusedDirectiveSeverityForSourcePath,
+				DirectiveRuleExists:     fileConfigResolver.DirectiveRuleExists,
 				RulesForFile: func(sourceFile *ast.SourceFile) []rule.ConfiguredRule {
 					return fileConfigResolver.EnabledRulesForSourcePath(sourceFile.FileName())
 				},

@@ -335,3 +335,37 @@ func TestValidateConfig_RejectsInvalidRuleValues(t *testing.T) {
 		})
 	}
 }
+
+func TestUnusedDirectiveSeverityConfig(t *testing.T) {
+	for _, tc := range []struct{ input, want string }{
+		{`false`, "off"}, {`0`, "off"}, {`"off"`, "off"},
+		{`true`, "warn"}, {`1`, "warn"}, {`"warn"`, "warn"},
+		{`2`, "error"}, {`"error"`, "error"},
+	} {
+		t.Run(tc.input, func(t *testing.T) {
+			var cfg RslintConfig
+			if err := json.Unmarshal([]byte(`[{"linterOptions":{"reportUnusedDisableDirectives":`+tc.input+`}}]`), &cfg); err != nil {
+				t.Fatal(err)
+			}
+			merged := cfg.GetConfigForFile("/repo/file.ts", "/repo")
+			if got := merged.UnusedDirectiveSeverity().String(); got != tc.want {
+				t.Fatalf("got %s, want %s", got, tc.want)
+			}
+		})
+	}
+	for _, invalid := range []string{`3`, `"warning"`, `[]`, `{}`, `null`} {
+		var cfg RslintConfig
+		if err := json.Unmarshal([]byte(`[{"linterOptions":{"reportUnusedDisableDirectives":`+invalid+`}}]`), &cfg); err == nil {
+			t.Fatalf("accepted %s", invalid)
+		}
+	}
+	var cfg RslintConfig
+	if err := json.Unmarshal([]byte(`[{"linterOptions":{"reportUnusedDisableDirectives":"error"}},{"files":["**/*.test.ts"],"linterOptions":{"reportUnusedDisableDirectives":false}}]`), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{"/repo/a.ts": "error", "/repo/a.test.ts": "off"} {
+		if got := cfg.GetConfigForFile(path, "/repo").UnusedDirectiveSeverity().String(); got != want {
+			t.Fatalf("%s: got %s, want %s", path, got, want)
+		}
+	}
+}

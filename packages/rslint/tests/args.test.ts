@@ -427,3 +427,21 @@ describe('parseArgs option-terminator (--)', () => {
     expect(result.positionals).toEqual(['src/a.ts', '--', 'src/b.ts']);
   });
 });
+
+describe('unused directive CLI flags', () => {
+  test('keeps explicit boolean false and severity values as flags', () => {
+    const parsed = parseArgs([
+      'input.ts',
+      '--report-unused-disable-directives=false',
+      '--report-unused-disable-directives-severity',
+      'warn',
+    ]);
+    expect(parsed.positionals).toEqual(['input.ts']);
+    expect(parsed.rest).toEqual([
+      '--report-unused-disable-directives=false',
+      '--report-unused-disable-directives-severity',
+      'warn',
+      'input.ts',
+    ]);
+  });
+});

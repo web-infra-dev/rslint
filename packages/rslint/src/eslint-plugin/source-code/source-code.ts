@@ -483,7 +483,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
 
   /**
    * Comments come from the Go-projected compact comment list (`parsedComments`), built
-   * into ESLint-shape `Comment[]` on first access (`getAllComments`, `applyDisableDirectives`,
+   * into ESLint-shape `Comment[]` on first access (`getAllComments`,
    * rules like `ban-ts-comment`). When absent, the SourceCode simply has no comments.
    */
   const ensureComments = (): Comment[] => {
@@ -1525,7 +1525,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
         }
 
         // Accept BOTH `eslint-*` and `rslint-*` prefixes — the
-        // suppression engine (`apply-disable-directives.ts`) treats
+        // Go suppression engine treats
         // them as equivalent first-class kinds, and
         // `getInlineConfigNodes` (above) already routes both into
         // this loop. Without the parallel `rslint-*` arm here, plugin

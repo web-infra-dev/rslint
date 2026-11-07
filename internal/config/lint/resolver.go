@@ -20,6 +20,7 @@ import (
 // Resolver maps Program source paths back to their selected lint targets and
 // resolves the effective configuration owned by those targets.
 type Resolver struct {
+	catalog              *rule.Catalog
 	configsByOwner       map[string]config.RslintConfig
 	config               config.RslintConfig
 	configDirectory      string
@@ -59,6 +60,7 @@ func NewResolver(options ResolverOptions) *Resolver {
 		panic("path-space snapshot is required")
 	}
 	resolver := &Resolver{
+		catalog:              options.Catalog,
 		configsByOwner:       options.ConfigsByOwner,
 		config:               options.Config,
 		configDirectory:      options.ConfigDirectory,
@@ -286,4 +288,32 @@ func (resolver *Resolver) EnabledRulesForSourcePath(sourcePath string) []rule.Co
 		return nil
 	}
 	return resolved.EnabledRules
+}
+
+// UnusedDirectiveSeverityForSourcePath resolves the setting independently of
+// enabled rules, including files with an empty rule set.
+func (resolver *Resolver) UnusedDirectiveSeverityForSourcePath(sourcePath string) rule.DiagnosticSeverity {
+	_, resolved, ok := resolver.ResolveSourcePath(sourcePath)
+	if !ok {
+		return rule.SeverityOff
+	}
+	return resolved.MergedConfig.UnusedDirectiveSeverity()
+}
+
+// DirectiveRuleExists checks availability, not enabled severity. Configured-off
+// rules can still have unused directives; unavailable names must not be deleted.
+func (resolver *Resolver) DirectiveRuleExists(sourcePath, name string) bool {
+	if _, ok := resolver.catalog.Lookup(name); !ok {
+		return false
+	}
+	namespace := rule.Namespace(name)
+	if namespace == "" {
+		return true
+	}
+	_, resolved, ok := resolver.ResolveSourcePath(sourcePath)
+	if !ok || resolved.MergedConfig == nil {
+		return false
+	}
+	_, declared := resolved.MergedConfig.Plugins[namespace]
+	return declared
 }
