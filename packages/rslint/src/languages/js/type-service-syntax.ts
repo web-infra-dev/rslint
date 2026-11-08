@@ -322,13 +322,28 @@ export class FileSyntaxViews {
               cbNodes ? (nodes) => cbNodes(this.wrap(nodes)) : undefined,
             );
           };
+        if (key === 'getChildAt')
+          return (index: number, sourceFile?: object) => {
+            this.ensure();
+            if (
+              sourceFile !== undefined &&
+              !Object.is(this.rawNodes.get(sourceFile), raw.getSourceFile())
+            )
+              unsupported('node.getChildAt with a foreign source');
+            const child = raw.getChildAt(index);
+            // The decoder also creates token/SyntaxList objects with no Go
+            // compiler handle. Keep those explicit until their syntax views
+            // can translate kinds and preserve identity without inventing one.
+            if (child !== undefined && !(child instanceof RemoteNode))
+              unsupported('node.getChildAt synthetic token or SyntaxList');
+            return this.wrap(child);
+          };
         if (
           typeof key === 'string' &&
           [
             'getChildren',
             'getFirstToken',
             'getLastToken',
-            'getChildAt',
             'getChildCount',
           ].includes(key)
         )

@@ -23,9 +23,9 @@ export class TypePacketReader {
   constructor(bytes: Uint8Array) {
     this.bytes = bytes;
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (bytes.length < 12 || this.word(0) !== 0x32535452) invalid();
+    if (bytes.length < 12 || this.word(0) !== 0x33535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 7, 5, 2][this.kind];
+    const words = [0, 1, 1, 1, 1, 8, 5, 2][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -88,6 +88,11 @@ export class TypePacketReader {
         break;
       case 'intrinsicName': {
         const at = this.word(20);
+        value = at ? this.text(at) : undefined;
+        break;
+      }
+      case 'escapedName': {
+        const at = this.word(36);
         value = at ? this.text(at) : undefined;
         break;
       }

@@ -98,7 +98,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	switch wire.Op {
 	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature":
 		request = &NodeRequest{Op: wire.Op}
-	case "constraint", "apparent", "baseLiteral", "nonNullable", "typeString", "properties", "typeArguments", "isArray", "isTuple", "typeRecord":
+	case "constraint", "apparent", "baseLiteral", "nonNullable", "typeString", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "typeRecord":
 		request = &TypeRequest{Op: wire.Op}
 	case "aliasedSymbol", "declaredType", "symbolRecord":
 		request = &SymbolRequest{Op: wire.Op}
@@ -148,6 +148,7 @@ type TypeFact struct {
 	Flags               []string
 	Symbol, AliasSymbol uint32
 	IntrinsicName       string
+	EscapedName         string
 	Literal             Literal
 	Types               []uint32
 }

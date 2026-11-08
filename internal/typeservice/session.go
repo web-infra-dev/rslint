@@ -348,13 +348,20 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return ids, nil
 		case "isArray":
 			return Boolean(c.IsArrayType(s.typeByID(r.ID))), nil
+		case "isArrayLike":
+			return Boolean(c.IsArrayLikeType(s.typeByID(r.ID))), nil
 		case "isTuple":
 			return Boolean(checker.IsTupleType(s.typeByID(r.ID))), nil
+		case "numberIndexType":
+			return Handle(s.typeID(checker.Checker_getIndexTypeOfType(c, s.typeByID(r.ID), c.GetNumberType()))), nil
 		case "typeRecord":
 			t := s.typeByID(r.ID)
 			fact := &TypeFact{Flags: checker.FormatTypeFlags(t.Flags()), Symbol: s.symbolID(t.Symbol()), AliasSymbol: s.symbolID(t.Alias().Symbol())}
 			if t.Flags()&checker.TypeFlagsIntrinsic != 0 {
 				fact.IntrinsicName = t.AsIntrinsicType().IntrinsicName()
+			}
+			if t.Flags()&checker.TypeFlagsUniqueESSymbol != 0 {
+				fact.EscapedName = ast.EscapeSymbolName(checker.GetPropertyNameFromType(t))
 			}
 			if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 				fact.Types = []uint32{}

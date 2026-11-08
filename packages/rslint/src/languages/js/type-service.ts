@@ -33,6 +33,7 @@ export interface TypeView {
   readonly symbol: SymbolView | undefined;
   readonly aliasSymbol: SymbolView | undefined;
   readonly intrinsicName: string | undefined;
+  readonly escapedName: string | undefined;
   readonly value: TypeFact['value'];
   readonly types: readonly TypeView[] | undefined;
   getSymbol(): SymbolView | undefined;
@@ -49,6 +50,7 @@ export interface TypeView {
   getProperty(name: string): SymbolView | undefined;
   getNonNullableType(): TypeView | undefined;
   getConstraint(): TypeView | undefined;
+  getNumberIndexType(): TypeView | undefined;
 }
 export interface SymbolView {
   readonly id: number;
@@ -93,6 +95,7 @@ export interface CheckerView {
   getPropertyOfType(t: object, name: string): SymbolView | undefined;
   getTypeArguments(t: object): readonly TypeView[];
   isArrayType(t: object): boolean;
+  isArrayLikeType(t: object): boolean;
   isTupleType(t: object): boolean;
   getSignatureFromDeclaration(n: object): SignatureView | undefined;
   getResolvedSignature(
@@ -296,6 +299,8 @@ export class FileTypeServiceClient {
           ),
         isArrayType: (t) =>
           this.query({ op: 'isArray', args: { id: this.id(t, 'type') } }),
+        isArrayLikeType: (t) =>
+          this.query({ op: 'isArrayLike', args: { id: this.id(t, 'type') } }),
         isTupleType: (t) =>
           this.query({ op: 'isTuple', args: { id: this.id(t, 'type') } }),
         getSignatureFromDeclaration: (n) =>
@@ -527,6 +532,7 @@ export class FileTypeServiceClient {
           this.symbol(this.typeField(id, 'aliasSymbol')),
         );
       const intrinsic = memo(ensure, () => this.typeField(id, 'intrinsicName')),
+        escapedName = memo(ensure, () => this.typeField(id, 'escapedName')),
         value = memo(ensure, () => this.typeField(id, 'value'));
       const types = memo(ensure, () => {
         const ids = this.typeField(id, 'types');
@@ -550,6 +556,9 @@ export class FileTypeServiceClient {
         ),
         constraint = memo(ensure, () =>
           this.type(this.query({ op: 'constraint', args: { id } })),
+        ),
+        numberIndexType = memo(ensure, () =>
+          this.type(this.query({ op: 'numberIndexType', args: { id } })),
         );
       const flag = (mask: number) => Boolean(flags() & mask),
         tf = this.typescript.TypeFlags;
@@ -566,6 +575,9 @@ export class FileTypeServiceClient {
         },
         get intrinsicName() {
           return intrinsic();
+        },
+        get escapedName() {
+          return escapedName();
         },
         get value() {
           return value();
@@ -594,6 +606,7 @@ export class FileTypeServiceClient {
           ),
         getNonNullableType: nonNullable,
         getConstraint: constraint,
+        getNumberIndexType: numberIndexType,
       };
     });
   }
