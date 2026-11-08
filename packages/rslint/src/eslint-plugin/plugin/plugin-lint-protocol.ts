@@ -4,7 +4,7 @@
 import type { LintTask } from '../worker-pool.js';
 import type { LintFileResult } from '../linter/ecma-language-plugin.js';
 import type { SharedBytes } from '../../native/types.js';
-import type { DisableDirectiveUsage } from '../linter/apply-disable-directives.js';
+import type { DisableDirectiveUsageSummary } from '../linter/apply-disable-directives.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Inputs
@@ -125,7 +125,7 @@ export function buildPluginLintTasks(
 export interface EslintPluginLintResult {
   results: Array<{
     filePath: string;
-    usedDisableDirectives?: DisableDirectiveUsage[];
+    usedDisableDirectives?: DisableDirectiveUsageSummary;
     diagnostics: unknown[];
     parseError?: string;
     cancelled?: boolean;

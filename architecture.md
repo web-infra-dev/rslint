@@ -1456,11 +1456,16 @@ Unused reporting creates a frozen, text-only Go state only for files whose
 effective severity is enabled and whose text contains a directive candidate.
 The plugin request's per-file `collectDirectiveUsage` asks Node to return a
 deduplicated `usedDisableDirectives` summary alongside visible diagnostics.
-Each entry identifies the original comment's zero-based ECMAScript line,
-UTF-16 column, and declared rule ID (`null` for a wildcard). Go validates the
-entire summary against that file's parsed entries before marking usage. Missing
-or unknown summaries are visible protocol failures and suppress unused reports
-and their fixes for the file.
+Workers encode the summary before returning it to the host, so both structured
+cloning and JSON transport use `{ rules, entries }`. The per-file `rules` table
+contains declared rule IDs (`null` for a wildcard); each numeric entry is
+`[line, column, ruleIndex]`, identifying the original comment's zero-based
+ECMAScript line and UTF-16 column. An empty summary is `{ rules: [], entries: [] }`.
+The host forwards it without rebuilding the table. Go validates the wire shape,
+integer coordinates and table indices, reconstructs internal entries, and
+validates the entire summary against that file's parsed entries before marking
+usage. Missing, malformed or unknown summaries are visible protocol failures
+and suppress unused reports and their fixes for the file.
 
 Native and plugin completion join per file; finalization happens once, including
 zero-rule files. Failure, missing plugin results, and cancellation suppress

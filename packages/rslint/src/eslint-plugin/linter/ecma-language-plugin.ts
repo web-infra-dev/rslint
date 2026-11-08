@@ -56,7 +56,8 @@ import type { LoadedPlugins } from '../plugin/plugin-loader.js';
 import type { Fix } from './fixer.js';
 import {
   applyDisableDirectives,
-  type DisableDirectiveUsage,
+  encodeDisableDirectiveUsage,
+  type DisableDirectiveUsageSummary,
 } from './apply-disable-directives.js';
 
 // Unicode matching treats a valid surrogate pair as one non-surrogate scalar.
@@ -168,7 +169,7 @@ export interface LintFileRequest {
 
 /** Per-file lint response — one record per LintFileRequest. */
 export interface LintFileResult {
-  usedDisableDirectives?: DisableDirectiveUsage[];
+  usedDisableDirectives?: DisableDirectiveUsageSummary;
   filePath: string;
   diagnostics: Diagnostic[];
   /** Aggregated fixes (sum of diagnostic.fixes for ApplyRuleFixes). For convenience; same data as diagnostics[].fixes. */
@@ -545,7 +546,10 @@ export function lintFile(
     collectUsage: req.collectDirectiveUsage === true,
   });
   if (filtered.usedDisableDirectives) {
-    result.usedDisableDirectives = filtered.usedDisableDirectives;
+    // Compact before structured cloning from the worker, not only before JSON.
+    result.usedDisableDirectives = encodeDisableDirectiveUsage(
+      filtered.usedDisableDirectives,
+    );
   }
 
   // ── 8. UTF-16 → UTF-8 conversion + wire push ────────────────────

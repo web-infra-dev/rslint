@@ -37,6 +37,14 @@ custom parser APIs, non-JavaScript language coordinates, or unsupported inline
 configuration options. CLI, API, plugin, and LSP integration have separate tests.
 This is not a claim that the entire ESLint linter suite was ported.
 
+Plugin integration tests also cover compact usage summaries. Workers return a
+per-file rule dictionary and numeric `[line, column, ruleIndex]` tuples before
+structured cloning; a `null` dictionary entry represents wildcard suppression.
+The host forwards the summary unchanged. Go validates its shape and indices
+before resolving entries against the original comments. An explicitly empty
+summary uses `{ rules: [], entries: [] }`; a missing or invalid summary preserves
+the file's directives and suppresses their unused reports and fixes.
+
 ## Regeneration
 
 Use an existing ESLint 10.14.0 installation and a source checkout at the revision

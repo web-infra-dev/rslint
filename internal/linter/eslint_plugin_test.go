@@ -30,6 +30,78 @@ func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) rule.Confi
 	return rule.ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 
+func TestDisableDirectiveUsageSummaryDecode(t *testing.T) {
+	name := "custom/check"
+	for _, tc := range []struct {
+		name, input string
+		want        disableDirectiveUsageSummary
+	}{
+		{"empty", `{"rules":[],"entries":[]}`, disableDirectiveUsageSummary{}},
+		{"null", `null`, nil},
+		{"missing", `{}`, nil},
+		{"reused and wildcard", `{"usedDisableDirectives":{"rules":["custom/check",null],"entries":[[0,2,0],[1,0,1],[2,6,0]]}}`, disableDirectiveUsageSummary{
+			{Line: 0, Column: 2, RuleID: &name},
+			{Line: 1, Column: 0},
+			{Line: 2, Column: 6, RuleID: &name},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var result EslintPluginFileResult
+			input := tc.input
+			if tc.name == "empty" || tc.name == "null" {
+				input = `{"usedDisableDirectives":` + input + `}`
+			}
+			if err := json.Unmarshal([]byte(input), &result); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(result.UsedDisableDirectives, tc.want) {
+				t.Fatalf("got %+v, want %+v", result.UsedDisableDirectives, tc.want)
+			}
+			if tc.name == "reused and wildcard" && result.UsedDisableDirectives[0].RuleID != result.UsedDisableDirectives[2].RuleID {
+				t.Fatal("rule table entry was copied for each usage")
+			}
+		})
+	}
+}
+
+func TestDisableDirectiveUsageSummaryRejectsMalformedInput(t *testing.T) {
+	for _, input := range []string{
+		`[]`, `{}`, `{"rules":[]}`, `{"entries":[]}`,
+		`{"rules":[],"entries":null}`, `{"rules":null,"entries":[]}`,
+	} {
+		var summary disableDirectiveUsageSummary
+		if err := json.Unmarshal([]byte(input), &summary); err == nil {
+			t.Fatalf("accepted malformed summary %s", input)
+		}
+	}
+	for _, entries := range []string{
+		`null`, `[null]`, `[[]]`, `[[0,0]]`, `[[0,0,0,0]]`,
+		`[[null,0,0]]`, `[[0,null,0]]`, `[[0,0,null]]`,
+		`[[-1,0,0]]`, `[[0,-1,0]]`, `[[0,0,-1]]`, `[[0,0,1]]`,
+		`[[0.5,0,0]]`, `[[0,0,0.0]]`, `[[0,0,"0"]]`, `[[false,0,0]]`,
+		`[[0,0,999999999999999999999999999999]]`,
+		`[[0,0,0],[1,0,1]]`,
+	} {
+		name := "existing"
+		original := disableDirectiveUsageSummary{{Line: 9, RuleID: &name}}
+		summary := slices.Clone(original)
+		input := `{"rules":["custom/check"],"entries":` + entries + `}`
+		if err := json.Unmarshal([]byte(input), &summary); err == nil {
+			t.Fatalf("accepted malformed summary %s", input)
+		}
+		if !reflect.DeepEqual(summary, original) {
+			t.Fatalf("invalid summary partially changed entries: %+v", summary)
+		}
+	}
+	for _, rules := range []string{`null`, `"custom/check"`, `[""]`, `[1]`, `[]`} {
+		var summary disableDirectiveUsageSummary
+		input := `{"rules":` + rules + `,"entries":[[0,0,0]]}`
+		if err := json.Unmarshal([]byte(input), &summary); err == nil {
+			t.Fatalf("accepted invalid rule table %s", input)
+		}
+	}
+}
+
 func TestDispatchEslintPluginRulesAsyncPublishesStructuredOutcome(t *testing.T) {
 	dispatchError := errors.New("transport closed")
 	outcomeCh := testDispatchEslintPluginRulesAsync(

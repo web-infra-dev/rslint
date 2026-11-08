@@ -275,9 +275,10 @@ test('returns used entry locations instead of suppressed plugin diagnostics', ()
     loaded,
   );
   expect(result.diagnostics).toHaveLength(0);
-  expect(result.usedDisableDirectives).toEqual([
-    { line: 0, column: 0, ruleId: 'stub/probe' },
-  ]);
+  expect(result.usedDisableDirectives).toEqual({
+    rules: ['stub/probe'],
+    entries: [[0, 0, 0]],
+  });
 });
 
 test('disable filtering and usage attribution match the shared ESLint corpus', () => {
@@ -512,13 +513,13 @@ test('usage summary distinguishes partial, wildcard and repeated directives', ()
       );
       expect(result.parseError).toBeUndefined();
       expect(result.diagnostics).toEqual([]);
-      expect(result.usedDisableDirectives).toHaveLength(1);
-      expect(result.usedDisableDirectives?.[0]).toEqual({
-        line: source.startsWith(`// ${prefix}-disable-next-line`) ? 0 : 1,
-        column: 0,
-        ruleId: source.includes(`/* ${prefix}-disable */`)
-          ? null
-          : 'stub/probe',
+      expect(result.usedDisableDirectives).toEqual({
+        rules: [
+          source.includes(`/* ${prefix}-disable */`) ? null : 'stub/probe',
+        ],
+        entries: [
+          [source.startsWith(`// ${prefix}-disable-next-line`) ? 0 : 1, 0, 0],
+        ],
       });
     }
   }
@@ -540,8 +541,9 @@ test('usage locations use UTF-16 columns against BOM-stripped source', () => {
     );
     expect(result.parseError).toBeUndefined();
     expect(result.diagnostics).toEqual([]);
-    expect(result.usedDisableDirectives).toEqual([
-      { line: 0, column: 6, ruleId: 'stub/probe' },
-    ]);
+    expect(result.usedDisableDirectives).toEqual({
+      rules: ['stub/probe'],
+      entries: [[0, 6, 0]],
+    });
   }
 });

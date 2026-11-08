@@ -7,6 +7,7 @@ import {
 } from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import { resolvePluginAttachments } from '../../../src/eslint-plugin/plugin/attachments.js';
+import { encodeDisableDirectiveUsage } from '../../../src/eslint-plugin/linter/apply-disable-directives.js';
 
 describe('binary plugin frame boundary', () => {
   test('resolves owned bytes and capabilities without decoding either', () => {
@@ -149,15 +150,45 @@ describe('buildPluginLintResult', () => {
       fixes: [],
       suggestionsCount: 0,
       cancelled: false,
-      usedDisableDirectives: [],
+      usedDisableDirectives: { rules: [], entries: [] },
     };
     expect(
       buildPluginLintResult([result]).results[0].usedDisableDirectives,
-    ).toEqual([]);
+    ).toEqual({ rules: [], entries: [] });
     delete result.usedDisableDirectives;
     expect(buildPluginLintResult([result]).results[0]).not.toHaveProperty(
       'usedDisableDirectives',
     );
+  });
+  test('shares rule IDs and wildcard entries before forwarding the summary', () => {
+    const summary = encodeDisableDirectiveUsage([
+      { line: 0, column: 2, ruleId: 'custom/check' },
+      { line: 1, column: 0, ruleId: null },
+      { line: 2, column: 4, ruleId: 'custom/check' },
+      { line: 3, column: 0, ruleId: 'other/check' },
+      { line: 4, column: 0, ruleId: null },
+    ]);
+    expect(summary).toEqual({
+      rules: ['custom/check', null, 'other/check'],
+      entries: [
+        [0, 2, 0],
+        [1, 0, 1],
+        [2, 4, 0],
+        [3, 0, 2],
+        [4, 0, 1],
+      ],
+    });
+    const result: LintFileResult = {
+      filePath: '/enabled.ts',
+      diagnostics: [],
+      fixes: [],
+      suggestionsCount: 0,
+      cancelled: false,
+      usedDisableDirectives: summary,
+    };
+    expect(
+      buildPluginLintResult([result]).results[0].usedDisableDirectives,
+    ).toBe(summary);
   });
   test('projects to the 6-field wire shape, drops aggregate convenience fields', () => {
     const results: LintFileResult[] = [

@@ -11,6 +11,33 @@ export interface DisableDirectiveUsage {
   ruleId: string | null;
 }
 
+/** Per-file summary shared across the worker and Go transport boundaries. */
+export interface DisableDirectiveUsageSummary {
+  /** Declared rule IDs; null identifies the wildcard entry. */
+  rules: (string | null)[];
+  /** Original comment's zero-based line, UTF-16 column, and rule-table index. */
+  entries: [line: number, column: number, ruleIndex: number][];
+}
+
+export function encodeDisableDirectiveUsage(
+  usages: readonly DisableDirectiveUsage[],
+): DisableDirectiveUsageSummary {
+  const rules: (string | null)[] = [];
+  const indices = new Map<string | null, number>();
+  const entries = usages.map(
+    ({ line, column, ruleId }): [number, number, number] => {
+      let index = indices.get(ruleId);
+      if (index === undefined) {
+        index = rules.length;
+        indices.set(ruleId, index);
+        rules.push(ruleId);
+      }
+      return [line, column, index];
+    },
+  );
+  return { rules, entries };
+}
+
 interface Directive {
   type: 'disable' | 'enable';
   pos: number;
