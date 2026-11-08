@@ -919,6 +919,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-identifier-import-export-specifiers.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-object-from-entries.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-query-selector.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-reflect-apply.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-regexp-test.test.ts',
