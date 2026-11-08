@@ -5,6 +5,7 @@ import {
   emitGlobalsAssetsPlugin,
 } from './plugins/globals.ts';
 import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-types.ts';
+import { compilerSyntaxDeclarationsPlugin } from './plugins/compiler-syntax.ts';
 
 /**
  * Single rslib build for all of `@rslint/core`'s JS: the public library surface
@@ -82,9 +83,19 @@ define.lib(() => {
     source: {
       tsconfigPath: './tsconfig.worker.json',
     },
+    tools: {
+      rspack(config: Rspack.Configuration) {
+        config.resolve ??= {};
+        config.resolve.conditionNames = [
+          '@typescript/source',
+          ...(config.resolve.conditionNames ?? ['...']),
+        ];
+      },
+    },
   };
 
   return {
+    plugins: [compilerSyntaxDeclarationsPlugin()],
     lib: [
       librarySurface,
       {
