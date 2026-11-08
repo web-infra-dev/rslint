@@ -22,11 +22,17 @@ var staticGlobalNumbers = map[string]map[string]float64{
 	},
 }
 
+// BuiltinNumberConstant returns the specified JavaScript value of a Math or
+// Number constant. Callers decide whether a source expression names that builtin.
+func BuiltinNumberConstant(object, property string) (float64, bool) {
+	number, ok := staticGlobalNumbers[object][property]
+	return number, ok
+}
+
 func staticGlobalNumber(object *ast.Node, key string) (float64, bool) {
 	object = SkipAssertionsAndParens(object)
 	if object == nil || !ast.IsIdentifier(object) || IsShadowed(object, object.Text()) {
 		return 0, false
 	}
-	number, ok := staticGlobalNumbers[object.Text()][key]
-	return number, ok
+	return BuiltinNumberConstant(object.Text(), key)
 }
