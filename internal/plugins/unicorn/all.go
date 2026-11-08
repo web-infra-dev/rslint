@@ -81,6 +81,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_flat_math_min_max"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_number_constants"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
@@ -190,6 +191,7 @@ func GetAllRules() []rule.Rule {
 		prefer_dom_node_append.PreferDomNodeAppendRule,
 		prefer_flat_math_min_max.PreferFlatMathMinMaxRule,
 		prefer_global_number_constants.PreferGlobalNumberConstantsRule,
+		prefer_global_this.PreferGlobalThisRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,

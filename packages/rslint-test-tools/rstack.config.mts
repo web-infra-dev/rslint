@@ -915,6 +915,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-dom-node-append.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-flat-math-min-max.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-global-number-constants.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-global-this.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-identifier-import-export-specifiers.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
