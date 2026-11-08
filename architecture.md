@@ -1894,8 +1894,14 @@ production CLI, API, LSP and WorkerPool requests do not supply it yet. Entrypoin
 admission, scheduling, generation transfer and editor integration remain follow-up
 work. Meta-property keywords are scalar compiler fields, so their synthetic
 ESTree identifiers have no compiler node origin and reject semantic queries.
-The core `build:js` and `dev` scripts build `@rslint/api` first, including its
-compiler syntax declarations, so direct builds need no earlier workspace build.
+Core's private `compiler-syntax` entry imports the binary syntax reader, decoder
+and enums directly from the same pinned compiler source as Go. Its separate
+composite project inherits upstream's compiler settings and emits declarations
+into core's local build cache. One incremental declaration build runs before each
+core compilation, including watch rebuilds; owned core files retain their strict
+compiler settings. Worker builds select upstream's source enum condition and
+bundle the reader, so neither a compiler runtime dependency nor the frontend
+`@rslint/api` package is needed by core or its consumers.
 
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,

@@ -1010,6 +1010,15 @@ define.test({
     },
     {
       name: 'go-frame',
+      tools: {
+        rspack(config) {
+          config.resolve ??= {};
+          config.resolve.conditionNames = [
+            '@typescript/source',
+            ...(config.resolve.conditionNames ?? ['...']),
+          ];
+        },
+      },
       testEnvironment: 'node',
       globals: true,
       testTimeout: ecosystemTests.testTimeout,
