@@ -9,9 +9,14 @@
   ],
   "compilerOptions": {
     "rootDir": "../..",
+    "paths": {
+      "#enums/*": [
+        "../../typescript-go/packages/typescript/src/enums/*.enum.ts"
+      ]
+    },
     "moduleResolution": "bundler",
     "module": "preserve"
   },
   "exclude": ["./tests/**/fixtures/**"],
-  "references": []
+  "references": [{ "path": "../rslint/compiler-syntax" }]
 }
