@@ -159,6 +159,8 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
   },
   {
     name: 'Global return',
+    // rslint already parses top-level returns without Espree's
+    // ecmaFeatures.globalReturn parser flag.
     valid: [
       {
         code: 'function a() {\n\treturn;\n}',
@@ -174,11 +176,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         filename: 'upstream.js',
         languageOptions: {
           sourceType: 'script',
-          parserOptions: {
-            ecmaFeatures: {
-              globalReturn: true,
-            },
-          },
         },
         errors: [
           {
@@ -3178,11 +3175,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         filename: 'upstream.js',
         languageOptions: {
           sourceType: 'script',
-          parserOptions: {
-            ecmaFeatures: {
-              globalReturn: true,
-            },
-          },
         },
         output: null,
         errors: [
