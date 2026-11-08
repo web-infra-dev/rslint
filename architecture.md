@@ -1838,27 +1838,56 @@ that sequence's original membership once and creates an ordinary writable alias
 array only when a caller requests the reverse mapping. Native compiler nodes and
 proxies resolve on map lookup through the pinned binary syntax reader.
 
-`FileTypeServiceClient` belongs to exactly one eligible file-lint invocation;
-callers close it in `finally`. An injected synchronous semantic transport uses a
-finite request/fact protocol and offset-addressed binary records. Property/name
-arguments and packet strings preserve UTF-16 code units. Packet fields decode
-on demand; wrappers cache requested immutable values and translated flags, never
-packet readers. The disposable packet LRU has an explicit byte budget. Binary
-fallback packets and compiler syntax replies are copied into exact owned
-buffers before retention. A separate syntax-source callback captures the exact
-session generation and encodes immutable sources outside checker leases.
+`TypeServiceClient` belongs to one worker and Program generation. Each eligible
+lint task obtains a `file(binding)` handle and closes it in `finally`; file
+completion releases ESTree maps while preserving generation-scoped native,
+type, symbol and signature identities while a plugin can observe them. Weak
+interning releases unreachable wrappers and their keys. Closing the owner invalidates all those
+objects and releases its transports and caches. `FileTypeServiceClient` is a
+convenience owner for a standalone invocation.
+
+An injected synchronous transport uses a finite request/fact protocol and
+offset-addressed binary records. Property/name arguments and packet strings
+preserve UTF-16 code units. Scalar answers include shallow facts for their
+direct handles and symbols, without recursively exporting member or type graphs.
+Workers and brokers retain each supplemental fact under its canonical key,
+rather than duplicating it under every node query. Fields decode on demand;
+wrappers retain requested immutable values and translated flags, never packet
+readers. A byte-bounded packet LRU is checked before shared storage and the
+bridge. Query keys use descriptor file ordinals while retaining every semantic
+argument. `QueryBatch` resolves node identities before one short checker lease
+and encodes its answers afterward.
+
+An optional profile groups observed node operations by native syntax shape and
+effective rule/options identity. Subsequent files may prefetch matching checker
+facts in batches of at most 256 queries, with bounded profile and request counts.
+This executes real checker queries and never predicts answers or replays rules;
+any unprepared or evicted query follows the same synchronous miss path. An
+optional preparation failure leaves demanded queries authoritative; cancellation,
+generation invalidation and malformed packets still fail the task.
+
+Compiler node proxies hold canonical file/index identities. Source metadata and
+`getSourceFile()` need no syntax transfer; a finite `nodeRecord` supplies
+requested declaration ancestors and names, with a separate byte-bounded summary
+cache. Relative and case aliases use metadata-only canonicalization through the
+Program; they do not request source syntax. Other structural properties load the
+exact immutable source through a separate callback outside checker leases.
+Copied source buffers have their own byte-bounded generation LRU. Full syntax
+and compact summaries use the same proxies and enum/heritage adapters, preserving
+identity through hydration. File origin maps continue to reference the exact
+compiler nodes and preferred reverse aliases.
 
 A broker may publish immutable packets into `SharedTypeCacheOwner`, a portable
-JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. Bounded
-probe walks deduplicate keys, preserve existing hits at capacity, and fall back
-to binary replies when insertion cannot proceed. Independent clients decode
-their own requested values; decoded objects are not shared. Closing a client
-clears packet storage, transports, shared-reader references and syntax registries.
-Stable wrappers and requested arrays have file-client lifetime, rather than a
-claimed global heap bound. Plugins retaining syntax nodes or decoded values may
-retain their independently owned graphs after close; semantic access rejects.
-Shared storage is reclaimed when its owner/readers/descriptors are unreachable.
-This cache retains no native attachment lease or research Go-mapped V8 store.
+JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. When an
+entry count is omitted, the index uses at most one quarter of the byte budget;
+it has no separate half-capacity insertion cutoff. Bounded probe walks preserve
+existing hits at capacity and fall back to binary replies when insertion cannot
+proceed. Independent workers decode their own requested values. Live wrappers
+and their requested arrays have generation validity, rather than a claimed global heap
+bound. Plugins retaining syntax methods or decoded values can retain their
+independently owned graphs after close; semantic access rejects. Shared storage
+is reclaimed when its owner/readers/descriptors are unreachable. This cache
+retains no native attachment lease or research Go-mapped V8 store.
 
 The optional parser-services factory is available to the direct rule runner;
 production CLI, API, LSP and WorkerPool requests do not supply it yet. Entrypoint

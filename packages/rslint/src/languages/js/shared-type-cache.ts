@@ -6,7 +6,7 @@ export interface SharedTypeCacheDescriptor {
 }
 const HEADER = 8,
   SLOT = 4;
-export const MAX_SHARED_TYPE_PROBES = 16;
+export const MAX_SHARED_TYPE_PROBES = 64;
 function keyBytes(key: string): Uint8Array {
   const bytes = new Uint8Array(key.length * 2);
   for (let i = 0; i < key.length; i++) {
@@ -100,7 +100,11 @@ export class SharedTypeCacheReader {
 export class SharedTypeCacheOwner {
   private storage: Storage | undefined;
   readonly stats = { probes: 0 };
-  constructor(generation: number, budgetBytes: number, entries: number) {
+  constructor(
+    generation: number,
+    budgetBytes: number,
+    entries = Math.max(1, 2 ** Math.floor(Math.log2(budgetBytes / 64))),
+  ) {
     const start = (HEADER + entries * SLOT) * 4;
     if (
       !Number.isSafeInteger(entries) ||
@@ -157,11 +161,7 @@ export class SharedTypeCacheOwner {
       const offset = control[slot + 1];
       if (encoded.every((byte, i) => bytes[offset + i] === byte)) return true;
     }
-    if (control[5] || available < 0) return false;
-    if (control[4] >= Math.max(1, Math.floor(descriptor.entries / 2))) {
-      control[5] = 1;
-      return false;
-    }
+    if (available < 0) return false;
     const offset = control[2],
       end = offset + encoded.length + packet.length;
     if (end > bytes.length) return false;
