@@ -90,8 +90,8 @@ func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	fixablePath := tspath.ResolvePath(root, "fixable.ts")
 	fixableProgram := pipelineTestProgram(t, root, fixablePath, "a")
-	compilerProgram, paths := createTestProgramWithFilesAndCompilerOptions(t,
-		map[string]string{"clean.ts": `const value: number = "wrong";`}, `{"noLib":true}`)
+	compilerProgram, paths := createTestProgramWithFiles(t,
+		map[string]string{"clean.ts": `const value: number = "wrong";`})
 	nonFixablePath := paths["clean.ts"]
 	nonFixableProgram := program.NewFromCompiler(compilerProgram)
 	generation := Generation{
