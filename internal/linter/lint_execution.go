@@ -21,6 +21,7 @@ type lintExecution struct {
 	completePrograms        bool
 	typeCheck               bool
 	projectTypeCheckSources bool
+	collectTypeDiagnostics  func([][]collectedTypeCheckDiagnostic)
 }
 
 func prepareLintExecution(opts RunLinterOptions, mode ProgramExecution, projectTypeCheckSources bool) (*lintExecution, error) {
@@ -82,6 +83,7 @@ func (e *lintExecution) close() {
 	e.programs = nil
 	clear(e.typeCheckPrograms)
 	e.typeCheckPrograms = nil
+	e.collectTypeDiagnostics = nil
 }
 
 func (e *lintExecution) typeCheckWork(source *program.Program) int {
@@ -153,7 +155,11 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 
 	// Even when computation is interleaved, type diagnostics follow every
 	// native report and choose dedupe survivors in original Program order.
-	emitDeduplicatedTypeCheckDiagnostics(typeResults, consumer.Report)
+	if e.collectTypeDiagnostics != nil {
+		e.collectTypeDiagnostics(typeResults)
+	} else {
+		emitDeduplicatedTypeCheckDiagnostics(typeResults, consumer.Report)
+	}
 
 	// Phased execution retains its second borrow. Type-check-only also uses
 	// this path, without imposing native scheduling on its independent work.
@@ -165,6 +171,7 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 			SingleThreaded: e.options.SingleThreaded,
 			OnDiagnostic:   consumer.Report,
 			ProjectSources: e.projectTypeCheckSources,
+			OnCollected:    e.collectTypeDiagnostics,
 		})
 	}
 	return result

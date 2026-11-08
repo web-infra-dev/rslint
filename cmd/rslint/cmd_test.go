@@ -988,9 +988,9 @@ func TestHandleLintCommandProjectServiceGapScope(t *testing.T) {
 }
 
 func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
-	directory := t.TempDir()
+	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	rootPath := filepath.Join(directory, "sibling.ts")
-	for _, name := range []string{"index.ts", "sibling.ts"} {
+	for _, name := range []string{"index.ts", "sibling.ts", "other.ts"} {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte("export const value: number = 1;\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -998,16 +998,19 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(`{"files":["index.ts","sibling.ts"]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(directory, "other.json"), []byte(`{"files":["other.ts"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	configEntries := rslintconfig.RslintConfig{{
 		Files: []string{"**/*.ts"},
 		LanguageOptions: &rslintconfig.LanguageOptions{
 			ParserOptions: &rslintconfig.ParserOptions{
-				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+				Project: rslintconfig.ProjectPaths{"./tsconfig.json", "./other.json"},
 			},
 		},
 	}}
 
-	run := func(format string) int {
+	run := func(format string, typeCheckOnly bool) int {
 		t.Helper()
 		fsys := &commandRealpathCountingFS{
 			FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
@@ -1018,7 +1021,7 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 			AllowFiles:     []string{tspath.NormalizePath(filepath.Join(directory, "index.ts"))},
 			FS:             fsys,
 			TypeCheck:      true,
-			TypeCheckOnly:  true,
+			TypeCheckOnly:  typeCheckOnly,
 			Format:         format,
 			NoColor:        true,
 			SingleThreaded: true,
@@ -1026,17 +1029,22 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("%s type-check exit = %d, stdout=%q stderr=%q", format, code, stdout, stderr)
 		}
+		if format == "default" && !strings.Contains(stdout, "(3 files,") {
+			t.Fatalf("admitted Programs lost the complete summary root union: stdout=%q stderr=%q", stdout, stderr)
+		}
 		return fsys.callCount(rootPath)
 	}
 
-	machineCalls := run("jsonline")
-	defaultCalls := run("default")
-	if defaultCalls != machineCalls+1 {
-		t.Fatalf(
-			"root Realpath calls: machine=%d default=%d, want exactly one default-only report identity lookup",
-			machineCalls,
-			defaultCalls,
-		)
+	for _, typeCheckOnly := range []bool{false, true} {
+		machineCalls := run("jsonline", typeCheckOnly)
+		defaultCalls := run("default", typeCheckOnly)
+		if defaultCalls != machineCalls+1 {
+			t.Fatalf(
+				"root Realpath calls: machine=%d default=%d, want exactly one default-only report identity lookup",
+				machineCalls,
+				defaultCalls,
+			)
+		}
 	}
 }
 

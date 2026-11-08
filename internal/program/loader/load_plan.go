@@ -32,9 +32,6 @@ type ProgramLoad struct {
 // and root identity ranking are shared with BuildProjects. The loads retain
 // immutable metadata and source snapshots, but no completed Program or AST.
 func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoots bool) ([]ProgramLoad, error) {
-	if request.Scope == AllDeclared {
-		return nil, nil
-	}
 	plan, err := s.prepareProjectPlan(request)
 	if err != nil {
 		return nil, err
@@ -43,7 +40,7 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 		return nil, nil
 	}
 	execution := newTargetedProjectExecution(s, plan, request.SingleThreaded)
-	if request.Scope == ActiveOwners {
+	if request.Scope == ActiveOwners || request.Scope == AllDeclared {
 		if err := execution.validateActiveConfigs(); err != nil {
 			return nil, err
 		}
@@ -54,9 +51,18 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 	groups := groupTargetsByProjects(request.Targets.Files, plan.targetProjects, func(owner string) []int {
 		return orderedProjectIndexesForConfig(plan, owner)
 	})
-	owners, err := execution.selectRootOwners(request.Targets.Files, request.Scope, groups, nil)
-	if err != nil {
-		return nil, err
+	var owners []int
+	if request.Scope == AllDeclared {
+		// Match the complete build's batch identity ranking. In particular,
+		// case-folded lexical roots cannot outrank a distinct physical file.
+		// Service selections also retain their authoritative missing-source
+		// validation instead of turning an absent selected source into a gap.
+		owners = execution.activeRootOwners(request.Targets.Files, groups)
+	} else {
+		owners, err = execution.selectRootOwners(request.Targets.Files, request.Scope, groups, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	filesByProject := make(map[int][]target.File)
 	for index, file := range request.Targets.Files {
@@ -66,6 +72,9 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 	projectCount := len(filesByProject)
 	if _, hasRoots := filesByProject[-1]; hasRoots {
 		projectCount--
+	}
+	if request.Scope == AllDeclared {
+		projectCount = len(plan.specs)
 	}
 	if projectCount < 2 {
 		return nil, nil
@@ -78,7 +87,7 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 	// roots last, independently of target enumeration and completion timing.
 	order := make([]int, 0, len(filesByProject))
 	for owner := range plan.specs {
-		if len(filesByProject[owner]) > 0 {
+		if request.Scope == AllDeclared || len(filesByProject[owner]) > 0 {
 			order = append(order, owner)
 		}
 	}
@@ -214,7 +223,12 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 // extension policy. Aliases and content mappers retain the complete binding
 // path, whose lookup can resolve their source identity across projects.
 func (s *Session) hasIndependentRoots(parsed *tsoptions.ParsedCommandLine, files []target.File, sourceReferences bool) bool {
-	if len(parsed.ContentMapperExtensions()) != 0 || (!sourceReferences && len(parsed.ProjectReferences()) != 0) {
+	if len(files) == 0 {
+		// Type-check-only Programs have no lint binding to redirect. Their
+		// complete roots, references, options and diagnostics remain intact.
+		return true
+	}
+	if len(parsed.ContentMapperExtensions()) != 0 {
 		return false
 	}
 	options := parsed.CompilerOptions()
@@ -244,5 +258,53 @@ func (s *Session) hasIndependentRoots(parsed *tsoptions.ParsedCommandLine, files
 			}
 		}
 	}
+	if !sourceReferences && len(parsed.ProjectReferences()) != 0 {
+		return s.referencesLeaveRootsUnchanged(parsed, files)
+	}
 	return true
+}
+
+// Ordinary project references can redirect a listed source root to a .d.ts
+// output. Their presence alone does not couple unrelated lint bindings: only
+// roots present in the recursive reference metadata can be redirected. This
+// conservative membership check never constructs a Program or changes its
+// reference mode. Unknown metadata retains the complete binding path and its
+// authoritative validation/error order.
+func (s *Session) referencesLeaveRootsUnchanged(parsed *tsoptions.ParsedCommandLine, files []target.File) bool {
+	useCaseSensitive := s.FS().UseCaseSensitiveFileNames()
+	selected := make(map[tspath.Path]struct{}, len(files))
+	for _, file := range files {
+		selected[tspath.ToPath(file.Path, "", useCaseSensitive)] = struct{}{}
+	}
+	root := tspath.ToPath(parsed.ConfigName(), "", useCaseSensitive)
+	seen := make(map[tspath.Path]struct{})
+	var visit func(*tsoptions.ParsedCommandLine) bool
+	visit = func(parent *tsoptions.ParsedCommandLine) bool {
+		for _, name := range parent.ResolvedProjectReferencePaths() {
+			path := tspath.ToPath(name, "", useCaseSensitive)
+			// Ordinary construction can reparse a cycle's root with a distinct
+			// config identity, unlike the service's special root host.
+			if path == root {
+				return false
+			}
+			if _, visited := seen[path]; visited {
+				continue
+			}
+			seen[path] = struct{}{}
+			child, err := s.context.parseConfig(tspath.GetDirectoryPath(name), name)
+			if err != nil || child == nil || len(child.ContentMapperExtensions()) != 0 {
+				return false
+			}
+			for path := range child.FileNamesByPath() {
+				if _, overlaps := selected[path]; overlaps {
+					return false
+				}
+			}
+			if !visit(child) {
+				return false
+			}
+		}
+		return true
+	}
+	return visit(parsed)
 }

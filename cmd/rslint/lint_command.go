@@ -9,6 +9,7 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -527,6 +528,34 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			}
 			if err := activate(); err != nil {
 				return nil, err
+			}
+			if format == output.FormatDefault && mode != output.ModeLint {
+				// Freeze each actual Program's roots while it is owned by its
+				// load, then retain only the observation-wide physical union.
+				// Every unit uses the complete target hints, including canonical
+				// self-identities owned by a different unit.
+				files := lintReportFileIdentities(mode, targetPlan.Files, nil)
+				projector, err := programSession.NewProgramRootIdentityProjector(targetPlan.Files, singleThreaded)
+				if err != nil {
+					return nil, err
+				}
+				var mu sync.Mutex
+				for index, load := range loads {
+					loads[index].Load = func() (loader.LoadResult, error) {
+						binding, err := load.Load()
+						if err != nil {
+							return loader.LoadResult{}, err
+						}
+						roots := projector.Freeze(binding.Programs)
+						mu.Lock()
+						for _, root := range roots {
+							files[root] = struct{}{}
+						}
+						summaryFileCount = len(files)
+						mu.Unlock()
+						return binding, nil
+					}
+				}
 			}
 			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
 		}

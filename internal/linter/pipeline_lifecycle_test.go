@@ -971,3 +971,129 @@ func TestPipelineJoinsAcquiredUnitsAfterLoadFailure(t *testing.T) {
 		t.Fatalf("failed partial observation escaped: error=%v result=%+v released=%d", err, result, released.Load())
 	}
 }
+
+func TestPipelineRetainsConfiguredPoolUntilLastPluginBorrower(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(previous)
+	pluginStarted := make(chan struct{})
+	resume := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(resume) })
+	defer unblock()
+	var releases atomic.Int32
+	loads := make([]GenerationLoad, 2)
+	for index := range loads {
+		loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			if index == 1 && releases.Load() != 1 {
+				t.Error("next pool was constructed before the previous binding's last borrower joined")
+			}
+			cp, paths := createTestProgramWithFilesAndCompilerOptions(t,
+				map[string]string{"file.ts": "const value = 1;"}, `{"noLib":true}`)
+			return Generation{
+				Native: NativeGeneration{
+					Programs: wrapTestPrograms(cp), TargetsByProgram: [][]string{{paths["file.ts"]}},
+					RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						if index == 0 {
+							return []rule.ConfiguredRule{
+								{Name: "native/check", Run: func(rule.RuleContext) rule.RuleListeners { return nil }},
+								{Name: "plugin/check", IsEslintPluginRule: true},
+							}
+						}
+						return nil
+					},
+				},
+				Plugin: &PluginGeneration{},
+				Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
+			}, func() { releases.Add(1) }, nil
+		}}
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}, ObservationPolicy{},
+			EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				close(pluginStarted)
+				<-resume
+				return &EslintPluginLintResult{}, nil
+			}),
+		))
+		done <- err
+	}()
+	select {
+	case <-pluginStarted:
+	case err := <-done:
+		t.Fatalf("pipeline ended before the last borrower started: %v", err)
+	}
+	if releases.Load() != 0 {
+		t.Error("binding released while its plugin borrower was blocked")
+	}
+	unblock()
+	if err := <-done; err != nil || releases.Load() != 2 {
+		t.Fatalf("error=%v, releases=%d", err, releases.Load())
+	}
+}
+
+func TestPipelineLoadsPreserveTypeCheckOrderAndDeduplication(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	paths := writeFiles(t, root, map[string]string{
+		"shared.d.ts":     "interface Parent { value: string; } interface Child extends Parent { value: number; }",
+		"a/tsconfig.json": `{"files":["file.ts","../shared.d.ts"]}`,
+		"b/tsconfig.json": `{"files":["file.ts","../shared.d.ts"]}`,
+		"c/tsconfig.json": `{"files":["file.ts"]}`,
+		"a/file.ts":       "export const value = 1;",
+		"b/file.ts":       "export const value = 2;",
+		"c/file.ts":       `export const value: number = "wrong";`,
+	})
+	for _, mode := range []ProgramExecution{ProgramPhases, ProgramComplete} {
+		for _, typeCheckOnly := range []bool{false, true} {
+			t.Run(fmt.Sprintf("mode-%d-only-%t", mode, typeCheckOnly), func(t *testing.T) {
+				loads := make([]GenerationLoad, 3)
+				for index, name := range []string{"a", "b", "c"} {
+					loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+						cp := createProgramFromTsconfigDir(t, tspath.ResolvePath(root, name))
+						generation := Generation{Native: NativeGeneration{
+							Programs: wrapTestPrograms(cp), TypeCheck: true,
+						}}
+						if !typeCheckOnly {
+							generation.Native.TargetsByProgram = [][]string{nil}
+							if index < 2 {
+								generation.Native.TargetsByProgram[0] = []string{paths[name+"/file.ts"]}
+							}
+							generation.Native.RulesForFile = func(*ast.SourceFile) []rule.ConfiguredRule {
+								return []rule.ConfiguredRule{{Name: "native/query", RequiresTypeInfo: true, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+									ctx.ReportRange(core.NewTextRange(13, 18), rule.RuleMessage{Description: "native"})
+									return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) { ctx.TypeChecker.GetTypeAtLocation(node) }}
+								}}}
+							}
+						}
+						return generation, nil, nil
+					}}
+				}
+				result, err := RunPipeline(context.Background(), NewLintRequest(
+					pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}, ObservationPolicy{ProgramExecution: mode}, nil))
+				if err != nil {
+					t.Fatal(err)
+				}
+				counts := make(map[string]int)
+				seenType := false
+				for _, diagnostic := range result.Observation.Native.Diagnostics {
+					counts[diagnostic.RuleName]++
+					if strings.HasPrefix(diagnostic.RuleName, "TypeScript(") {
+						seenType = true
+						if _, retainsAST := diagnostic.SourceFile.(*ast.SourceFile); retainsAST {
+							t.Fatal("frozen type diagnostics retained a compiler AST")
+						}
+					} else if seenType {
+						t.Fatal("type diagnostics preceded native reports from a later load")
+					}
+				}
+				wantNative := 2
+				if typeCheckOnly {
+					wantNative = 0
+				}
+				if counts["native/query"] != wantNative || counts["TypeScript(TS2430)"] != 1 || counts["TypeScript(TS2322)"] != 1 {
+					t.Fatalf("lost native/type-only coverage or cross-load deduplication: %v", counts)
+				}
+			})
+		}
+	}
+}

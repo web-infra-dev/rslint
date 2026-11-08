@@ -18,6 +18,7 @@ type typeCheckRequest struct {
 	SingleThreaded bool
 	OnDiagnostic   DiagnosticHandler
 	ProjectSources bool
+	OnCollected    func([][]collectedTypeCheckDiagnostic)
 }
 
 // runTypeCheckAcrossPrograms runs program-scoped semantic diagnostics
@@ -58,7 +59,11 @@ func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 
 	// Program diagnostics are computed in parallel above, but survivor choice
 	// follows stable Program input order rather than goroutine completion order.
-	emitDeduplicatedTypeCheckDiagnostics(collected, req.OnDiagnostic)
+	if req.OnCollected != nil {
+		req.OnCollected(collected)
+	} else {
+		emitDeduplicatedTypeCheckDiagnostics(collected, req.OnDiagnostic)
+	}
 }
 
 func emitDeduplicatedTypeCheckDiagnostics(collected [][]collectedTypeCheckDiagnostic, onDiagnostic DiagnosticHandler) {

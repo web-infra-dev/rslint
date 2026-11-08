@@ -225,6 +225,10 @@ func lintReportFileCount(
 	lintTargets []target.File,
 	typeCheckedRootIDs []string,
 ) int {
+	return len(lintReportFileIdentities(mode, lintTargets, typeCheckedRootIDs))
+}
+
+func lintReportFileIdentities(mode output.Mode, lintTargets []target.File, typeCheckedRootIDs []string) map[string]struct{} {
 	seen := make(map[string]struct{}, len(lintTargets)+len(typeCheckedRootIDs))
 	if mode != output.ModeTypeCheckOnly {
 		for _, lintTarget := range lintTargets {
@@ -243,5 +247,5 @@ func lintReportFileCount(
 			seen[rootID] = struct{}{}
 		}
 	}
-	return len(seen)
+	return seen
 }

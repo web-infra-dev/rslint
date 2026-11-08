@@ -62,6 +62,50 @@ func TestFreezeProgramRootIdentitiesUsesTargetHintsAndCanonicalUnion(t *testing.
 	}
 }
 
+func TestProgramRootIdentityProjectorSharesHintsAcrossConcurrentLoads(t *testing.T) {
+	const known = "/repo/known.ts"
+	const physical = "/physical/known.ts"
+	fsys := newBindingIndexTestFS([]string{known, physical, "/repo/a.ts", "/repo/b.ts"}, map[string]string{
+		"/repo/a.ts": "/physical/a.ts", "/repo/b.ts": "/physical/b.ts",
+	})
+	programs := []*lintprogram.Program{
+		lintprogram.NewFromCompiler(createBindingIndexTestProgram(t, fsys, known, "/repo/a.ts")),
+		lintprogram.NewFromCompiler(createBindingIndexTestProgram(t, fsys, physical, "/repo/b.ts")),
+	}
+	projector, err := NewSession(fsys).NewProgramRootIdentityProjector([]target.File{
+		{PathIdentity: rslintconfig.PathIdentity{Path: known, CanonicalPath: physical}},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fsys.resetCalls()
+	results := make([][]string, len(programs))
+	start := make(chan struct{})
+	var workers sync.WaitGroup
+	for index, program := range programs {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			<-start
+			results[index] = projector.Freeze([]*lintprogram.Program{program})
+		}()
+	}
+	close(start)
+	workers.Wait()
+	for index, name := range []string{"a", "b"} {
+		want := []string{exactPathID(physical), exactPathID("/physical/" + name + ".ts")}
+		if !slices.Equal(results[index], want) {
+			t.Fatalf("load %d identities = %q, want %q", index, results[index], want)
+		}
+		if fsys.callCount("/repo/"+name+".ts") != 1 {
+			t.Fatalf("unknown root from load %d must be resolved once", index)
+		}
+	}
+	if fsys.callCount(known) != 0 || fsys.callCount(physical) != 0 {
+		t.Fatal("concurrent loads re-resolved shared frozen target identities")
+	}
+}
+
 func TestFreezeProgramRootIdentitiesSkipsSourceOnlyPrograms(t *testing.T) {
 	const (
 		typeCheckedRoot = "/repo/type-checked.ts"

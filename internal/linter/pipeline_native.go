@@ -75,7 +75,12 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 		return NativeObservation{}, err
 	}
 	diagnostics := work.diagnostics
+	syntacticDiagnosticCount := len(diagnostics)
 	work.diagnostics = nil
+	var typeDiagnostics [][]collectedTypeCheckDiagnostic
+	work.execution.collectTypeDiagnostics = func(collected [][]collectedTypeCheckDiagnostic) {
+		typeDiagnostics = append(typeDiagnostics, collected...)
+	}
 	consumer := rule.DiagnosticConsumer{Demand: work.demand}
 	var diagnosticsWait sync.WaitGroup
 	finishDiagnostics := func() {}
@@ -116,11 +121,19 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 	for index := range diagnostics {
 		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)
 	}
+	for _, collected := range typeDiagnostics {
+		for index := range collected {
+			diagnostic := &collected[index].ruleDiagnostic
+			diagnostic.FilePath = projectTargetPath(work.targetPath, diagnostic.FilePath)
+		}
+	}
 	result := NativeObservation{
-		Diagnostics:           diagnostics,
-		Lint:                  lintResult,
-		Files:                 work.files,
-		HasTargetSyntaxErrors: work.hasTargetSyntaxErrors,
+		Diagnostics:              diagnostics,
+		Lint:                     lintResult,
+		Files:                    work.files,
+		HasTargetSyntaxErrors:    work.hasTargetSyntaxErrors,
+		syntacticDiagnosticCount: syntacticDiagnosticCount,
+		typeDiagnostics:          typeDiagnostics,
 	}
 	return result, ctx.Err()
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // executeObservation owns admission, lifetime and the result boundary for all
@@ -38,6 +40,10 @@ func executeObservation(
 	prepare := func(i int, reservation *programReservation) (preparedObservation, error) {
 		load := loads[i]
 		loads[i] = GenerationLoad{}
+		// Loading owns a complete Program and its checker pool through the
+		// last native/plugin borrower. Native shard progress returns CPU work,
+		// but cannot admit another pool while this binding is still leased.
+		reservation.retainUntilClose(load.CheckerCount)
 		prepared, err := prepareObservation(ctx, load.Acquire, snapshot, policy, dispatcher,
 			planChanges, stopOnTargetSyntaxErrors, reservation, sourceReads)
 		if err == nil {
@@ -84,7 +90,7 @@ func executeObservation(
 		if checkers <= 0 {
 			checkers = 4 // The compiler default, also used by programCheckerHint.
 		}
-		estimates[i] = max(1, min(load.TargetCount, checkers))
+		estimates[i] = max(1, min(load.TargetCount, checkers), load.CheckerCount)
 	}
 	run := func(i int, reservation *programReservation) {
 		var work preparedObservation
@@ -131,6 +137,7 @@ func mergeObservationExecutions(parts []observationExecution, index int) (observ
 	// Transfer its result without copying native and plugin output slices.
 	if len(parts) == 1 && parts[0].observation.Native.Lint != nil {
 		result := parts[0]
+		appendObservationTypeDiagnostics(&result.observation.Native)
 		result.observation.Index = index
 		if result.deferredTask != nil {
 			result.deferredTask.resources = nil
@@ -141,9 +148,12 @@ func mergeObservationExecutions(parts []observationExecution, index int) (observ
 		Index: index, Native: NativeObservation{Lint: &LintResult{ExecutedRules: make(map[string]struct{})}},
 	}}
 	var plugins []EslintPluginDispatchOutcome
+	var syntactic []rule.RuleDiagnostic
 	for _, part := range parts {
 		native := part.observation.Native
-		result.observation.Native.Diagnostics = append(result.observation.Native.Diagnostics, native.Diagnostics...)
+		syntactic = append(syntactic, native.Diagnostics[:native.syntacticDiagnosticCount]...)
+		result.observation.Native.Diagnostics = append(result.observation.Native.Diagnostics, native.Diagnostics[native.syntacticDiagnosticCount:]...)
+		result.observation.Native.typeDiagnostics = append(result.observation.Native.typeDiagnostics, native.typeDiagnostics...)
 		result.observation.Native.Files = append(result.observation.Native.Files, native.Files...)
 		result.observation.Native.HasTargetSyntaxErrors = result.observation.Native.HasTargetSyntaxErrors || native.HasTargetSyntaxErrors
 		if native.Lint != nil {
@@ -179,6 +189,20 @@ func mergeObservationExecutions(parts []observationExecution, index int) (observ
 			}
 		}
 	}
+	if len(syntactic) > 0 {
+		result.observation.Native.Diagnostics = append(syntactic, result.observation.Native.Diagnostics...)
+	}
+	appendObservationTypeDiagnostics(&result.observation.Native)
 	result.observation.pluginOutcome = mergePluginOutcomes(plugins)
 	return result, nil
+}
+
+// Type diagnostics retain their frozen physical identity keys across loading
+// units. Publish once, after all native reports, in original Program order.
+func appendObservationTypeDiagnostics(native *NativeObservation) {
+	emitDeduplicatedTypeCheckDiagnostics(native.typeDiagnostics, func(diagnostic rule.RuleDiagnostic) {
+		native.Diagnostics = append(native.Diagnostics, diagnostic)
+	})
+	native.typeDiagnostics = nil
+	native.syntacticDiagnosticCount = 0
 }

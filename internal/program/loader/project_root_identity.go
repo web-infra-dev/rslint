@@ -1,6 +1,8 @@
 package loader
 
 import (
+	"sync"
+
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -24,10 +26,35 @@ func (s *Session) FreezeProgramRootIdentities(
 	knownTargets []target.File,
 	singleThreaded bool,
 ) ([]string, error) {
+	projector, err := s.NewProgramRootIdentityProjector(knownTargets, singleThreaded)
+	if err != nil {
+		return nil, err
+	}
+	return projector.Freeze(programs), nil
+}
+
+// ProgramRootIdentityProjector freezes actual Program roots across one
+// operation's admitted loads. Target hints are immutable and shared; unknown
+// roots use one bounded identity-resolution window. It retains no Programs,
+// source files, or resolved-root cache between calls.
+type ProgramRootIdentityProjector struct {
+	resolver *projectRootIdentityResolver
+	unknown  sync.Mutex
+}
+
+// NewProgramRootIdentityProjector starts an operation over this Session's
+// immutable VFS generation and the complete operation's target hints.
+func (s *Session) NewProgramRootIdentityProjector(knownTargets []target.File, singleThreaded bool) (*ProgramRootIdentityProjector, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
+	return &ProgramRootIdentityProjector{resolver: newProjectRootIdentityResolver(knownTargets, s.FS(), singleThreaded)}, nil
+}
 
+// Freeze returns physical root identities in first-declaration order. Calls
+// may overlap, and every Program must belong to the projector's source/VFS
+// generation. Each caller owns its result independently of other loads.
+func (p *ProgramRootIdentityProjector) Freeze(programs []*lintprogram.Program) []string {
 	rootPaths := make([]string, 0)
 	seenRootPaths := make(map[string]struct{})
 	for _, program := range programs {
@@ -45,7 +72,7 @@ func (s *Session) FreezeProgramRootIdentities(
 		}
 	}
 
-	resolver := newProjectRootIdentityResolver(knownTargets, s.FS(), singleThreaded)
+	resolver := p.resolver
 	canonicalIDs := make([]string, len(rootPaths))
 	unknownPaths := make([]string, 0, len(rootPaths))
 	unknownIndexes := make([]int, 0, len(rootPaths))
@@ -58,7 +85,7 @@ func (s *Session) FreezeProgramRootIdentities(
 		unknownPaths = append(unknownPaths, rootPath)
 		unknownIndexes = append(unknownIndexes, index)
 	}
-	resolvedUnknown := resolver.canonicalRootPathIDs(unknownPaths)
+	resolvedUnknown := p.freezeUnknown(unknownPaths)
 	for index, canonicalID := range resolvedUnknown {
 		canonicalIDs[unknownIndexes[index]] = canonicalID
 	}
@@ -72,5 +99,14 @@ func (s *Session) FreezeProgramRootIdentities(
 		seenIdentities[canonicalID] = struct{}{}
 		identities = append(identities, canonicalID)
 	}
-	return identities, nil
+	return identities
+}
+
+func (p *ProgramRootIdentityProjector) freezeUnknown(paths []string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+	p.unknown.Lock()
+	defer p.unknown.Unlock()
+	return p.resolver.canonicalRootPathIDs(paths)
 }

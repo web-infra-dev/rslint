@@ -23,6 +23,10 @@ type NativeObservation struct {
 	// Files is populated when target paths or source ASTs are requested.
 	Files                 []LintedFile
 	HasTargetSyntaxErrors bool
+
+	// Private unit output, finalized only at the observation merge boundary.
+	syntacticDiagnosticCount int
+	typeDiagnostics          [][]collectedTypeCheckDiagnostic
 }
 
 type pluginObservationKind uint8
@@ -66,6 +70,12 @@ func (r *ObservationResult) detachDiagnosticSources() {
 	for _, diagnostics := range [][]rule.RuleDiagnostic{r.Native.Diagnostics, r.pluginOutcome.Diagnostics} {
 		for index := range diagnostics {
 			diagnostic := &diagnostics[index]
+			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+		}
+	}
+	for _, diagnostics := range r.Native.typeDiagnostics {
+		for index := range diagnostics {
+			diagnostic := &diagnostics[index].ruleDiagnostic
 			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
 		}
 	}
