@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -247,6 +248,7 @@ func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 		return true
 	}
 	node = utils.ESTreeRuntimeExpression(node)
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKNonNullAssertions)
 	if ast.IsCallExpression(node) && ast.IsOptionalChain(node) {
 		// Optional invocation does not change an authored return annotation.
 		// Classify a clone so the source tree and its chain boundaries stay intact.
@@ -272,22 +274,33 @@ func isKnownNonStringReceiver(ctx rule.RuleContext, node *ast.Node) bool {
 		}
 	}
 	annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration)
-	return annotation != nil && utils.IsJSDocSyntaxNode(annotation) && nonStringAnnotation(annotation)
+	return annotation != nil && utils.IsJSDocSyntaxNode(annotation) && nonStringAnnotation(ctx.SourceFile, annotation)
 }
 
-func nonStringAnnotation(node *ast.Node) bool {
+func nonStringAnnotation(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindParenthesizedType, ast.KindJSDocNonNullableType, ast.KindJSDocNullableType, ast.KindJSDocOptionalType:
-		return nonStringAnnotation(node.Type())
-	case ast.KindUnionType:
-		for _, part := range node.AsUnionTypeNode().Types.Nodes {
-			if !nonStringAnnotation(part) {
+		return nonStringAnnotation(sourceFile, node.Type())
+	case ast.KindUnionType, ast.KindIntersectionType:
+		var parts []*ast.Node
+		if node.Kind == ast.KindIntersectionType {
+			parts = node.AsIntersectionTypeNode().Types.Nodes
+		} else {
+			parts = node.AsUnionTypeNode().Types.Nodes
+		}
+		for _, part := range parts {
+			if !nonStringAnnotation(sourceFile, part) {
 				return false
 			}
 		}
 		return true
 	case ast.KindLiteralType:
 		return !ast.IsStringLiteralLike(node.AsLiteralTypeNode().Literal)
+	case ast.KindTypeReference:
+		// tsgo retains Closure-style function syntax as a reference to "function".
+		name := node.AsTypeReferenceNode().TypeName
+		return ast.IsIdentifier(name) && name.Text() == "function" &&
+			scanner.ScanTokenAtPosition(sourceFile, node.End()) == ast.KindOpenParenToken
 	case ast.KindNumberKeyword, ast.KindBooleanKeyword, ast.KindBigIntKeyword, ast.KindSymbolKeyword,
 		ast.KindObjectKeyword, ast.KindVoidKeyword, ast.KindUndefinedKeyword, ast.KindNullKeyword,
 		ast.KindArrayType, ast.KindTupleType, ast.KindTypeLiteral, ast.KindJSDocTypeLiteral,
