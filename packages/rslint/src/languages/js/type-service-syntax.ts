@@ -177,13 +177,13 @@ export class GenerationSyntaxViews {
       ) ?? 'other';
     return `${raw.kind}:${parent?.kind}:${role}`;
   }
-  matching(
+  matching<Operation extends string>(
     file: string,
-    shapes: ReadonlyMap<string, ReadonlySet<string>>,
+    shapes: ReadonlyMap<string, ReadonlySet<Operation>>,
     limit: number,
-  ): Array<{ op: string; node: NodeRef }> {
+  ): Array<{ op: Operation; node: NodeRef }> {
     const source = this.sources.get(file),
-      requests: Array<{ op: string; node: NodeRef }> = [];
+      requests: Array<{ op: Operation; node: NodeRef }> = [];
     if (!source) return requests;
     const visit = (node: RemoteNode): void => {
       if (requests.length > limit) return;
@@ -247,7 +247,7 @@ export class GenerationSyntaxViews {
     if (kind === SyntaxKind.QualifiedName) return 'QualifiedName';
     if (kind === SyntaxKind.TypeReference) return 'TypeReference';
     if (kind === SyntaxKind.HeritageClause) return 'HeritageClause';
-    return SyntaxKind[kind]!;
+    return SyntaxKind[kind];
   }
   private isHeritage(ref: NodeRef): boolean {
     let current: NodeRef | undefined = ref;

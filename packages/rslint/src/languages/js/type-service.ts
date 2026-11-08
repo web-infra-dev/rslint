@@ -166,6 +166,16 @@ type NodeOperation =
   | 'symbol'
   | 'signature'
   | 'resolvedSignature';
+function isNodeOperation(operation: string): operation is NodeOperation {
+  return (
+    operation === 'type' ||
+    operation === 'fromTypeNode' ||
+    operation === 'context' ||
+    operation === 'symbol' ||
+    operation === 'signature' ||
+    operation === 'resolvedSignature'
+  );
+}
 interface QueryProfile {
   shapes: Map<string, Set<NodeOperation>>;
   maxQueries: number;
@@ -257,7 +267,9 @@ export class TypeServiceClient {
         this.read({ op: 'nodeRecord', args: { node } }, (packet) =>
           packet.nodeFacts(),
         ),
-      () => this.ensure(),
+      () => {
+        this.ensure();
+      },
       options.maxSyntaxBytes ?? 16 << 20,
       options.maxSyntaxFactsBytes ?? 1 << 20,
     );
@@ -567,8 +579,8 @@ export class TypeServiceClient {
         throw new Error('incomplete type service batch');
       this.stats.queries += batch.length;
       packets.forEach((packet, index) => {
-        const reader = this.ingest(queries[index]!, packet);
-        if (this.facts.get(keys[index]!) !== reader) reader.close();
+        const reader = this.ingest(queries[index], packet);
+        if (this.facts.get(keys[index]) !== reader) reader.close();
       });
     }
   }
@@ -578,14 +590,7 @@ export class TypeServiceClient {
       active &&
       'node' in request.args &&
       request.args.node?.file === active.name &&
-      [
-        'type',
-        'fromTypeNode',
-        'context',
-        'symbol',
-        'signature',
-        'resolvedSignature',
-      ].includes(request.op)
+      isNodeOperation(request.op)
     ) {
       active.queries++;
       const shape = this.syntax.shape(request.args.node);
@@ -593,7 +598,7 @@ export class TypeServiceClient {
         let operations = active.profile.shapes.get(shape);
         if (!operations && active.profile.shapes.size < 128)
           active.profile.shapes.set(shape, (operations = new Set()));
-        operations?.add(request.op as NodeOperation);
+        operations?.add(request.op);
       }
     }
     return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
@@ -842,7 +847,9 @@ export class TypeServiceClient {
     const file = new TypeServiceFile(
       this,
       binding,
-      new FileSyntaxViews(this.syntax, binding, () => this.ensure()),
+      new FileSyntaxViews(this.syntax, binding, () => {
+        this.ensure();
+      }),
       profileKey,
     );
     this.files.add(file);
@@ -870,7 +877,7 @@ export class TypeServiceClient {
     if (requests.length > cap) return;
     this.prepare(
       requests.map(({ op, node }) => ({
-        op: op as NodeOperation,
+        op,
         args: { node },
       })),
       true,
