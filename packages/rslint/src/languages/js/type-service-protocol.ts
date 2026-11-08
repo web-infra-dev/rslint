@@ -44,6 +44,7 @@ export interface TypeFact {
   readonly symbol: number;
   readonly aliasSymbol: number;
   readonly intrinsicName: string | undefined;
+  readonly escapedName: string | undefined;
   readonly value:
     string | number | { negative: boolean; base10Value: string } | undefined;
   readonly types: readonly number[] | undefined;
@@ -76,7 +77,9 @@ export interface QueryArguments {
   properties: IDArgs;
   typeArguments: IDArgs;
   isArray: IDArgs;
+  isArrayLike: IDArgs;
   isTuple: IDArgs;
+  numberIndexType: IDArgs;
   typeRecord: IDArgs;
   aliasedSymbol: IDArgs;
   declaredType: IDArgs;
@@ -109,7 +112,9 @@ export interface QueryResults {
   properties: readonly number[];
   typeArguments: readonly number[];
   isArray: boolean;
+  isArrayLike: boolean;
   isTuple: boolean;
+  numberIndexType: number;
   typeRecord: TypeFact;
   aliasedSymbol: number;
   declaredType: number;
@@ -176,7 +181,9 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   properties: 4,
   typeArguments: 4,
   isArray: 2,
+  isArrayLike: 2,
   isTuple: 2,
+  numberIndexType: 1,
   aliasedSymbol: 1,
   declaredType: 1,
   returnType: 1,

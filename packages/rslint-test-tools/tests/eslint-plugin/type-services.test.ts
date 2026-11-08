@@ -136,6 +136,14 @@ const cases: Case[] = [
     reports: 0,
   },
   {
+    name: 'Promise aggregator arrays and unique iterator symbols',
+    plugin: typedPlugin,
+    rule: 'await-thenable',
+    code: 'declare const valid: Promise<number>[]; declare const invalid: number[]; Promise.all(valid); Promise.all(invalid);',
+    reports: 1,
+    requiredOps: ['isArrayLike', 'numberIndexType'],
+  },
+  {
     name: 'union operands',
     plugin: typedPlugin,
     rule: 'restrict-plus-operands',
@@ -156,6 +164,14 @@ const cases: Case[] = [
     rule: 'return-await',
     options: ['always'],
     code: 'async function run() { return Promise.resolve(1); }',
+    reports: 1,
+  },
+  {
+    name: 'already awaited returns and nonthenable fixes',
+    plugin: typedPlugin,
+    rule: 'return-await',
+    options: ['always'],
+    code: 'async function valid() { try { return await Promise.resolve(1); } finally { console.log("cleanup"); } } async function invalid() { return await 42; }',
     reports: 1,
   },
   {
@@ -430,6 +446,8 @@ declare const a: any;
 a?.b.c;
 f<string>("x");
 const __name = "\\uD800" as const;
+declare const unique: unique symbol;
+const uniqueKeys = {[unique]: true};
 const truth = true as const;
 const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
 const view = <Box />;
@@ -446,6 +464,7 @@ import.meta;
 const first = 1, second = 2, third = 3;
 first, second, third;
 undefined;
+await Promise.resolve(1);
 `;
   writeFileSync(file, code);
   writeFileSync(resolve(directory, 'other.tsx'), code);
@@ -606,6 +625,12 @@ undefined;
         (node) =>
           node.type === 'ExpressionStatement' && node.expression.type === type,
       ).expression;
+    const nativeAwait = services.esTreeNodeToTSNodeMap.get(
+      expression('AwaitExpression'),
+    );
+    expect(nativeAwait.getChildAt(1)).toBe(nativeAwait.expression);
+    expect(nativeAwait.getChildAt(1).kind).toBe(ts.SyntaxKind.CallExpression);
+    expect(() => nativeAwait.getChildAt(0)).toThrow('synthetic token');
     const fn = body.find(
       (node) => node.type === 'ExportNamedDeclaration',
     ).declaration;
@@ -707,6 +732,13 @@ undefined;
     expect(services.esTreeNodeToTSNodeMap.get(declaration.id).escapedText).toBe(
       '___name',
     );
+    const uniqueType = services.getTypeAtLocation(variable('unique').id);
+    const uniqueProperty = services
+      .getTypeAtLocation(variable('uniqueKeys').id)
+      .getProperties()[0];
+    expect(uniqueType.flags & ts.TypeFlags.UniqueESSymbol).toBeTruthy();
+    expect(uniqueType.escapedName).toBe(uniqueProperty.escapedName);
+    expect(uniqueType.escapedName).toMatch(/^__@unique@\d+$/);
     const booleanType = services.getTypeAtLocation(variable('truth').id);
     expect(booleanType.intrinsicName).toBe('true');
     expect(booleanType.isLiteral()).toBe(false);

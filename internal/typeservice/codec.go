@@ -37,7 +37,7 @@ func EncodePacket(result Result) ([]byte, error) {
 	case Handles:
 		kind, words = packetHandles, 1
 	case *TypeFact:
-		kind, words = packetType, 7
+		kind, words = packetType, 8
 	case *SymbolFact:
 		kind, words = packetSymbol, 5
 	case *SignatureFact:
@@ -46,7 +46,7 @@ func EncodePacket(result Result) ([]byte, error) {
 		return nil, errors.New("unsupported semantic fact")
 	}
 	w := packetWriter{data: make([]byte, 8+words*4), strings: make(map[string]uint32)}
-	copy(w.data, "RTS2")
+	copy(w.data, "RTS3")
 	w.put(4, kind)
 	switch fact := result.(type) {
 	case Handle:
@@ -88,6 +88,9 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(28, offset)
 		}
 		w.put(32, w.ids(fact.Types))
+		if fact.EscapedName != "" {
+			w.put(36, w.text(fact.EscapedName))
+		}
 	case *SymbolFact:
 		w.put(8, w.text(fact.Name))
 		w.put(12, w.text(fact.EscapedName))
