@@ -34,6 +34,7 @@ export interface TypeView {
   readonly aliasSymbol: SymbolView | undefined;
   readonly intrinsicName: string | undefined;
   readonly escapedName: string | undefined;
+  readonly objectFlags: number | undefined;
   readonly value: TypeFact['value'];
   readonly types: readonly TypeView[] | undefined;
   getSymbol(): SymbolView | undefined;
@@ -156,7 +157,12 @@ function memo<T>(ensure: () => void, read: () => T): () => T {
 type ObjectKind = 'type' | 'symbol' | 'signature';
 type TypeScriptEnums = Pick<
   typeof ts,
-  'SyntaxKind' | 'TypeFlags' | 'NodeFlags' | 'JsxEmit' | 'ModuleDetectionKind'
+  | 'SyntaxKind'
+  | 'TypeFlags'
+  | 'ObjectFlags'
+  | 'NodeFlags'
+  | 'JsxEmit'
+  | 'ModuleDetectionKind'
 >;
 
 /** Exactly one eligible file-lint invocation owns this client. Close it in
@@ -525,6 +531,13 @@ export class FileTypeServiceClient {
           return value | flag;
         }, 0),
       );
+      const objectFlags = memo(ensure, () =>
+        this.typeField(id, 'objectFlags')?.reduce((value, name) => {
+          const flag = Reflect.get(this.typescript.ObjectFlags, name);
+          if (typeof flag !== 'number') unsupported(`ObjectFlags.${name}`);
+          return value | flag;
+        }, 0),
+      );
       const symbol = memo(ensure, () =>
           this.symbol(this.typeField(id, 'symbol')),
         ),
@@ -578,6 +591,9 @@ export class FileTypeServiceClient {
         },
         get escapedName() {
           return escapedName();
+        },
+        get objectFlags() {
+          return objectFlags();
         },
         get value() {
           return value();

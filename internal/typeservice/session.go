@@ -19,6 +19,33 @@ import (
 var nextGeneration atomic.Uint32
 var ErrClosed = errors.New("type service session is closed")
 
+// Public TypeScript ObjectFlags have different bit positions from Go's flags.
+// Do not expose checker-private cache state through the compatibility surface.
+var publicObjectFlags = [...]struct {
+	flag checker.ObjectFlags
+	name string
+}{
+	{checker.ObjectFlagsClass, "Class"},
+	{checker.ObjectFlagsInterface, "Interface"},
+	{checker.ObjectFlagsReference, "Reference"},
+	{checker.ObjectFlagsTuple, "Tuple"},
+	{checker.ObjectFlagsAnonymous, "Anonymous"},
+	{checker.ObjectFlagsMapped, "Mapped"},
+	{checker.ObjectFlagsInstantiated, "Instantiated"},
+	{checker.ObjectFlagsObjectLiteral, "ObjectLiteral"},
+	{checker.ObjectFlagsEvolvingArray, "EvolvingArray"},
+	{checker.ObjectFlagsObjectLiteralPatternWithComputedProperties, "ObjectLiteralPatternWithComputedProperties"},
+	{checker.ObjectFlagsReverseMapped, "ReverseMapped"},
+	{checker.ObjectFlagsJsxAttributes, "JsxAttributes"},
+	{checker.ObjectFlagsJSLiteral, "JSLiteral"},
+	{checker.ObjectFlagsFreshLiteral, "FreshLiteral"},
+	{checker.ObjectFlagsArrayLiteral, "ArrayLiteral"},
+	{checker.ObjectFlagsSingleSignatureType, "SingleSignatureType"},
+	{checker.ObjectFlagsContainsSpread, "ContainsSpread"},
+	{checker.ObjectFlagsObjectRestType, "ObjectRestType"},
+	{checker.ObjectFlagsInstantiationExpressionType, "InstantiationExpressionType"},
+}
+
 // Session owns the Program and checker objects until Close. It must not be
 // placed in Program.Cached, whose weak cache must not retain the Program.
 // One anchored checker supplies all objects, including cross-file declarations.
@@ -362,6 +389,14 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			}
 			if t.Flags()&checker.TypeFlagsUniqueESSymbol != 0 {
 				fact.EscapedName = ast.EscapeSymbolName(checker.GetPropertyNameFromType(t))
+			}
+			if t.Flags()&checker.TypeFlagsObject != 0 {
+				fact.ObjectFlags = []string{}
+				for _, flag := range publicObjectFlags {
+					if t.ObjectFlags()&flag.flag != 0 {
+						fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
+					}
+				}
 			}
 			if t.Flags()&checker.TypeFlagsUnionOrIntersection != 0 {
 				fact.Types = []uint32{}
