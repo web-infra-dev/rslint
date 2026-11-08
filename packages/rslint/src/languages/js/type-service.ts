@@ -2,8 +2,12 @@ import type ts from 'typescript';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import type { SharedTypeCacheReader } from './shared-type-cache.js';
-import { TypePacketReader } from './type-service-codec.js';
-import { FileSyntaxViews } from './type-service-syntax.js';
+import { WeakObjectCache } from './type-service-cache.js';
+import { typeReplyPackets, TypePacketReader } from './type-service-codec.js';
+import {
+  FileSyntaxViews,
+  GenerationSyntaxViews,
+} from './type-service-syntax.js';
 import {
   typeQueryKey,
   nameToUnits,
@@ -19,6 +23,7 @@ import {
   type SignatureFact,
   type ServiceRequest,
   type ScalarRequest,
+  type BatchTransport,
 } from './type-service-protocol.js';
 export { typeQueryKey } from './type-service-protocol.js';
 export type {
@@ -154,6 +159,17 @@ function memo<T>(ensure: () => void, read: () => T): () => T {
     return (cached ??= { value: read() }).value;
   };
 }
+type NodeOperation =
+  | 'type'
+  | 'fromTypeNode'
+  | 'context'
+  | 'symbol'
+  | 'signature'
+  | 'resolvedSignature';
+interface QueryProfile {
+  shapes: Map<string, Set<NodeOperation>>;
+  maxQueries: number;
+}
 type ObjectKind = 'type' | 'symbol' | 'signature';
 type TypeScriptEnums = Pick<
   typeof ts,
@@ -165,56 +181,85 @@ type TypeScriptEnums = Pick<
   | 'ModuleDetectionKind'
 >;
 
-/** Exactly one eligible file-lint invocation owns this client. Close it in
- * finally after the rule run. Stable wrappers/requested arrays live until close;
- * maxFactsBytes bounds disposable packet readers, not plugin-retained objects or
- * independently owned syntax views. The Go Session may outlive many clients. */
-export class FileTypeServiceClient {
+export interface TypeServiceClientOptions {
+  maxFactsBytes: number;
+  maxSyntaxBytes?: number;
+  maxSyntaxFactsBytes?: number;
+  shared?: SharedTypeCacheReader;
+  batchTransport?: BatchTransport;
+}
+/** One worker owns this client for one Program generation. File handles own
+ * ESTree mappings; immutable semantic and native identities survive file close. */
+export class TypeServiceClient {
   private closed = false;
   private readonly facts = new Map<string, TypePacketReader>();
-  private readonly types = new Map<number, TypeView>();
-  private readonly symbols = new Map<number, SymbolView>();
-  private readonly signatures = new Map<number, SignatureView>();
+  private readonly types = new WeakObjectCache<number, TypeView>();
+  private readonly symbols = new WeakObjectCache<number, SymbolView>();
+  private readonly signatures = new WeakObjectCache<number, SignatureView>();
   private readonly brands = new WeakMap<
     object,
     { kind: ObjectKind; id: number }
   >();
   private shared: SharedTypeCacheReader | undefined;
   private readonly maxFactsBytes: number;
-  private readonly syntax: FileSyntaxViews;
+  private readonly syntax: GenerationSyntaxViews;
+  private readonly fileOrdinals = new Map<string, number>();
+  private readonly files = new Set<TypeServiceFile>();
+  private batchTransport: BatchTransport | undefined;
+  private readonly profiles = new Map<string, QueryProfile>();
+  private activeFile:
+    | {
+        file: TypeServiceFile;
+        name: string;
+        profile: QueryProfile;
+        queries: number;
+      }
+    | undefined;
   readonly stats = { queries: 0, localHits: 0, sharedHits: 0, factBytes: 0 };
   readonly program: ProgramView;
   readonly checker: CheckerView;
   constructor(
     private readonly typescript: TypeScriptEnums,
     readonly descriptor: TypeServiceDescriptor,
-    readonly binding: FileBinding,
     private transport: QueryTransport | undefined,
     syntax: SyntaxSource,
-    options: { maxFactsBytes: number; shared?: SharedTypeCacheReader },
+    options: TypeServiceClientOptions,
   ) {
     if (
-      binding.generation !== descriptor.generation ||
-      binding.checker !== descriptor.checker
-    )
-      throw new Error('foreign file binding');
-    if (
       !Number.isSafeInteger(options.maxFactsBytes) ||
-      options.maxFactsBytes < 0
+      options.maxFactsBytes < 0 ||
+      !Number.isSafeInteger(options.maxSyntaxBytes ?? 16 << 20) ||
+      (options.maxSyntaxBytes ?? 16 << 20) < 0
     )
       throw new Error('invalid type service client budget');
+    if (
+      !Number.isSafeInteger(options.maxSyntaxFactsBytes ?? 1 << 20) ||
+      (options.maxSyntaxFactsBytes ?? 1 << 20) < 0
+    )
+      throw new Error('invalid syntax fact budget');
     this.maxFactsBytes = options.maxFactsBytes;
     this.shared = options.shared;
-    if (this.shared && this.shared.descriptor.generation !== binding.generation)
+    this.batchTransport = options.batchTransport;
+    if (
+      this.shared &&
+      this.shared.descriptor.generation !== descriptor.generation
+    )
       throw new Error('foreign shared type cache');
-    this.syntax = new FileSyntaxViews(
+    descriptor.sources.forEach((source, index) => {
+      this.fileOrdinals.set(source.fileName, index + 1);
+      this.fileOrdinals.set(source.path, index + 1);
+    });
+    this.syntax = new GenerationSyntaxViews(
       typescript,
       descriptor,
-      binding,
       syntax,
-      () => {
-        this.ensure();
-      },
+      (node) =>
+        this.read({ op: 'nodeRecord', args: { node } }, (packet) =>
+          packet.nodeFacts(),
+        ),
+      () => this.ensure(),
+      options.maxSyntaxBytes ?? 16 << 20,
+      options.maxSyntaxFactsBytes ?? 1 << 20,
     );
     const nodeType = (op: 'type' | 'fromTypeNode' | 'context', n: object) =>
       this.type(
@@ -374,8 +419,7 @@ export class FileTypeServiceClient {
         sourceFileToPackageName: {
           get: (path) => {
             this.ensure();
-            return descriptor.sources.find((s) => s.path === path)
-              ?.packages?.[0];
+            return this.syntax.packageName(path);
           },
         },
         isSourceFileFromExternalLibrary: (source) =>
@@ -404,10 +448,15 @@ export class FileTypeServiceClient {
     this.types.clear();
     this.symbols.clear();
     this.signatures.clear();
+    for (const file of this.files) file.close();
+    this.files.clear();
     this.syntax.close();
     this.shared?.close();
     this.shared = undefined;
     this.transport = undefined;
+    this.batchTransport = undefined;
+    this.profiles.clear();
+    this.activeFile = undefined;
   }
   private read<K>(
     request: ServiceRequest,
@@ -415,48 +464,138 @@ export class FileTypeServiceClient {
   ): K {
     this.ensure();
     const query: TypeServiceQuery = {
-      generation: this.binding.generation,
-      checker: this.binding.checker,
+      generation: this.descriptor.generation,
+      checker: this.descriptor.checker,
       ...request,
     };
-    const key = typeQueryKey(query);
-    let reader = this.facts.get(key),
-      retained = true;
+    const key = this.key(query);
+    let reader = this.facts.get(key);
     if (reader) {
       this.stats.localHits++;
       this.facts.delete(key);
       this.facts.set(key, reader);
     } else {
-      let bytes = this.shared?.get(key);
-      if (bytes) this.stats.sharedHits++;
-      else {
-        this.stats.queries++;
-        bytes = Uint8Array.from(this.transport!(query, key));
-      }
-      reader = new TypePacketReader(bytes);
-      retained = reader.retainedBytes <= this.maxFactsBytes;
-      if (retained) {
-        while (
-          this.stats.factBytes + reader.retainedBytes >
-          this.maxFactsBytes
-        ) {
-          const oldest = this.facts.keys().next().value!;
-          const evicted = this.facts.get(oldest)!;
-          this.stats.factBytes -= evicted.retainedBytes;
-          evicted.close();
-          this.facts.delete(oldest);
-        }
-        this.facts.set(key, reader);
-        this.stats.factBytes += reader.retainedBytes;
-      }
+      const shared = this.shared?.get(key);
+      if (shared) this.stats.sharedHits++;
+      else this.stats.queries++;
+      reader = this.ingest(query, shared ?? this.transport!(query, key));
     }
     try {
       return read(reader);
     } finally {
-      if (!retained) reader.close();
+      if (this.facts.get(key) !== reader) reader.close();
+    }
+  }
+  key(query: TypeServiceQuery): string {
+    return typeQueryKey(query, this.fileOrdinals);
+  }
+  private store(key: string, bytes: Uint8Array): TypePacketReader {
+    const existing = this.facts.get(key);
+    if (existing) return existing;
+    const reader = new TypePacketReader(Uint8Array.from(bytes));
+    if (reader.retainedBytes <= this.maxFactsBytes) {
+      while (this.stats.factBytes + reader.retainedBytes > this.maxFactsBytes) {
+        const oldest = this.facts.keys().next().value!,
+          evicted = this.facts.get(oldest)!;
+        this.stats.factBytes -= evicted.retainedBytes;
+        evicted.close();
+        this.facts.delete(oldest);
+      }
+      this.facts.set(key, reader);
+      this.stats.factBytes += reader.retainedBytes;
+    }
+    return reader;
+  }
+  private ingest(query: TypeServiceQuery, bytes: Uint8Array): TypePacketReader {
+    const reply = typeReplyPackets(bytes);
+    for (const record of reply.records) {
+      const key = this.key({
+        ...query,
+        op: record.op,
+        args: { id: record.id },
+      });
+      const reader = this.store(key, record.packet);
+      if (this.facts.get(key) !== reader) reader.close();
+    }
+    return this.store(this.key(query), reply.packet);
+  }
+  /** Merge known misses only. Cache hits, including negative answers, never
+   * cross the bridge. The scalar API remains the authoritative fallback. */
+  prefetch(requests: readonly ServiceRequest[]): void {
+    this.prepare(requests, false);
+  }
+  private prepare(
+    requests: readonly ServiceRequest[],
+    optional: boolean,
+  ): void {
+    this.ensure();
+    if (!this.batchTransport) return;
+    const missing = new Map<string, TypeServiceQuery>();
+    for (const request of requests) {
+      const query = {
+        generation: this.descriptor.generation,
+        checker: this.descriptor.checker,
+        ...request,
+      };
+      const key = this.key(query);
+      if (this.facts.has(key) || missing.has(key)) continue;
+      const shared = this.shared?.get(key);
+      if (shared) {
+        this.stats.sharedHits++;
+        const reader = this.ingest(query, shared);
+        if (this.facts.get(key) !== reader) reader.close();
+      } else missing.set(key, query);
+    }
+    const all = [...missing.entries()];
+    for (let offset = 0; offset < all.length; offset += 256) {
+      const batch = all.slice(offset, offset + 256),
+        queries = batch.map(([, query]) => query),
+        keys = batch.map(([key]) => key);
+      let packets: readonly Uint8Array[];
+      try {
+        packets = this.batchTransport(queries, keys);
+      } catch (error) {
+        this.ensure();
+        if (
+          !optional ||
+          (error instanceof Error && error.name === 'AbortError')
+        )
+          throw error;
+        return;
+      }
+      if (packets.length !== batch.length)
+        throw new Error('incomplete type service batch');
+      this.stats.queries += batch.length;
+      packets.forEach((packet, index) => {
+        const reader = this.ingest(queries[index]!, packet);
+        if (this.facts.get(keys[index]!) !== reader) reader.close();
+      });
     }
   }
   private query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']] {
+    const active = this.activeFile;
+    if (
+      active &&
+      'node' in request.args &&
+      request.args.node?.file === active.name &&
+      [
+        'type',
+        'fromTypeNode',
+        'context',
+        'symbol',
+        'signature',
+        'resolvedSignature',
+      ].includes(request.op)
+    ) {
+      active.queries++;
+      const shape = this.syntax.shape(request.args.node);
+      if (shape) {
+        let operations = active.profile.shapes.get(shape);
+        if (!operations && active.profile.shapes.size < 128)
+          active.profile.shapes.set(shape, (operations = new Set()));
+        operations?.add(request.op as NodeOperation);
+      }
+    }
     return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
   }
   private typeField<K extends keyof TypeFact>(
@@ -490,7 +629,7 @@ export class FileTypeServiceClient {
     return brand.id;
   }
   private intern<T extends object>(
-    map: Map<number, T>,
+    map: WeakObjectCache<number, T>,
     kind: ObjectKind,
     id: number,
     create: () => T,
@@ -693,30 +832,126 @@ export class FileTypeServiceClient {
       };
     });
   }
+  file(binding: FileBinding, profileKey?: string): TypeServiceFile {
+    this.ensure();
+    if (
+      binding.generation !== this.descriptor.generation ||
+      binding.checker !== this.descriptor.checker
+    )
+      throw new Error('foreign file binding');
+    const file = new TypeServiceFile(
+      this,
+      binding,
+      new FileSyntaxViews(this.syntax, binding, () => this.ensure()),
+      profileKey,
+    );
+    this.files.add(file);
+    return file;
+  }
+  prepareFile(
+    file: TypeServiceFile,
+    name: string,
+    profileKey: string | undefined,
+  ): void {
+    if (!profileKey || !this.batchTransport) return;
+    let profile = this.profiles.get(profileKey);
+    if (!profile) {
+      if (this.profiles.size >= 64)
+        this.profiles.delete(this.profiles.keys().next().value!);
+      this.profiles.set(
+        profileKey,
+        (profile = { shapes: new Map(), maxQueries: 0 }),
+      );
+    }
+    this.activeFile = { file, name, profile, queries: 0 };
+    if (profile.maxQueries < 16) return;
+    const cap = Math.max(256, Math.min(4096, profile.maxQueries * 4));
+    const requests = this.syntax.matching(name, profile.shapes, cap);
+    if (requests.length > cap) return;
+    this.prepare(
+      requests.map(({ op, node }) => ({
+        op: op as NodeOperation,
+        args: { node },
+      })),
+      true,
+    );
+  }
+  releaseFile(file: TypeServiceFile): void {
+    this.files.delete(file);
+    if (this.activeFile?.file === file) {
+      this.activeFile.profile.maxQueries = Math.max(
+        this.activeFile.profile.maxQueries,
+        this.activeFile.queries,
+      );
+      this.activeFile = undefined;
+    }
+  }
+}
+
+export class TypeServiceFile {
+  private closed = false;
+  constructor(
+    private readonly owner: TypeServiceClient,
+    readonly binding: FileBinding,
+    private readonly syntax: FileSyntaxViews,
+    private readonly profileKey?: string,
+  ) {}
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.syntax.close();
+    this.owner.releaseFile(this);
+  }
   parserServices(
     frame: DecodedFrame,
     projection: TypeServiceProjection,
     sourceFileName: string,
   ) {
+    if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
+    this.owner.prepareFile(this, sourceFileName, this.profileKey);
     const toTS = (node: ESTreeNode): object => {
       const native = this.syntax.esTreeNodeToTSNodeMap.get(node);
       if (!native)
         throw new Error(`ESTree node has no compiler origin: ${node.type}`);
       return native;
     };
-    const options = this.descriptor.compilerOptions;
+    const options = this.owner.descriptor.compilerOptions;
     return {
-      program: this.program,
+      program: this.owner.program,
       esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
       tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
       getTypeAtLocation: (node: ESTreeNode) =>
-        this.checker.getTypeAtLocation(toTS(node)),
+        this.owner.checker.getTypeAtLocation(toTS(node)),
       getSymbolAtLocation: (node: ESTreeNode) =>
-        this.checker.getSymbolAtLocation(toTS(node)),
+        this.owner.checker.getSymbolAtLocation(toTS(node)),
       emitDecoratorMetadata: options.emitDecoratorMetadata === true,
       experimentalDecorators: options.experimentalDecorators === true,
       isolatedDeclarations: options.isolatedDeclarations === true,
     };
+  }
+}
+
+/** Compatibility convenience for a standalone invocation. Worker pools should
+ * retain TypeServiceClient and create/close file handles for each lint task. */
+export class FileTypeServiceClient extends TypeServiceClient {
+  private readonly handle: TypeServiceFile;
+  constructor(
+    typescript: TypeScriptEnums,
+    descriptor: TypeServiceDescriptor,
+    binding: FileBinding,
+    transport: QueryTransport,
+    syntax: SyntaxSource,
+    options: TypeServiceClientOptions,
+  ) {
+    super(typescript, descriptor, transport, syntax, options);
+    this.handle = this.file(binding);
+  }
+  parserServices(
+    frame: DecodedFrame,
+    projection: TypeServiceProjection,
+    sourceFileName: string,
+  ) {
+    return this.handle.parserServices(frame, projection, sourceFileName);
   }
 }

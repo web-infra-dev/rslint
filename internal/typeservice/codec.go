@@ -18,6 +18,7 @@ const (
 	packetType
 	packetSymbol
 	packetSignature
+	packetNodes
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -42,6 +43,8 @@ func EncodePacket(result Result) ([]byte, error) {
 		kind, words = packetSymbol, 5
 	case *SignatureFact:
 		kind, words = packetSignature, 2
+	case NodeFacts:
+		kind, words = packetNodes, 1
 	default:
 		return nil, errors.New("unsupported semantic fact")
 	}
@@ -114,6 +117,22 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(20, offset)
 		}
 		w.put(24, w.node(fact.ValueDeclaration))
+	case NodeFacts:
+		offset := uint32(len(w.data))
+		w.data = append(w.data, make([]byte, 4+len(fact)*28)...)
+		w.put(offset, uint32(len(fact)))
+		for i, node := range fact {
+			at := offset + 4 + uint32(i)*28
+			w.put(at, w.node(&node.Node))
+			w.put(at+4, w.text(node.Kind))
+			w.put(at+8, node.Flags)
+			w.put(at+12, w.node(node.Parent))
+			w.put(at+16, w.node(node.Name))
+			if node.Text != nil {
+				w.put(at+20, w.text(*node.Text))
+			}
+		}
+		w.put(8, offset)
 	case *SignatureFact:
 		w.put(8, w.ids(fact.Parameters))
 		w.put(12, w.node(fact.Declaration))
@@ -163,4 +182,44 @@ func (w *packetWriter) node(node *NodeRef) uint32 {
 	w.put(offset, w.text(node.File))
 	w.put(offset+4, node.Index)
 	return offset
+}
+
+// EncodeReply keeps direct immutable object records beside the scalar answer.
+// Packet slices use independent offset origins and can be retained or evicted
+// separately by the worker. No recursive graph or shared native pointer exists.
+func EncodeReply(result Result, records []Record) ([]byte, error) {
+	packet, err := EncodePacket(result)
+	if err != nil || len(records) == 0 {
+		return packet, err
+	}
+	data := make([]byte, 0, 12+len(records)*16+len(packet))
+	data = append(data, make([]byte, 12+len(records)*16)...)
+	copy(data, "RTB1")
+	binary.LittleEndian.PutUint32(data[4:], uint32(len(packet)))
+	binary.LittleEndian.PutUint32(data[8:], uint32(len(records)))
+	data = append(data, packet...)
+	for i, record := range records {
+		encoded, err := EncodePacket(record.Fact)
+		if err != nil {
+			return nil, err
+		}
+		at := 12 + i*16
+		var kind uint32
+		switch record.Op {
+		case "typeRecord":
+			kind = 1
+		case "symbolRecord":
+			kind = 2
+		case "signatureRecord":
+			kind = 3
+		default:
+			return nil, errors.New("invalid supplemental fact")
+		}
+		binary.LittleEndian.PutUint32(data[at:], kind)
+		binary.LittleEndian.PutUint32(data[at+4:], record.ID)
+		binary.LittleEndian.PutUint32(data[at+8:], uint32(len(data)))
+		binary.LittleEndian.PutUint32(data[at+12:], uint32(len(encoded)))
+		data = append(data, encoded...)
+	}
+	return data, nil
 }

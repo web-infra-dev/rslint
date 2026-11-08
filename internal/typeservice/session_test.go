@@ -1,6 +1,7 @@
 package typeservice
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -83,6 +84,49 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatal("type service retained checker lease between queries")
 		}
+	}
+	var identifier uint32
+	for index, node := range table.Nodes {
+		if node != nil && ast.IsIdentifier(node) {
+			identifier = uint32(index)
+			break
+		}
+	}
+	if identifier == 0 {
+		t.Fatal("fixture identifier missing")
+	}
+	batch := []Query{query, {Scope: query.Scope, Request: &NodeRequest{Op: "type", Node: NodeRef{name, identifier}}}, {Scope: query.Scope, Request: &NodeRequest{Op: "nodeRecord", Node: NodeRef{name, identifier}}}}
+	packets, err := session.QueryBatch(t.Context(), batch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, q := range batch {
+		packet, err := session.Query(t.Context(), q)
+		if err != nil || !bytes.Equal(packet, packets[i]) {
+			t.Fatalf("batch query %d differs from scalar: %v", i, err)
+		}
+	}
+	// A metadata-only batch must not borrow a checker held by a native rule.
+	_, release := p.TypeCheckerForFileExclusive(core.WithCheckerLifetime(t.Context(), core.CheckerLifetimeAPI), file)
+	metadataDone := make(chan error, 1)
+	go func() { _, err := session.QueryBatch(t.Context(), batch[2:]); metadataDone <- err }()
+	select {
+	case err := <-metadataDone:
+		release()
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		release()
+		t.Fatal("syntax metadata borrowed a checker")
+	}
+	if _, err := session.QueryBatch(t.Context(), make([]Query, 257)); err == nil {
+		t.Fatal("unbounded query batch admitted")
+	}
+	stale := query
+	stale.Generation++
+	if _, err := session.QueryBatch(t.Context(), []Query{query, stale}); err == nil {
+		t.Fatal("stale batch admitted")
 	}
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()

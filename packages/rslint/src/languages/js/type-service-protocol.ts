@@ -19,6 +19,7 @@ export interface TypeServiceDescriptor extends Scope {
     packages?: string[];
     external: boolean;
     defaultLibrary: boolean;
+    isDeclarationFile: boolean;
   }>;
 }
 export interface TypeServiceProjection {
@@ -38,7 +39,16 @@ export interface TypeServiceProjection {
 export type SyntaxSource = (
   scope: Scope,
   file: string,
-) => { fileName: string; tree: Uint8Array } | undefined;
+  metadataOnly?: boolean,
+) => { fileName: string; tree?: Uint8Array } | undefined;
+export interface NodeFact {
+  readonly node: NodeRef;
+  readonly kind: string;
+  readonly flags: number;
+  readonly parent: NodeRef | undefined;
+  readonly name: NodeRef | undefined;
+  readonly text: string | undefined;
+}
 export interface TypeFact {
   readonly flags: readonly string[];
   readonly symbol: number;
@@ -64,6 +74,7 @@ export interface SignatureFact {
 type NodeArgs = { node: NodeRef };
 type IDArgs = { id: number };
 export interface QueryArguments {
+  nodeRecord: NodeArgs;
   type: NodeArgs;
   fromTypeNode: NodeArgs;
   context: NodeArgs;
@@ -99,6 +110,7 @@ export interface QueryArguments {
   };
 }
 export interface QueryResults {
+  nodeRecord: readonly NodeFact[];
   type: number;
   fromTypeNode: number;
   context: number;
@@ -136,11 +148,51 @@ export type QueryTransport = (
   query: TypeServiceQuery,
   key: string,
 ) => Uint8Array;
-const nodeKey = (node: NodeRef | undefined): string =>
-  node ? `${node.file.length}:${node.file}:${node.index}` : '-';
-export function typeQueryKey(q: TypeServiceQuery): string {
-  const prefix = `${q.generation}:${q.checker}:${q.op}:`;
+const operations = [
+  'type',
+  'fromTypeNode',
+  'context',
+  'symbol',
+  'signature',
+  'resolvedSignature',
+  'constraint',
+  'apparent',
+  'baseLiteral',
+  'nonNullable',
+  'typeString',
+  'properties',
+  'typeArguments',
+  'isArray',
+  'isArrayLike',
+  'isTuple',
+  'numberIndexType',
+  'typeRecord',
+  'aliasedSymbol',
+  'declaredType',
+  'symbolRecord',
+  'returnType',
+  'signatureRecord',
+  'void',
+  'property',
+  'symbolType',
+  'signatures',
+  'resolveName',
+  'nodeRecord',
+] as const;
+const operationIDs = new Map<Operation, number>(
+  operations.map((op, index) => [op, index + 1]),
+);
+export function typeQueryKey(
+  q: TypeServiceQuery,
+  files?: ReadonlyMap<string, number>,
+): string {
+  const nodeKey = (node: NodeRef | undefined): string =>
+    node
+      ? `${files?.get(node.file) ?? `${node.file.length}:${node.file}`}:${node.index}`
+      : '-';
+  const prefix = `${q.generation}:${q.checker}:${operationIDs.get(q.op)}:`;
   switch (q.op) {
+    case 'nodeRecord':
     case 'type':
     case 'fromTypeNode':
     case 'context':
@@ -165,7 +217,7 @@ export function typeQueryKey(q: TypeServiceQuery): string {
 
 export type ScalarOperation = Exclude<
   Operation,
-  'typeRecord' | 'symbolRecord' | 'signatureRecord'
+  'typeRecord' | 'symbolRecord' | 'signatureRecord' | 'nodeRecord'
 >;
 export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   type: 1,
@@ -194,6 +246,11 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   signatures: 4,
   resolveName: 1,
 };
+
+export type BatchTransport = (
+  queries: readonly TypeServiceQuery[],
+  keys: readonly string[],
+) => readonly Uint8Array[];
 
 export type ServiceRequest<K extends Operation = Operation> = {
   [P in K]: { op: P; args: QueryArguments[P] };
