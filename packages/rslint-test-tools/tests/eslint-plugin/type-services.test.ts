@@ -562,12 +562,14 @@ test('generation clients reuse facts and lazy dependency identities across files
       );
       expect(declaration.name.text).toBe('value');
       expect(sources).toBe(0);
-      expect(
-        owner.program.getSourceFile(
-          relative(descriptor.currentDirectory, first.file),
-        ),
-      ).toBe(owner.program.getSourceFile(first.file));
-      expect(metadataRequests).toBe(1);
+      // Resolve platform paths before counting the relative alias lookup.
+      const firstSource = owner.program.getSourceFile(first.file),
+        relativeFile = relative(descriptor.currentDirectory, first.file),
+        beforeMetadata = metadataRequests;
+      expect(owner.program.getSourceFile(relativeFile)).toBe(firstSource);
+      expect(metadataRequests - beforeMetadata).toBe(1);
+      expect(owner.program.getSourceFile(relativeFile)).toBe(firstSource);
+      expect(metadataRequests - beforeMetadata).toBe(1);
       expect(sources).toBe(0);
       first.handle.close();
       expect(() => first.services.esTreeNodeToTSNodeMap.get(imported)).toThrow(
