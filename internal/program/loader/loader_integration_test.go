@@ -4198,7 +4198,10 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			request := ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: test.scope}
+			request := ProjectBuildRequest{
+				Configs: configs, Targets: plan, Policies: policies, Scope: test.scope,
+				IncludeProgramRootIdentities: true,
+			}
 			materialized := NewSession(fsys)
 			set, err := materialized.BuildProjects(request)
 			if err != nil {
@@ -4237,6 +4240,7 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			wantPrograms := project(want)
 			gotPrograms := make(map[string]projection)
 			gotMapping := make(map[string]target.File)
+			var gotRootIdentities []string
 			for _, load := range loads {
 				binding, err := load.Load()
 				if err != nil {
@@ -4248,9 +4252,13 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 				for key, value := range binding.LintTargetBySourcePath {
 					gotMapping[key] = value
 				}
+				gotRootIdentities = append(gotRootIdentities, binding.ProgramRootIdentities...)
 			}
 			if !reflect.DeepEqual(gotPrograms, wantPrograms) || !reflect.DeepEqual(gotMapping, want.LintTargetBySourcePath) {
 				t.Fatal("admitted loads changed complete source graphs, target grouping, capabilities, or source identity")
+			}
+			if len(want.ProgramRootIdentities) == 0 || !slices.Equal(gotRootIdentities, want.ProgramRootIdentities) {
+				t.Fatalf("admitted loads changed frozen root identities: got %v, want %v", gotRootIdentities, want.ProgramRootIdentities)
 			}
 		})
 	}

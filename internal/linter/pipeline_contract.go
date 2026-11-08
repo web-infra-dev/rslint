@@ -130,6 +130,9 @@ type Generation struct {
 	Native NativeGeneration
 	Target TargetProjection
 	Plugin *PluginGeneration
+	// ProgramRootIdentities is an optional frozen physical root projection.
+	// The pipeline carries these immutable strings without querying Programs.
+	ProgramRootIdentities []string
 }
 
 // NativeGeneration is the input understood by the native lint engine.

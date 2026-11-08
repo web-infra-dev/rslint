@@ -158,6 +158,13 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 			return nil, nil
 		}
 	}
+	var rootIdentities *ProgramRootIdentityProjector
+	if request.IncludeProgramRootIdentities {
+		rootIdentities, err = s.NewProgramRootIdentityProjector(request.Targets.Files, request.SingleThreaded)
+		if err != nil {
+			return nil, err
+		}
+	}
 	loads := make([]ProgramLoad, 0, len(order))
 	for _, owner := range order {
 		files := filesByProject[owner]
@@ -212,6 +219,9 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 					return LoadResult{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", unbound[0].Path, spec.tsconfigPath)
 				}
 				finalizeResult(&binding)
+				if rootIdentities != nil {
+					binding.ProgramRootIdentities = rootIdentities.Freeze(binding.Programs)
+				}
 				return binding, nil
 			},
 		})

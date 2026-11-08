@@ -36,16 +36,20 @@ type ProjectBuildRequest struct {
 	Policies       map[target.File]rslintconfig.ProjectPolicy
 	Scope          ProjectScope
 	SingleThreaded bool
+	// IncludeProgramRootIdentities freezes physical roots of diagnostic-capable
+	// Programs into the returned metadata without retaining their ASTs.
+	IncludeProgramRootIdentities bool
 }
 
 // ProjectSet is the stable, deduplicated set of configured project generations
 // built for one load pass. Its compiler backing and config associations are
 // private assembly details; consumers use Programs after loading or binding.
 type ProjectSet struct {
-	compilerPrograms []*compiler.Program
-	programs         []*lintprogram.Program
-	configOrders     []configOrders
-	targetBinding    *projectTargetBinding
+	compilerPrograms      []*compiler.Program
+	programs              []*lintprogram.Program
+	configOrders          []configOrders
+	programRootIdentities []string
+	targetBinding         *projectTargetBinding
 	// Missing entries use ordinary owner declarations. Present entries are an
 	// ordered candidate list; an empty list explicitly leaves a target unbound.
 	targetProjects map[target.File][]int
@@ -55,6 +59,12 @@ type ProjectSet struct {
 // The slice is read-only and remains owned by the ProjectSet.
 func (projects ProjectSet) Programs() []*lintprogram.Program {
 	return projects.programs
+}
+
+// ProgramRootIdentities returns the optional frozen physical root projection.
+// The read-only slice contains no Program or source-file references.
+func (projects ProjectSet) ProgramRootIdentities() []string {
+	return projects.programRootIdentities
 }
 
 func (projects ProjectSet) Len() int {
@@ -355,6 +365,12 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 			if utils.NewProgramSourceLookup(program, s.FS()).SourceFileForTarget(file.Path, file.CanonicalPath) == nil {
 				return ProjectSet{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", file.Path, program.CommandLine().ConfigName())
 			}
+		}
+	}
+	if request.IncludeProgramRootIdentities {
+		set.programRootIdentities, err = s.FreezeProgramRootIdentities(set.programs, request.Targets.Files, request.SingleThreaded)
+		if err != nil {
+			return ProjectSet{}, err
 		}
 	}
 	return set, nil

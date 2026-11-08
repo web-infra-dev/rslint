@@ -29,7 +29,7 @@ func executeObservation(
 		return observationExecution{}, &GenerationLoadError{Err: err}
 	}
 	loads := plan.Loads
-	results := make([]observationExecution, len(loads))
+	results := make([]observationUnitExecution, len(loads))
 	errs := make([]error, len(loads))
 	resources := newPluginDispatchResources()
 	sourceReadLimit := runtime.GOMAXPROCS(0)
@@ -104,7 +104,7 @@ func executeObservation(
 			}
 		}
 		results[i], errs[i] = executePreparedObservation(ctx, work, snapshot, policy, dispatcher,
-			index, planChanges, stopOnTargetSyntaxErrors)
+			planChanges, stopOnTargetSyntaxErrors)
 	}
 	if plan.SingleThreaded || len(loads) <= 1 {
 		for i := range loads {
@@ -113,7 +113,7 @@ func executeObservation(
 	} else {
 		runWithProgramAdmission(estimates, runtime.GOMAXPROCS(0), run)
 	}
-	result, err := mergeObservationExecutions(results, index)
+	result, err := mergeObservationUnits(results, index)
 	if err != nil {
 		return observationExecution{}, err
 	}
@@ -132,77 +132,82 @@ func executeObservation(
 	return result, nil
 }
 
-func mergeObservationExecutions(parts []observationExecution, index int) (observationExecution, error) {
-	// A complete single binding already has the final diagnostic ordering.
-	// Transfer its result without copying native and plugin output slices.
-	if len(parts) == 1 && parts[0].observation.Native.Lint != nil {
-		result := parts[0]
-		appendObservationTypeDiagnostics(&result.observation.Native)
-		result.observation.Index = index
-		if result.deferredTask != nil {
-			result.deferredTask.resources = nil
-		}
-		return result, nil
-	}
-	result := observationExecution{observation: ObservationResult{
-		Index: index, Native: NativeObservation{Lint: &LintResult{ExecutedRules: make(map[string]struct{})}},
-	}}
-	var plugins []EslintPluginDispatchOutcome
-	var syntactic []rule.RuleDiagnostic
-	for _, part := range parts {
-		native := part.observation.Native
-		syntactic = append(syntactic, native.Diagnostics[:native.syntacticDiagnosticCount]...)
-		result.observation.Native.Diagnostics = append(result.observation.Native.Diagnostics, native.Diagnostics[native.syntacticDiagnosticCount:]...)
-		result.observation.Native.typeDiagnostics = append(result.observation.Native.typeDiagnostics, native.typeDiagnostics...)
-		result.observation.Native.Files = append(result.observation.Native.Files, native.Files...)
-		result.observation.Native.HasTargetSyntaxErrors = result.observation.Native.HasTargetSyntaxErrors || native.HasTargetSyntaxErrors
-		if native.Lint != nil {
-			result.observation.Native.Lint.LintedFileCount += native.Lint.LintedFileCount
-			for name := range native.Lint.ExecutedRules {
-				result.observation.Native.Lint.ExecutedRules[name] = struct{}{}
+func mergeObservationUnits(parts []observationUnitExecution, index int) (observationExecution, error) {
+	var combined observationUnitExecution
+	if len(parts) == 1 && parts[0].native.lint != nil {
+		// Transfer a single binding's native/plugin slices and statistics.
+		combined = parts[0]
+	} else {
+		combined.native.lint = &LintResult{ExecutedRules: make(map[string]struct{})}
+		var plugins []EslintPluginDispatchOutcome
+		for _, part := range parts {
+			combined.programRootIdentities = append(combined.programRootIdentities, part.programRootIdentities...)
+			native := part.native
+			combined.native.syntacticDiagnostics = append(combined.native.syntacticDiagnostics, native.syntacticDiagnostics...)
+			combined.native.diagnostics = append(combined.native.diagnostics, native.diagnostics...)
+			combined.native.typeDiagnostics = append(combined.native.typeDiagnostics, native.typeDiagnostics...)
+			combined.native.files = append(combined.native.files, native.files...)
+			combined.native.hasTargetSyntaxErrors = combined.native.hasTargetSyntaxErrors || native.hasTargetSyntaxErrors
+			if native.lint != nil {
+				combined.native.lint.LintedFileCount += native.lint.LintedFileCount
+				for name := range native.lint.ExecutedRules {
+					combined.native.lint.ExecutedRules[name] = struct{}{}
+				}
 			}
-		}
-		if part.observation.pluginKind == pluginObservationJoined {
-			result.observation.pluginKind = pluginObservationJoined
-			plugins = append(plugins, part.observation.pluginOutcome)
-		}
-		if len(part.fixTexts) != 0 && result.fixTexts == nil {
-			result.fixTexts = make(fixTextSnapshot)
-		}
-		for path, text := range part.fixTexts {
-			if _, duplicate := result.fixTexts[path]; duplicate {
-				return observationExecution{}, fmt.Errorf("linter pipeline: duplicate fix target %q", path)
+			if part.pluginKind == pluginObservationJoined {
+				combined.pluginKind = pluginObservationJoined
+				plugins = append(plugins, part.pluginOutcome)
 			}
-			result.fixTexts[path] = text
-		}
-		if part.deferredTask != nil {
-			result.observation.pluginKind = pluginObservationProgressive
-			if result.deferredTask == nil {
-				result.deferredTask = part.deferredTask
-				result.deferredTask.resources = nil
-			} else {
-				task := result.deferredTask
-				task.inputs = append(task.inputs, part.deferredTask.inputs...)
-				for wire, target := range part.deferredTask.targetPathByWire {
-					task.targetPathByWire[wire] = target
+			if len(part.fixTexts) != 0 && combined.fixTexts == nil {
+				combined.fixTexts = make(fixTextSnapshot)
+			}
+			for path, text := range part.fixTexts {
+				if _, duplicate := combined.fixTexts[path]; duplicate {
+					return observationExecution{}, fmt.Errorf("linter pipeline: duplicate fix target %q", path)
+				}
+				combined.fixTexts[path] = text
+			}
+			if part.deferredTask != nil {
+				combined.pluginKind = pluginObservationProgressive
+				if combined.deferredTask == nil {
+					combined.deferredTask = part.deferredTask
+				} else {
+					task := combined.deferredTask
+					task.inputs = append(task.inputs, part.deferredTask.inputs...)
+					for wire, target := range part.deferredTask.targetPathByWire {
+						task.targetPathByWire[wire] = target
+					}
 				}
 			}
 		}
+		combined.pluginOutcome = mergePluginOutcomes(plugins)
 	}
-	if len(syntactic) > 0 {
-		result.observation.Native.Diagnostics = append(syntactic, result.observation.Native.Diagnostics...)
+	if combined.deferredTask != nil {
+		combined.deferredTask.resources = nil
 	}
-	appendObservationTypeDiagnostics(&result.observation.Native)
-	result.observation.pluginOutcome = mergePluginOutcomes(plugins)
-	return result, nil
-}
-
-// Type diagnostics retain their frozen physical identity keys across loading
-// units. Publish once, after all native reports, in original Program order.
-func appendObservationTypeDiagnostics(native *NativeObservation) {
+	native := combined.native
+	diagnostics := native.diagnostics
+	if len(native.syntacticDiagnostics) > 0 {
+		diagnostics = append(native.syntacticDiagnostics, diagnostics...)
+	}
+	// All groups retain load/Program order and their original physical keys.
+	// Construct a public result only after syntax/native/type ordering and
+	// cross-load type deduplication are complete.
 	emitDeduplicatedTypeCheckDiagnostics(native.typeDiagnostics, func(diagnostic rule.RuleDiagnostic) {
-		native.Diagnostics = append(native.Diagnostics, diagnostic)
+		diagnostics = append(diagnostics, diagnostic)
 	})
-	native.typeDiagnostics = nil
-	native.syntacticDiagnosticCount = 0
+	return observationExecution{
+		observation: ObservationResult{
+			Index: index,
+			Native: NativeObservation{
+				Diagnostics: diagnostics, Lint: native.lint, Files: native.files,
+				HasTargetSyntaxErrors: native.hasTargetSyntaxErrors,
+			},
+			ProgramRootIdentities: combined.programRootIdentities,
+			pluginKind:            combined.pluginKind,
+			pluginOutcome:         combined.pluginOutcome,
+		},
+		fixTexts:     combined.fixTexts,
+		deferredTask: combined.deferredTask,
+	}, nil
 }

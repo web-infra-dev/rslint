@@ -15,12 +15,10 @@ import (
 // deduplicated in first-declaration order.
 //
 // Programs must belong to this Session's loader generation and VFS. The
-// command satisfies that contract by requesting the projection immediately
-// after loading and before execution.
+// loader satisfies that contract while assembling each requested load result.
 //
-// The result belongs to this call only. It is not retained by the Session,
-// Programs, or their backing projects because target hints and scheduling
-// policy are operation-specific rather than project-generation state.
+// The result is immutable load metadata. It is not retained by the Session or
+// Programs because target hints and scheduling policy are operation-specific.
 func (s *Session) FreezeProgramRootIdentities(
 	programs []*lintprogram.Program,
 	knownTargets []target.File,

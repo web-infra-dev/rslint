@@ -9,7 +9,6 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -22,9 +21,7 @@ import (
 	configLint "github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
-	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/output"
-	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
@@ -330,9 +327,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 
 	projectRequest := loader.ProjectBuildRequest{
-		Configs:        projectConfigs,
-		Scope:          projectScope,
-		SingleThreaded: singleThreaded,
+		Configs:                      projectConfigs,
+		Scope:                        projectScope,
+		SingleThreaded:               singleThreaded,
+		IncludeProgramRootIdentities: format == output.FormatDefault && mode != output.ModeLint,
 	}
 	pathSpaces := configCatalog.PathSpaces
 	if pathSpaces != nil {
@@ -395,7 +393,6 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	programSession := loader.NewSession(sourceFS)
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
-	var summaryFileCount int
 	activate := func() error {
 		if completeActivation == nil {
 			return nil
@@ -408,14 +405,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Rebuild ts-go Programs against a caller-supplied immutable VFS generation
 	// and bind the original stable target plan again. A target can move between
 	// rslint Programs when in-memory fixes change the import graph.
-	createPrograms := func(session *loader.Session) (loader.LoadResult, error) {
+	createPrograms := func(session *loader.Session, request loader.ProjectBuildRequest) (loader.LoadResult, error) {
 		defer session.ReleaseBuildCache()
-		rebuilt, err := session.BuildProjects(projectRequest)
+		rebuilt, err := session.BuildProjects(request)
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
 		if typeCheckOnly {
-			return loader.LoadResult{Programs: rebuilt.Programs()}, nil
+			return loader.LoadResult{Programs: rebuilt.Programs(), ProgramRootIdentities: rebuilt.ProgramRootIdentities()}, nil
 		}
 		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
 		if err != nil {
@@ -470,25 +467,19 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 					return utils.RestoreSourceBOM(generationFS, path, source.Text())
 				},
 			},
-			Plugin: plugin,
+			Plugin:                plugin,
+			ProgramRootIdentities: binding.ProgramRootIdentities,
 		}
 	}
 
 	provider := &cliGenerationProvider{
 		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
-			binding, err := createPrograms(programSession)
+			binding, err := createPrograms(programSession, projectRequest)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
 			}
 			if err := activate(); err != nil {
 				return loader.LoadResult{}, nil, err
-			}
-			if format == output.FormatDefault && mode != output.ModeLint {
-				summaryFileCount, err = freezeLintReportFileCount(ctx, mode, programSession,
-					binding.Programs, targetPlan.Files, singleThreaded)
-				if err != nil {
-					return loader.LoadResult{}, nil, err
-				}
 			}
 			return binding, programSession.FS(), nil
 		},
@@ -506,7 +497,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				}
 			}
 			roundSession := loader.NewSession(utils.NewOverlayVFS(sourceFS, overrides))
-			binding, err := createPrograms(roundSession)
+			roundRequest := projectRequest
+			roundRequest.IncludeProgramRootIdentities = false
+			binding, err := createPrograms(roundSession, roundRequest)
 			if err != nil {
 				return loader.LoadResult{}, nil, err
 			}
@@ -521,43 +514,15 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Fix validation needs one coherent source-identity boundary. Ordinary
 	// lint admits disjoint bindings independently, regardless of rule backend.
 	if !fix {
-		provider.loads = func(ctx context.Context) ([]linter.GenerationLoad, error) {
+		provider.loads = func(ctx context.Context) ([]loader.ProgramLoad, vfs.FS, error) {
 			loads, err := programSession.PlanLoads(projectRequest, currentDirectory, false)
 			if err != nil || len(loads) == 0 {
-				return nil, err
+				return nil, nil, err
 			}
 			if err := activate(); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
-			if format == output.FormatDefault && mode != output.ModeLint {
-				// Freeze each actual Program's roots while it is owned by its
-				// load, then retain only the observation-wide physical union.
-				// Every unit uses the complete target hints, including canonical
-				// self-identities owned by a different unit.
-				files := lintReportFileIdentities(mode, targetPlan.Files, nil)
-				projector, err := programSession.NewProgramRootIdentityProjector(targetPlan.Files, singleThreaded)
-				if err != nil {
-					return nil, err
-				}
-				var mu sync.Mutex
-				for index, load := range loads {
-					loads[index].Load = func() (loader.LoadResult, error) {
-						binding, err := load.Load()
-						if err != nil {
-							return loader.LoadResult{}, err
-						}
-						roots := projector.Freeze(binding.Programs)
-						mu.Lock()
-						for _, root := range roots {
-							files[root] = struct{}{}
-						}
-						summaryFileCount = len(files)
-						mu.Unlock()
-						return binding, nil
-					}
-				}
-			}
-			return lintLoader.GenerationLoads(loads, programSession.FS(), generationForBinding), nil
+			return loads, programSession.FS(), nil
 		}
 	}
 
@@ -655,17 +620,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// Machine formats deliberately omit Summary and its upstream identity work.
 	var summary *output.Summary
 	if format == output.FormatDefault {
-		if mode == output.ModeLint {
-			// Keep lint-only's target-union allocation after execution, matching
-			// its established pipeline allocation timing.
-			summaryFileCount = lintReportFileCount(mode, targetPlan.Files, nil)
-		}
 		threadsCount := 1
 		if !singleThreaded {
 			threadsCount = runtime.GOMAXPROCS(0)
 		}
 		summary = &output.Summary{
-			Files:       summaryFileCount,
+			Files:       lintReportFileCount(mode, targetPlan.Files, initialObservation.ProgramRootIdentities),
 			Rules:       len(lintResult.ExecutedRules),
 			Threads:     threadsCount,
 			FixedIssues: fixedCount,
@@ -722,33 +682,4 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 1
 	}
 	return 0
-}
-
-// freezeLintReportFileCount isolates default-format, type-check summary
-// work from the lint command's hot orchestration path. The loader owns root
-// identity resolution; the command immediately reduces its operation-scoped
-// result into the presentation scalar.
-func freezeLintReportFileCount(
-	ctx context.Context,
-	mode output.Mode,
-	session *loader.Session,
-	programs []*program.Program,
-	lintTargets []target.File,
-	singleThreaded bool,
-) (int, error) {
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
-	typeCheckedRootIDs, err := session.FreezeProgramRootIdentities(
-		programs,
-		lintTargets,
-		singleThreaded,
-	)
-	if err != nil {
-		return 0, err
-	}
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
-	return lintReportFileCount(mode, lintTargets, typeCheckedRootIDs), nil
 }

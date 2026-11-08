@@ -89,15 +89,18 @@ func TestPipelineDetachesSourcesAfterFreezingNativeAndPluginFixes(t *testing.T) 
 func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 	root := tspath.NormalizePath(t.TempDir())
 	fixablePath := tspath.ResolvePath(root, "fixable.ts")
-	nonFixablePath := tspath.ResolvePath(root, "clean.ts")
 	fixableProgram := pipelineTestProgram(t, root, fixablePath, "a")
-	nonFixableProgram := pipelineTestProgram(t, root, nonFixablePath, "clean")
+	compilerProgram, paths := createTestProgramWithFilesAndCompilerOptions(t,
+		map[string]string{"clean.ts": `const value: number = "wrong";`}, `{"noLib":true}`)
+	nonFixablePath := paths["clean.ts"]
+	nonFixableProgram := program.NewFromCompiler(compilerProgram)
 	generation := Generation{
 		Native: NativeGeneration{
 			Programs:         []*program.Program{fixableProgram, nonFixableProgram},
 			TargetsByProgram: [][]string{{fixablePath}, {nonFixablePath}},
 			SingleThreaded:   true,
 			Cwd:              root,
+			TypeCheck:        true,
 			RulesForFile: func(source *ast.SourceFile) []rule.ConfiguredRule {
 				if source.FileName() != fixablePath {
 					return nil
@@ -138,6 +141,16 @@ func TestPipelineFreezesTextOnlyForFixableTargets(t *testing.T) {
 	changes := applied.FinalChanges
 	if !ok || len(changes) != 1 || changes[0].Path != fixablePath {
 		t.Fatalf("planned changes = %+v, planned=%v", changes, ok)
+	}
+	diagnostics, complete := applied.Initial.CompleteDiagnostics()
+	if !complete || len(diagnostics) != 2 || diagnostics[0].RuleName != "native/fix" ||
+		diagnostics[1].RuleName != "TypeScript(TS2322)" || diagnostics[1].FilePath != nonFixablePath {
+		t.Fatalf("fix observation lost or reordered non-fixable type diagnostics: %+v", diagnostics)
+	}
+	for _, diagnostic := range diagnostics {
+		if _, retained := diagnostic.SourceFile.(*ast.SourceFile); retained {
+			t.Fatal("fix observation retained a compiler AST")
+		}
 	}
 }
 

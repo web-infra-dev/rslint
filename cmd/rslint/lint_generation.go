@@ -7,6 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	lintLoader "github.com/web-infra-dev/rslint/internal/linter/loader"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 )
 
@@ -15,7 +16,7 @@ import (
 // It never owns fix rounds or mutates disk.
 type cliGenerationProvider struct {
 	initial        func(context.Context) (loader.LoadResult, vfs.FS, error)
-	loads          func(context.Context) ([]linter.GenerationLoad, error)
+	loads          func(context.Context) ([]loader.ProgramLoad, vfs.FS, error)
 	singleThreaded bool
 	rebuild        func(context.Context, linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error)
 	generation     func(loader.LoadResult, vfs.FS) linter.Generation
@@ -61,11 +62,11 @@ func (p *cliGenerationProvider) PlanGeneration(ctx context.Context, snapshot lin
 		return plan, err
 	}
 	if snapshot.Empty() && p.initial != nil && p.loads != nil {
-		loads, err := p.loads(ctx)
+		loads, fsys, err := p.loads(ctx)
 		if err != nil {
 			return plan, err
 		}
-		plan.Loads = loads
+		plan.Loads = lintLoader.GenerationLoads(loads, fsys, p.generation)
 	}
 	if len(plan.Loads) == 0 {
 		plan.Loads = []linter.GenerationLoad{{Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {

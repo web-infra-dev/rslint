@@ -1010,8 +1010,9 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 		},
 	}}
 
-	run := func(format string, typeCheckOnly bool) int {
+	run := func(t *testing.T, projects rslintconfig.ProjectPaths, format string, typeCheckOnly bool) int {
 		t.Helper()
+		configEntries[0].LanguageOptions.ParserOptions.Project = projects
 		fsys := &commandRealpathCountingFS{
 			FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
 			calls: make(map[string]int),
@@ -1029,22 +1030,29 @@ func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("%s type-check exit = %d, stdout=%q stderr=%q", format, code, stdout, stderr)
 		}
-		if format == "default" && !strings.Contains(stdout, "(3 files,") {
+		if format == "default" && !strings.Contains(stdout, fmt.Sprintf("(%d files,", len(projects)+1)) {
 			t.Fatalf("admitted Programs lost the complete summary root union: stdout=%q stderr=%q", stdout, stderr)
 		}
 		return fsys.callCount(rootPath)
 	}
 
-	for _, typeCheckOnly := range []bool{false, true} {
-		machineCalls := run("jsonline", typeCheckOnly)
-		defaultCalls := run("default", typeCheckOnly)
-		if defaultCalls != machineCalls+1 {
-			t.Fatalf(
-				"root Realpath calls: machine=%d default=%d, want exactly one default-only report identity lookup",
-				machineCalls,
-				defaultCalls,
-			)
-		}
+	for _, projects := range []rslintconfig.ProjectPaths{
+		{"./tsconfig.json"},
+		{"./tsconfig.json", "./other.json"},
+	} {
+		t.Run(strings.Join(projects, ","), func(t *testing.T) {
+			for _, typeCheckOnly := range []bool{false, true} {
+				machineCalls := run(t, projects, "jsonline", typeCheckOnly)
+				defaultCalls := run(t, projects, "default", typeCheckOnly)
+				if defaultCalls != machineCalls+1 {
+					t.Fatalf(
+						"root Realpath calls: machine=%d default=%d, want exactly one default-only report identity lookup",
+						machineCalls,
+						defaultCalls,
+					)
+				}
+			}
+		})
 	}
 }
 

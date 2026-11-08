@@ -336,6 +336,7 @@ func (s *Session) bindTargetsToProjects(
 		Programs:               append([]*lintprogram.Program(nil), set.programs...),
 		TargetsByProgram:       make([][]string, len(set.compilerPrograms)),
 		LintTargetBySourcePath: make(map[string]target.File),
+		ProgramRootIdentities:  set.programRootIdentities,
 	}
 
 	var unbound []target.File
