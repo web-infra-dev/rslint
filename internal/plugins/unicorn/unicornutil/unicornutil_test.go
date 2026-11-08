@@ -350,6 +350,27 @@ func TestShouldAddParenthesesToMemberExpressionObject(t *testing.T) {
 			}
 		})
 	}
+	for _, test := range []struct {
+		code string
+		call string
+		want bool
+	}{
+		{`target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, true},
+		{`!target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, false},
+		{`const f = () => target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, true},
+		{`if (target({pattern: /x/}.pattern)) {}`, `target({pattern: /x/}.pattern)`, false},
+		{`target(function() {});`, `target(function() {})`, true},
+		{`target(import("x"));`, `target(import("x"))`, false},
+		{`target((value as RegExp)!);`, `target((value as RegExp)!)`, false},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			source := parseTestSource(test.code)
+			call := findTestCall(t, source, test.call)
+			if got := ShouldAddParenthesesToMemberExpressionObjectAt(source, utils.ESTreeRuntimeExpression(call.Arguments()[0]), call.Expression()); got != test.want {
+				t.Fatalf("parentheses at replacement position = %v, want %v", got, test.want)
+			}
+		})
+	}
 }
 
 func TestSpaceAroundKeywordFixesUsesESTreeTokenClasses(t *testing.T) {
