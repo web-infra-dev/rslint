@@ -2,6 +2,7 @@
 import { SCALAR_KINDS } from './type-service-protocol.js';
 import type {
   NodeRef,
+  NodeFact,
   TypeFact,
   SymbolFact,
   SignatureFact,
@@ -25,7 +26,7 @@ export class TypePacketReader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x34535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 9, 5, 2][this.kind];
+    const words = [0, 1, 1, 1, 1, 9, 5, 2, 1][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -72,6 +73,24 @@ export class TypePacketReader {
     return offset
       ? { file: this.text(this.word(offset)), index: this.word(offset + 4) }
       : undefined;
+  }
+  nodeFacts(): readonly NodeFact[] {
+    if (this.kind !== 8) return invalid();
+    const at = this.word(8),
+      count = this.word(at);
+    if (at + 4 + count * 28 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 28,
+        text = this.word(pos + 20);
+      return {
+        node: this.node(this.word(pos))!,
+        kind: this.text(this.word(pos + 4)),
+        flags: this.word(pos + 8),
+        parent: this.node(this.word(pos + 12)),
+        name: this.node(this.word(pos + 16)),
+        text: text ? this.text(text) : undefined,
+      };
+    });
   }
   typeField<K extends keyof TypeFact>(field: K): TypeFact[K] {
     if (this.kind !== 5) return invalid();
@@ -190,4 +209,39 @@ export class TypePacketReader {
     }
     return value as QueryResults[K];
   }
+}
+
+// Supplemental slices have independent packet offset origins. The owner copies
+// each retained packet into exact storage so one small fact never pins a reply.
+export function typeReplyPackets(bytes: Uint8Array): {
+  packet: Uint8Array;
+  records: Array<{
+    op: 'typeRecord' | 'symbolRecord' | 'signatureRecord';
+    id: number;
+    packet: Uint8Array;
+  }>;
+} {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (bytes.length < 4 || view.getUint32(0, true) !== 0x31425452)
+    return { packet: bytes, records: [] };
+  if (bytes.length < 12) return invalid();
+  const length = view.getUint32(4, true),
+    count = view.getUint32(8, true),
+    start = 12 + count * 16;
+  if (start > bytes.length || start + length > bytes.length) return invalid();
+  const records = [];
+  for (let i = 0; i < count; i++) {
+    const at = 12 + i * 16,
+      kind = view.getUint32(at, true),
+      id = view.getUint32(at + 4, true),
+      offset = view.getUint32(at + 8, true),
+      size = view.getUint32(at + 12, true);
+    const op = (
+      [undefined, 'typeRecord', 'symbolRecord', 'signatureRecord'] as const
+    )[kind];
+    if (!op || offset < start + length || offset + size > bytes.length)
+      return invalid();
+    records.push({ op, id, packet: bytes.subarray(offset, offset + size) });
+  }
+  return { packet: bytes.subarray(start, start + length), records };
 }

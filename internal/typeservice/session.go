@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -71,11 +72,12 @@ type Descriptor struct {
 	Sources          []Source       `json:"sources"`
 }
 type Source struct {
-	FileName       string   `json:"fileName"`
-	Path           string   `json:"path"`
-	Packages       []string `json:"packages"`
-	External       bool     `json:"external"`
-	DefaultLibrary bool     `json:"defaultLibrary"`
+	FileName          string   `json:"fileName"`
+	Path              string   `json:"path"`
+	Packages          []string `json:"packages"`
+	External          bool     `json:"external"`
+	DefaultLibrary    bool     `json:"defaultLibrary"`
+	IsDeclarationFile bool     `json:"isDeclarationFile"`
 }
 
 // Binding authorizes one eligible lint target. Dependency nodes remain valid
@@ -183,57 +185,100 @@ func (s *Session) Descriptor() (Descriptor, error) {
 	return d, nil
 }
 func (s *Session) source(f *ast.SourceFile) Source {
-	return Source{FileName: f.FileName(), Path: string(f.Path()), Packages: s.program.PackageNamesForSourceFile(f), External: s.program.IsSourceFileFromExternalLibrary(f), DefaultLibrary: s.program.IsSourceFileDefaultLibrary(f)}
+	return Source{FileName: f.FileName(), Path: string(f.Path()), Packages: s.program.PackageNamesForSourceFile(f), External: s.program.IsSourceFileFromExternalLibrary(f), DefaultLibrary: s.program.IsSourceFileDefaultLibrary(f), IsDeclarationFile: f.IsDeclarationFile}
 }
 
-// Query copies checker facts while exclusively leased. Source indexing and
-// serialization happen afterward; they cannot delay another checker borrower.
-func (s *Session) Query(ctx context.Context, q Query) (packet []byte, err error) {
-	var op Operation
+// Query returns one authoritative answer, with shallow facts for its direct
+// handles. Callers batch known misses to amortize the transport and checker lease.
+func (s *Session) Query(ctx context.Context, q Query) ([]byte, error) {
+	packets, err := s.QueryBatch(ctx, []Query{q})
+	if err != nil {
+		return nil, err
+	}
+	return packets[0], nil
+}
+
+// QueryBatch resolves syntax before one short exclusive checker lease. Every
+// query is authoritative; no listener replay or semantic prediction is involved.
+func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]byte, err error) {
 	defer func() {
 		if value := recover(); value != nil {
-			packet = nil
-			err = fmt.Errorf("type service %s: %v", op, value)
+			packets = nil
+			err = fmt.Errorf("type service: %v", value)
 		}
 	}()
+	if len(queries) > 256 {
+		return nil, errors.New("type service batch exceeds 256 queries")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	if s.program == nil {
 		s.mu.Unlock()
 		return nil, ErrClosed
 	}
-	if q.Generation != s.generation || q.Checker != 1 {
-		s.mu.Unlock()
-		return nil, errors.New("stale or foreign type service handle")
-	}
 	p := s.program
+	for _, q := range queries {
+		if q.Generation != s.generation || q.Checker != 1 {
+			s.mu.Unlock()
+			return nil, errors.New("stale or foreign type service handle")
+		}
+		if q.Request == nil {
+			s.mu.Unlock()
+			return nil, errors.New("missing type service request")
+		}
+	}
 	s.mu.Unlock()
-	if q.Request == nil {
-		return nil, errors.New("missing type service request")
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	op = q.Request.operation()
-	node := requestNode(q.Request)
-	var native *ast.Node
-	if node != nil {
-		f := p.GetSourceFile(node.File)
-		if f == nil {
-			return nil, errors.New("foreign source handle")
-		}
-		table := encoder.GetNodeIndexTable(f)
-		if node.Index == 0 || int(node.Index) >= len(table.Nodes) {
-			return nil, errors.New("invalid compiler node handle")
-		}
-		native = table.Nodes[node.Index]
-		if native == nil {
-			return nil, errors.New("invalid compiler node handle")
+	natives := make([]*ast.Node, len(queries))
+	for i, q := range queries {
+		if node := requestNode(q.Request); node != nil {
+			f := p.GetSourceFile(node.File)
+			if f == nil {
+				return nil, errors.New("foreign source handle")
+			}
+			table := encoder.GetNodeIndexTable(f)
+			if node.Index == 0 || int(node.Index) >= len(table.Nodes) || table.Nodes[node.Index] == nil {
+				return nil, errors.New("invalid compiler node handle")
+			}
+			natives[i] = table.Nodes[node.Index]
 		}
 	}
-	result, err := s.check(ctx, q.Request, native)
-	if err != nil {
-		return nil, err
+	results := make([]Result, len(queries))
+	records := make([][]Record, len(queries))
+	semantic := false
+	for _, query := range queries {
+		if query.Request.operation() != "nodeRecord" {
+			semantic = true
+			break
+		}
 	}
+	if semantic {
+		err = s.checkBatch(ctx, queries, natives, results, records)
+		if err != nil {
+			return nil, err
+		}
+	}
+	packets = make([][]byte, len(queries))
+	for i, result := range results {
+		if queries[i].Request.operation() == "nodeRecord" {
+			result = nodeFacts(p, natives[i])
+		}
+		materializeReferences(p, result)
+		for _, record := range records[i] {
+			materializeReferences(p, record.Fact)
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		packets[i], err = EncodeReply(result, records[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return packets, nil
+}
+func materializeReferences(p *program.Program, result Result) {
 	switch fact := result.(type) {
 	case *SymbolFact:
 		if fact.nodes != nil {
@@ -249,29 +294,143 @@ func (s *Session) Query(ctx context.Context, q Query) (packet []byte, err error)
 		fact.Declaration = nodeReference(p, fact.node)
 		fact.node = nil
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	return EncodePacket(result)
 }
-func (s *Session) check(ctx context.Context, request Request, native *ast.Node) (Result, error) {
+func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, results []Result, records [][]Record) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.program == nil {
-		return nil, ErrClosed
+		return ErrClosed
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return err
 	}
 	c, done := s.program.TypeCheckerForFileExclusive(core.WithCheckerLifetime(ctx, core.CheckerLifetimeAPI), s.anchor)
 	defer done()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
 	if c != s.checker {
-		return nil, errors.New("type service checker identity changed")
+		return errors.New("type service checker identity changed")
 	}
-	return s.execute(c, request, native)
+	for i, q := range queries {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if q.Request.operation() == "nodeRecord" {
+			continue
+		}
+		var err error
+		results[i], err = s.execute(c, q.Request, natives[i])
+		if err != nil {
+			return err
+		}
+		records[i], err = s.directRecords(c, q.Request.operation(), results[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (s *Session) directRecords(c *checker.Checker, op Operation, result Result) ([]Record, error) {
+	var kind Operation
+	switch op {
+	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable", "void", "declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments":
+		kind = "typeRecord"
+	case "symbol", "aliasedSymbol", "property", "properties", "resolveName":
+		kind = "symbolRecord"
+	case "signature", "resolvedSignature", "signatures":
+		kind = "signatureRecord"
+	default:
+		return nil, nil
+	}
+	var ids []uint32
+	switch value := result.(type) {
+	case Handle:
+		ids = []uint32{uint32(value)}
+	case Handles:
+		ids = value
+	}
+	records := []Record{}
+	seen := make(map[[2]uint32]bool)
+	var add func(Operation, uint32) error
+	add = func(kind Operation, id uint32) error {
+		if id == 0 {
+			return nil
+		}
+		tag := uint32(1)
+		if kind == "symbolRecord" {
+			tag = 2
+		}
+		if kind == "signatureRecord" {
+			tag = 3
+		}
+		key := [2]uint32{tag, id}
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		var request Request
+		switch kind {
+		case "typeRecord":
+			request = &TypeRequest{Op: kind, ID: id}
+		case "symbolRecord":
+			request = &SymbolRequest{Op: kind, ID: id}
+		case "signatureRecord":
+			request = &SignatureRequest{Op: kind, ID: id}
+		}
+		fact, err := s.execute(c, request, nil)
+		if err != nil {
+			return err
+		}
+		records = append(records, Record{kind, id, fact})
+		// Only directly referenced symbols are included, never member/type graphs.
+		switch value := fact.(type) {
+		case *TypeFact:
+			if err := add("symbolRecord", value.Symbol); err != nil {
+				return err
+			}
+			return add("symbolRecord", value.AliasSymbol)
+		case *SignatureFact:
+			for _, parameter := range value.Parameters {
+				if err := add("symbolRecord", parameter); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+	for _, id := range ids {
+		if err := add(kind, id); err != nil {
+			return nil, err
+		}
+	}
+	return records, nil
+}
+
+// Only the requested declaration's ancestors and declaration names are copied.
+// Descendant syntax stays demand-loaded through the immutable source transport.
+func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
+	facts := NodeFacts{}
+	seen := map[*ast.Node]bool{}
+	add := func(n *ast.Node) {
+		if n == nil || seen[n] {
+			return
+		}
+		seen[n] = true
+		fact := NodeFact{Node: *nodeReference(p, n), Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, n.Parent)}
+		if ast.IsIdentifier(n) || ast.IsPrivateIdentifier(n) || ast.IsStringLiteral(n) || ast.IsNumericLiteral(n) {
+			text := n.Text()
+			fact.Text = &text
+		}
+		if n.Name() != nil {
+			fact.Name = nodeReference(p, n.Name())
+		}
+		facts = append(facts, fact)
+	}
+	for current := node; current != nil; current = current.Parent {
+		add(current)
+		if current.Name() != nil {
+			add(current.Name())
+		}
+	}
+	return facts
 }
 func nodeReference(p *program.Program, n *ast.Node) *NodeRef {
 	if n == nil {

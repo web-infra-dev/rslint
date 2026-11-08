@@ -96,7 +96,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature":
+	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord":
 		request = &NodeRequest{Op: wire.Op}
 	case "constraint", "apparent", "baseLiteral", "nonNullable", "typeString", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "typeRecord":
 		request = &TypeRequest{Op: wire.Op}
@@ -167,12 +167,33 @@ type SymbolFact struct {
 	nodes             []*ast.Node
 	valueNode         *ast.Node
 }
+
+// NodeFact is a finite syntax summary. Structural traversal still uses exact
+// source syntax; declaration ancestry never requires serializing that source.
+type NodeFact struct {
+	Node         NodeRef
+	Kind         string
+	Flags        uint32
+	Parent, Name *NodeRef
+	Text         *string
+}
+type NodeFacts []NodeFact
+
+// Record supplements a queried handle with its directly requested object fact.
+// It never recursively expands referenced types or their properties.
+type Record struct {
+	Op   Operation
+	ID   uint32
+	Fact Result
+}
+
 type SignatureFact struct {
 	Parameters  []uint32
 	Declaration *NodeRef
 	node        *ast.Node
 }
 
+func (NodeFacts) result()      {}
 func (Handle) result()         {}
 func (Handles) result()        {}
 func (Boolean) result()        {}

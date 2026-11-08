@@ -2,7 +2,7 @@ import { beforeAll, afterAll, describe, expect, test } from 'rstack/test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { resolve, relative } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { pathToFileURL } from 'node:url';
 import { Linter } from 'eslint';
@@ -13,16 +13,21 @@ import effectorPlugin from 'eslint-plugin-effector';
 import ts from 'typescript';
 import {
   FileTypeServiceClient,
+  TypeServiceClient,
   typeQueryKey,
   type TypeServiceDescriptor,
 } from '../../../rslint/src/languages/js/type-service.js';
 import {
   SharedTypeCacheOwner,
+  MAX_SHARED_TYPE_PROBES,
   SharedTypeCacheReader,
 } from '../../../rslint/src/languages/js/shared-type-cache.js';
 import { lintFile } from '../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../rslint/src/languages/js/frame.js';
-import { TypePacketReader } from '../../../rslint/src/languages/js/type-service-codec.js';
+import {
+  typeReplyPackets,
+  TypePacketReader,
+} from '../../../rslint/src/languages/js/type-service-codec.js';
 import { VISITOR_KEYS } from '../../../rslint/src/languages/js/visitor-keys.js';
 
 const root = resolve(import.meta.dirname, '../../../..');
@@ -87,14 +92,22 @@ class Host {
     if (response.error) throw new Error(response.error);
     return response.result;
   }
-  source = (scope: { generation: number }, file: string) => {
+  source = (
+    scope: { generation: number },
+    file: string,
+    metadataOnly = false,
+  ) => {
     const reply = this.request({
       method: 'source',
       generation: scope.generation,
       file,
+      metadataOnly,
     });
     return reply
-      ? { fileName: reply.fileName, tree: Buffer.from(reply.tree, 'base64') }
+      ? {
+          fileName: reply.fileName,
+          tree: reply.tree ? Buffer.from(reply.tree, 'base64') : undefined,
+        }
       : undefined;
   };
   async close() {
@@ -382,7 +395,17 @@ describe('original npm typed rules over Go type services', () => {
                   host.request({ method: 'query', query }),
                   'base64',
                 );
-                cache?.publish(key, packet);
+                const reply = typeReplyPackets(packet);
+                cache?.publish(key, reply.packet);
+                for (const record of reply.records)
+                  cache?.publish(
+                    typeQueryKey({
+                      ...query,
+                      op: record.op,
+                      args: { id: record.id },
+                    }),
+                    record.packet,
+                  );
                 return packet;
               },
               host.source,
@@ -425,6 +448,226 @@ describe('original npm typed rules over Go type services', () => {
         rmSync(directory, { recursive: true, force: true });
       }
     });
+});
+
+test('generation clients reuse facts and lazy dependency identities across files', async () => {
+  const directory = mkdtempSync(
+    resolve(root, 'packages/rslint-test-tools/.type-services-'),
+  );
+  const config = resolve(directory, 'tsconfig.json');
+  const code =
+    'import { value } from "./dependency";\n' +
+    Array.from({ length: 40 }, (_, index) => `const item${index}=value;`).join(
+      '\n',
+    );
+  for (const name of ['first.ts', 'second.ts', 'third.ts'])
+    writeFileSync(
+      resolve(directory, name),
+      name === 'third.ts' ? code + '\nawait value;' : code,
+    );
+  writeFileSync(
+    resolve(directory, 'dependency.ts'),
+    '/** 😀 */ export const value=1 as const;',
+  );
+  writeFileSync(
+    config,
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        noLib: true,
+        module: 'ESNext',
+        moduleResolution: 'Bundler',
+        types: [],
+      },
+      include: ['*.ts'],
+    }),
+  );
+  const host = new Host();
+  try {
+    const descriptor = host.request({
+      method: 'init',
+      config,
+    }) as TypeServiceDescriptor;
+    let scalar = 0,
+      batches = 0,
+      sources = 0,
+      metadataRequests = 0,
+      failPrefetch = false;
+    const owner = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) => {
+        scalar++;
+        return Buffer.from(host.request({ method: 'query', query }), 'base64');
+      },
+      (scope, file, metadataOnly) => {
+        if (metadataOnly) metadataRequests++;
+        else sources++;
+        return host.source(scope, file, metadataOnly);
+      },
+      {
+        maxFactsBytes: 1 << 20,
+        maxSyntaxBytes: 1 << 20,
+        maxSyntaxFactsBytes: 1024,
+        batchTransport: (queries) => {
+          batches++;
+          if (failPrefetch) throw new Error('speculative checker query failed');
+          return host
+            .request({ method: 'batch', queries })
+            .map((packet: string) => Buffer.from(packet, 'base64'));
+        },
+      },
+    );
+    const open = (name: string) => {
+      const file = resolve(directory, name),
+        encoded = host.request({ method: 'project', file });
+      const projection = {
+        ...encoded,
+        tree: Buffer.from(encoded.tree, 'base64'),
+      };
+      const frame = decodeFrame(Buffer.from(encoded.frame, 'base64'));
+      const handle = owner.file(projection.binding, 'same rules and options');
+      const services = handle.parserServices(
+        frame,
+        projection,
+        file.replaceAll('\\', '/'),
+      );
+      return { file, frame, handle, services };
+    };
+    try {
+      const first = open('first.ts');
+      const declarations = (first.frame.ast.body as any[]).flatMap(
+        (node) => node.declarations ?? [],
+      );
+      const firstType = first.services.getTypeAtLocation(declarations[0].id)!;
+      expect(firstType.flags & ts.TypeFlags.NumberLiteral).toBeTruthy();
+      for (const declaration of declarations)
+        expect(first.services.getTypeAtLocation(declaration.id)).toBe(
+          firstType,
+        );
+      const imported = ((first.frame.ast.body as any[])[0] as any).specifiers[0]
+        .local;
+      const alias = first.services.getSymbolAtLocation(imported)!;
+      const symbol = owner.checker.getAliasedSymbol(alias)!;
+      const declaration = symbol.declarations![0] as any;
+      const source = declaration.getSourceFile();
+      expect(source).toBe(
+        owner.program.getSourceFile(resolve(directory, 'dependency.ts')),
+      );
+      expect(source.fileName.replaceAll('\\', '/')).toBe(
+        resolve(directory, 'dependency.ts').replaceAll('\\', '/'),
+      );
+      expect(declaration.parent.kind).toBe(
+        ts.SyntaxKind.VariableDeclarationList,
+      );
+      expect(declaration.name.text).toBe('value');
+      expect(sources).toBe(0);
+      expect(
+        owner.program.getSourceFile(
+          relative(descriptor.currentDirectory, first.file),
+        ),
+      ).toBe(owner.program.getSourceFile(first.file));
+      expect(metadataRequests).toBe(1);
+      expect(sources).toBe(0);
+      first.handle.close();
+      expect(() => first.services.esTreeNodeToTSNodeMap.get(imported)).toThrow(
+        'closed',
+      );
+      // File completion does not destroy the generation's semantic/native objects.
+      expect(firstType.flags & ts.TypeFlags.NumberLiteral).toBeTruthy();
+      const before = scalar,
+        second = open('second.ts');
+      expect(batches).toBeGreaterThan(0);
+      for (const node of (second.frame.ast.body as any[]).flatMap(
+        (node) => node.declarations ?? [],
+      ))
+        expect(second.services.getTypeAtLocation(node.id)).toBe(firstType);
+      expect(scalar - before).toBe(0);
+      expect(
+        owner.checker.getAliasedSymbol(
+          second.services.getSymbolAtLocation(
+            ((second.frame.ast.body as any[])[0] as any).specifiers[0].local,
+          )!,
+        ),
+      ).toBe(symbol);
+      expect(symbol.declarations![0]).toBe(declaration);
+      expect(declaration.getText()).toBe('value=1 as const');
+      expect(sources).toBe(1);
+      expect(symbol.declarations![0]).toBe(declaration);
+      expect(declaration.getSourceFile()).toBe(source);
+      expect('initializer' in declaration).toBe(true);
+      expect(sources).toBe(1);
+      second.handle.close();
+      // The learned batch includes unconsumed nodes; a speculative failure must
+      // not alter the demanded scalar result or diagnostics of this rule.
+      failPrefetch = true;
+      const thirdFile = resolve(directory, 'third.ts'),
+        encoded = host.request({ method: 'project', file: thirdFile });
+      const thirdProjection = {
+        ...encoded,
+        tree: Buffer.from(encoded.tree, 'base64'),
+      };
+      const thirdHandle = owner.file(
+        thirdProjection.binding,
+        'same rules and options',
+      );
+      const beforeDemand = scalar;
+      const actual = lintFile(
+        {
+          filePath: thirdFile,
+          frame: Buffer.from(encoded.frame, 'base64'),
+          rules: { 'typed/await-thenable': { options: [] } },
+          collectFixes: true,
+          suggestionsMode: 'eager',
+        },
+        {
+          rules: new Map([
+            ['typed/await-thenable', typedPlugin.rules['await-thenable']],
+          ]),
+        } as any,
+        (decoded) =>
+          thirdHandle.parserServices(
+            decoded,
+            thirdProjection,
+            thirdFile.replaceAll('\\', '/'),
+          ),
+      );
+      const expected = new Linter().verify(
+        code + '\nawait value;',
+        [
+          {
+            files: ['**/*.ts'],
+            languageOptions: {
+              parser: tsParser,
+              parserOptions: { project: config, tsconfigRootDir: directory },
+            },
+            plugins: { typed: typedPlugin as any },
+            rules: { 'typed/await-thenable': 'error' },
+          },
+        ],
+        { filename: thirdFile },
+      );
+      expect(expected).toHaveLength(1);
+      expect(actual.ruleErrors).toBeUndefined();
+      expect(actual.parseError).toBeUndefined();
+      expect(normResult(actual, code + '\nawait value;')).toEqual(
+        normMessages(expected),
+      );
+      expect(scalar).toBeGreaterThan(beforeDemand);
+      thirdHandle.close();
+      expect(owner.syntaxStats.summaryBytes).toBeLessThanOrEqual(1024);
+      expect(owner.stats.factBytes).toBeLessThanOrEqual(1 << 20);
+      expect(owner.syntaxStats.sourceBytes).toBeLessThanOrEqual(1 << 20);
+      owner.close();
+      expect(() => declaration.kind).toThrow('closed');
+      expect(() => firstType.flags).toThrow('closed');
+    } finally {
+      owner.close();
+    }
+  } finally {
+    await host.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('exact origins, aliases, metadata and disposal', async () => {
@@ -516,8 +759,18 @@ await Promise.resolve(1);
             host.request({ method: 'query', query }),
             'base64',
           );
-          published.set(key, packet);
-          cache.publish(key, packet);
+          const reply = typeReplyPackets(packet);
+          published.set(key, reply.packet);
+          cache.publish(key, reply.packet);
+          for (const record of reply.records) {
+            const recordKey = typeQueryKey({
+              ...query,
+              op: record.op,
+              args: { id: record.id },
+            });
+            published.set(recordKey, record.packet);
+            cache.publish(recordKey, record.packet);
+          }
           return packet;
         },
         host.source,
@@ -907,7 +1160,7 @@ test('shared cache capacity and publication stay bounded', () => {
   unicodeReader.close();
   unicode.close();
 
-  for (let i = 0; i < 4; i++)
+  for (let i = 0; i < 8; i++)
     expect(owner.publish(`fact-${i}`, packet)).toBe(true);
   const used = owner.usedBytes,
     entries = owner.entries;
@@ -916,7 +1169,9 @@ test('shared cache capacity and publication stay bounded', () => {
   const probes = owner.stats.probes;
   for (let i = 0; i < 100; i++)
     expect(owner.publish(`overflow-${i}`, packet)).toBe(false);
-  expect(owner.stats.probes - probes).toBeLessThanOrEqual(100 * 16);
+  expect(owner.stats.probes - probes).toBeLessThanOrEqual(
+    100 * MAX_SHARED_TYPE_PROBES,
+  );
   expect([...reader.get('fact-0')!]).toEqual([...packet]);
   reader.close();
   owner.close();
