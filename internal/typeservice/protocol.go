@@ -149,6 +149,7 @@ type TypeFact struct {
 	Symbol, AliasSymbol uint32
 	IntrinsicName       string
 	EscapedName         string
+	ObjectFlags         []string
 	Literal             Literal
 	Types               []uint32
 }

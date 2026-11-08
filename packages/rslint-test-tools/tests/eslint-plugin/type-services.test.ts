@@ -29,6 +29,7 @@ const root = resolve(import.meta.dirname, '../../../..');
 const enums = {
   SyntaxKind: ts.SyntaxKind,
   TypeFlags: ts.TypeFlags,
+  ObjectFlags: ts.ObjectFlags,
   NodeFlags: ts.NodeFlags,
   JsxEmit: ts.JsxEmit,
   ModuleDetectionKind: ts.ModuleDetectionKind,
@@ -136,12 +137,12 @@ const cases: Case[] = [
     reports: 0,
   },
   {
-    name: 'Promise aggregator arrays and unique iterator symbols',
+    name: 'Promise aggregator arrays, tuples and iterators',
     plugin: typedPlugin,
     rule: 'await-thenable',
-    code: 'declare const valid: Promise<number>[]; declare const invalid: number[]; Promise.all(valid); Promise.all(invalid);',
-    reports: 1,
-    requiredOps: ['isArrayLike', 'numberIndexType'],
+    code: 'declare const valid: Promise<number>[]; declare const invalid: number[]; declare const validTuple: readonly [Promise<number>, Promise<string>]; declare const invalidTuple: readonly [Promise<number>, number]; declare const validMap: Map<number, Promise<number>>; declare const invalidMap: Map<number, number>; Promise.all(valid); Promise.all(invalid); Promise.all(validTuple); Promise.all(invalidTuple); Promise.allSettled(validMap.values()); Promise.allSettled(invalidMap.values());',
+    reports: 3,
+    requiredOps: ['isArrayLike', 'numberIndexType', 'typeArguments'],
   },
   {
     name: 'union operands',
@@ -450,6 +451,7 @@ declare const unique: unique symbol;
 const uniqueKeys = {[unique]: true};
 const truth = true as const;
 const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
+const spreadKeys = {...surrogateKeys};
 const view = <Box />;
 declare const Box: () => null;
 declare namespace N { const value: number; interface Item<T> {} }
@@ -759,6 +761,19 @@ await Promise.resolve(1);
     ).toEqual(['1', '"two"', 'true']);
 
     const referenceChecker = upstream.services.program!.getTypeChecker();
+    const referenceSpread = (upstream.ast.body as any[])
+      .flatMap((node) => node.declarations ?? [])
+      .find((entry) => entry.id.name === 'spreadKeys').init;
+    const referenceSpreadType = referenceChecker.getTypeAtLocation(
+      upstream.services.esTreeNodeToTSNodeMap!.get(referenceSpread),
+    ) as ts.ObjectType;
+    expect(
+      referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread,
+    ).toBe(ts.ObjectFlags.ContainsSpread);
+    expect(
+      services.getTypeAtLocation(variable('spreadKeys').init).objectFlags &
+        ts.ObjectFlags.ContainsSpread,
+    ).toBe(referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread);
     const truthLocation = services.esTreeNodeToTSNodeMap.get(
       variable('truth').id,
     );

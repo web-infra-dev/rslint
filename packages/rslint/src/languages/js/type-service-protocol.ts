@@ -45,6 +45,7 @@ export interface TypeFact {
   readonly aliasSymbol: number;
   readonly intrinsicName: string | undefined;
   readonly escapedName: string | undefined;
+  readonly objectFlags: readonly string[] | undefined;
   readonly value:
     string | number | { negative: boolean; base10Value: string } | undefined;
   readonly types: readonly number[] | undefined;
