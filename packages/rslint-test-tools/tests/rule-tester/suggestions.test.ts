@@ -3,7 +3,7 @@
 import { RuleTester } from '@rslint/rule-tester';
 
 new RuleTester({ plugin: 'unicorn' }).run('no-negation-in-equality-check', {
-  valid: [{ code: 'foo === bar' }],
+  valid: ['foo === bar', { code: '!(foo === bar)' }],
   invalid: [
     {
       code: '!foo === bar',

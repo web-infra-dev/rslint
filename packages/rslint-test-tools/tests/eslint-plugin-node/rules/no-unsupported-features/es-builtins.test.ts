@@ -1,6 +1,10 @@
 // Every test group and ignore variant from eslint-plugin-n v18.3.0:
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unsupported-features/es-builtins.js
-import { RuleTester } from '@rslint/rule-tester';
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
 
 function unsupported(
   name: string,
@@ -21,7 +25,7 @@ function unsupported(
   };
 }
 
-type Cases = Parameters<RuleTester['run']>[1];
+type Cases = { valid: ValidTestCase[]; invalid: TestCase[] };
 const patterns: ({ keyword: string } & Cases)[] = [
   {
     keyword: 'AggregateError',

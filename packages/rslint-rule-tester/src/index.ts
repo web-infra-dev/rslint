@@ -55,7 +55,11 @@ export class RuleTester {
 
   run(
     name: string,
-    cases: { valid: ValidTestCase[]; invalid: TestCase[] },
+    cases: {
+      /** A string is shorthand for `{ code }`. */
+      valid: (string | ValidTestCase)[];
+      invalid: TestCase[];
+    },
   ): void {
     const { plugin, fixtureFiles = {}, languageOptions } = this.config;
     const ruleName = `${plugin}/${name}`;
@@ -84,10 +88,16 @@ export class RuleTester {
           });
         }
       });
-      for (const [kind, entries] of Object.entries(cases) as [
-        string,
-        TestCase[],
-      ][]) {
+      const groups: [string, TestCase[]][] = [
+        [
+          'valid',
+          cases.valid.map((item) =>
+            typeof item === 'string' ? { code: item } : item,
+          ),
+        ],
+        ['invalid', cases.invalid],
+      ];
+      for (const [kind, entries] of groups) {
         entries.forEach((item, index) => {
           const run = item.skip ? test.skip : test;
           const label = item.skip ?? item.name;
