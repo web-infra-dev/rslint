@@ -34,6 +34,13 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		// Ignoring case keeps either order valid despite the upper-first locale.
 		{Code: `<App Ⅰ ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper", "ignoreCase": true}},
 		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper", "ignoreCase": true}},
+		// Czech and Slovak sort the "ch" contraction after "h".
+		{Code: `<App onHover onChange />`, Tsx: true, Options: map[string]any{"locale": "cs"}},
+		// Documented difference: non-ASCII letters keep their base-letter order
+		// instead of the Swedish tailoring that puts "ä" after "z".
+		{Code: `<App ä z />`, Tsx: true, Options: map[string]any{"locale": "sv"}},
+		// Documented difference: Hungarian uses the default order for ASCII.
+		{Code: `<App cs cz />`, Tsx: true, Options: map[string]any{"locale": "hu"}},
 	}, []rule_tester.InvalidTestCase{
 		// A moved line comment carries its exact terminator when the destination
 		// slot would otherwise let it consume the closing tag.
