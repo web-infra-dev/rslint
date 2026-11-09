@@ -920,6 +920,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-global-number-constants.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-global-this.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-identifier-import-export-specifiers.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-math-trunc.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-modern-math-apis.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-module.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-node-protocol.test.ts',

@@ -647,6 +647,7 @@ trae
 treegrid
 trimpath
 trippable
+trunc
 tsconfiga
 tses
 tseslint
