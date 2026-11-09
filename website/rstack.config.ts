@@ -26,16 +26,10 @@ define.doc({
     },
   ],
   route: {
-    cleanUrls: true,
     // exclude document fragments from routes
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
   globalStyles: path.join(import.meta.dirname, 'styles/index.css'),
-  markdown: {
-    link: {
-      checkAnchors: true,
-    },
-  },
   themeConfig: {
     llmsUI: {
       placement: 'outline',
