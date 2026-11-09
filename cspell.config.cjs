@@ -36,6 +36,7 @@ module.exports = {
     'internal/plugins/react/rules/no_unused_prop_types/no_unused_prop_types_upstream.json',
     'internal/plugins/unicorn/rules/name_replacements/testdata/name_replacements_v77.json',
     'internal/plugins/unicorn/rules/no_for_each/testdata/no_for_each_v77.json',
+    'internal/utils/ecmascript/testdata/locale_collation_golden.json',
     'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],
