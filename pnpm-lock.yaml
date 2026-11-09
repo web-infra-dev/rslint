@@ -265,6 +265,9 @@ importers:
       '@eslint/plugin-kit':
         specifier: 'catalog:'
         version: 0.7.2
+      '@rslint/api':
+        specifier: workspace:*
+        version: link:../rslint-api
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5

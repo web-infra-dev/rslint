@@ -61,6 +61,7 @@
   ],
   "devDependencies": {
     "@eslint/plugin-kit": "catalog:",
+    "@rslint/api": "workspace:*",
     "@types/node": "catalog:",
     "@typescript-eslint/scope-manager": "catalog:",
     "@typescript-eslint/visitor-keys": "catalog:",
