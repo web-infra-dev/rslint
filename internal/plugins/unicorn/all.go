@@ -77,6 +77,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_last_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_boolean_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_flat_math_min_max"
@@ -192,6 +193,7 @@ func GetAllRules() []rule.Rule {
 		prefer_array_last_methods.PreferArrayLastMethodsRule,
 		prefer_array_some.PreferArraySomeRule,
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
+		prefer_boolean_return.PreferBooleanReturnRule,
 		prefer_date_now.PreferDateNowRule,
 		prefer_dom_node_append.PreferDomNodeAppendRule,
 		prefer_flat_math_min_max.PreferFlatMathMinMaxRule,
