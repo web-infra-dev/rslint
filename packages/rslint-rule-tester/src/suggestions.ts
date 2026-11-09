@@ -1,43 +1,7 @@
 import assert from 'node:assert/strict';
 import type { Diagnostic } from '@rslint/core/internal';
-
-export interface ExpectedSuggestion {
-  messageId: string;
-  /** The rendered suggestion message. */
-  desc: string;
-  /** The source after applying only this suggestion. */
-  output: string;
-}
-
-type Edit = NonNullable<Diagnostic['fixes']>[number];
-
-const BOM = '\uFEFF';
-
-/**
- * Applies one diagnostic's edits as a single change, like ESLint applies a
- * suggestion. Offsets are UTF-16 and exclude a leading byte order mark; an
- * edit starting at -1 also removes the mark.
- */
-export function applyEdits(code: string, edits: readonly Edit[]): string {
-  const bom = code.startsWith(BOM) ? BOM : '';
-  let text = bom ? code.slice(1) : code;
-  let keepBom = true;
-  const sorted = [...edits].sort(
-    (a, b) => a.startPos - b.startPos || a.endPos - b.endPos,
-  );
-  for (let i = 1; i < sorted.length; i++) {
-    assert.ok(
-      sorted[i].startPos >= sorted[i - 1].endPos,
-      `Suggestion edits overlap: ${JSON.stringify(sorted)}`,
-    );
-  }
-  for (const edit of sorted.reverse()) {
-    const start = Math.max(0, edit.startPos);
-    if (edit.startPos < 0) keepBom = false;
-    text = text.slice(0, start) + edit.text + text.slice(edit.endPos);
-  }
-  return (keepBom ? bom : '') + text;
-}
+import { applyEdits } from './edits.ts';
+import type { ExpectedSuggestion } from './types.ts';
 
 /**
  * Checks a diagnostic's suggestions against the expectation. Omitting the

@@ -1,9 +1,6 @@
 import { describe, expect, test } from 'rstack/test';
-import {
-  applyEdits,
-  checkSuggestions,
-  type ExpectedSuggestion,
-} from '../src/suggestions.ts';
+import { checkSuggestions } from '../src/suggestions.ts';
+import type { ExpectedSuggestion } from '../src/types.ts';
 
 const code = 'let a = 1;';
 const message = 'Unexpected let.';
@@ -17,38 +14,6 @@ const expected: ExpectedSuggestion = {
   desc: 'Use const.',
   output: 'const a = 1;',
 };
-
-describe('applyEdits', () => {
-  test('applies several edits as one change', () => {
-    expect(
-      applyEdits(code, [
-        { startPos: 8, endPos: 9, text: '2' },
-        { startPos: 0, endPos: 3, text: 'var' },
-      ]),
-    ).toBe('var a = 2;');
-  });
-
-  test('keeps a byte order mark outside the edit offsets', () => {
-    expect(
-      applyEdits('\uFEFFlet a;', [{ startPos: 0, endPos: 3, text: 'var' }]),
-    ).toBe('\uFEFFvar a;');
-  });
-
-  test('removes the byte order mark for an edit starting at -1', () => {
-    expect(
-      applyEdits('\uFEFFlet a;', [{ startPos: -1, endPos: 0, text: '' }]),
-    ).toBe('let a;');
-  });
-
-  test('rejects overlapping edits', () => {
-    expect(() =>
-      applyEdits(code, [
-        { startPos: 0, endPos: 5, text: '' },
-        { startPos: 4, endPos: 6, text: '' },
-      ]),
-    ).toThrow('overlap');
-  });
-});
 
 // Defers the check so the assertions can observe a throw.
 function check(...args: Parameters<typeof checkSuggestions>) {
