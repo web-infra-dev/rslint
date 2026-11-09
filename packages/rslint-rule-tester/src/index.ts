@@ -176,7 +176,11 @@ export class RuleTester {
             }
             if (item.output !== undefined) {
               const fixed = await lint({ ...request, fix: true });
-              expect(Object.values(fixed.output ?? {})).toEqual([item.output]);
+              // Output is keyed by the path relative to the config directory.
+              expect(fixed.output).toEqual({
+                [path.relative(root, filename).replaceAll('\\', '/')]:
+                  item.output,
+              });
             }
           });
         });
