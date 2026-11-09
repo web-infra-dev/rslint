@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkUsedVariables": {
+          "type": "boolean",
+          "description": "Whether to check variables that are used in the module."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}
