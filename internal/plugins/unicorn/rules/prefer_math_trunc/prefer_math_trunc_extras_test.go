@@ -1,7 +1,9 @@
 package prefer_math_trunc_test
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -100,7 +102,8 @@ func TestPreferMathTruncEditDemand(t *testing.T) {
 ~~value;
 Number.parseInt(String(value), 10);
 items[0] ^= 0;
-items[index++] |= 0;`
+items[index++] |= 0;
+~~(flag ? 1n : 1.5);`
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "edit-demand.js")
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: source})
@@ -126,8 +129,8 @@ items[index++] |= 0;`
 				results[demand] = append(results[demand], d)
 			}},
 		})
-		if len(results[demand]) != 5 {
-			t.Fatalf("demand %d: got %d diagnostics, want 5", demand, len(results[demand]))
+		if len(results[demand]) != 6 {
+			t.Fatalf("demand %d: got %d diagnostics, want 6", demand, len(results[demand]))
 		}
 	}
 	for demand, diagnostics := range results {
@@ -145,5 +148,157 @@ items[index++] |= 0;`
 				t.Errorf("demand %d changed diagnostic %d suggestions", demand, i)
 			}
 		}
+	}
+}
+
+func TestPreferMathTruncBigIntSyntax(t *testing.T) {
+	tests := []struct {
+		code   string
+		report bool
+		output string
+	}{
+		{code: `~~(flag ? 1n : 2n);`},
+		{code: `~~(BigInt(1) + 1n);`},
+		{code: `~~(-(BigInt(value) as bigint));`},
+		{code: `~~(1n << 1048576n); ~~(2n ** 1000000000n);`},
+		{code: `~~(true ? 1n : 1.5); ~~(false ? 1.5 : 1n);`},
+		{code: `~~(0, 1n); ~~(value = 1n);`},
+		{code: `parseInt(String(1n), 10); Number.parseInt(String(BigInt(value)), 10);`},
+		{code: `~~(flag ? 1n : 1.5);`, report: true},
+		{code: `~~(value + 1n);`, report: true},
+		{code: `~~(value && 1n);`, report: true},
+		{code: `parseInt(String(flag ? 1n : 1.5), 10);`, report: true},
+		{code: `~~(1n + "2");`, report: true, output: `Math.trunc(1n + "2");`},
+		{code: `~~(1n < 2n);`, report: true, output: `Math.trunc(1n < 2n);`},
+		{code: `~~(flag ? 1.5 : 2.5);`, report: true, output: `Math.trunc(flag ? 1.5 : 2.5);`},
+		{code: `function f(BigInt) { return ~~BigInt(1); }`, report: true, output: `function f(BigInt) { return Math.trunc(BigInt(1)); }`},
+	}
+	for _, typed := range []bool{false, true} {
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("typed=%t/%s", typed, test.code), func(t *testing.T) {
+				diagnostics := lintMathTruncBigInt(t, test.code, typed)
+				assertMathTruncSuggestion(t, test.code, diagnostics, test.report, test.output)
+			})
+		}
+	}
+}
+
+func TestPreferMathTruncBigIntTypes(t *testing.T) {
+	for _, code := range []string{
+		`declare const value: bigint; ~~value;`,
+		`declare function read(): bigint; ~~read();`,
+		`declare const object: { value: bigint }; ~~object.value;`,
+		`function f<T extends bigint>(value: T) { return ~~value; }`,
+		`declare const value: bigint; parseInt(String(value), 10);`,
+	} {
+		t.Run(code, func(t *testing.T) {
+			// The same syntax remains lintable without a checker.
+			if diagnostics := lintMathTruncBigInt(t, code, false); len(diagnostics) != 1 {
+				t.Fatalf("source-only: got %d diagnostics, want 1", len(diagnostics))
+			}
+			assertMathTruncSuggestion(t, code, lintMathTruncBigInt(t, code, true), false, "")
+		})
+	}
+	for _, declaration := range []string{
+		`declare const value: number | bigint;`,
+		`declare function value(): number | bigint;`,
+	} {
+		operand := "value"
+		if strings.Contains(declaration, "function") {
+			operand += "()"
+		}
+		for _, expression := range []string{"~~" + operand, "parseInt(String(" + operand + "), 10)", operand + " | 0"} {
+			code := declaration + " " + expression + ";"
+			t.Run(code, func(t *testing.T) {
+				assertMathTruncSuggestion(t, code, lintMathTruncBigInt(t, code, true), true, "")
+				if diagnostics := lintMathTruncBigInt(t, code, false); len(diagnostics) != 1 || diagnostics[0].Suggestions == nil {
+					t.Fatal("source-only: expected the original suggestion for an unresolved operand")
+				}
+			})
+		}
+	}
+	for _, kind := range []string{"number", "any", "unknown"} {
+		code := "declare const value: " + kind + "; ~~value;"
+		output := "declare const value: " + kind + "; Math.trunc(value);"
+		t.Run(kind, func(t *testing.T) {
+			assertMathTruncSuggestion(t, code, lintMathTruncBigInt(t, code, true), true, output)
+		})
+	}
+	code := `function f<T extends number | bigint>(value: T) { return ~~value; }`
+	assertMathTruncSuggestion(t, code, lintMathTruncBigInt(t, code, true), true, "")
+}
+
+func lintMathTruncBigInt(t *testing.T, code string, typed bool) []rule.RuleDiagnostic {
+	t.Helper()
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, "bigint.ts")
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	host := utils.CreateCompilerHost(root.Dir, fs)
+	var lintProgram *program.Program
+	if typed {
+		compilerProgram, err := utils.CreateProgram(true, fs, root.Dir, "tsconfig.json", host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lintProgram = program.NewFromCompiler(compilerProgram)
+	} else {
+		var err error
+		lintProgram, err = program.NewFromRoots(program.RootOptions{
+			RootFileNames: []string{fileName}, Host: host,
+			CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var diagnostics []rule.RuleDiagnostic
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: lintProgram, File: fileName,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name: prefer_math_trunc.PreferMathTruncRule.Name, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					if (ctx.TypeChecker != nil) != typed {
+						t.Fatalf("checker availability: got %t, want %t", ctx.TypeChecker != nil, typed)
+					}
+					return prefer_math_trunc.PreferMathTruncRule.Run(ctx, nil)
+				},
+			}}
+		},
+		Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) {
+			diagnostics = append(diagnostics, d)
+		}},
+	})
+	return diagnostics
+}
+
+func assertMathTruncSuggestion(t *testing.T, code string, diagnostics []rule.RuleDiagnostic, report bool, output string) {
+	t.Helper()
+	wantCount := 0
+	if report {
+		wantCount = 1
+	}
+	if len(diagnostics) != wantCount {
+		t.Fatalf("got %d diagnostics, want %d: %v", len(diagnostics), wantCount, diagnostics)
+	}
+	if !report {
+		return
+	}
+	diagnostic := diagnostics[0]
+	if diagnostic.FixesPtr != nil {
+		t.Fatal("unexpected autofix")
+	}
+	if output == "" {
+		if diagnostic.Suggestions != nil {
+			t.Fatal("unexpected suggestion for a possible BigInt operand")
+		}
+		return
+	}
+	if diagnostic.Suggestions == nil || len(*diagnostic.Suggestions) != 1 {
+		t.Fatal("expected exactly one suggestion")
+	}
+	fixed, _, _ := linter.ApplyRuleFixes(code, *diagnostic.Suggestions)
+	if fixed != output {
+		t.Fatalf("suggestion output: got %q, want %q", fixed, output)
 	}
 }

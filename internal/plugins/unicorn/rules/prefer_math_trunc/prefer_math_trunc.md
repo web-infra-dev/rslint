@@ -65,9 +65,30 @@ object[indices.current] |= 0;
 values[key`index`] |= 0;
 ```
 
-Rslint skips double bitwise NOT on operands known to be BigInts, such as `~~1n`,
-`~~(-1n)`, and `~~BigInt(1)`. BigInts are already integers, and `Math.trunc()`
-throws if passed a BigInt.
+Rslint skips truncation patterns whose operands are known to be BigInts. BigInts
+are already integers, and `Math.trunc()` throws if passed a BigInt. This also
+applies to `parseInt(String(bigintValue), 10)`.
+
+When project type information is available, Rslint uses it to recognize BigInt
+variables, function results and generic constraints. An operand whose type
+includes both Number and BigInt still receives a diagnostic, but no suggestion.
+The rule does not require type information and continues to run without a
+project. In that mode, it recognizes BigInt literals, global `BigInt()` calls,
+and their arithmetic and conditional combinations without evaluating their
+values. Expressions with a possible BigInt result receive no suggestion.
+
+```javascript
+// No diagnostic: both branches produce BigInts.
+~~(flag ? 1n : 2n);
+~~(BigInt(value) + 1n);
+
+// Diagnostic without a suggestion: one branch produces a BigInt.
+~~(flag ? 1n : 1.5);
+```
+
+Unknown operands, including `any` and `unknown` types, retain the usual
+suggestion when neither syntax nor type information identifies a possible
+BigInt. The rule does not guarantee the runtime value of such operands.
 
 ## Original documentation
 
