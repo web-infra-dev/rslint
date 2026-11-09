@@ -57,19 +57,26 @@ describe('checkExpectedError', () => {
 describe('checkInvalidCase', () => {
   test('accepts a case with errors', () => {
     expect(() => {
-      checkInvalidCase({ errors: [{}] });
+      checkInvalidCase({ code: 'a', errors: [{}] });
+      checkInvalidCase({ code: 'a', errors: [{}], output: 'b' });
     }).not.toThrow();
   });
 
   test('rejects missing errors', () => {
     expect(() => {
-      checkInvalidCase({});
+      checkInvalidCase({ code: 'a' });
     }).toThrow("must have an 'errors' array");
   });
 
   test('rejects empty errors', () => {
     expect(() => {
-      checkInvalidCase({ errors: [] });
+      checkInvalidCase({ code: 'a', errors: [] });
     }).toThrow('at least one error');
+  });
+
+  test('rejects an output equal to the code', () => {
+    expect(() => {
+      checkInvalidCase({ code: 'a', errors: [{}], output: 'a' });
+    }).toThrow("'output' matches 'code'");
   });
 });

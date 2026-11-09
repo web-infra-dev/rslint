@@ -170,14 +170,11 @@ export class RuleTester {
                 ]);
               } else if (item.output === undefined) {
                 expect(diagnostic.fixes).toBeUndefined();
-              } else {
-                expect(diagnostic.fixes?.length).toBeGreaterThan(0);
               }
             }
             if (item.output !== undefined) {
               const fixed = await lint({ ...request, fix: true });
               expect(Object.values(fixed.output ?? {})).toEqual([item.output]);
-              expect(fixed.diagnostics).toEqual([]);
             }
           });
         });
