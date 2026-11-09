@@ -39,7 +39,7 @@ import (
 // for nested / wrapped JSX where the opening element isn't at col 1.
 var expectedErrorAnyPos = rule_tester.InvalidTestCaseError{
 	MessageId: "noNoninteractiveElementInteractions",
-	Message:   errorMessage,
+	Message:   "Non-interactive elements should not be assigned mouse or keyboard event listeners.",
 }
 
 // polymorphicSettings exercises `settings['jsx-a11y'].polymorphicPropName`.
@@ -569,7 +569,7 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noNoninteractiveElementInteractions",
-					Message:   errorMessage,
+					Message:   "Non-interactive elements should not be assigned mouse or keyboard event listeners.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -582,8 +582,8 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 					`</article>`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 1, Column: 1},
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 2, Column: 3},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 1, Column: 1},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 2, Column: 3},
 				},
 			},
 
@@ -599,7 +599,7 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noNoninteractiveElementInteractions",
-					Message:   errorMessage,
+					Message:   "Non-interactive elements should not be assigned mouse or keyboard event listeners.",
 					Line:      1,
 					Column:    1,
 				}},
@@ -609,8 +609,8 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 				Code: `<><article onClick={fn} /><section onClick={fn} aria-label="x" /></>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 1, Column: 3},
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 1, Column: 27},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 1, Column: 3},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 1, Column: 27},
 				},
 			},
 			// ---- Nested non-interactive child inside interactive parent
@@ -622,7 +622,7 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "noNoninteractiveElementInteractions",
-					Message:   errorMessage,
+					Message:   "Non-interactive elements should not be assigned mouse or keyboard event listeners.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -706,8 +706,8 @@ func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
 					`function B() { return <section onClick={fn} aria-label="x" />; }`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 1},
-					{MessageId: "noNoninteractiveElementInteractions", Message: errorMessage, Line: 2},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 1},
+					{MessageId: "noNoninteractiveElementInteractions", Message: "Non-interactive elements should not be assigned mouse or keyboard event listeners.", Line: 2},
 				},
 			},
 

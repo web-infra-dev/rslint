@@ -11,7 +11,7 @@ import (
 // future text tweak lives in one place. Shared with scope_extras_test.go.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "scopeOnTh",
-	Message:   errorMessage,
+	Message:   "The scope prop can only be used on <th> elements.",
 }
 
 // componentsSettings mirrors upstream's

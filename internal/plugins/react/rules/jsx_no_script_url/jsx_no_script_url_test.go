@@ -285,7 +285,7 @@ func TestJsxNoScriptUrl(t *testing.T) {
 			Code: `<a href="javascript:"></a>`,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noScriptURL",
-				Message:   noScriptURLMessage,
+				Message:   "A future version of React will block javascript: URLs as a security precaution. Use event handlers instead if you can. If you need to generate unsafe HTML, try using dangerouslySetInnerHTML instead.",
 				Line:      1,
 				Column:    4,
 			}},

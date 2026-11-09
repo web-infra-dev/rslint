@@ -344,7 +344,7 @@ func TestNoAriaHiddenOnFocusableExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noAriaHiddenOnFocusable",
-				Message:   errorMessage,
+				Message:   `aria-hidden="true" must not be set on focusable elements.`,
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 29,
 			}},
 		},
@@ -356,7 +356,7 @@ func TestNoAriaHiddenOnFocusableExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noAriaHiddenOnFocusable",
-				Message:   errorMessage,
+				Message:   `aria-hidden="true" must not be set on focusable elements.`,
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 28,
 			}},
 		},
@@ -366,7 +366,7 @@ func TestNoAriaHiddenOnFocusableExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noAriaHiddenOnFocusable",
-				Message:   errorMessage,
+				Message:   `aria-hidden="true" must not be set on focusable elements.`,
 				Line:      1, Column: 1, EndLine: 4, EndColumn: 3,
 			}},
 		},

@@ -391,21 +391,21 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h2></h2>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h6></h6>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -414,14 +414,14 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h2 />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h6 />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -432,7 +432,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1><>x</></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -441,7 +441,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1><span aria-hidden="true">x</span></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -451,7 +451,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `  <h1></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 3},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 3},
 			},
 		},
 
@@ -461,7 +461,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -473,7 +473,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1><h2 /></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 5},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 5},
 			},
 		},
 
@@ -488,7 +488,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1><h2 aria-hidden /></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -498,7 +498,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: remapASettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -513,21 +513,21 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-labelledby="id1" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h1 aria-label="Title" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h1 title="Title" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -536,7 +536,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h2><input type="hidden" /></h2>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -547,7 +547,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1>{((undefined))}</h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -556,7 +556,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 {...this.props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -565,8 +565,8 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<><h1 /><h2>x</h2><h3 /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 19},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 3},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 19},
 			},
 		},
 
@@ -575,7 +575,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `cond ? <h1 /> : <h1>x</h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 8},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 8},
 			},
 		},
 
@@ -584,7 +584,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1>{undefined}{undefined}</h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -601,7 +601,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 {...{children: 'x'}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -610,7 +610,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 {...{dangerouslySetInnerHTML: {__html: "x"}}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -619,7 +619,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 {...{children}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -634,9 +634,9 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: "<>\n    <h1 />\n    <h2 />\n    <h3>OK</h3>\n    <h4 />\n</>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 2, Column: 5},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 3, Column: 5},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 5, Column: 5},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 2, Column: 5},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 3, Column: 5},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 5, Column: 5},
 			},
 		},
 
@@ -652,7 +652,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-hidden="false" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// ---- aria-hidden="" empty string → upstream getPropValue → ""
@@ -662,7 +662,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-hidden=""></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// ---- aria-hidden={false} JSX-expression boolean false → not
@@ -671,7 +671,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-hidden={false} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// ---- aria-hidden={someVar} non-static → not statically true →
@@ -680,7 +680,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-hidden={someVar} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// ---- aria-hidden={1} truthy non-boolean → upstream's `=== true`
@@ -690,7 +690,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-hidden={1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// ============================================================
@@ -703,14 +703,14 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1><Icon aria-hidden="true" /></h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h2><svg aria-hidden="true"><path /></svg></h2>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -720,14 +720,14 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 className="hero" id="page-title" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<h1 data-testid="title" role="heading" aria-level={1} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -738,7 +738,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1 aria-describedby="desc" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -749,7 +749,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"components": []interface{}{"MyHeader"}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -759,12 +759,12 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<><h1 /><h2 /><h3 /><h4 /><h5 /><h6 /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 9},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 15},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 21},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 27},
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 33},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 3},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 9},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 15},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 21},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 27},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 33},
 			},
 		},
 
@@ -773,14 +773,14 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `() => <h1 />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `function Page() { return <h1 />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 26},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 26},
 			},
 		},
 
@@ -789,7 +789,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `class C { render() { return <h1 />; } }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 29},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 29},
 			},
 		},
 
@@ -800,7 +800,7 @@ func TestHeadingHasContentExtras(t *testing.T) {
 			Code: `<h1>{((((undefined))))}</h1>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 	})
@@ -833,7 +833,7 @@ func TestHeadingHasContentOptionParsing(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"components": []interface{}{"Heading"}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		// Array-wrapped shape — reports on a custom matched tag.
@@ -842,7 +842,7 @@ func TestHeadingHasContentOptionParsing(t *testing.T) {
 			Tsx:     true,
 			Options: []interface{}{map[string]interface{}{"components": []interface{}{"Title"}}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "headingHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "headingHasContent", Message: "Headings must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 	})

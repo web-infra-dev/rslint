@@ -13,7 +13,7 @@ import (
 func expectedErr(role, tag string) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "preferTagOverRole",
-		Message:   errorMessage(tag, role),
+		Message:   "Use " + tag + ` instead of the "` + role + `" role to ensure accessibility across all devices.`,
 		Line:      1,
 		Column:    1,
 	}

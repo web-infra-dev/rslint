@@ -587,7 +587,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 11,
 			}},
 		},
@@ -598,7 +598,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 17,
 			}},
 		},
@@ -608,7 +608,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      2, Column: 3, EndLine: 4, EndColumn: 4,
 			}},
 		},
@@ -619,7 +619,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 11,
 			}},
 		},
@@ -644,8 +644,8 @@ func TestScopeExtras(t *testing.T) {
 			Code: `<div scope><span scope /></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "scopeOnTh", Message: errorMessage, Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
-				{MessageId: "scopeOnTh", Message: errorMessage, Line: 1, Column: 18, EndLine: 1, EndColumn: 23},
+				{MessageId: "scopeOnTh", Message: "The scope prop can only be used on <th> elements.", Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
+				{MessageId: "scopeOnTh", Message: "The scope prop can only be used on <th> elements.", Line: 1, Column: 18, EndLine: 1, EndColumn: 23},
 			},
 		},
 		// Nested th wrapping non-th: the th's scope attribute is exempt; the
@@ -654,7 +654,7 @@ func TestScopeExtras(t *testing.T) {
 			Code: `<th scope="col"><div scope /></th>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "scopeOnTh", Message: errorMessage, Line: 1, Column: 22, EndLine: 1, EndColumn: 27},
+				{MessageId: "scopeOnTh", Message: "The scope prop can only be used on <th> elements.", Line: 1, Column: 22, EndLine: 1, EndColumn: 27},
 			},
 		},
 		// Multiple scope attributes on one non-th element each report. tsgo
@@ -664,8 +664,8 @@ func TestScopeExtras(t *testing.T) {
 			Code: `<div scope scope />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "scopeOnTh", Message: errorMessage, Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
-				{MessageId: "scopeOnTh", Message: errorMessage, Line: 1, Column: 12, EndLine: 1, EndColumn: 17},
+				{MessageId: "scopeOnTh", Message: "The scope prop can only be used on <th> elements.", Line: 1, Column: 6, EndLine: 1, EndColumn: 11},
+				{MessageId: "scopeOnTh", Message: "The scope prop can only be used on <th> elements.", Line: 1, Column: 12, EndLine: 1, EndColumn: 17},
 			},
 		},
 
@@ -777,7 +777,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      1, Column: 14, EndLine: 1, EndColumn: 19,
 			}},
 		},
@@ -833,8 +833,8 @@ func TestScopeExtras(t *testing.T) {
 		// Group 14: Class component with state-driven JSX
 		// ============================================================
 		{
-			Code: `class T extends React.Component { render() { return this.state.ready ? <div scope="row" /> : null; } }`,
-			Tsx:  true,
+			Code:   `class T extends React.Component { render() { return this.state.ready ? <div scope="row" /> : null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -968,8 +968,8 @@ func TestScopeExtras(t *testing.T) {
 		// `<thead scope>` itself reports (thead is not th). Inner `<th scope>`
 		// is exempt — only one error from thead.
 		{
-			Code: `<thead scope><tr><th scope="col" /></tr></thead>`,
-			Tsx:  true,
+			Code:   `<thead scope><tr><th scope="col" /></tr></thead>`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		// 3-deep wrapper containing both reporting and exempt forms.
@@ -1007,8 +1007,8 @@ func TestScopeExtras(t *testing.T) {
 		},
 		// Render prop with both exempt + offending in arms.
 		{
-			Code: `<Provider cellRender={(c) => c.header ? <th scope="col" /> : <div scope="col" />} />`,
-			Tsx:  true,
+			Code:   `<Provider cellRender={(c) => c.header ? <th scope="col" /> : <div scope="col" />} />`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1023,8 +1023,8 @@ func TestScopeExtras(t *testing.T) {
 			},
 		},
 		{
-			Code: `function App() { return [<div scope key="a" />, <th scope key="b" />]; }`,
-			Tsx:  true,
+			Code:   `function App() { return [<div scope key="a" />, <th scope key="b" />]; }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1287,8 +1287,8 @@ func TestScopeExtras(t *testing.T) {
 		},
 		// Mixed cells: some th (exempt), some td (reports).
 		{
-			Code: `<table><tr><th scope="col" /><td scope="col" /><th scope="col" /><td scope="col" /></tr></table>`,
-			Tsx:  true,
+			Code:   `<table><tr><th scope="col" /><td scope="col" /><th scope="col" /><td scope="col" /></tr></table>`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 
@@ -1296,14 +1296,14 @@ func TestScopeExtras(t *testing.T) {
 		// Group 36: scope inside iterator / map with destructured items
 		// ============================================================
 		{
-			Code: `const cells = data.map(({ scope, ...rest }, i) => <td key={i} scope={scope} {...rest} />);`,
-			Tsx:  true,
+			Code:   `const cells = data.map(({ scope, ...rest }, i) => <td key={i} scope={scope} {...rest} />);`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 		// flatMap producing offending elements.
 		{
-			Code: `const cells = rows.flatMap(r => [<td scope="col" key={r.id} />, <span />]);`,
-			Tsx:  true,
+			Code:   `const cells = rows.flatMap(r => [<td scope="col" key={r.id} />, <span />]);`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1320,8 +1320,8 @@ func TestScopeExtras(t *testing.T) {
 		// Group 38: switch statement returning JSX
 		// ============================================================
 		{
-			Code: `function App({type}) { switch(type) { case 'a': return <div scope />; case 'b': return <span scope />; default: return null; } }`,
-			Tsx:  true,
+			Code:   `function App({type}) { switch(type) { case 'a': return <div scope />; case 'b': return <span scope />; default: return null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError, expectedError},
 		},
 
@@ -1496,7 +1496,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      2, Column: 1, EndLine: 3, EndColumn: 10,
 			}},
 		},
@@ -1506,7 +1506,7 @@ func TestScopeExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "scopeOnTh",
-				Message:   errorMessage,
+				Message:   "The scope prop can only be used on <th> elements.",
 				Line:      2, Column: 3, EndLine: 2, EndColumn: 16,
 			}},
 		},

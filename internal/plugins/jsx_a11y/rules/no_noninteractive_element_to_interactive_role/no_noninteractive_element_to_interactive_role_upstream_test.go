@@ -12,7 +12,7 @@ import (
 // error-text tweak touches one place.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noNoninteractiveElementToInteractiveRole",
-	Message:   errorMessage,
+	Message:   "Non-interactive elements should not be assigned interactive roles.",
 }
 
 // componentsSettings mirrors upstream's

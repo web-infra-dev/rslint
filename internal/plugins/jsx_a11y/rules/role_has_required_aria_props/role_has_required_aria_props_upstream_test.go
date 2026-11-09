@@ -119,7 +119,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("slider", []string{"aria-valuenow"}),
+				Message:   `Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -128,7 +128,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("slider", []string{"aria-valuenow"}),
+				Message:   `Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -137,7 +137,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("slider", []string{"aria-valuenow"}),
+				Message:   `Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -148,7 +148,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("checkbox", []string{"aria-checked"}),
+				Message:   `Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -159,7 +159,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("checkbox", []string{"aria-checked"}),
+				Message:   `Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -169,7 +169,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("checkbox", []string{"aria-checked"}),
+				Message:   `Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -180,7 +180,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("checkbox", []string{"aria-checked"}),
+				Message:   `Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked`,
 				Line:      1, Column: 7,
 			}},
 		},
@@ -191,7 +191,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("combobox", []string{"aria-controls", "aria-expanded"}),
+				Message:   `Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -201,7 +201,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("combobox", []string{"aria-controls", "aria-expanded"}),
+				Message:   `Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -211,7 +211,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("combobox", []string{"aria-controls", "aria-expanded"}),
+				Message:   `Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -222,7 +222,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("scrollbar", []string{"aria-controls", "aria-valuenow"}),
+				Message:   `Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -231,7 +231,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("scrollbar", []string{"aria-controls", "aria-valuenow"}),
+				Message:   `Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -240,7 +240,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("scrollbar", []string{"aria-controls", "aria-valuenow"}),
+				Message:   `Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -250,7 +250,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("scrollbar", []string{"aria-controls", "aria-valuenow"}),
+				Message:   `Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -260,7 +260,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("scrollbar", []string{"aria-controls", "aria-valuenow"}),
+				Message:   `Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -271,7 +271,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("heading", []string{"aria-level"}),
+				Message:   `Elements with the ARIA role "heading" must have the following attributes defined: aria-level`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -285,7 +285,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("option", []string{"aria-selected"}),
+				Message:   `Elements with the ARIA role "option" must have the following attributes defined: aria-selected`,
 				Line:      1, Column: 6,
 			}},
 		},
@@ -298,7 +298,7 @@ func TestRoleHasRequiredAriaPropsUpstream(t *testing.T) {
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-has-required-aria-props",
-				Message:   errorMessage("combobox", []string{"aria-controls", "aria-expanded"}),
+				Message:   `Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded`,
 				Line:      1, Column: 14,
 			}},
 		},

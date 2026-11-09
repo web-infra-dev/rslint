@@ -11,7 +11,7 @@ import (
 // case carries the same single diagnostic. Shared with the extras test.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noAriaHiddenOnFocusable",
-	Message:   errorMessage,
+	Message:   `aria-hidden="true" must not be set on focusable elements.`,
 }
 
 // TestNoAriaHiddenOnFocusableUpstream migrates the full upstream suite from

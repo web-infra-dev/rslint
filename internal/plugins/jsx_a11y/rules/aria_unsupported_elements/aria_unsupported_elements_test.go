@@ -132,7 +132,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("role"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
 			}},
 		})
 	}
@@ -144,7 +144,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 		Settings: metaSettings,
 		Errors: []rule_tester.InvalidTestCaseError{{
 			MessageId: "unsupported",
-			Message:   errorMessage("aria-hidden"),
+			Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 		}},
 	})
 
@@ -163,7 +163,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		})
 	}
@@ -177,7 +177,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("role"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 14,
 			}},
 		},
@@ -186,7 +186,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Multiple invalid attributes on the same element: upstream's
@@ -195,9 +195,9 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Code: `<base role aria-hidden aria-label="x" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unsupported", Message: errorMessage("role")},
-				{MessageId: "unsupported", Message: errorMessage("aria-hidden")},
-				{MessageId: "unsupported", Message: errorMessage("aria-label")},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'role'."},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'."},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'."},
 			},
 		},
 		// Diagnostic position: upstream reports on the JSXOpeningElement
@@ -209,7 +209,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 21,
 			}},
 		},
@@ -220,7 +220,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 20,
 			}},
 		},
@@ -237,7 +237,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Components-map miss + polymorphicPropName combined: rawType is
@@ -255,7 +255,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("role"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
 			}},
 		},
 		// Components map points at a reserved element: the JSX tag `Foo`
@@ -272,7 +272,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Reserved within non-reserved: outer `div` is not reserved (no
@@ -283,7 +283,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 26,
 			}},
 		},
@@ -293,8 +293,8 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Code: `<head role="x"><base aria-hidden /></head>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unsupported", Message: errorMessage("role")},
-				{MessageId: "unsupported", Message: errorMessage("aria-hidden")},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'role'."},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'."},
 			},
 		},
 		// Reserved element with mixed valid + invalid attributes — only the
@@ -304,7 +304,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Spread interleaved with named attributes on a reserved element:
@@ -313,8 +313,8 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Code: `<base {...a} role {...b} aria-hidden {...c} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unsupported", Message: errorMessage("role")},
-				{MessageId: "unsupported", Message: errorMessage("aria-hidden")},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'role'."},
+				{MessageId: "unsupported", Message: "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'."},
 			},
 		},
 		// Multi-line attributes: report position is on the opening element
@@ -325,12 +325,12 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unsupported",
-					Message:   errorMessage("aria-hidden"),
+					Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 					Line:      1, Column: 1, EndLine: 4, EndColumn: 3,
 				},
 				{
 					MessageId: "unsupported",
-					Message:   errorMessage("role"),
+					Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
 					Line:      1, Column: 1, EndLine: 4, EndColumn: 3,
 				},
 			},
@@ -343,7 +343,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("role"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
 			}},
 		},
 		// Reserved fragment-style element (svg foreign tag with `<title>`):
@@ -355,7 +355,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Boolean form of an aria-* attribute (no value at all). Upstream's
@@ -365,7 +365,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-label"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'.",
 			}},
 		},
 		// Reserved tag with children (semantically illegal HTML for void
@@ -376,7 +376,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Self-closing without space before `/>`. tsgo tokenizes the same
@@ -386,7 +386,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// JSX inside Array.map callback — common React pattern. Each
@@ -398,7 +398,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// JSX inside class component render method.
@@ -407,7 +407,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// Conditional render via && — the JSX expression child wraps the
@@ -417,7 +417,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// TypeScript type assertion on attribute value. We never read the
@@ -428,7 +428,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// `as const` assertion on attribute value.
@@ -437,7 +437,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-label"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'.",
 			}},
 		},
 		// JSX inside a generic function — locks that surrounding TS
@@ -447,7 +447,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 		// polymorphicAllowList kicks in: `Box` IS in the allow list, so
@@ -463,7 +463,7 @@ func TestAriaUnsupportedElements(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unsupported",
-				Message:   errorMessage("aria-hidden"),
+				Message:   "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
 			}},
 		},
 	)

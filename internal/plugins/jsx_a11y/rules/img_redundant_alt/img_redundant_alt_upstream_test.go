@@ -29,7 +29,7 @@ var componentsSettings = map[string]interface{}{
 // in one place. Shared with img_redundant_alt_extras_test.go.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "redundantAlt",
-	Message:   errorMessage,
+	Message:   "Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.",
 }
 
 // TestImgRedundantAltUpstream covers the full valid/invalid suite migrated

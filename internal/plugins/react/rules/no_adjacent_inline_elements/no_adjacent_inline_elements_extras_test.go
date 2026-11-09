@@ -64,9 +64,9 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		// emitted for a container with three adjacent inline children.
 	}, []rule_tester.InvalidTestCase{
 		// ---- Dimension 4: multi-line JSX container range ----
-		{Code: "<div>\n  <a /><span />\n</div>;", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 1, Column: 1, EndLine: 3, EndColumn: 7}}},
+		{Code: "<div>\n  <a /><span />\n</div>;", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: "Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.", Line: 1, Column: 1, EndLine: 3, EndColumn: 7}}},
 		// Locks in upstream isCreateElement() destructured-import branch.
-		{Code: "import { createElement } from \"react\";\ncreateElement(\"div\", null, [createElement(\"a\"), createElement(\"span\")]);", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 2, Column: 1, EndLine: 2, EndColumn: 72}}},
+		{Code: "import { createElement } from \"react\";\ncreateElement(\"div\", null, [createElement(\"a\"), createElement(\"span\")]);", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: "Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.", Line: 2, Column: 1, EndLine: 2, EndColumn: 72}}},
 		// Locks in upstream's computed-identifier callee branch.
 		{Code: `React[createElement]("div", null, [React.createElement("a"), React.createElement("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 91)}},
 		{Code: `React?.[createElement]("div", null, [React.createElement("a"), React.createElement("span")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 93)}},
@@ -74,7 +74,7 @@ func TestNoAdjacentInlineElementsExtras(t *testing.T) {
 		{Code: `<div><img></img><input></input></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 38)}},
 		{Code: `<div><a /><span /></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 25)}},
 		{Code: `React.createElement("div", null, [React.createElement("a"), "", React.createElement("a")]);`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{inlineElementError(1, 1, 91)}},
-		{Code: `<div><span><a /><a /></span></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: inlineElementMessage, Line: 1, Column: 6, EndLine: 1, EndColumn: 29}}},
+		{Code: `<div><span><a /><a /></span></div>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "inlineElement", Message: "Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.", Line: 1, Column: 6, EndLine: 1, EndColumn: 29}}},
 		{Code: "<div>\n  <a />\n  <span />\n</div>;", Tsx: true},
 		// ---- Literal children in createElement arrays remain inline after
 		// JavaScript-to-TypeScript AST kind mapping ----

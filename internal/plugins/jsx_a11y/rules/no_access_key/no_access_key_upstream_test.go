@@ -12,7 +12,7 @@ import (
 // one place. Shared with no_access_key_extras_test.go.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noAccessKey",
-	Message:   errorMessage,
+	Message:   "No access key attribute allowed. Inconsistencies between keyboard shortcuts and keyboard commands used by screen readers and keyboard-only users create a11y complications.",
 }
 
 // TestNoAccessKeyUpstream covers the full valid/invalid suite migrated 1:1

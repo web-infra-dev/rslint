@@ -340,7 +340,7 @@ func TestAnchorAmbiguousTextExtras(t *testing.T) {
 			Tsx:     true,
 			Options: customWordsOnlyOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorAmbiguousText", Message: errorMessage([]string{"custom phrase"}), Line: 1, Column: 1},
+				{MessageId: "anchorAmbiguousText", Message: `Ambiguous text within anchor. Screen reader users rely on link text for context; the words "custom phrase" are ambiguous and do not provide enough context.`, Line: 1, Column: 1},
 			},
 		},
 

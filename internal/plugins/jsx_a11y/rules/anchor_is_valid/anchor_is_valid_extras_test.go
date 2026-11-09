@@ -318,54 +318,54 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		}},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Locks in paired-form coverage (KindJsxOpeningElement) ----
-		{Code: `<a>x</a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a>x</a>`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Locks in upstream regex /^\W*?javascript:/ positive cases ----
 		// 1+ non-word prefix (whitespace, `#`, etc.) still matches.
-		{Code: `<a href=" javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href="	javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href=" javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href="	javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `#` is non-word in `\W`, so `#javascript:foo` matches the regex
 		// after the lazy quantifier consumes the `#`. Locks in the
 		// non-zero-prefix branch.
-		{Code: `<a href="#javascript:foo" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="#javascript:foo" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// Direct JSX attribute strings are entity-decoded by ESTree parsers
 		// before jsx-ast-utils sees them. Numeric entities can therefore hide
 		// both the exact "#" value and a javascript: prefix and must still be
 		// rejected. The expression-container counterparts above stay encoded.
-		{Code: `<a href="&#35;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href="&#106;avascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href="&#160;javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="&#35;" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href="&#106;avascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href="&#160;javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Dimension 4: TS expression wrappers around invalid values
 		//      must still be rejected. `("#" as const)` should reach the
 		//      `value === '#'` disjunct. ----
-		{Code: `<a href={("#")} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href={"#" as string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href={"" as const} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={("#")} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href={"#" as string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href={"" as const} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Locks in NoSubstitutionTemplateLiteral coverage. tsgo splits
 		//      template literals into a separate kind from StringLiteral;
 		//      both must be staticEval-able to a string. `` `#` `` should
 		//      hit the `value === '#'` disjunct. ----
-		{Code: "<a href={`#`} />", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: "<a href={`javascript:void(0)`} />", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: "<a href={`#`} />", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: "<a href={`javascript:void(0)`} />", Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Locks in spread-of-literal walking. `<a {...{href: ""}}/>`
 		//      has hasSpread=true AND populates hasAnyHref via the literal
 		//      spread walk. The hrefs-found branch then fires invalidHref. ----
-		{Code: `<a {...{href: ""}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a {...{href: "#"}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a {...{href: ""}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a {...{href: "#"}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Mixed-validity props: one prop is a valid href, another is
 		//      invalid. Upstream's filter takes ANY invalid in the array →
 		//      report. Locks in the OR-merge across propsToValidate. ----
-		{Code: `<a href="foo" hrefLeft="" />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href="" hrefLeft="foo" />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="foo" hrefLeft="" />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href="" hrefLeft="foo" />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Polymorphic-as-a: `<Foo as="a" />` resolves to "a" → checked.
 		//      Locks in the GetElementType polymorphic-prop branch with no
 		//      href → noHref report. ----
-		{Code: `<Foo as="a" />`, Tsx: true, Settings: polymorphicSettings, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<Foo as="a" />`, Tsx: true, Settings: polymorphicSettings, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Two consecutive anchors → both reported independently. Locks
 		//      in the per-element listener firing (no state leak). ----
@@ -373,8 +373,8 @@ func TestAnchorIsValidExtras(t *testing.T) {
 			Code: `<><a /><a href="#" /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 3},
-				{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 8},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 3},
+				{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 8},
 			},
 		},
 
@@ -385,8 +385,8 @@ func TestAnchorIsValidExtras(t *testing.T) {
 			Code: `<a><a /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1},
-				{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 4},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 4},
 			},
 		},
 
@@ -394,27 +394,27 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		// `"javascript:" || "/foo"` — left is truthy (non-empty string) →
 		// take left = "javascript:" → matches /^\W*?javascript:/ → invalid.
 		// Locks in the BinaryExpression-`||` arm of staticEvalBinary.
-		{Code: `<a href={"javascript:" || "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"javascript:" || "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `"" || "#"` — left is falsy → take right = "#" → invalid.
-		{Code: `<a href={"" || "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"" || "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `null || ""` — left null (falsy) → take right = "" → invalid.
-		{Code: `<a href={null || ""} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={null || ""} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- staticEval `&&` short-circuit: truthy left → take right ----
 		// `"foo" && "#"` — left truthy → take right = "#" → invalid.
-		{Code: `<a href={"foo" && "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"foo" && "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `1 && "javascript:void(0)"` — number 1 truthy → take right →
 		// invalid. Locks in non-string truthy left.
-		{Code: `<a href={1 && "javascript:void(0)"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={1 && "javascript:void(0)"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- staticEval `??` nullish coalescing: null left → take right ----
 		// `null ?? "#"` and `undefined ?? "javascript:foo"` — both fall to
 		// the right operand. Locks in the null-or-undefined detection arm.
-		{Code: `<a href={null ?? "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href={undefined ?? "javascript:foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={null ?? "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href={undefined ?? "javascript:foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `"" ?? "#"` — empty string is NOT null/undef → take left = "" →
 		// invalid (length 0). Lock in distinction between `??` and `||`.
-		{Code: `<a href={"" ?? "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"" ?? "#"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- `&&` short-circuit producing nullish result → noHref ----
 		// `null && X` returns null per JS semantics (and staticEval mirrors
@@ -423,26 +423,26 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		// for `undefined && X`. Crucially distinct from `false && X` and
 		// `0 && X` which produce non-nullish falsy values (covered in
 		// valid above).
-		{Code: `<a href={null && "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href={undefined && "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={null && "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href={undefined && "/foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- ConditionalExpression: literal true → consequent ----
 		// `true ? "javascript:" : "/foo"` → "javascript:" → invalid.
-		{Code: `<a href={true ? "javascript:foo" : "/"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={true ? "javascript:foo" : "/"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `false ? "/" : "javascript:..."` → take alternate → invalid.
-		{Code: `<a href={false ? "/" : "javascript:foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={false ? "/" : "javascript:foo"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// `cond ? "#" : "/"` — cond is Identifier (truthy string per
 		// jsx-ast-utils Identifier extractor) → take consequent = "#" →
 		// invalid.
-		{Code: `<a href={cond ? "#" : "/"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={cond ? "#" : "/"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- staticEval string concatenation: result matches js: prefix ----
 		// `"java" + "script:" + "alert(1)"` — concatenated to
 		// "javascript:alert(1)" → matches regex → invalid. Locks in the
 		// `+` BinaryExpression arm with same-side string operands.
-		{Code: `<a href={"java" + "script:" + "alert(1)"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"java" + "script:" + "alert(1)"} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// String concat producing exact "#" — `"#" + ""` → "#" → invalid.
-		{Code: `<a href={"#" + ""} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"#" + ""} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Multi-line code: position assertions on each line. Verifies
 		//      Line/Column report at the opening `<` of each anchor. ----
@@ -453,8 +453,8 @@ func TestAnchorIsValidExtras(t *testing.T) {
 </div>`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noHref", Message: noHrefErrorMessage, Line: 2, Column: 3},
-				{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 3, Column: 3},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 2, Column: 3},
+				{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 3, Column: 3},
 			},
 		},
 
@@ -470,8 +470,8 @@ func TestAnchorIsValidExtras(t *testing.T) {
 </nav>`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 4, Column: 3},
-				{MessageId: "noHref", Message: noHrefErrorMessage, Line: 5, Column: 3},
+				{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 4, Column: 3},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 5, Column: 3},
 			},
 		},
 
@@ -479,19 +479,19 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		// `<a href="/" hrefLeft="" onClick={fn}/>` with specialLink=
 		// ['hrefLeft']. hasAnyHref=true (via /), hasInvalidHref=true (via
 		// hrefLeft=""), onClick + preferButton active → preferButton report.
-		{Code: `<a href="/" hrefLeft="" onClick={() => 0} />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href="/" hrefLeft="" onClick={() => 0} />`, Tsx: true, Options: specialLinkOption, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Spread + explicit invalid href: hasSpread=true does NOT
 		//      suppress the invalidHref report (spread suppression only
 		//      applies to the no-href branch). ----
-		{Code: `<a {...props} href="" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a {...props} href="javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a {...props} href="" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a {...props} href="javascript:void(0)" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Spread literal walk + onClick via spread: `<a {...{href: "#",
 		//      onClick: fn}}/>` — both found via single literal-spread
 		//      walk. hasAnyHref=true, hasInvalidHref=true, onClick present,
 		//      preferButton active → preferButton report. ----
-		{Code: `<a {...{href: "#", onClick: () => 0}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a {...{href: "#", onClick: () => 0}} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Attribute order: literal-spread BEFORE explicit href —
 		//      FindAttributeByName returns the FIRST match (the spread one),
@@ -499,21 +499,21 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      spread's invalid value drives the report even though the
 		//      runtime override would set href="foo". This is upstream's
 		//      known quirk and we mirror it. ----
-		{Code: `<a {...{href: "#"}} href="foo" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: invalidHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a {...{href: "#"}} href="foo" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidHref", Message: "The href attribute requires a valid value to be accessible. Provide a valid, navigable address as the href value. If you cannot provide a valid href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- staticEval Identifier extractor: bare `<a href={undefined}/>`
 		//      vs identifier whose name happens to be a known-truthy global.
 		//      The `undefined` Identifier returns jsUndef → nullish → no
 		//      href → noHref report. Locks in the special-cased Identifier
 		//      handling. ----
-		{Code: `<a href={undefined} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={undefined} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Empty JsxExpression `<a href={}/>` — tsgo accepts this for
 		//      error-recovery; jsx-ast-utils routes JSXEmptyExpression
 		//      through its `TYPES[type] === undefined → return null`
 		//      fallback. `null != null` is false → no href → noHref. Locks
 		//      in PropValueIsNullish's `inner == nil` branch alignment. ----
-		{Code: `<a href={} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- TS `satisfies` wrapper — upstream's TYPES table has NO
 		//      `TSSatisfiesExpression` extractor, so `getPropValue` returns
@@ -522,16 +522,16 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      satisfies-wrapped values land on the default `jsNull` arm
 		//      and PropValueIsNullish reports nullish → noHref. Catches
 		//      what would otherwise be silent under-reporting. ----
-		{Code: `<a href={"foo" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
-		{Code: `<a href={"javascript:void(0)" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"foo" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
+		{Code: `<a href={"javascript:void(0)" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 		// JsxExpression containing only a comment is the same shape as
 		// empty: tsgo strips trivia, leaving Expression nil. Same outcome.
-		{Code: `<a href={/* todo */} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={/* todo */} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- onClick prop case-insensitive lookup. With no href, the
 		//      lowercase legacy HTML attribute should still trigger
 		//      preferButton (per jsx-ast-utils ignoreCase=true). ----
-		{Code: `<a onclick={() => 0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a onclick={() => 0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Boolean form for special link: `<a hrefLeft />` with
 		//      specialLink=['hrefLeft']. Boolean form maps to value `true`
@@ -550,14 +550,14 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      GetOptionsMap's `map[string]interface{}` branch. ----
 		{Code: `<Link />`, Tsx: true, Options: map[string]interface{}{
 			"components": []interface{}{"Link"},
-		}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Bare-object options with aspects override ----
 		// Locks in the CLI-shape parse for the aspects path too: only
 		// `noHref` active should still report on a bare anchor.
 		{Code: `<a />`, Tsx: true, Options: map[string]interface{}{
 			"aspects": []interface{}{"noHref"},
-		}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 1}}},
 
 		// ---- Two onClick reports across same parent: each anchor's
 		//      listener invocation is independent. Locks in the absence
@@ -566,8 +566,8 @@ func TestAnchorIsValidExtras(t *testing.T) {
 			Code: `<div><a onClick={() => 0} /><a href="#" onClick={() => 0} /></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 1, Column: 6},
-				{MessageId: "preferButton", Message: preferButtonErrorMessage, Line: 1, Column: 29},
+				{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 6},
+				{MessageId: "preferButton", Message: "Anchor used as a button. Anchors are primarily expected to navigate. Use the button element instead. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md", Line: 1, Column: 29},
 			},
 		},
 
@@ -577,7 +577,7 @@ func TestAnchorIsValidExtras(t *testing.T) {
 			Code: `function App({cond}) { return cond && <a />; }`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noHref", Message: noHrefErrorMessage},
+				{MessageId: "noHref", Message: "The href attribute is required for an anchor to be keyboard accessible. Provide a valid, navigable address as the href value. If you cannot provide an href, but still need the element to resemble a link, use a button and change it with appropriate styles. Learn more: https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/HEAD/docs/rules/anchor-is-valid.md"},
 			},
 		},
 	})
