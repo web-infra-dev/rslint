@@ -21,7 +21,7 @@ function unsupported(
   };
 }
 
-type Cases = Parameters<RuleTester['run']>[2];
+type Cases = Parameters<RuleTester['run']>[1];
 const patterns: ({ keyword: string } & Cases)[] = [
   {
     keyword: 'AggregateError',
@@ -1343,20 +1343,16 @@ for (const pattern of patterns) {
       },
     ],
   }));
-  ruleTester.run(
-    'no-unsupported-features/es-builtins',
-    {},
-    {
-      valid: [...pattern.valid, ...ignored].map((item) => ({
-        ...item,
-        name: pattern.keyword,
-      })),
-      invalid: pattern.invalid.map((item) => ({
-        ...item,
-        name: pattern.keyword,
-      })),
-    },
-  );
+  ruleTester.run('no-unsupported-features/es-builtins', {
+    valid: [...pattern.valid, ...ignored].map((item) => ({
+      ...item,
+      name: pattern.keyword,
+    })),
+    invalid: pattern.invalid.map((item) => ({
+      ...item,
+      name: pattern.keyword,
+    })),
+  });
 }
 
 // The two configuration examples in the pinned documentation.
@@ -1364,29 +1360,23 @@ for (const settings of [undefined, { node: { version: '>=16.0.0' } }]) {
   const options = [
     { ...(settings ? {} : { version: '>=16.0.0' }), ignores: [] },
   ];
-  ruleTester.run(
-    'no-unsupported-features/es-builtins',
-    {},
-    {
-      valid: [
-        {
-          name: 'documented version configuration',
-          code: 'Object.fromEntries(entries)',
-          options,
-          settings,
-        },
-      ],
-      invalid: [
-        {
-          name: 'documented version configuration',
-          code: 'Map.groupBy(items, key)',
-          options,
-          settings,
-          errors: [
-            unsupported('Map.groupBy', '21.0.0', '>=16.0.0', 1, 1, 1, 12),
-          ],
-        },
-      ],
-    },
-  );
+  ruleTester.run('no-unsupported-features/es-builtins', {
+    valid: [
+      {
+        name: 'documented version configuration',
+        code: 'Object.fromEntries(entries)',
+        options,
+        settings,
+      },
+    ],
+    invalid: [
+      {
+        name: 'documented version configuration',
+        code: 'Map.groupBy(items, key)',
+        options,
+        settings,
+        errors: [unsupported('Map.groupBy', '21.0.0', '>=16.0.0', 1, 1, 1, 12)],
+      },
+    ],
+  });
 }

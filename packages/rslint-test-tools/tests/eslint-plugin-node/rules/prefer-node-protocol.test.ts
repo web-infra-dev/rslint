@@ -22,7 +22,7 @@ function error(
 new RuleTester({
   plugin: 'node',
   languageOptions: { sourceType: 'module' },
-}).run('prefer-node-protocol', undefined, {
+}).run('prefer-node-protocol', {
   valid: [
     // Imports
     {

@@ -34,70 +34,66 @@ new RuleTester({
       global: 'readonly',
     },
   },
-}).run(
-  'prefer-global/url',
-  {},
-  {
-    valid: [
-      { code: 'var b = new URL(s)' },
-      { code: 'var b = new URL(s)', options: ['always'] },
-      ...provideModuleMethods.flatMap((method) => [
-        {
-          code: `var { URL } = ${method}('url'); var b = new URL(s)`,
-          options: ['never'],
-        },
-        {
-          code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
-          options: ['never'],
-        },
-      ]),
-      // Documentation: always / never.
-      { code: 'const u = new URL(s)' },
+}).run('prefer-global/url', {
+  valid: [
+    { code: 'var b = new URL(s)' },
+    { code: 'var b = new URL(s)', options: ['always'] },
+    ...provideModuleMethods.flatMap((method) => [
       {
-        code: 'const { URL } = require("url")\nconst u = new URL(s)',
+        code: `var { URL } = ${method}('url'); var b = new URL(s)`,
         options: ['never'],
       },
-    ],
-    invalid: [
-      ...provideModuleMethods.flatMap((method) => [
-        {
-          code: `var { URL } = ${method}('url'); var b = new URL(s)`,
-          errors: [urlError('preferGlobal', 1, 7, 1, 10)],
-        },
-        {
-          code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
-          errors: [urlError('preferGlobal', 1, 7, 1, 10)],
-        },
-        {
-          code: `var { URL } = ${method}('url'); var b = new URL(s)`,
-          options: ['always'],
-          errors: [urlError('preferGlobal', 1, 7, 1, 10)],
-        },
-        {
-          code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
-          options: ['always'],
-          errors: [urlError('preferGlobal', 1, 7, 1, 10)],
-        },
-      ]),
       {
-        code: 'var b = new URL(s)',
+        code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
         options: ['never'],
-        errors: [urlError('preferModule', 1, 13, 1, 16)],
       },
-      // Documentation: equivalence / always / never.
+    ]),
+    // Documentation: always / never.
+    { code: 'const u = new URL(s)' },
+    {
+      code: 'const { URL } = require("url")\nconst u = new URL(s)',
+      options: ['never'],
+    },
+  ],
+  invalid: [
+    ...provideModuleMethods.flatMap((method) => [
       {
-        code: 'console.log(URL === require("url").URL) //→ true',
-        errors: [urlError('preferGlobal', 1, 21, 1, 39)],
+        code: `var { URL } = ${method}('url'); var b = new URL(s)`,
+        errors: [urlError('preferGlobal', 1, 7, 1, 10)],
       },
       {
-        code: 'const { URL } = require("url")\nconst u = new URL(s)',
-        errors: [urlError('preferGlobal', 1, 9, 1, 12)],
+        code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
+        errors: [urlError('preferGlobal', 1, 7, 1, 10)],
       },
       {
-        code: 'const u = new URL(s)',
-        options: ['never'],
-        errors: [urlError('preferModule', 1, 15, 1, 18)],
+        code: `var { URL } = ${method}('url'); var b = new URL(s)`,
+        options: ['always'],
+        errors: [urlError('preferGlobal', 1, 7, 1, 10)],
       },
-    ],
-  },
-);
+      {
+        code: `var { URL } = ${method}('node:url'); var b = new URL(s)`,
+        options: ['always'],
+        errors: [urlError('preferGlobal', 1, 7, 1, 10)],
+      },
+    ]),
+    {
+      code: 'var b = new URL(s)',
+      options: ['never'],
+      errors: [urlError('preferModule', 1, 13, 1, 16)],
+    },
+    // Documentation: equivalence / always / never.
+    {
+      code: 'console.log(URL === require("url").URL) //→ true',
+      errors: [urlError('preferGlobal', 1, 21, 1, 39)],
+    },
+    {
+      code: 'const { URL } = require("url")\nconst u = new URL(s)',
+      errors: [urlError('preferGlobal', 1, 9, 1, 12)],
+    },
+    {
+      code: 'const u = new URL(s)',
+      options: ['never'],
+      errors: [urlError('preferModule', 1, 15, 1, 18)],
+    },
+  ],
+});

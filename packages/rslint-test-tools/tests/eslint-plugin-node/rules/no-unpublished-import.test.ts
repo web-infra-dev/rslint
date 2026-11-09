@@ -19,7 +19,7 @@ new RuleTester({
   plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'module' },
-}).run('no-unpublished-import', null, {
+}).run('no-unpublished-import', {
   valid: [
     {
       name: '1/test.js',

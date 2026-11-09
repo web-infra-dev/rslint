@@ -24,7 +24,7 @@ const ruleTester = new RuleTester({
   languageOptions: { sourceType: 'module' },
 });
 // no-extraneous-import
-ruleTester.run('no-extraneous-import', null, {
+ruleTester.run('no-extraneous-import', {
   valid: [
     {
       filename: 'dependencies/a.js',
@@ -335,7 +335,7 @@ ruleTester.run('no-extraneous-import', null, {
   ],
 });
 // no-extraneous-import/typescript
-ruleTester.run('no-extraneous-import', null, {
+ruleTester.run('no-extraneous-import', {
   valid: [
     {
       filename: 'typesOnly/a.ts',

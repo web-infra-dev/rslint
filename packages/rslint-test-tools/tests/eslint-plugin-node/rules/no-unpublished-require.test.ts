@@ -22,7 +22,7 @@ new RuleTester({
     sourceType: 'commonjs',
     globals: { require: 'readonly', global: 'readonly' },
   },
-}).run('no-unpublished-require', null, {
+}).run('no-unpublished-require', {
   valid: [
     {
       filename: '1/test.js',

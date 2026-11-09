@@ -5,7 +5,6 @@
  */
 
 import { RuleTester, type TestCase } from '@rslint/rule-tester';
-const rule = undefined;
 
 // The package metadata mirrors tests/fixtures/shebang at eslint-plugin-n v18.3.0.
 const packages = {
@@ -57,11 +56,7 @@ function fixtureRelative(item: TestCase): TestCase {
 }
 
 const ruleTester = {
-  run(
-    name: string,
-    _rule: unknown,
-    cases: { valid: TestCase[]; invalid: TestCase[] },
-  ) {
+  run(name: string, cases: { valid: TestCase[]; invalid: TestCase[] }) {
     new RuleTester({
       plugin: 'node',
       fixtureFiles: Object.fromEntries(
@@ -70,7 +65,7 @@ const ruleTester = {
           JSON.stringify(pkg),
         ]),
       ),
-    }).run(name, _rule, {
+    }).run(name, {
       valid: cases.valid.map(fixtureRelative),
       invalid: cases.invalid.map((item) => expandErrors(fixtureRelative(item))),
     });
@@ -86,7 +81,7 @@ function fixture(name: string) {
   return name;
 }
 
-ruleTester.run('hashbang', rule, {
+ruleTester.run('hashbang', {
   valid: [
     {
       name: 'string-bin/bin/test.js',

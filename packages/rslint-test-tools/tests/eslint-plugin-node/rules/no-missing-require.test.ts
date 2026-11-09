@@ -31,7 +31,7 @@ const ruleTester = new RuleTester({
   fixtureFiles,
   languageOptions,
 });
-ruleTester.run('no-missing-require', null, {
+ruleTester.run('no-missing-require', {
   valid: [
     {
       filename: 'tests/fixtures/no-missing/test.js',

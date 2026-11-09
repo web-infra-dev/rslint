@@ -46,11 +46,7 @@ export interface RuleTesterConfig {
 export class RuleTester {
   constructor(private readonly config: RuleTesterConfig) {}
 
-  run(
-    name: string,
-    _rule: unknown,
-    cases: { valid: TestCase[]; invalid: TestCase[] },
-  ): void {
+  run(name: string, cases: { valid: TestCase[]; invalid: TestCase[] }): void {
     const { plugin, fixtureFiles = {}, languageOptions } = this.config;
     const ruleName = `${plugin}/${name}`;
     describe(ruleName, () => {

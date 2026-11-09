@@ -21,7 +21,7 @@ new RuleTester({
   plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'commonjs' },
-}).run('no-unpublished-bin', null, {
+}).run('no-unpublished-bin', {
   valid: [
     {
       filename: 'simple-ok/a.js',
