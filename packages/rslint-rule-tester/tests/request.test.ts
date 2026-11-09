@@ -37,6 +37,16 @@ describe('buildLintRequest', () => {
     expect(filename).toBe(path.join(root, 'src/a.ts'));
   });
 
+  test('uses the tester filename as the default', () => {
+    const { filename } = buildLintRequest(
+      { ...config, filename: 'src/a.tsx' },
+      'node/x',
+      root,
+      { code: '' },
+    );
+    expect(filename).toBe(path.join(root, 'src/a.tsx'));
+  });
+
   test('appends options, resolving a function against the root', () => {
     const { request } = buildLintRequest(config, 'node/x', root, {
       code: '',
