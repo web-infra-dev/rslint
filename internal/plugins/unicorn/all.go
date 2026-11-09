@@ -84,6 +84,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_modern_math_apis"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_module"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_node_protocol"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_object_from_entries"
@@ -197,6 +198,7 @@ func GetAllRules() []rule.Rule {
 		prefer_global_this.PreferGlobalThisRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
 		prefer_modern_math_apis.PreferModernMathApisRule,
+		prefer_module.PreferModuleRule,
 		prefer_node_protocol.PreferNodeProtocolRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		prefer_object_from_entries.PreferObjectFromEntriesRule,
