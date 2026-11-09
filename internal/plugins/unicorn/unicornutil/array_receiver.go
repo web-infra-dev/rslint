@@ -289,6 +289,15 @@ func classifyArrayReceiverInner(
 	if isSyntacticTargetConstructor(node, targetNames) {
 		return arrayClassTarget
 	}
+	if factory, ok := MatchDotMethodCall(node, DotMethodCallOptions{Methods: []string{"from", "of"}}); ok {
+		constructor := utils.ESTreeRuntimeExpression(factory.Object)
+		if ast.IsIdentifier(constructor) && IsTypedArrayName(constructor.Text()) {
+			if targetNames.Has(constructor.Text()) {
+				return arrayClassTarget
+			}
+			return arrayClassNonTarget
+		}
+	}
 
 	if state.useTypeInformation && ctx.TypeChecker != nil {
 		t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)

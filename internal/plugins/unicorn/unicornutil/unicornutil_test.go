@@ -36,14 +36,18 @@ func TestArrayClassificationQueryOrder(t *testing.T) {
 						}
 						// A typed array is an indexed collection, but never a plain
 						// array. Sharing a file cache must not mix those two answers.
-						if isArray || skipIndexed || !IsKnownNonArray(ctx, node) {
+						if isArray || skipIndexed || !IsKnownNonArray(ctx, node) || !IsIndexedCollection(ctx, node) {
 							ctx.ReportNode(node, rule.RuleMessage{Id: "classification", Description: "Typed array classification depends on query order."})
 						}
 					}}
 				},
 			}
 			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule,
-				[]rule_tester.ValidTestCase{{Code: "const value = new Uint8Array(); use(value);", FileName: "file.js"}}, nil)
+				[]rule_tester.ValidTestCase{
+					{Code: "const value = new Uint8Array(); use(value);", FileName: "file.js"},
+					{Code: "const value = Uint8Array.of(...input); use(value);", FileName: "file.js"},
+					{Code: "const value = Float32Array.from(input); use(value);", FileName: "file.js"},
+				}, nil)
 		})
 	}
 }
