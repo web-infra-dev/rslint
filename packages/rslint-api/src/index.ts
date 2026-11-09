@@ -11,6 +11,13 @@
 // leaks unresolvable `#enums/*` literals into the published `.d.ts` — fixed
 // by a `paths` entry in tsconfig.build.json (rslib's `dts.alias` is a no-op
 // for `bundle: true`, so we have to go through tsconfig).
-export { RemoteSourceFile } from '../../../typescript-go/packages/typescript/src/api/node/node.ts';
-export { SyntaxKind } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
+export {
+  RemoteSourceFile,
+  RemoteNode,
+} from '../../../typescript-go/packages/typescript/src/api/node/node.ts';
+export {
+  SyntaxKind,
+  NodeFlags,
+} from '../../../typescript-go/packages/typescript/src/ast/index.ts';
 export type { Node } from '../../../typescript-go/packages/typescript/src/ast/index.ts';
+export { Wtf8Decoder } from '../../../typescript-go/packages/typescript/src/api/node/wtf8.ts';

@@ -5,7 +5,7 @@ import {
   SyntaxKind,
   NodeFlags,
   Wtf8Decoder,
-} from '../../../compiler-syntax/index.js';
+} from '@rslint/api';
 import type ts from 'typescript';
 import { WeakObjectCache } from './type-service-cache.js';
 import type {
