@@ -136,8 +136,8 @@ catalogs:
       specifier: ^0.8.3
       version: 0.8.3
     globals:
-      specifier: 17.13.0
-      version: 17.13.0
+      specifier: 17.14.0
+      version: 17.14.0
     jiti:
       specifier: ^2.7.0
       version: 2.7.0
@@ -226,7 +226,7 @@ importers:
     devDependencies:
       '@napi-rs/cli':
         specifier: 'catalog:'
-        version: 3.10.8(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.5)
+        version: 3.10.8(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.5)
 
   npm/rslint/darwin-arm64: {}
 
@@ -291,7 +291,7 @@ importers:
         version: 1.7.0
       globals:
         specifier: 'catalog:'
-        version: 17.13.0
+        version: 17.14.0
       json-schema-to-typescript:
         specifier: 'catalog:'
         version: 15.0.4
@@ -3527,12 +3527,12 @@ packages:
     peerDependencies:
       tslib: '2'
 
-  globals@17.11.0:
-    resolution: {integrity: sha512-Z2I8hM+PbJDXQDq3Icgpzv+mPdwr68iZUU9d5WW4FuXfDUQfkZaZuvjMv42/5crNyw154+9+VWXbYrUgDXbxNw==}
-    engines: {node: '>=18'}
-
   globals@17.13.0:
     resolution: {integrity: sha512-RwMTC61u7hrG3ZJMkZQOK4JLJrKS8QtoTii63EmWvFXHqycY9FObBJQCbsLxSO8kjKhWE5kV1GC+Vb1g3RI0Zg==}
+    engines: {node: '>=18'}
+
+  globals@17.14.0:
+    resolution: {integrity: sha512-UtdkTVyAJePQv0J2M9Xe4L0ruNSDV314XiIJsADI2Zf40bcdAonE/D/OhAU8AT99oij9mhLByb+NvA3QWZYgCg==}
     engines: {node: '>=18'}
 
   gopd@1.2.0:
@@ -5798,7 +5798,7 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@napi-rs/cli@3.10.8(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@26.6.5)':
+  '@napi-rs/cli@3.10.8(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@types/node@26.6.5)':
     dependencies:
       '@inquirer/prompts': 8.5.2(@types/node@26.6.5)
       '@napi-rs/cross-toolchain': 1.0.3
@@ -5813,8 +5813,8 @@ snapshots:
       typanion: 3.14.0
       typescript: 6.0.3
     optionalDependencies:
-      '@emnapi/core': 1.9.2
-      '@emnapi/runtime': 1.9.2
+      '@emnapi/core': 1.11.2
+      '@emnapi/runtime': 1.11.2
     transitivePeerDependencies:
       - '@napi-rs/cross-toolchain-arm64-target-aarch64'
       - '@napi-rs/cross-toolchain-arm64-target-armv7'
@@ -7702,7 +7702,7 @@ snapshots:
   eslint-plugin-cypress@6.4.3(@typescript-eslint/parser@8.65.0(eslint@10.14.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.14.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.14.0(jiti@2.7.0)
-      globals: 17.11.0
+      globals: 17.13.0
     optionalDependencies:
       '@typescript-eslint/parser': 8.65.0(eslint@10.14.0(jiti@2.7.0))(typescript@6.0.3)
 
@@ -7716,7 +7716,7 @@ snapshots:
   eslint-plugin-playwright@2.12.1(eslint@10.14.0(jiti@2.7.0)):
     dependencies:
       eslint: 10.14.0(jiti@2.7.0)
-      globals: 17.11.0
+      globals: 17.13.0
 
   eslint-plugin-promise@7.3.0(eslint@10.14.0(jiti@2.7.0)):
     dependencies:
@@ -7738,7 +7738,7 @@ snapshots:
       bytes: 3.1.2
       eslint: 10.14.0(jiti@2.7.0)
       functional-red-black-tree: 1.0.1
-      globals: 17.11.0
+      globals: 17.13.0
       jsx-ast-utils-x: 0.1.0
       lodash.merge: 4.6.2
       minimatch: 10.2.5
@@ -7759,7 +7759,7 @@ snapshots:
       entities: 4.5.0
       eslint: 10.14.0(jiti@2.7.0)
       find-up-simple: 1.0.1
-      globals: 17.11.0
+      globals: 17.13.0
       indent-string: 5.0.0
       is-builtin-module: 5.0.0
       is-identifier: 1.1.0
@@ -8002,9 +8002,9 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  globals@17.11.0: {}
-
   globals@17.13.0: {}
+
+  globals@17.14.0: {}
 
   gopd@1.2.0: {}
 
