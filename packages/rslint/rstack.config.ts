@@ -27,7 +27,7 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *
  * 2. Plugin host and worker → `dist/eslint-plugin/`. The public plugin entries
  *    bundle declarations from `tsconfig.plugin-api.json`. The worker checks
- *    its full project and compiler syntax reference with `dts.build`, keeping
+ *    its full project and API reference with `dts.build`, keeping
  *    those private declarations in the build cache. Each runtime entry has
  *    its own `lib` block (the public index shares its block with a type-only entry)
  *    so Rspack inlines each output's full module graph with NO shared chunks —
