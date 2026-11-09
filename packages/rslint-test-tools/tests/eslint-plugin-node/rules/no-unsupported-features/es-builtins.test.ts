@@ -1339,15 +1339,17 @@ const patterns: ({ keyword: string } & Cases)[] = [
 const ruleTester = new RuleTester({ plugin: 'node' });
 for (const pattern of patterns) {
   const ignored = pattern.invalid.map(
-    ({ errors: _errors, output: _output, ...item }) => ({
-      ...item,
-      options: [
-        {
-          ...(item.options as Record<string, unknown>[] | undefined)?.[0],
-          ignores: [pattern.keyword],
-        },
-      ],
-    }),
+    ({ errors: _errors, output: _output, ...item }) => {
+      // Like upstream, append the keyword to any existing ignores.
+      const option = (
+        item.options as Record<string, unknown>[] | undefined
+      )?.[0];
+      const ignores = (option?.ignores as string[] | undefined) ?? [];
+      return {
+        ...item,
+        options: [{ ...option, ignores: [...ignores, pattern.keyword] }],
+      };
+    },
   );
   ruleTester.run('no-unsupported-features/es-builtins', {
     valid: [...pattern.valid, ...ignored].map((item) => ({
