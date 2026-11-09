@@ -911,6 +911,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-array-last-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-block-statement-over-iife.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-boolean-return.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-date-now.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-dom-node-append.test.ts',
