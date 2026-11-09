@@ -913,6 +913,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-date-now.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-dom-node-append.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-export-from.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-flat-math-min-max.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-global-number-constants.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-global-this.test.ts',
