@@ -1,8 +1,9 @@
 // Upstream cases and documentation examples, eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-deprecated-api.js
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'commonjs',
     globals: {

@@ -2,7 +2,7 @@
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-sync.js
 import { readFileSync } from 'node:fs';
 import { test } from 'rstack/test';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 const archive = readFileSync(
   new URL(
     '../../../../../internal/plugins/node/rules/no_sync/testdata/upstream.txtar',
@@ -17,6 +17,7 @@ const fixtureFiles: Record<string, string> = {};
 for (let i = 0; i < entries.length; i += 2)
   fixtureFiles[entries[i]] = entries[i + 1];
 const ruleTester = new RuleTester({
+  plugin: 'node',
   fixtureFiles,
   languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
 });

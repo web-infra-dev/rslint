@@ -1,7 +1,8 @@
 import path from 'node:path';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const ruleTester = new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'module',
     globals: {

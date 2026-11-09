@@ -1,6 +1,6 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({ plugin: 'node' });
 
 const noNewRequire = {
   messageId: 'noNewRequire',

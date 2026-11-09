@@ -1,9 +1,10 @@
 // Complete upstream suite: eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unsupported-features/node-builtins.js
 import { globals } from '@rslint/core';
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'module',
     globals: globals.node,

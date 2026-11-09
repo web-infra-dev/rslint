@@ -1,7 +1,8 @@
 // eslint-plugin-n v18.3.0 / eslint-plugin-es-x v7.8.0 upstream mirror.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unsupported-features/es-syntax.js
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 const ruleTester = new RuleTester({
+  plugin: 'node',
   languageOptions: { sourceType: 'commonjs' },
   fixtureFiles: {
     'package.json': '{}\n',

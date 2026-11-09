@@ -4,8 +4,78 @@
  * See LICENSE file in root directory for full license.
  */
 
-import { RuleTester } from '../rule-tester';
+import { RuleTester, type TestCase } from '@rslint/rule-tester';
 const rule = undefined;
+
+// The package metadata mirrors tests/fixtures/shebang at eslint-plugin-n v18.3.0.
+const packages = {
+  'string-bin': { name: 'test', version: '0.0.0', bin: './bin/test.js' },
+  'object-bin': {
+    name: 'test',
+    version: '0.0.0',
+    bin: { a: './bin/a.js', b: './bin/b.js', c: './bin', t: './bin/t.ts' },
+  },
+  'no-bin-field': { name: 'test', version: '0.0.0' },
+  unpublished: { name: 'test', version: '0.0.0', files: ['./published.js'] },
+};
+
+// Upstream expects message strings. Each hashbang diagnostic covers the
+// complete first line and has an autofix.
+function expandErrors(item: TestCase): TestCase {
+  const end =
+    item.code.replace(/^\uFEFF/, '').split(/\r\n|[\r\n\u2028\u2029]/)[0]
+      .length + 1;
+  return {
+    ...item,
+    errors: item.errors?.map((message) =>
+      typeof message !== 'string'
+        ? message
+        : {
+            message,
+            messageId: message.includes('needs shebang')
+              ? 'expectedHashbangNode'
+              : message.includes('needs no shebang')
+                ? 'expectedHashbang'
+                : message.includes('Unicode BOM')
+                  ? 'unexpectedBOM'
+                  : 'expectedLF',
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: end,
+          },
+    ),
+  };
+}
+
+// Relative upstream filenames point into the shebang fixture directory.
+function fixtureRelative(item: TestCase): TestCase {
+  return {
+    ...item,
+    filename: item.filename?.replace(/^tests\/fixtures\/shebang\//, ''),
+  };
+}
+
+const ruleTester = {
+  run(
+    name: string,
+    _rule: unknown,
+    cases: { valid: TestCase[]; invalid: TestCase[] },
+  ) {
+    new RuleTester({
+      plugin: 'node',
+      fixtureFiles: Object.fromEntries(
+        Object.entries(packages).map(([dir, pkg]) => [
+          `${dir}/package.json`,
+          JSON.stringify(pkg),
+        ]),
+      ),
+    }).run(name, _rule, {
+      valid: cases.valid.map(fixtureRelative),
+      invalid: cases.invalid.map((item) => expandErrors(fixtureRelative(item))),
+    });
+  },
+};
 
 /**
  * Makes a file path to a fixture.
@@ -16,7 +86,6 @@ function fixture(name: string) {
   return name;
 }
 
-const ruleTester = new RuleTester();
 ruleTester.run('hashbang', rule, {
   valid: [
     {

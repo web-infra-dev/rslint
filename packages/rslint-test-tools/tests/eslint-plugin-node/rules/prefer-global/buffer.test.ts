@@ -1,4 +1,4 @@
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const preferBufferAt = (
   messageId: 'preferGlobal' | 'preferModule',
@@ -22,6 +22,7 @@ const provideModuleMethods = ['require', 'process.getBuiltinModule'];
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/prefer-global/buffer.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/prefer-global/buffer.md
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'commonjs',
     globals: {

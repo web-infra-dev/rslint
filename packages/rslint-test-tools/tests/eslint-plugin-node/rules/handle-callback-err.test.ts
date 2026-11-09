@@ -1,10 +1,10 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 // All tests and documentation examples from eslint-plugin-n v18.3.0:
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/handle-callback-err.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/handle-callback-err.md
 // Rule-enabling comments are omitted; the tester enables node/handle-callback-err.
-new RuleTester().run(
+new RuleTester({ plugin: 'node' }).run(
   'handle-callback-err',
   {},
   {

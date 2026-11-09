@@ -1,7 +1,8 @@
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/prefer-global/text-encoder.js
 const ruleTester = new RuleTester({
+  plugin: 'node',
   languageOptions: {
     globals: {
       TextEncoder: 'readonly',

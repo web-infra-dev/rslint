@@ -15,6 +15,7 @@
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "catalog:",
     "@rslint/core": "workspace:*",
+    "@rslint/rule-tester": "workspace:*",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/node": "catalog:",
     "@typescript-eslint/parser": "catalog:",

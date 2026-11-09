@@ -1,4 +1,4 @@
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const urlError = (
   messageId: 'preferGlobal' | 'preferModule',
@@ -24,6 +24,7 @@ const provideModuleMethods = ['require', 'process.getBuiltinModule'];
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/prefer-global/url.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/prefer-global/url.md
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'commonjs',
     globals: {
