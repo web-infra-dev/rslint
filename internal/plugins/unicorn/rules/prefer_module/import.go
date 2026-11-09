@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -110,19 +111,30 @@ func importFixes(ctx rule.RuleContext, identifier *ast.Node) []rule.RuleFix {
 
 func importBinding(binding *ast.Node, json bool) bool {
 	if binding.Kind == ast.KindIdentifier {
-		return true
+		return isModuleBindingName(binding.Text())
 	}
 	if json || binding.Kind != ast.KindObjectBindingPattern {
 		return false
 	}
 	for _, node := range binding.AsBindingPattern().Elements.Nodes {
 		element := node.AsBindingElement()
-		if element.DotDotDotToken != nil || element.Initializer != nil || element.Name().Kind != ast.KindIdentifier ||
+		local := element.Name()
+		if element.DotDotDotToken != nil || element.Initializer != nil || !ast.IsIdentifier(local) || !isModuleBindingName(local.Text()) ||
 			(element.PropertyName != nil && element.PropertyName.Kind != ast.KindIdentifier) {
 			return false
 		}
 	}
 	return true
+}
+
+// Check the decoded local name against ES module binding restrictions.
+func isModuleBindingName(name string) bool {
+	switch name {
+	case "await", "eval", "arguments":
+		return false
+	}
+	keyword := scanner.StringToToken(name)
+	return (keyword < ast.KindFirstReservedWord || keyword > ast.KindLastFutureReservedWord) && scanner.IsValidIdentifier(name)
 }
 
 // Static templates have no raw string token to reuse. Match Unicorn's

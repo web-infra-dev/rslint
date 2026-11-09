@@ -66,12 +66,16 @@ This rule has no options.
 
 ## Differences from upstream
 
-Compared with eslint-plugin-unicorn v79.0.0, rslint keeps the diagnostic but
-withholds suggestions that would produce invalid syntax or remove comments:
+Compared with eslint-plugin-unicorn v79.0.0, rslint keeps the diagnostic and
+withholds edits that would produce invalid syntax or remove comments.
 
+- The comment in `"use strict" /* keep */;` blocks removal of the directive.
+  Move the comment outside the statement to enable the edit.
 - Calls such as `require<string>('x')` and `require('x',)` need manual conversion
   to imports. The upstream suggestion retains the type arguments or trailing
   comma in the generated import.
+- A local name that is invalid in ES modules blocks the import suggestion. For example,
+  rename `await` in `const await = require('x');` before converting it to an import.
 - For `module /* comment */ .exports = value`, move the comment outside
   `module.exports` before applying the export suggestion. Otherwise, replacing
   the member expression would delete the comment.

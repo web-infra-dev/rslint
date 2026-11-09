@@ -43,6 +43,9 @@ var PreferModuleRule = rule.Rule{
 				}
 				message := rule.RuleMessage{Id: "error/use-strict-directive", Description: "Do not use \"use strict\" directive."}
 				fix := func() []rule.RuleFix {
+					if commentsInside(ctx, node) {
+						return nil
+					}
 					return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(
 						utils.TrimNodeTextRange(ctx.SourceFile, node).Pos(), spacesEnd(ctx.SourceFile, node.End()),
 					))}
@@ -51,7 +54,11 @@ var PreferModuleRule = rule.Rule{
 					ctx.ReportNodeWithDeferredFixes(node, message, fix)
 				} else {
 					ctx.ReportNodeWithDeferredSuggestions(node, message, func() []rule.RuleSuggestion {
-						return []rule.RuleSuggestion{{Message: rule.RuleMessage{Id: "suggestion/use-strict-directive", Description: "Remove \"use strict\" directive."}, FixesArr: fix()}}
+						fixes := fix()
+						if len(fixes) == 0 {
+							return nil
+						}
+						return []rule.RuleSuggestion{{Message: rule.RuleMessage{Id: "suggestion/use-strict-directive", Description: "Remove \"use strict\" directive."}, FixesArr: fixes}}
 					})
 				}
 			},

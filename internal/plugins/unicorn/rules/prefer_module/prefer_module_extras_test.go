@@ -490,6 +490,36 @@ func TestPreferModuleExtras(t *testing.T) {
 		{Code: "class C { #exports; f() { return module.exports; } }", FileName: "review.js", Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "error/identifier", Message: "Do not use \"module\".", Line: 1, Column: 34, EndLine: 1, EndColumn: 40},
 		}},
+
+		// A comment between the literal and semicolon belongs to the directive.
+		{Code: `"use strict" /* keep */; run();`, FileName: "review.mjs", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/use-strict-directive", Message: "Do not use \"use strict\" directive.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25},
+		}},
+		{Code: "\"use strict\" // keep\n; run();", FileName: "review.js", Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/use-strict-directive", Message: "Do not use \"use strict\" directive.", Line: 1, Column: 1, EndLine: 2, EndColumn: 2},
+		}},
+
+		// CommonJS accepts these local names, but an ES module import cannot bind them.
+		{Code: `const await = require("x");
+const yield = require("y");
+const eval = require("z");
+const arguments = require("w");`, FileName: "review.js", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 1, Column: 15, EndLine: 1, EndColumn: 22},
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 2, Column: 15, EndLine: 2, EndColumn: 22},
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 3, Column: 14, EndLine: 3, EndColumn: 21},
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 4, Column: 19, EndLine: 4, EndColumn: 26},
+		}},
+		{Code: `const {yield} = require("x");`, FileName: "review.js", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 1, Column: 17, EndLine: 1, EndColumn: 24},
+		}},
+		{Code: `const {foo: \u0061\u0077\u0061\u0069\u0074} = require("x");`, FileName: "review.js", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 1, Column: 47, EndLine: 1, EndColumn: 54},
+		}},
+		{Code: `const {await: wait, yield: async} = require("x");`, FileName: "review.js", LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "error/identifier", Message: "Do not use \"require\".", Line: 1, Column: 37, EndLine: 1, EndColumn: 44, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "suggestion/import", Output: `import {await as wait, yield as async} from "x";`},
+			}},
+		}},
 	}
 	for i := range valid {
 		if valid[i].Globals == nil {
