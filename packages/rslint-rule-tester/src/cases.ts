@@ -10,6 +10,18 @@ export function checkValidCase(item: object): void {
   }
 }
 
+/** Requires an invalid case to expect at least one error. */
+export function checkInvalidCase(item: { errors?: unknown }): void {
+  assert.ok(
+    Array.isArray(item.errors),
+    "Invalid test case must have an 'errors' array",
+  );
+  assert.ok(
+    item.errors.length > 0,
+    'Invalid test case must have at least one error',
+  );
+}
+
 const requiredErrorFields = {
   messageId: ['string'],
   message: ['string', 'function'],

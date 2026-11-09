@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'rstack/test';
-import { checkExpectedError, checkValidCase } from '../src/cases.ts';
+import {
+  checkExpectedError,
+  checkInvalidCase,
+  checkValidCase,
+} from '../src/cases.ts';
 
 describe('checkValidCase', () => {
   test('accepts a case without expectations', () => {
@@ -47,5 +51,25 @@ describe('checkExpectedError', () => {
     expect(() => {
       checkExpectedError(rest, 2);
     }).toThrow(`errors[2].${key} must be`);
+  });
+});
+
+describe('checkInvalidCase', () => {
+  test('accepts a case with errors', () => {
+    expect(() => {
+      checkInvalidCase({ errors: [{}] });
+    }).not.toThrow();
+  });
+
+  test('rejects missing errors', () => {
+    expect(() => {
+      checkInvalidCase({});
+    }).toThrow("must have an 'errors' array");
+  });
+
+  test('rejects empty errors', () => {
+    expect(() => {
+      checkInvalidCase({ errors: [] });
+    }).toThrow('at least one error');
   });
 });

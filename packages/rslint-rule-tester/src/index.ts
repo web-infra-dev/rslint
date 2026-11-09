@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
-import { checkExpectedError, checkValidCase } from './cases.ts';
+import {
+  checkExpectedError,
+  checkInvalidCase,
+  checkValidCase,
+} from './cases.ts';
 import { checkSuggestions, type ExpectedSuggestion } from './suggestions.ts';
 
 export type { ExpectedSuggestion } from './suggestions.ts';
@@ -31,7 +35,8 @@ export interface TestCase {
   options?: unknown[] | ((root: string) => unknown[]);
   settings?: Record<string, unknown>;
   languageOptions?: LanguageOptions;
-  errors?: ExpectedError[];
+  /** Required, and non-empty, for invalid cases. */
+  errors: ExpectedError[];
   output?: string;
 }
 
@@ -87,7 +92,7 @@ export class RuleTester {
           });
         }
       });
-      const groups: [string, TestCase[]][] = [
+      const groups: [string, (ValidTestCase | TestCase)[]][] = [
         [
           'valid',
           cases.valid.map((item) =>
@@ -102,6 +107,7 @@ export class RuleTester {
           const label = item.skip ?? item.name;
           run(`${kind} ${index}${label ? `: ${label}` : ''}`, async () => {
             if (kind === 'valid') checkValidCase(item);
+            else checkInvalidCase(item);
             const filename = path.join(root, item.filename ?? 'input.js');
             const request = {
               configDirectory: root,
