@@ -660,14 +660,16 @@ func TestCompleteProgramsPreservesDuplicateInputsAndReusablePlan(t *testing.T) {
 	})
 	for _, mode := range []ProgramExecution{ProgramComplete, ProgramPhases, ProgramComplete} {
 		var diagnostics []rule.RuleDiagnostic
+		consumer := rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }}
 		execution, err := prepareLintExecution(RunLinterOptions{
 			LintPlan: plan, TypeCheck: true,
-			Consumer: rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }},
+			Consumer: consumer,
 		}, mode, false)
 		if err != nil {
 			t.Fatal(err)
 		}
-		execution.run(rule.DiagnosticConsumer{Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }})
+		_, typeDiagnostics := execution.run(consumer)
+		emitDeduplicatedTypeCheckDiagnostics(typeDiagnostics, consumer.Report)
 		if len(diagnostics) != 1 || diagnostics[0].SourceFile != raw.GetSourceFile(paths["source.ts"]) || len(plan.programs) != 3 {
 			t.Fatalf("mode %d changed dedupe, source identity, or the reusable input plan: %+v", mode, diagnostics)
 		}

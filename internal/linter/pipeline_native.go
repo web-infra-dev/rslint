@@ -5,7 +5,20 @@ import (
 	"sync"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// nativeObservationUnit keeps diagnostic groups private until every load has
+// joined. It owns no Programs; fix planning may retain source identity until
+// the unit freezes its diagnostic sources.
+type nativeObservationUnit struct {
+	syntacticDiagnostics  []rule.RuleDiagnostic
+	diagnostics           []rule.RuleDiagnostic
+	typeDiagnostics       [][]collectedTypeCheckDiagnostic
+	lint                  *LintResult
+	files                 []LintedFile
+	hasTargetSyntaxErrors bool
+}
 
 // nativeObservationWork contains only consumable execution tasks and the
 // requested output metadata. It never retains the producer Generation or plan.
@@ -14,6 +27,7 @@ type nativeObservationWork struct {
 	diagnostics            []rule.RuleDiagnostic
 	files                  []LintedFile
 	targetPath             func(string) string
+	typeCheckPaths         map[string]string
 	demand                 rule.EditDemand
 	preserveSourceIdentity bool
 	hasTargetSyntaxErrors  bool
@@ -53,6 +67,7 @@ func prepareNativeObservation(
 		execution:              execution,
 		files:                  lintedFiles,
 		targetPath:             generation.Target.Path,
+		typeCheckPaths:         generation.Target.TypeCheckPaths,
 		demand:                 demand,
 		preserveSourceIdentity: preserveSourceIdentity,
 		hasTargetSyntaxErrors:  plan.HasSyntacticDiagnostics(),
@@ -70,12 +85,13 @@ func prepareNativeObservation(
 
 // runNativeObservation projects sources before the result channel can become
 // an AST owner. Fix planning keeps exact source identity until text freezing.
-func runNativeObservation(ctx context.Context, work *nativeObservationWork) (NativeObservation, error) {
+func runNativeObservation(ctx context.Context, work *nativeObservationWork) (nativeObservationUnit, error) {
 	if err := ctx.Err(); err != nil {
-		return NativeObservation{}, err
+		return nativeObservationUnit{}, err
 	}
-	diagnostics := work.diagnostics
+	syntacticDiagnostics := work.diagnostics
 	work.diagnostics = nil
+	var diagnostics []rule.RuleDiagnostic
 	consumer := rule.DiagnosticConsumer{Demand: work.demand}
 	var diagnosticsWait sync.WaitGroup
 	finishDiagnostics := func() {}
@@ -110,17 +126,31 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (Nat
 	var finishOnce sync.Once
 	finish := func() { finishOnce.Do(finishDiagnostics) }
 	defer finish()
-	lintResult := work.execution.run(consumer)
+	lintResult, typeDiagnostics := work.execution.run(consumer)
 	finish()
 
-	for index := range diagnostics {
-		diagnostics[index].FilePath = projectTargetPath(work.targetPath, diagnostics[index].FilePath)
+	for _, group := range [][]rule.RuleDiagnostic{syntacticDiagnostics, diagnostics} {
+		for index := range group {
+			group[index].FilePath = projectTargetPath(work.targetPath, group[index].FilePath)
+		}
 	}
-	result := NativeObservation{
-		Diagnostics:           diagnostics,
-		Lint:                  lintResult,
-		Files:                 work.files,
-		HasTargetSyntaxErrors: work.hasTargetSyntaxErrors,
+	for _, collected := range typeDiagnostics {
+		for index := range collected {
+			entry := &collected[index]
+			path := work.typeCheckPaths[utils.NormalizeAbsoluteDrive(entry.key.path)]
+			if path == "" {
+				path = projectTargetPath(work.targetPath, entry.ruleDiagnostic.FilePath)
+			}
+			entry.ruleDiagnostic.FilePath = path
+		}
+	}
+	result := nativeObservationUnit{
+		syntacticDiagnostics:  syntacticDiagnostics,
+		diagnostics:           diagnostics,
+		typeDiagnostics:       typeDiagnostics,
+		lint:                  lintResult,
+		files:                 work.files,
+		hasTargetSyntaxErrors: work.hasTargetSyntaxErrors,
 	}
 	return result, ctx.Err()
 }

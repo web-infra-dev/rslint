@@ -39,6 +39,9 @@ const (
 type ObservationResult struct {
 	Index  int
 	Native NativeObservation
+	// ProgramRootIdentities preserves requested generation metadata in load
+	// order. Consumers may deduplicate the physical identities for presentation.
+	ProgramRootIdentities []string
 
 	pluginKind    pluginObservationKind
 	pluginOutcome EslintPluginDispatchOutcome
@@ -55,20 +58,6 @@ func (r ObservationResult) CompleteDiagnostics() ([]rule.RuleDiagnostic, bool) {
 		diagnostics = append(diagnostics, r.pluginOutcome.Diagnostics...)
 	}
 	return diagnostics, true
-}
-
-// detachDiagnosticSources ends any remaining diagnostic ownership of compiler
-// ASTs. Observations planning fixes call it after source identity validation and
-// fix text freezing; other observations already project before aggregation.
-// Reuse one text projection per source object, never per path: distinct
-// generations can share a path.
-func (r *ObservationResult) detachDiagnosticSources() {
-	for _, diagnostics := range [][]rule.RuleDiagnostic{r.Native.Diagnostics, r.pluginOutcome.Diagnostics} {
-		for index := range diagnostics {
-			diagnostic := &diagnostics[index]
-			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
-		}
-	}
 }
 
 // JoinedPluginOutcome returns the structured result for joined plugin work.

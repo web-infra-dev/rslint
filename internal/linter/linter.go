@@ -459,7 +459,10 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return execution.run(normalizeDiagnosticConsumer(opts.Consumer)), nil
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
+	result, typeDiagnostics := execution.run(consumer)
+	emitDeduplicatedTypeCheckDiagnostics(typeDiagnostics, consumer.Report)
+	return result, nil
 }
 
 // LintSingleFile runs lint rules against one already selected file in one

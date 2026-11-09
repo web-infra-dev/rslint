@@ -91,7 +91,7 @@ func (e *lintExecution) typeCheckWork(source *program.Program) int {
 	return 0
 }
 
-func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
+func (e *lintExecution) run(consumer rule.DiagnosticConsumer) (*LintResult, [][]collectedTypeCheckDiagnostic) {
 	defer e.close()
 	result := &LintResult{ExecutedRules: make(map[string]struct{})}
 	programResults := make([]programLintResult, len(e.programs))
@@ -151,23 +151,20 @@ func (e *lintExecution) run(consumer rule.DiagnosticConsumer) *LintResult {
 		}
 	}
 
-	// Even when computation is interleaved, type diagnostics follow every
-	// native report and choose dedupe survivors in original Program order.
-	emitDeduplicatedTypeCheckDiagnostics(typeResults, consumer.Report)
-
 	// Phased execution retains its second borrow. Type-check-only also uses
 	// this path, without imposing native scheduling on its independent work.
 	programs := e.typeCheckPrograms
 	e.typeCheckPrograms = nil
 	if len(programs) > 0 {
-		runTypeCheckAcrossPrograms(typeCheckRequest{
+		typeResults = runTypeCheckAcrossPrograms(typeCheckRequest{
 			Programs:       programs,
 			SingleThreaded: e.options.SingleThreaded,
-			OnDiagnostic:   consumer.Report,
 			ProjectSources: e.projectTypeCheckSources,
 		})
 	}
-	return result
+	// The caller publishes type diagnostics after every native report and
+	// chooses dedupe survivors in this original Program order.
+	return result, typeResults
 }
 
 // estimateProgramLintShards reads only the frozen native file projection. It
