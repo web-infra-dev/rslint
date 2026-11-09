@@ -16,8 +16,7 @@ var PreferBlockStatementOverIIFERule = rule.Rule{
 	Name:   "unicorn/prefer-block-statement-over-iife",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		// Annex B can also expose a block function in a sloppy CommonJS wrapper.
-		nonModule := ctx.LanguageOptions.EffectiveSourceType() != "module"
+		sourceType := ctx.LanguageOptions.EffectiveSourceType()
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(statement *ast.Node) {
 				expression := utils.ESTreeRuntimeExpression(statement.Expression())
@@ -43,12 +42,18 @@ var PreferBlockStatementOverIIFERule = rule.Rule{
 					return
 				}
 				statements := body.Statements()
-				if (len(statements) != 0 && ast.IsPrologueDirective(statements[0])) ||
-					usesFunctionScope(body, nonModule, ownContext) {
+				if len(statements) != 0 && ast.IsPrologueDirective(statements[0]) {
 					return
 				}
 
 				file := ctx.SourceFile
+				// Annex B can also expose a block function in a non-strict CommonJS wrapper.
+				preserveDeclarations := sourceType == "script" ||
+					(sourceType == "commonjs" && !utils.IsInStrictModeWithSourceType(statement, file, sourceType))
+				if usesFunctionScope(body, preserveDeclarations, ownContext) {
+					return
+				}
+
 				expressionRange := core.NewTextRange(scanner.GetTokenPosOfNode(expression, file, false), expression.End())
 				ctx.ReportRangeWithDeferredFixes(expressionRange, rule.RuleMessage{
 					Id:          "prefer-block-statement-over-iife",
@@ -81,25 +86,21 @@ var PreferBlockStatementOverIIFERule = rule.Rule{
 	},
 }
 
-func usesFunctionScope(body *ast.Node, nonModule, ownContext bool) bool {
+func usesFunctionScope(body *ast.Node, preserveDeclarations, ownContext bool) bool {
+	callee := body.Parent
+	inIIFEScope := func(node *ast.Node) bool {
+		return ast.FindAncestor(node.Parent, ast.IsFunctionLikeOrClassStaticBlockDeclaration) == callee
+	}
 	var visit ast.Visitor
-	inArrow := false
 	visit = func(node *ast.Node) bool {
 		if ast.IsFunctionLikeDeclaration(node) && node.Body() != nil {
 			switch node.Kind {
 			case ast.KindFunctionDeclaration:
-				return nonModule && !inArrow
+				return preserveDeclarations && inIIFEScope(node)
 			case ast.KindFunctionExpression:
 				return false
 			case ast.KindArrowFunction:
-				if !ownContext {
-					return false
-				}
-				outerArrow := inArrow
-				inArrow = true
-				found := node.ForEachChild(visit)
-				inArrow = outerArrow
-				return found
+				return ownContext && node.ForEachChild(visit)
 			default:
 				// A method's key and decorators evaluate outside its function scope.
 				name := node.Name()
@@ -117,11 +118,11 @@ func usesFunctionScope(body *ast.Node, nonModule, ownContext bool) bool {
 
 		switch node.Kind {
 		case ast.KindReturnStatement:
-			if !inArrow {
+			if inIIFEScope(node) {
 				return true
 			}
 		case ast.KindVariableDeclarationList:
-			if !inArrow && !ast.IsBlockOrCatchScoped(node) {
+			if !ast.IsBlockOrCatchScoped(node) && inIIFEScope(node) {
 				return true
 			}
 		case ast.KindCallExpression:
@@ -130,25 +131,27 @@ func usesFunctionScope(body *ast.Node, nonModule, ownContext bool) bool {
 				return true
 			}
 		case ast.KindThisKeyword:
-			return ownContext
+			return ownContext && ast.GetThisContainer(node, false /*includeArrowFunctions*/, false /*includeClassComputedPropertyName*/) == callee
 		case ast.KindMetaProperty:
-			return ownContext && node.AsMetaProperty().KeywordToken == ast.KindNewKeyword
+			return ownContext && node.AsMetaProperty().KeywordToken == ast.KindNewKeyword &&
+				ast.GetNewTargetContainer(node) == callee
 		case ast.KindIdentifier:
-			return ownContext && node.Text() == "arguments" && !isJSXLiteralName(node)
+			return ownContext && isArgumentsReference(node)
 		}
 		return node.ForEachChild(visit)
 	}
 	return visit(body)
 }
 
-func isJSXLiteralName(node *ast.Node) bool {
-	parent := node.Parent
-	switch parent.Kind {
+func isArgumentsReference(node *ast.Node) bool {
+	if node.Text() != "arguments" || utils.IsNonReferenceIdentifier(node) ||
+		(ast.IsPartOfTypeNode(node) && !ast.IsPartOfTypeQuery(node)) {
+		return false
+	}
+	switch node.Parent.Kind {
 	case ast.KindJsxAttribute, ast.KindJsxNamespacedName:
-		return true
-	case ast.KindPropertyAccessExpression:
-		return parent.Name() == node && utils.IsInJsxTagName(parent)
+		return false
 	default:
-		return ast.IsJsxTagName(node)
+		return !ast.IsJsxTagName(node)
 	}
 }

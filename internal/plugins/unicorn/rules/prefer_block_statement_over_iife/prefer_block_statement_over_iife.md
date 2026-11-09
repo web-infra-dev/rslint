@@ -49,13 +49,19 @@ This rule has no options.
 rslint allows some IIFEs that Unicorn v79.0.0 reports when a block could change
 what the code can access.
 
-- In CommonJS, `(() => { function load() {} load(); })();` keeps `load` private
-  to the function. In non-strict code, a replacement block could expose the
-  name outside that block.
+- In non-strict CommonJS, `(() => { function load() {} load(); })();` keeps
+  `load` private to the function. A replacement block could expose the name
+  outside that block. Strict CommonJS code can use the block form.
 - A callback such as `() => eval('arguments.length')` can read the enclosing
   IIFE's arguments. A JSX tag such as `<this.View />` or `<arguments.View />`, or
   a TypeScript parameter decorator such as `@decorate(this)`, can also rely on
-  the enclosing IIFE's bindings.
+  the enclosing IIFE's bindings. The same applies to a JSDoc type query such
+  as `@type {typeof arguments}`.
+
+rslint can fix IIFEs containing a class field such as `value = this` or a
+static block such as `static { var x = 1; }` because those bindings belong to
+the class field or static block. An ordinary property access such as
+`obj.arguments` also permits a fix.
 
 In the following cases, rslint reports the IIFE for manual review.
 

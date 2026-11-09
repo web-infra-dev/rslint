@@ -36,6 +36,13 @@ func TestPreferBlockStatementOverIIFEExtras(t *testing.T) {
 		{Code: "(function () { const obj = { [this.name]() {} }; run(obj); })();", FileName: "case.js"},
 		{Code: "(function () { class C { @decorate(this) method() {} } run(C); })();", FileName: "case.ts"},
 		{Code: "(function () { class C { method(@decorate(this) value: number) {} } run(C); })();", FileName: "case.ts"},
+		{Code: "(function () { class C extends this.Base {} new C(); })();", FileName: "case.js"},
+		{Code: "(function () { class C { [this.key] = 1; } new C(); })();", FileName: "case.js"},
+
+		// Shorthand, computed keys, and type queries read the function binding.
+		{Code: "(function () { use({arguments}); })();", FileName: "case.js"},
+		{Code: "(function () { use({[arguments]: 42}); })();", FileName: "case.js"},
+		{Code: "(function () { use(/** @type {typeof arguments} */ (value)); })();", FileName: "case.js"},
 
 		// These replacements can change bindings even though Unicorn v79 reports them.
 		{Code: "function outer() { (() => { function inner() {} })(); return typeof inner; }", FileName: "case.cjs"},
@@ -65,6 +72,16 @@ func TestPreferBlockStatementOverIIFEExtras(t *testing.T) {
 			Errors: iifeDiagnostic(1, 1, 1, 51),
 		},
 		{
+			Code: `"use strict"; (() => { function f() {} f(); })();`, FileName: "case.cjs",
+			Output: []string{`"use strict"; { function f() {} f(); }`},
+			Errors: iifeDiagnostic(1, 15, 1, 49),
+		},
+		{
+			Code: `function outer() { "use strict"; (() => { function f() {} f(); })(); }`, FileName: "case.cjs",
+			Output: []string{`function outer() { "use strict"; { function f() {} f(); } }`},
+			Errors: iifeDiagnostic(1, 34, 1, 68),
+		},
+		{
 			Code: "(function () { const obj = { method() { var value = eval(code); return this.x + value; } }; run(obj); })();", FileName: "case.js",
 			Output: []string{"{ const obj = { method() { var value = eval(code); return this.x + value; } }; run(obj); }"},
 			Errors: iifeDiagnostic(1, 1, 1, 107),
@@ -73,6 +90,21 @@ func TestPreferBlockStatementOverIIFEExtras(t *testing.T) {
 			Code: "(function () { class C { #method() { return this; } } run(C); })();", FileName: "case.js",
 			Output: []string{"{ class C { #method() { return this; } } run(C); }"},
 			Errors: iifeDiagnostic(1, 1, 1, 67),
+		},
+		{
+			Code: "(function () { class C { value = this; } new C(); })();", FileName: "case.js",
+			Output: []string{"{ class C { value = this; } new C(); }"},
+			Errors: iifeDiagnostic(1, 1, 1, 55),
+		},
+		{
+			Code: "(function () { class C { value = new.target; } new C(); })();", FileName: "case.js",
+			Output: []string{"{ class C { value = new.target; } new C(); }"},
+			Errors: iifeDiagnostic(1, 1, 1, 61),
+		},
+		{
+			Code: "(() => { class C { static { var x = 1; } } new C(); })();", FileName: "case.js",
+			Output: []string{"{ class C { static { var x = 1; } } new C(); }"},
+			Errors: iifeDiagnostic(1, 1, 1, 57),
 		},
 		{
 			Code: "(function () { const nested = () => { function local() {} return local; }; run(nested); })();", FileName: "case.js",
@@ -99,6 +131,16 @@ func TestPreferBlockStatementOverIIFEExtras(t *testing.T) {
 			Code: "/** @type {Function} */ ((() => { run(); })());", FileName: "case.js",
 			Output: []string{"/** @type {Function} */ { run(); }"},
 			Errors: iifeDiagnostic(1, 26, 1, 46),
+		},
+		{
+			Code: "(function () { ({arguments: 42}).arguments; })();", FileName: "case.js",
+			Output: []string{"{ ({arguments: 42}).arguments; }"},
+			Errors: iifeDiagnostic(1, 1, 1, 49),
+		},
+		{
+			Code: "(function () { use(/** @type {{arguments: number}} */ (value)); })();", FileName: "case.js",
+			Output: []string{"{ use(/** @type {{arguments: number}} */ (value)); }"},
+			Errors: iifeDiagnostic(1, 1, 1, 69),
 		},
 		{
 			Code: "(function () { render(<arguments arguments={1} />, <View.arguments />); })();", FileName: "case.tsx",
