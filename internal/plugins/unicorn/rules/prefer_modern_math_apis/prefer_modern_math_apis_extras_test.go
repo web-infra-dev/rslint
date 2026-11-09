@@ -341,6 +341,52 @@ func TestPreferModernMathApisJSDoc(t *testing.T) {
 
 // Additional AST shapes and conservative fixes for shadowed builtin names.
 func TestPreferModernMathApisBoundaries(t *testing.T) {
+	t.Run("constant method calls in computed keys", func(t *testing.T) {
+		var invalid []rule_tester.InvalidTestCase
+		for _, pair := range []struct{ left, right string }{
+			{`x[[0].at(0)]`, `x[0]`},
+			{`x[1]`, `x[[0, 1].at(-1)]`},
+			{`x[[, 1].at(0)]`, `x.undefined`},
+			{`x[[0].at(7)]`, `x.undefined`},
+			{`x[[...[0, 1]].at("1.9")].point`, `x[1].point`},
+			{`x[[[0]][0].at(0)]`, `x[0]`},
+			{`x[[0].concat([1])[1]]`, `x[1]`},
+			{`x[[0, 1].slice(-1)]`, `x[1]`},
+			{`x[[[0]].flat().at(0) + 1]`, `x[1]`},
+			{`x[[0 / 0].includes(0 / 0)]`, `x.true`},
+			{`x[[,].includes(void 0)]`, `x.true`},
+			{`x[[0].indexOf(0)]`, `x[0]`},
+			{`x[[,].indexOf(void 0)]`, `x[-1]`},
+			{`x[[0, 1, 0].lastIndexOf(0)]`, `x[2]`},
+			{`x[[0, 1, 0].lastIndexOf(0, void 0)]`, `x[0]`},
+			{`x[[0, 1].toString()]`, `x["0,1"]`},
+			{`x["ab".at(-1)]`, `x.b`},
+			{`x["😀".at(1)]`, `x["\uDE00"]`},
+			{`x["a".at(7)]`, `x.undefined`},
+			{`x["e\u0301".normalize()]`, `x["é"]`},
+			{`x["é".normalize("NFD")]`, `x["e\u0301"]`},
+			{`x["①".normalize("NFKC")]`, `x["1"]`},
+			{`x["e\u0301a".normalize().at(0)]`, `x["é"]`},
+		} {
+			invalid = append(invalid, computedKeyCase("input.js", pair.left, pair.right))
+		}
+		invalid = append(invalid,
+			computedKeyCase("input.ts", `x[([0] as const).at(0)]`, `x[0]`),
+			computedKeyCase("input.ts", `x[("e\u0301" satisfies string).normalize()]`, `x["é"]`),
+		)
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_modern_math_apis.PreferModernMathApisRule,
+			[]rule_tester.ValidTestCase{
+				{Code: `Math.sqrt(x[[1].at(0)] * x[0]);`},
+				{Code: `Math.sqrt(x[[0, unknown].at(0)] * x[0]);`},
+				{Code: `Math.sqrt(x[[0].at(index)] * x[0]);`},
+				{Code: `Math.sqrt(x[[0].at(0, get())] * x[0]);`},
+				{Code: `Math.sqrt(x[get().at(0)] * x[0]);`},
+				{Code: `Math.sqrt(x[[0].at(0n)] * x[0]);`},
+				{Code: `Math.sqrt(x[[0].indexOf("0")] * x[0]);`},
+				{Code: `Math.sqrt(x["a".normalize("invalid")] * x.a);`},
+				{Code: `Math.sqrt(x[[0].at(0)].point * x[0].other);`},
+			}, invalid)
+	})
 	t.Run("heritage, context and binding shapes", func(t *testing.T) {
 		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_modern_math_apis.PreferModernMathApisRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
 			{Code: "class C extends Math.sqrt(value ** 2) {}", FileName: "input.ts",
@@ -465,6 +511,19 @@ func TestPreferModernMathApisBoundaries(t *testing.T) {
 				}},
 		})
 	})
+}
+
+func computedKeyCase(filename, left, right string) rule_tester.InvalidTestCase {
+	return rule_tester.InvalidTestCase{
+		Code:     "Math.sqrt(" + left + " * " + right + ");",
+		FileName: filename,
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: "prefer-modern-math-apis",
+			Message:   "Prefer `Math.abs(…)` over `Math.sqrt(…)`.",
+			Line:      1, Column: 6, EndLine: 1, EndColumn: 10,
+			Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "suggestion", Output: "Math.abs(" + left + ");"}},
+		}},
+	}
 }
 
 func TestPreferModernMathApisGlobals(t *testing.T) {

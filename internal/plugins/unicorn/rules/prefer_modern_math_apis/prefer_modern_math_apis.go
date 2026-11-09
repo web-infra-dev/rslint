@@ -135,7 +135,7 @@ func checkSqrt(ctx rule.RuleContext, node *ast.Node) {
 		case ast.KindAsteriskToken:
 			// This comparator includes static strings and erased TypeScript
 			// wrappers, as upstream's isSameReference does in v79.
-			if !unicornutil.IsSameComparisonOperand(binary.Left, binary.Right) {
+			if !unicornutil.IsSameComparisonOperandWithKeyEvaluator(binary.Left, binary.Right, staticKeyText) {
 				return false
 			}
 		case ast.KindAsteriskAsteriskToken:
