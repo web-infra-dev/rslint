@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
+import { checkSuggestions, type ExpectedSuggestion } from './suggestions.ts';
+
+export type { ExpectedSuggestion } from './suggestions.ts';
 
 export interface ExpectedError {
   messageId: string;
@@ -13,6 +16,8 @@ export interface ExpectedError {
   endLine: number;
   endColumn: number;
   fix?: { range: [number, number]; text: string };
+  /** Omitted or empty means the diagnostic must have no suggestions. */
+  suggestions?: ExpectedSuggestion[];
 }
 
 export interface TestCase {
@@ -118,7 +123,11 @@ export class RuleTester {
             for (const [i, expected] of (item.errors ?? []).entries()) {
               const diagnostic = result.diagnostics[i];
               expect(diagnostic.ruleName).toBe(ruleName);
-              expect(diagnostic.suggestions).toBeUndefined();
+              checkSuggestions(
+                item.code,
+                diagnostic,
+                typeof expected === 'string' ? undefined : expected.suggestions,
+              );
               if (typeof expected === 'string') {
                 expect(diagnostic.message).toBe(expected);
                 continue;
