@@ -7,6 +7,7 @@ import { lint } from '@rslint/core/internal';
 import {
   checkExpectedError,
   checkInvalidCase,
+  checkSkip,
   checkValidCase,
 } from './cases.ts';
 import { checkSuggestions, type ExpectedSuggestion } from './suggestions.ts';
@@ -106,6 +107,7 @@ export class RuleTester {
           const run = item.skip ? test.skip : test;
           const label = item.skip ?? item.name;
           run(`${kind} ${index}${label ? `: ${label}` : ''}`, async () => {
+            checkSkip(item);
             if (kind === 'valid') checkValidCase(item);
             else checkInvalidCase(item);
             const filename = path.join(root, item.filename ?? 'input.js');

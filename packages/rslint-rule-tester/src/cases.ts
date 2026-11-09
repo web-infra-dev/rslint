@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
 
+/** Requires a skipped case to state why. */
+export function checkSkip(item: { skip?: unknown }): void {
+  if (!Object.hasOwn(item, 'skip')) return;
+  assert.ok(
+    typeof item.skip === 'string' && item.skip.trim() !== '',
+    "Test case property 'skip' must be a non-empty reason",
+  );
+}
+
 /** Rejects expectations that only invalid cases can carry. */
 export function checkValidCase(item: object): void {
   for (const key of ['errors', 'output']) {

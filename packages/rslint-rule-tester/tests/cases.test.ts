@@ -2,6 +2,7 @@ import { describe, expect, test } from 'rstack/test';
 import {
   checkExpectedError,
   checkInvalidCase,
+  checkSkip,
   checkValidCase,
 } from '../src/cases.ts';
 
@@ -78,5 +79,20 @@ describe('checkInvalidCase', () => {
     expect(() => {
       checkInvalidCase({ code: 'a', errors: [{}], output: 'a' });
     }).toThrow("'output' matches 'code'");
+  });
+});
+
+describe('checkSkip', () => {
+  test('accepts no skip and a stated reason', () => {
+    expect(() => {
+      checkSkip({});
+      checkSkip({ skip: 'tsgo rejects this syntax' });
+    }).not.toThrow();
+  });
+
+  test.each(['', '  ', undefined])('rejects skip %j', (skip) => {
+    expect(() => {
+      checkSkip({ skip });
+    }).toThrow("'skip' must be a non-empty reason");
   });
 });
