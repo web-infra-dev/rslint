@@ -95,6 +95,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_has"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_set_size"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_single_call"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_raw"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_slice"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_starts_ends_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_string_trim_start_end"
@@ -208,6 +209,7 @@ func GetAllRules() []rule.Rule {
 		prefer_set_has.PreferSetHasRule,
 		prefer_set_size.PreferSetSizeRule,
 		prefer_single_call.PreferSingleCallRule,
+		prefer_string_raw.PreferStringRawRule,
 		prefer_string_slice.PreferStringSliceRule,
 		prefer_string_starts_ends_with.PreferStringStartsEndsWithRule,
 		prefer_string_trim_start_end.PreferStringTrimStartEndRule,
