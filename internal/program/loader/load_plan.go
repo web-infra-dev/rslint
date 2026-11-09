@@ -24,9 +24,10 @@ type ProgramLoad struct {
 }
 
 // PlanLoads separates target ownership from source construction. A nil plan
-// keeps the whole-binding acquisition. Compiler-only roots preserve consumers
-// that require the compiler AST representation; otherwise the parser/binder
-// facade handles supported project-external roots.
+// keeps the whole-binding acquisition. Discovery-only targets contribute
+// configured Programs and service source validation. Compiler-only roots
+// preserve consumers that require the compiler AST representation; otherwise
+// the parser/binder facade handles supported project-external roots.
 //
 // Call on a fresh Session, before constructing any Programs. Config validation
 // and root identity ranking are shared with BuildProjects. The loads retain
@@ -48,26 +49,9 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 	if plan.terminalErr != nil {
 		return nil, plan.terminalErr
 	}
-	groups := groupTargetsByProjects(request.Targets.Files, plan.targetProjects, func(owner string) []int {
-		return orderedProjectIndexesForConfig(plan, owner)
-	})
-	var owners []int
-	if request.Scope == AllDeclared {
-		// Match the complete build's batch identity ranking. In particular,
-		// case-folded lexical roots cannot outrank a distinct physical file.
-		// Service selections also retain their authoritative missing-source
-		// validation instead of turning an absent selected source into a gap.
-		owners = execution.activeRootOwners(request.Targets.Files, groups)
-	} else {
-		owners, err = execution.selectRootOwners(request.Targets.Files, request.Scope, groups, nil)
-		if err != nil {
-			return nil, err
-		}
-	}
-	filesByProject := make(map[int][]target.File)
-	for index, file := range request.Targets.Files {
-		owner := owners[index]
-		filesByProject[owner] = append(filesByProject[owner], file)
+	filesByProject, err := execution.loadTargetsByProject(request)
+	if err != nil {
+		return nil, err
 	}
 	projectCount := len(filesByProject)
 	if _, hasRoots := filesByProject[-1]; hasRoots {
@@ -191,6 +175,10 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 			continue
 		}
 		spec := plan.specs[owner]
+		var validationFiles []target.File
+		if request.SkipLintBinding {
+			validationFiles, files = files, nil
+		}
 		slot, err := execution.parse(owner)
 		if err != nil {
 			return nil, err
@@ -204,21 +192,32 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 				if err != nil {
 					return LoadResult{}, fmt.Errorf("create TypeScript Program from %q: %w", spec.tsconfigPath, err)
 				}
-				set := ProjectSet{
-					compilerPrograms: []*compiler.Program{cp},
-					configOrders:     []configOrders{spec.configOrders},
-					targetBinding:    &projectTargetBinding{targets: files, owners: make([]int, len(files))},
-					targetProjects:   make(map[target.File][]int, len(files)),
+				compilerPrograms := []*compiler.Program{cp}
+				binding := LoadResult{Programs: lintprogram.NewOwnedFromCompilers(compilerPrograms)}
+				if request.SkipLintBinding {
+					for _, file := range validationFiles {
+						if err := validateProjectSource(cp, s.FS(), file); err != nil {
+							return LoadResult{}, err
+						}
+					}
+				} else {
+					set := ProjectSet{
+						compilerPrograms: compilerPrograms,
+						programs:         binding.Programs,
+						configOrders:     []configOrders{spec.configOrders},
+						targetBinding:    &projectTargetBinding{targets: files, owners: make([]int, len(files))},
+						targetProjects:   make(map[target.File][]int, len(files)),
+					}
+					for _, file := range files {
+						set.targetProjects[file] = []int{0}
+					}
+					var unbound []target.File
+					binding, unbound = s.bindTargetsToProjects(set, target.Plan{Files: files}, request.SingleThreaded)
+					if len(unbound) > 0 {
+						return LoadResult{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", unbound[0].Path, spec.tsconfigPath)
+					}
+					finalizeResult(&binding)
 				}
-				set.programs = lintprogram.NewOwnedFromCompilers(set.compilerPrograms)
-				for _, file := range files {
-					set.targetProjects[file] = []int{0}
-				}
-				binding, unbound := s.bindTargetsToProjects(set, target.Plan{Files: files}, request.SingleThreaded)
-				if len(unbound) > 0 {
-					return LoadResult{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", unbound[0].Path, spec.tsconfigPath)
-				}
-				finalizeResult(&binding)
 				if rootIdentities != nil {
 					binding.ProgramRootIdentities = rootIdentities.Freeze(binding.Programs)
 				}
@@ -229,13 +228,51 @@ func (s *Session) PlanLoads(request ProjectBuildRequest, cwd string, compilerRoo
 	return loads, nil
 }
 
+func (execution *targetedProjectExecution) loadTargetsByProject(request ProjectBuildRequest) (map[int][]target.File, error) {
+	plan := execution.plan
+	files := request.Targets.Files
+	filesByProject := make(map[int][]target.File)
+	if request.SkipLintBinding {
+		// Discovery has already selected the service owners. The complete
+		// Program set only needs to validate their selected sources.
+		for _, file := range files {
+			indexes := plan.targetProjects[file]
+			if request.Policies[file].ServiceRootDirectory != "" && len(indexes) > 0 {
+				owner := indexes[0]
+				filesByProject[owner] = append(filesByProject[owner], file)
+			}
+		}
+		return filesByProject, nil
+	}
+	groups := groupTargetsByProjects(files, plan.targetProjects, func(owner string) []int {
+		return orderedProjectIndexesForConfig(plan, owner)
+	})
+	var owners []int
+	if request.Scope == AllDeclared {
+		// Use the complete build's batch identity ranking and preserve
+		// authoritative service selections, including missing sources.
+		owners = execution.activeRootOwners(files, groups)
+	} else {
+		var err error
+		owners, err = execution.selectRootOwners(files, request.Scope, groups, nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for index, file := range files {
+		owner := owners[index]
+		filesByProject[owner] = append(filesByProject[owner], file)
+	}
+	return filesByProject, nil
+}
+
 // Metadata suffices only for direct roots accepted by the compiler's
 // extension policy. Aliases and content mappers retain the complete binding
 // path, whose lookup can resolve their source identity across projects.
 func (s *Session) hasIndependentRoots(parsed *tsoptions.ParsedCommandLine, files []target.File, sourceReferences bool) bool {
 	if len(files) == 0 {
-		// Type-check-only Programs have no lint binding to redirect. Their
-		// complete roots, references, options and diagnostics remain intact.
+		// With no sources to bind or validate, the Program can be constructed
+		// independently with its complete roots, references and options.
 		return true
 	}
 	if len(parsed.ContentMapperExtensions()) != 0 {

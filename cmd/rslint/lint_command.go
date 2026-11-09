@@ -330,6 +330,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		Configs:                      projectConfigs,
 		Scope:                        projectScope,
 		SingleThreaded:               singleThreaded,
+		SkipLintBinding:              typeCheckOnly,
 		IncludeProgramRootIdentities: format == output.FormatDefault && mode != output.ModeLint,
 	}
 	pathSpaces := configCatalog.PathSpaces
@@ -411,10 +412,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
-		if typeCheckOnly {
+		if request.SkipLintBinding {
 			return loader.LoadResult{Programs: rebuilt.Programs(), ProgramRootIdentities: rebuilt.ProgramRootIdentities()}, nil
 		}
-		binding, err := session.LoadCLI(rebuilt, targetPlan, currentDirectory, singleThreaded)
+		binding, err := session.LoadCLI(rebuilt, request.Targets, currentDirectory, singleThreaded)
 		if err != nil {
 			return loader.LoadResult{}, err
 		}
@@ -472,7 +473,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
+	var preferredCallerPaths map[string]string
+	if typeCheck && !typeCheckOnly && !fix {
+		preferredCallerPaths = targetPlan.PreferredCallerPaths()
+	}
 	provider := &cliGenerationProvider{
+		typeCheckPaths: preferredCallerPaths,
 		initial: func(ctx context.Context) (loader.LoadResult, vfs.FS, error) {
 			binding, err := createPrograms(programSession, projectRequest)
 			if err != nil {
@@ -609,7 +615,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return 0
 	}
 
-	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, targetPlan.PreferredCallerPaths())
+	if preferredCallerPaths == nil {
+		preferredCallerPaths = targetPlan.PreferredCallerPaths()
+	}
+	allDiags = deduplicateTypeScriptDiagnostics(allDiags, fs, preferredCallerPaths)
 
 	// Paths have already been remapped into the caller-visible target space.
 	// Sort the completed set before rendering; same-start diagnostics retain

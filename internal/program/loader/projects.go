@@ -36,6 +36,9 @@ type ProjectBuildRequest struct {
 	Policies       map[target.File]rslintconfig.ProjectPolicy
 	Scope          ProjectScope
 	SingleThreaded bool
+	// SkipLintBinding keeps the selected targets of an AllDeclared request
+	// for project discovery and service source validation only.
+	SkipLintBinding bool
 	// IncludeProgramRootIdentities freezes physical roots of diagnostic-capable
 	// Programs into the returned metadata without retaining their ASTs.
 	IncludeProgramRootIdentities bool
@@ -361,9 +364,8 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 			if len(indexes) == 0 {
 				continue
 			}
-			program := set.compilerPrograms[indexes[0]]
-			if utils.NewProgramSourceLookup(program, s.FS()).SourceFileForTarget(file.Path, file.CanonicalPath) == nil {
-				return ProjectSet{}, fmt.Errorf("project root %q from %q was absent from its TypeScript Program", file.Path, program.CommandLine().ConfigName())
+			if err := validateProjectSource(set.compilerPrograms[indexes[0]], s.FS(), file); err != nil {
+				return ProjectSet{}, err
 			}
 		}
 	}
@@ -374,6 +376,13 @@ func (s *Session) BuildProjects(request ProjectBuildRequest) (ProjectSet, error)
 		}
 	}
 	return set, nil
+}
+
+func validateProjectSource(program *compiler.Program, fsys vfs.FS, file target.File) error {
+	if utils.NewProgramSourceLookup(program, fsys).SourceFileForTarget(file.Path, file.CanonicalPath) == nil {
+		return fmt.Errorf("project root %q from %q was absent from its TypeScript Program", file.Path, program.CommandLine().ConfigName())
+	}
+	return nil
 }
 
 // prepareProjectPlan resolves declarations and service metadata without loading

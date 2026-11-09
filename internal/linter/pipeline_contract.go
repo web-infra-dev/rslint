@@ -156,6 +156,10 @@ type NativeGeneration struct {
 type TargetProjection struct {
 	Path     func(sourcePath string) string
 	ReadText func(targetPath string, source ast.SourceFileLike) (string, error)
+	// TypeCheckPaths maps exact physical identities to caller-visible paths
+	// for program-wide diagnostics. The immutable map can include targets
+	// from other loads. Diagnostics without an entry use Path.
+	TypeCheckPaths map[string]string
 }
 
 // PluginGeneration is the generation-local projection needed to materialize

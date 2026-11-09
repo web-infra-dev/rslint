@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // nativeObservationUnit keeps diagnostic groups private until every load has
@@ -26,6 +27,7 @@ type nativeObservationWork struct {
 	diagnostics            []rule.RuleDiagnostic
 	files                  []LintedFile
 	targetPath             func(string) string
+	typeCheckPaths         map[string]string
 	demand                 rule.EditDemand
 	preserveSourceIdentity bool
 	hasTargetSyntaxErrors  bool
@@ -65,6 +67,7 @@ func prepareNativeObservation(
 		execution:              execution,
 		files:                  lintedFiles,
 		targetPath:             generation.Target.Path,
+		typeCheckPaths:         generation.Target.TypeCheckPaths,
 		demand:                 demand,
 		preserveSourceIdentity: preserveSourceIdentity,
 		hasTargetSyntaxErrors:  plan.HasSyntacticDiagnostics(),
@@ -133,8 +136,12 @@ func runNativeObservation(ctx context.Context, work *nativeObservationWork) (nat
 	}
 	for _, collected := range typeDiagnostics {
 		for index := range collected {
-			diagnostic := &collected[index].ruleDiagnostic
-			diagnostic.FilePath = projectTargetPath(work.targetPath, diagnostic.FilePath)
+			entry := &collected[index]
+			path := work.typeCheckPaths[utils.NormalizeAbsoluteDrive(entry.key.path)]
+			if path == "" {
+				path = projectTargetPath(work.targetPath, entry.ruleDiagnostic.FilePath)
+			}
+			entry.ruleDiagnostic.FilePath = path
 		}
 	}
 	result := nativeObservationUnit{

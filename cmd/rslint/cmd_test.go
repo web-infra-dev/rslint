@@ -987,6 +987,109 @@ func TestHandleLintCommandProjectServiceGapScope(t *testing.T) {
 	}
 }
 
+func TestHandleLintCommandTypeCheckOnlySkipsUnownedSources(t *testing.T) {
+	root := txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "deferred")
+	dir := tspath.NormalizePath(osvfs.FS().Realpath(root))
+	gap := tspath.ResolvePath(dir, "loose.ts")
+	fsys := &commandReadCountingFS{
+		FS:    bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		reads: make(map[string]int),
+	}
+	config := rslintconfig.RslintConfig{{
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{
+			ProjectService: rslintconfig.BoolPtr(true),
+		}},
+	}}
+	code, stdout, stderr := runLintCommandForTest(t, dir, lintArgs{
+		ConfigCatalog: explicitConfigCatalogForTest(dir, config),
+		AllowFiles: []string{
+			tspath.ResolvePath(dir, "a/file.ts"), tspath.ResolvePath(dir, "b/file.ts"), gap,
+		},
+		FS: fsys, TypeCheck: true, TypeCheckOnly: true,
+		Format: "jsonline", NoColor: true, SingleThreaded: true,
+	})
+	if reads := fsys.readCount(gap); reads != 0 {
+		t.Errorf("type-check-only read the unowned source %d times", reads)
+	}
+	if code != 1 || stderr != "" || strings.Count(stdout, "TypeScript(TS2322)") != 1 ||
+		!strings.Contains(stdout, `"filePath":"a/real.ts"`) {
+		t.Fatalf("expected a type diagnostic from the configured import graph: exit=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+}
+
+func TestCLIProgramLoadsProjectTypeDiagnosticToCallerAlias(t *testing.T) {
+	root := txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, "deferred")
+	dir := tspath.NormalizePath(osvfs.FS().Realpath(root))
+	realPath := tspath.ResolvePath(dir, "a/real.ts")
+	aliasPath := tspath.ResolvePath(dir, "b/alias.ts")
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	baseFS := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	declaration := &rslintconfig.ProjectDeclaration{
+		Patterns: rslintconfig.ProjectPaths{"a/tsconfig.json", "b/alias.json"}, BaseDirectory: dir,
+	}
+	config := rslintconfig.RslintConfig{{
+		LanguageOptions: &rslintconfig.LanguageOptions{ParserOptions: &rslintconfig.ParserOptions{Project: declaration.Patterns}},
+	}}
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{
+		Config: config, ConfigDirectory: dir, FS: baseFS,
+		Files: rslintconfig.ResolveFileIdentities([]string{tspath.ResolvePath(dir, "a/file.ts"), aliasPath}, baseFS),
+	}))
+	if err != nil || len(plan.Files) != 2 {
+		t.Fatalf("target plan: files=%v error=%v", plan.Files, err)
+	}
+	fsys, err := loader.WithFrozenIO(baseFS, plan.PathSpaces(), plan.Files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loads, err := loader.NewSession(fsys).PlanLoads(loader.ProjectBuildRequest{
+		Configs: map[string]rslintconfig.RslintConfig{dir: config},
+		Targets: plan, Scope: loader.AllDeclared, SingleThreaded: true,
+		Policies: map[target.File]rslintconfig.ProjectPolicy{
+			plan.Files[0]: {ExplicitProject: declaration}, plan.Files[1]: {ExplicitProject: declaration},
+		},
+	}, dir, false)
+	if err != nil || len(loads) != 2 {
+		t.Fatalf("expected two independent project loads: loads=%d error=%v", len(loads), err)
+	}
+	provider := &cliGenerationProvider{
+		initial: func(context.Context) (loader.LoadResult, vfs.FS, error) {
+			return loader.LoadResult{}, nil, errors.New("unexpected whole-binding acquisition")
+		},
+		loads: func(context.Context) ([]loader.ProgramLoad, vfs.FS, error) { return loads, fsys, nil },
+		generation: func(binding loader.LoadResult, fsys vfs.FS) linter.Generation {
+			return linter.Generation{
+				Native: linter.NativeGeneration{
+					Programs: binding.Programs, TargetsByProgram: binding.TargetsByProgram,
+					TypeCheck: true, SingleThreaded: true, Cwd: dir,
+					RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return nil },
+				},
+				Target: linter.TargetProjection{Path: func(path string) string {
+					if file, ok := target.LookupSourceTarget(binding.LintTargetBySourcePath, path, fsys); ok {
+						return file.Path
+					}
+					return path
+				}},
+			}
+		},
+		singleThreaded: true,
+		typeCheckPaths: plan.PreferredCallerPaths(),
+	}
+	result, err := linter.RunPipeline(context.Background(), linter.NewLintRequest(
+		provider, linter.ObservationPolicy{ProgramExecution: linter.ProgramComplete}, nil,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first Program diagnoses its import under the real path. The core
+	// must publish that survivor once using the second load's selected alias.
+	diagnostics := result.Observation.Native.Diagnostics
+	if len(diagnostics) != 1 || diagnostics[0].RuleName != "TypeScript(TS2322)" || diagnostics[0].FilePath != aliasPath {
+		t.Fatalf("expected one TS2322 at %q, got %+v", aliasPath, diagnostics)
+	}
+}
+
 func TestMachineTypeCheckSkipsReportRootIdentityProjection(t *testing.T) {
 	directory := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	rootPath := filepath.Join(directory, "sibling.ts")

@@ -18,6 +18,7 @@ type cliGenerationProvider struct {
 	initial        func(context.Context) (loader.LoadResult, vfs.FS, error)
 	loads          func(context.Context) ([]loader.ProgramLoad, vfs.FS, error)
 	singleThreaded bool
+	typeCheckPaths map[string]string
 	rebuild        func(context.Context, linter.SourceSnapshot) (loader.LoadResult, vfs.FS, error)
 	generation     func(loader.LoadResult, vfs.FS) linter.Generation
 }
@@ -66,7 +67,11 @@ func (p *cliGenerationProvider) PlanGeneration(ctx context.Context, snapshot lin
 		if err != nil {
 			return plan, err
 		}
-		plan.Loads = lintLoader.GenerationLoads(loads, fsys, p.generation)
+		plan.Loads = lintLoader.GenerationLoads(loads, fsys, func(binding loader.LoadResult, fsys vfs.FS) linter.Generation {
+			generation := p.generation(binding, fsys)
+			generation.Target.TypeCheckPaths = p.typeCheckPaths
+			return generation
+		})
 	}
 	if len(plan.Loads) == 0 {
 		plan.Loads = []linter.GenerationLoad{{Acquire: func(ctx context.Context) (linter.Generation, linter.ReleaseFunc, error) {
