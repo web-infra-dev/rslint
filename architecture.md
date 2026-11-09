@@ -1895,13 +1895,12 @@ admission, scheduling, generation transfer and editor integration remain follow-
 work. Meta-property keywords are scalar compiler fields, so their synthetic
 ESTree identifiers have no compiler node origin and reject semantic queries.
 Core's private `compiler-syntax` entry imports the binary syntax reader, decoder
-and enums directly from the same pinned compiler source as Go. Its separate
-composite project inherits upstream's compiler settings and emits declarations
-into core's local build cache. One incremental declaration build runs before each
-core compilation, including watch rebuilds; owned core files retain their strict
-compiler settings. Worker builds select upstream's source enum condition and
-bundle the reader, so neither a compiler runtime dependency nor the frontend
-`@rslint/api` package is needed by core or its consumers.
+and enums directly from the same pinned compiler source as Go. Rslib bundles that
+source into the worker. Its declaration build follows the worker's project
+reference to check the upstream reader with upstream's compiler settings and
+the worker with core's strict settings. The build and watch modes keep these
+private declarations in the local cache. Public plugin declarations are bundled
+from the public entries, which have no dependency on the reader.
 
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
