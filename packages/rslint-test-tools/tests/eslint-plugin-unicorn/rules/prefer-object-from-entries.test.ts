@@ -1,3 +1,4 @@
+// Expected reduce fixes also remove sparse-array holes.
 // Ported from eslint-plugin-unicorn v79.0.0 tests and documentation; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-object-from-entries.js
 import { RuleTester } from '../rule-tester';
@@ -533,7 +534,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'JSON.stringify([1, 2].reduce((object, value) => ({...object, [value]: value}), {}));',
       filename: 'src/virtual.js',
       output:
-        'JSON.stringify(Object.fromEntries([1, 2].map((value) => [value, value])));',
+        'JSON.stringify(Object.fromEntries([1, 2].flatMap((value) => [[value, value]])));',
       errors: [
         {
           messageId: 'reduce',
@@ -550,7 +551,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'JSON.stringify(new Array(1, 2).reduce((object, value) => ({...object, [value]: value}), {}));',
       filename: 'src/virtual.js',
       output:
-        'JSON.stringify(Object.fromEntries(new Array(1, 2).map((value) => [value, value])));',
+        'JSON.stringify(Object.fromEntries(new Array(1, 2).flatMap((value) => [[value, value]])));',
       errors: [
         {
           messageId: 'reduce',
@@ -567,7 +568,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'JSON.stringify(Array.from([1, 2]).reduce((object, value) => ({...object, [value]: value}), {}));',
       filename: 'src/virtual.js',
       output:
-        'JSON.stringify(Object.fromEntries(Array.from([1, 2]).map((value) => [value, value])));',
+        'JSON.stringify(Object.fromEntries(Array.from([1, 2]).flatMap((value) => [[value, value]])));',
       errors: [
         {
           messageId: 'reduce',
@@ -584,7 +585,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'JSON.stringify(Array.of(1, 2).reduce((object, value) => ({...object, [value]: value}), {}));',
       filename: 'src/virtual.js',
       output:
-        'JSON.stringify(Object.fromEntries(Array.of(1, 2).map((value) => [value, value])));',
+        'JSON.stringify(Object.fromEntries(Array.of(1, 2).flatMap((value) => [[value, value]])));',
       errors: [
         {
           messageId: 'reduce',
@@ -601,7 +602,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, key}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -633,7 +634,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, key}), {},);',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key],));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]],));",
       errors: [
         {
           messageId: 'reduce',
@@ -649,7 +650,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, key,}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -665,7 +666,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, key}), (( {} )));',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -681,7 +682,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce( (( object => ({...object, key}) )) , {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map( (( () => ['key', key] )) ));",
+      output:
+        "Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));",
       errors: [
         {
           messageId: 'reduce',
@@ -697,7 +699,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce( (( (object) => ({...object, key}) )) , {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map( (( () => ['key', key] )) ));",
+      output:
+        "Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));",
       errors: [
         {
           messageId: 'reduce',
@@ -713,7 +716,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce( (( (object,) => ({...object, key}) )) , {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map( (( () => ['key', key] )) ));",
+      output:
+        "Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));",
       errors: [
         {
           messageId: 'reduce',
@@ -729,7 +733,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [((key))] : ((value))}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [((key)), ((value))]));',
+      output:
+        'Object.fromEntries(pairs.flatMap(() => [[((key)), ((value))]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -746,7 +751,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: '((\n\t(( pairs ))\n\t.reduce(\n\t\t((\n\t\t\t(object,) => ((\n\t\t\t\t((\n\t\t\t\t\tObject\n\t\t\t\t)).assign(\n\t\t\t\t\t((\n\t\t\t\t\t\tobject\n\t\t\t\t\t)),\n\t\t\t\t\t(({\n\t\t\t\t\t\t[ ((key)) ] : ((value)),\n\t\t\t\t\t}))\n\t\t\t\t)\n\t\t\t))\n\t\t)),\n\t\t({})\n\t)\n));',
       filename: 'src/virtual.js',
       output:
-        '((\n\tObject.fromEntries((( pairs ))\n\t.map(\n\t\t((\n\t\t\t() => \n\t\t\t\t[((key)), ((value))]\n\t\t\t\n\t\t))\n\t))\n));',
+        '((\n\tObject.fromEntries((( pairs ))\n\t.flatMap(\n\t\t((\n\t\t\t() => \n\t\t\t\t[[((key)), ((value))]]\n\t\t\t\n\t\t))\n\t))\n));',
       errors: [
         {
           messageId: 'reduce',
@@ -762,7 +767,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, 0: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [0, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[0, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -778,7 +783,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, true: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['true', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['true', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -794,7 +799,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, 0n: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [0n, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[0n, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -810,7 +815,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, undefined: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['undefined', value]));",
+      output:
+        "Object.fromEntries(pairs.flatMap(() => [['undefined', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -826,7 +832,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, null: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['null', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['null', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -842,7 +848,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, var: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['var', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['var', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -858,7 +864,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, for: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['for', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['for', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -874,7 +880,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, default: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['default', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['default', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -890,7 +896,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, string: value}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['string', value]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['string', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -906,7 +912,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, "string": value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => ["string", value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [["string", value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -922,7 +928,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [0]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [0, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[0, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -938,7 +944,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [true]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [true, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[true, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -954,7 +960,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [0n]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [0n, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[0n, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -970,7 +976,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [undefined]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [undefined, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[undefined, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -986,7 +992,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [null]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [null, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[null, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1002,7 +1008,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, ["for"]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => ["for", value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [["for", value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1018,7 +1024,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, [string]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [string, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[string, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1034,7 +1040,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => ({...object, ["string"]: value}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => ["string", value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [["string", value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1050,7 +1056,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => Object.assign(object, {key}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1066,7 +1072,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => Object.assign(object, {key,}), {});',
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['key', key]));",
+      output: "Object.fromEntries(pairs.flatMap(() => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1082,7 +1088,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: 'pairs.reduce(object => Object.assign(object, {[key]: value,}), {});',
       filename: 'src/virtual.js',
-      output: 'Object.fromEntries(pairs.map(() => [key, value]));',
+      output: 'Object.fromEntries(pairs.flatMap(() => [[key, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1099,7 +1105,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'pairs.reduce((object, element, index, array) => ({...object, key}), {});',
       filename: 'src/virtual.js',
       output:
-        "Object.fromEntries(pairs.map((element, index, array) => ['key', key]));",
+        "Object.fromEntries(pairs.flatMap((element, index, array) => [['key', key]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1116,7 +1122,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'pairs.reduce((object, [key, value], index, array,) => ({...object, [key]: value + index + array.length}), {});',
       filename: 'src/virtual.js',
       output:
-        'Object.fromEntries(pairs.map(([key, value], index, array,) => [key, value + index + array.length]));',
+        'Object.fromEntries(pairs.flatMap(([key, value], index, array,) => [[key, value + index + array.length]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1133,7 +1139,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'pairs.reduce(object => ({...object, key: function (object) { return object; }}), {});',
       filename: 'src/virtual.js',
       output:
-        "Object.fromEntries(pairs.map(() => ['key', function (object) { return object; }]));",
+        "Object.fromEntries(pairs.flatMap(() => [['key', function (object) { return object; }]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1150,7 +1156,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'pairs.reduce(object => ({...object, method: async () => {}}), {});',
       filename: 'src/virtual.js',
       output:
-        "Object.fromEntries(pairs.map(() => ['method', async () => {}]));",
+        "Object.fromEntries(pairs.flatMap(() => [['method', async () => {}]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1167,7 +1173,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'pairs.reduce(object => ({...object, method: async function * (){}}), {});',
       filename: 'src/virtual.js',
       output:
-        "Object.fromEntries(pairs.map(() => ['method', async function * (){}]));",
+        "Object.fromEntries(pairs.flatMap(() => [['method', async function * (){}]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1533,7 +1539,8 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
     {
       code: "pairs.reduce(object => ({...object, ['__proto__']: value}), {});",
       filename: 'src/virtual.js',
-      output: "Object.fromEntries(pairs.map(() => ['__proto__', value]));",
+      output:
+        "Object.fromEntries(pairs.flatMap(() => [['__proto__', value]]));",
       errors: [
         {
           messageId: 'reduce',
@@ -1582,7 +1589,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'const object = pairs.reduce((object, [key, value]) => ({...object, [key]: value}), {});',
       filename: 'src/virtual.js',
       output:
-        'const object = Object.fromEntries(pairs.map(([key, value]) => [key, value]));',
+        'const object = Object.fromEntries(pairs.flatMap(([key, value]) => [[key, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1599,7 +1606,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'const object = pairs.reduce((object, element, index, array) => ({...object, [key]: value}), {});',
       filename: 'src/virtual.js',
       output:
-        'const object = Object.fromEntries(pairs.map((element, index, array) => [key, value]));',
+        'const object = Object.fromEntries(pairs.flatMap((element, index, array) => [[key, value]]));',
       errors: [
         {
           messageId: 'reduce',
@@ -1634,7 +1641,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'const object = pairs.reduce(\n\t(object, [key, value]) => ({...object, [key]: value}),\n\t{}\n);',
       filename: 'src/virtual.js',
       output:
-        'const object = Object.fromEntries(pairs.map(\n\t([key, value]) => [key, value]\n));',
+        'const object = Object.fromEntries(pairs.flatMap(\n\t([key, value]) => [[key, value]]\n));',
       errors: [
         {
           messageId: 'reduce',
@@ -1651,7 +1658,7 @@ new RuleTester().run('prefer-object-from-entries', {} as never, {
       code: 'const object = pairs.reduce(\n\t(object, [key, value]) => Object.assign(object, {[key]: value}),\n\t{}\n);',
       filename: 'src/virtual.js',
       output:
-        'const object = Object.fromEntries(pairs.map(\n\t([key, value]) => [key, value]\n));',
+        'const object = Object.fromEntries(pairs.flatMap(\n\t([key, value]) => [[key, value]]\n));',
       errors: [
         {
           messageId: 'reduce',

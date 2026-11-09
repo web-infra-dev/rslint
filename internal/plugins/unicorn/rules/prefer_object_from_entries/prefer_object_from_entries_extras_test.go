@@ -1,3 +1,4 @@
+// Expected reduce fixes also remove sparse-array holes.
 // Additional cases verified against eslint-plugin-unicorn v79.0.0.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-object-from-entries.js
 package prefer_object_from_entries_test
@@ -83,11 +84,33 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			{Code: "const values = BigUint64Array.of(...input); values.reduce((o, v) => ({...o, [v]: v}), {});", FileName: "case.js"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// The rewrite skips holes and preserves callback indices.
+			{
+				Code: `const records = new Array(3);
+records[2] = {id: 'b', value: 2};
+const result = records.reduce((acc, record, index) => ({...acc, [record.id]: record.value + index}), {});`,
+				FileName: "case.js",
+				Output: []string{`const records = new Array(3);
+records[2] = {id: 'b', value: 2};
+const result = Object.fromEntries(records.flatMap((record, index) => [[record.id, record.value + index]]));`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 3, Column: 24, EndLine: 3, EndColumn: 30},
+				},
+			},
+			// The original return annotation would reject the entry pair.
+			{
+				Code: `const pairs: number[] = [1, 2];
+const result = pairs.reduce((o, v): Record<string, number> => ({...o, [v]: v}), {});`,
+				FileName: "case.ts",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 2, Column: 22, EndLine: 2, EndColumn: 28},
+				},
+			},
 			// AST, scope, options and edit boundaries; expected diagnostics and edits checked against v79.0.0.
 			// computed sequences.
 			{
 				Code: "pairs.reduce(object => ({...object, [(first(), key)]: (next(), value)}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [(first(), key), (next(), value)]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[(first(), key), (next(), value)]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -95,7 +118,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			// prototype spelling.
 			{
 				Code: "pairs.reduce(object => ({...object, [\"__proto__\"]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [\"__proto__\", value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[\"__proto__\", value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -103,7 +126,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			// nested shadowing.
 			{
 				Code: "pairs.reduce(object => ({...object, key: (object => object)(value)}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', (object => object)(value)]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', (object => object)(value)]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -112,7 +135,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			{
 				Code: "pairs.reduce((object, value) => ({...object, [value.id]: <Value item={value} />}), {});", FileName: "case.tsx",
 				Options: []any{map[string]any{}},
-				Output:  []string{"Object.fromEntries(pairs.map((value) => [value.id, <Value item={value} />]));"},
+				Output:  []string{"Object.fromEntries(pairs.flatMap((value) => [[value.id, <Value item={value} />]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -121,7 +144,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			{
 				Code: "pairs.reduce((object: Record<string, number>, value: number) => ({...object, [value]: value}), {});", FileName: "case.ts",
 				Options: []any{map[string]any{}},
-				Output:  []string{"Object.fromEntries(pairs.map((value: number) => [value, value]));"},
+				Output:  []string{"Object.fromEntries(pairs.flatMap((value: number) => [[value, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -130,7 +153,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			{
 				Code: "pairs.reduce(<T,>(object: Record<string, T>, value: T) => ({...object, key: value}), {});", FileName: "case.ts",
 				Options: []any{map[string]any{}},
-				Output:  []string{"Object.fromEntries(pairs.map(<T,>(value: T) => ['key', value]));"},
+				Output:  []string{"Object.fromEntries(pairs.flatMap(<T,>(value: T) => [['key', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -145,7 +168,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			// JS JSDoc receiver.
 			{
 				Code: "(/** @type {any} */ (pairs)).reduce(object => ({...object, key}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries((/** @type {any} */ (pairs)).map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries((/** @type {any} */ (pairs)).flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 30, EndLine: 1, EndColumn: 36},
 				},
@@ -231,7 +254,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 			// UTF16 reduce range.
 			{
 				Code: "const emoji = \"💩\"; pairs.reduce(o => ({...o, key}), {});", FileName: "case.js",
-				Output: []string{"const emoji = \"💩\"; Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"const emoji = \"💩\"; Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 27, EndLine: 1, EndColumn: 33},
 				},
@@ -314,7 +337,7 @@ func TestPreferObjectFromEntriesExtras(t *testing.T) {
 
 func TestPreferObjectFromEntriesEditDemand(t *testing.T) {
 	for _, test := range []struct{ name, code, output, reported string }{
-		{"reduce", "pairs.reduce(o => ({...o, key}), {});", "Object.fromEntries(pairs.map(() => ['key', key]));", "reduce"},
+		{"reduce", "pairs.reduce(o => ({...o, key}), {});", "Object.fromEntries(pairs.flatMap(() => [['key', key]]));", "reduce"},
 		{"function", "_.fromPairs(pairs);", "Object.fromEntries(pairs);", "_.fromPairs"},
 		{"loop", "const o = {}; for (const [k, v] of pairs) o[k] = v;", "const o = Object.fromEntries(pairs); ", "for (const [k, v] of pairs) o[k] = v;"},
 		{"comment", "pairs.reduce(o => ({...o, /* keep */ key}), {});", "", "reduce"},
@@ -405,7 +428,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// JSX intrinsic name.
 			{
 				Code: "pairs.reduce(o => ({...o, value: <o />}), {});", FileName: "case.tsx",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['value', <o />]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['value', <o />]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -413,7 +436,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// JSX property name.
 			{
 				Code: "pairs.reduce(o => ({...o, value: <UI.o />}), {});", FileName: "case.tsx",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['value', <UI.o />]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['value', <UI.o />]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -421,7 +444,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// shadowed type parameter.
 			{
 				Code: "pairs.reduce(o => ({...o, key: <o,>(value: o) => value}), {});", FileName: "case.tsx",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', <o,>(value: o) => value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', <o,>(value: o) => value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -429,7 +452,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// escaped identifiers.
 			{
 				Code: "pairs.reduce(\\u006f => ({...o, \\u006bey: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['\\u006bey', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['\\u006bey', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -445,7 +468,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// property name is not a reference.
 			{
 				Code: "pairs.reduce(o => Object.assign(o, {o: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['o', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['o', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -453,7 +476,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// comma before initial value.
 			{
 				Code: "pairs.reduce(o => ({...o, key}) /* retained */, {} /* retained */);", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key] /* retained */ /* retained */));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]] /* retained */ /* retained */));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -461,7 +484,7 @@ func TestPreferObjectFromEntriesASTBoundaries(t *testing.T) {
 			// comment outside callback.
 			{
 				Code: "pairs.reduce((/* retained */ o => ({...o, key}) /* retained */), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map((/* retained */ () => ['key', key] /* retained */)));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap((/* retained */ () => [['key', key]] /* retained */)));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},

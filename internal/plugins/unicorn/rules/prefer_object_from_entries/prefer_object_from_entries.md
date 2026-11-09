@@ -65,6 +65,15 @@ Add names or dotted paths of functions that convert pairs into an object.
 With this configuration, `utils.fromPairs(pairs)` is reported and fixed to
 `Object.fromEntries(pairs)`.
 
+## Differences from upstream
+
+- Autofixes for `reduce()` use `.flatMap()` to skip missing elements in sparse
+  arrays. A reduction over `[1, , 3]` still uses the original indices `0` and `2`.
+- TypeScript callbacks with a declared return type are reported without a fix.
+  A return type such as `Record<string, number>` describes the accumulator.
+  When converting the callback manually, update the return type to match the
+  array of key-value pairs returned by the new callback.
+
 ## Original documentation
 
 - [eslint-plugin-unicorn: prefer-object-from-entries](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/prefer-object-from-entries.md)

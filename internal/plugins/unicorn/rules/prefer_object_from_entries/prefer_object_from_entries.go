@@ -117,9 +117,12 @@ func reduceProperty(ctx rule.RuleContext, node *ast.Node) (unicornutil.DotMethod
 }
 
 func reduceFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, callback, property *ast.Node) []rule.RuleFix {
+	if len(call.Call.TypeArguments()) > 0 || callback.Type() != nil {
+		return nil
+	}
 	sf := ctx.SourceFile
 	callbackRange := utils.TrimNodeTextRange(sf, callback)
-	if len(call.Call.TypeArguments()) > 0 || utils.HasCommentInSpan(ctx.Comments.All(), callbackRange.Pos(), callbackRange.End()) {
+	if utils.HasCommentInSpan(ctx.Comments.All(), callbackRange.Pos(), callbackRange.End()) {
 		return nil
 	}
 	initialRange := utils.TrimNodeTextRange(sf, call.Call.Arguments()[1])
@@ -130,7 +133,7 @@ func reduceFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, callback,
 	fixes := []rule.RuleFix{
 		rule.RuleFixInsertBefore(sf, call.Call, "Object.fromEntries("),
 		rule.RuleFixInsertAfter(call.Call, ")"),
-		rule.RuleFixReplace(sf, call.Property, "map"),
+		rule.RuleFixReplace(sf, call.Property, "flatMap"),
 		rule.RuleFixRemoveRange(core.NewTextRange(comma.Start, initialRange.End())),
 	}
 	first := callback.AsArrowFunction().Parameters.Nodes[0]
@@ -155,7 +158,9 @@ func reduceFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, callback,
 		keyText = "'" + keyText + "'"
 	}
 	body := utils.ESTreeRuntimeExpression(callback.Body())
-	fixes = append(fixes, rule.RuleFixReplace(sf, body, "["+keyText+", "+utils.TrimmedNodeText(sf, value)+"]"))
+	// Emit one entry per callback invocation. flatMap skips holes and passes
+	// the original indices to the callback.
+	fixes = append(fixes, rule.RuleFixReplace(sf, body, "[["+keyText+", "+utils.TrimmedNodeText(sf, value)+"]]"))
 	// Remove only the surrounding parenthesis tokens, retaining their spacing.
 	for wrapper := callback.Body(); wrapper != body; wrapper = wrapper.Expression() {
 		wrapperRange := utils.TrimNodeTextRange(sf, wrapper)

@@ -1,3 +1,4 @@
+// Expected reduce fixes also remove sparse-array holes.
 // Ported from eslint-plugin-unicorn v79.0.0 tests and documentation; see LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-object-from-entries.js
 package prefer_object_from_entries_test
@@ -149,28 +150,28 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			// Upstream typed-array runtime regressions (lint and applied output).
 			{
 				Code: "JSON.stringify([1, 2].reduce((object, value) => ({...object, [value]: value}), {}));", FileName: "case.js",
-				Output: []string{"JSON.stringify(Object.fromEntries([1, 2].map((value) => [value, value])));"},
+				Output: []string{"JSON.stringify(Object.fromEntries([1, 2].flatMap((value) => [[value, value]])));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 23, EndLine: 1, EndColumn: 29},
 				},
 			},
 			{
 				Code: "JSON.stringify(new Array(1, 2).reduce((object, value) => ({...object, [value]: value}), {}));", FileName: "case.js",
-				Output: []string{"JSON.stringify(Object.fromEntries(new Array(1, 2).map((value) => [value, value])));"},
+				Output: []string{"JSON.stringify(Object.fromEntries(new Array(1, 2).flatMap((value) => [[value, value]])));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 32, EndLine: 1, EndColumn: 38},
 				},
 			},
 			{
 				Code: "JSON.stringify(Array.from([1, 2]).reduce((object, value) => ({...object, [value]: value}), {}));", FileName: "case.js",
-				Output: []string{"JSON.stringify(Object.fromEntries(Array.from([1, 2]).map((value) => [value, value])));"},
+				Output: []string{"JSON.stringify(Object.fromEntries(Array.from([1, 2]).flatMap((value) => [[value, value]])));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 35, EndLine: 1, EndColumn: 41},
 				},
 			},
 			{
 				Code: "JSON.stringify(Array.of(1, 2).reduce((object, value) => ({...object, [value]: value}), {}));", FileName: "case.js",
-				Output: []string{"JSON.stringify(Object.fromEntries(Array.of(1, 2).map((value) => [value, value])));"},
+				Output: []string{"JSON.stringify(Object.fromEntries(Array.of(1, 2).flatMap((value) => [[value, value]])));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 31, EndLine: 1, EndColumn: 37},
 				},
@@ -178,7 +179,7 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			// test.snapshot: reduce and for-of.
 			{
 				Code: "pairs.reduce(object => ({...object, key}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -191,238 +192,238 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, key}), {},);", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key],));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]],));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, key,}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, key}), (( {} )));", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce( (( object => ({...object, key}) )) , {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map( (( () => ['key', key] )) ));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce( (( (object) => ({...object, key}) )) , {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map( (( () => ['key', key] )) ));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce( (( (object,) => ({...object, key}) )) , {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map( (( () => ['key', key] )) ));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap( (( () => [['key', key]] )) ));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [((key))] : ((value))}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [((key)), ((value))]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[((key)), ((value))]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "((\n\t(( pairs ))\n\t.reduce(\n\t\t((\n\t\t\t(object,) => ((\n\t\t\t\t((\n\t\t\t\t\tObject\n\t\t\t\t)).assign(\n\t\t\t\t\t((\n\t\t\t\t\t\tobject\n\t\t\t\t\t)),\n\t\t\t\t\t(({\n\t\t\t\t\t\t[ ((key)) ] : ((value)),\n\t\t\t\t\t}))\n\t\t\t\t)\n\t\t\t))\n\t\t)),\n\t\t({})\n\t)\n));", FileName: "case.js",
-				Output: []string{"((\n\tObject.fromEntries((( pairs ))\n\t.map(\n\t\t((\n\t\t\t() => \n\t\t\t\t[((key)), ((value))]\n\t\t\t\n\t\t))\n\t))\n));"},
+				Output: []string{"((\n\tObject.fromEntries((( pairs ))\n\t.flatMap(\n\t\t((\n\t\t\t() => \n\t\t\t\t[[((key)), ((value))]]\n\t\t\t\n\t\t))\n\t))\n));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 3, Column: 3, EndLine: 3, EndColumn: 9},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, 0: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [0, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[0, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, true: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['true', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['true', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, 0n: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [0n, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[0n, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, undefined: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['undefined', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['undefined', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, null: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['null', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['null', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, var: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['var', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['var', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, for: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['for', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['for', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, default: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['default', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['default', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, string: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['string', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['string', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, \"string\": value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [\"string\", value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[\"string\", value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [0]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [0, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[0, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [true]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [true, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[true, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [0n]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [0n, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[0n, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [undefined]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [undefined, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[undefined, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [null]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [null, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[null, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [\"for\"]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [\"for\", value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[\"for\", value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [string]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [string, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[string, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, [\"string\"]: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [\"string\", value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[\"string\", value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => Object.assign(object, {key}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => Object.assign(object, {key,}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => Object.assign(object, {[key]: value,}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => [key, value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [[key, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce((object, element, index, array) => ({...object, key}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map((element, index, array) => ['key', key]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap((element, index, array) => [['key', key]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce((object, [key, value], index, array,) => ({...object, [key]: value + index + array.length}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(([key, value], index, array,) => [key, value + index + array.length]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(([key, value], index, array,) => [[key, value + index + array.length]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, key: function (object) { return object; }}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['key', function (object) { return object; }]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['key', function (object) { return object; }]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, method: async () => {}}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['method', async () => {}]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['method', async () => {}]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
 			},
 			{
 				Code: "pairs.reduce(object => ({...object, method: async function * (){}}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['method', async function * (){}]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['method', async function * (){}]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -576,7 +577,7 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			// test: prototype properties and comments.
 			{
 				Code: "pairs.reduce(object => ({...object, ['__proto__']: value}), {});", FileName: "case.js",
-				Output: []string{"Object.fromEntries(pairs.map(() => ['__proto__', value]));"},
+				Output: []string{"Object.fromEntries(pairs.flatMap(() => [['__proto__', value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 7, EndLine: 1, EndColumn: 13},
 				},
@@ -595,14 +596,14 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			},
 			{
 				Code: "const object = pairs.reduce((object, [key, value]) => ({...object, [key]: value}), {});", FileName: "case.js",
-				Output: []string{"const object = Object.fromEntries(pairs.map(([key, value]) => [key, value]));"},
+				Output: []string{"const object = Object.fromEntries(pairs.flatMap(([key, value]) => [[key, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 28},
 				},
 			},
 			{
 				Code: "const object = pairs.reduce((object, element, index, array) => ({...object, [key]: value}), {});", FileName: "case.js",
-				Output: []string{"const object = Object.fromEntries(pairs.map((element, index, array) => [key, value]));"},
+				Output: []string{"const object = Object.fromEntries(pairs.flatMap((element, index, array) => [[key, value]]));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 28},
 				},
@@ -618,14 +619,14 @@ func TestPreferObjectFromEntriesUpstream(t *testing.T) {
 			// Documentation examples.
 			{
 				Code: "const object = pairs.reduce(\n\t(object, [key, value]) => ({...object, [key]: value}),\n\t{}\n);", FileName: "case.js",
-				Output: []string{"const object = Object.fromEntries(pairs.map(\n\t([key, value]) => [key, value]\n));"},
+				Output: []string{"const object = Object.fromEntries(pairs.flatMap(\n\t([key, value]) => [[key, value]]\n));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 28},
 				},
 			},
 			{
 				Code: "const object = pairs.reduce(\n\t(object, [key, value]) => Object.assign(object, {[key]: value}),\n\t{}\n);", FileName: "case.js",
-				Output: []string{"const object = Object.fromEntries(pairs.map(\n\t([key, value]) => [key, value]\n));"},
+				Output: []string{"const object = Object.fromEntries(pairs.flatMap(\n\t([key, value]) => [[key, value]]\n));"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "reduce", Message: "Prefer `Object.fromEntries()` over `Array#reduce()`.", Line: 1, Column: 22, EndLine: 1, EndColumn: 28},
 				},
