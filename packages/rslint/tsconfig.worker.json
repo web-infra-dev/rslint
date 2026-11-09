@@ -3,6 +3,8 @@
   "references": [{ "path": "./compiler-syntax" }],
   "compilerOptions": {
     "types": ["node"],
+    "declarationDir": "${configDir}/node_modules/.cache/rslint-core-worker-dts",
+    "emitDeclarationOnly": true,
     "paths": {
       "#enums/*": [
         "../../typescript-go/packages/typescript/src/enums/*.enum.ts"
