@@ -128,14 +128,7 @@ func hasUnsafeLiftReference(ctx rule.RuleContext, test, body *ast.Node) bool {
 }
 
 func hasDirectEval(node *ast.Node) bool {
-	if ast.IsCallExpression(node) && node.AsCallExpression().QuestionDotToken == nil {
-		callee := ast.SkipOuterExpressions(node.Expression(), ast.OEKAll)
-		// Even a local binding named eval can hold the intrinsic eval function.
-		if ast.IsIdentifier(callee) && callee.AsIdentifier().Text == "eval" {
-			return true
-		}
-	}
-	return node.ForEachChild(hasDirectEval)
+	return unicornutil.IsDirectEvalCall(node) || node.ForEachChild(hasDirectEval)
 }
 
 func loopConditionText(ctx rule.RuleContext, test *ast.Node) string {
