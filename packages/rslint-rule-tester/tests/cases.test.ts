@@ -83,14 +83,15 @@ describe('checkInvalidCase', () => {
 });
 
 describe('checkSkip', () => {
-  test('accepts no skip and a stated reason', () => {
+  test('accepts no skip, an undefined skip and a stated reason', () => {
     expect(() => {
       checkSkip({});
+      checkSkip({ skip: undefined });
       checkSkip({ skip: 'tsgo rejects this syntax' });
     }).not.toThrow();
   });
 
-  test.each(['', '  ', undefined])('rejects skip %j', (skip) => {
+  test.each(['', '  ', false, null])('rejects skip %j', (skip) => {
     expect(() => {
       checkSkip({ skip });
     }).toThrow("'skip' must be a non-empty reason");

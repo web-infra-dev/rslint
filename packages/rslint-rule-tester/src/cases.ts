@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 
-/** Requires a skipped case to state why. */
+/**
+ * Requires a skipped case to state why. `undefined` means the case runs, so
+ * a case can skip conditionally.
+ */
 export function checkSkip(item: { skip?: unknown }): void {
-  if (!Object.hasOwn(item, 'skip')) return;
+  if (item.skip === undefined) return;
   assert.ok(
     typeof item.skip === 'string' && item.skip.trim() !== '',
     "Test case property 'skip' must be a non-empty reason",
