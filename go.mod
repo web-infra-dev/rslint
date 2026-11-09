@@ -11,6 +11,7 @@ replace (
 	github.com/microsoft/TypeScript/tsc/shim/checker => ./shim/checker
 	github.com/microsoft/TypeScript/tsc/shim/collections => ./shim/collections
 	github.com/microsoft/TypeScript/tsc/shim/compiler => ./shim/compiler
+	github.com/microsoft/TypeScript/tsc/shim/contentmapper => ./shim/contentmapper
 	github.com/microsoft/TypeScript/tsc/shim/core => ./shim/core
 	github.com/microsoft/TypeScript/tsc/shim/diagnostics => ./shim/diagnostics
 	github.com/microsoft/TypeScript/tsc/shim/evaluator => ./shim/evaluator
@@ -45,6 +46,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/checker v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/collections v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/compiler v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/contentmapper v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/core v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/diagnostics v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/evaluator v0.0.0-00010101000000-000000000000

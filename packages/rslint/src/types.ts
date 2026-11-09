@@ -119,6 +119,10 @@ export interface LintOptions {
   // Rules and languageOptions live in the config entries — there is no
   // separate ruleOptions / languageOptions override surface.
   fix?: boolean;
+  // Run the content mappers that tsconfig files declare (tsc's
+  // --runExternalCode). Each mapper is an npm package started as a child
+  // process for the request.
+  runExternalCode?: boolean;
 }
 
 export interface RSlintOptions {

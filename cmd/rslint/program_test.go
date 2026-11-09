@@ -30,7 +30,7 @@ func TestGate_LinterFiltersTypeAwareRuleOnSourceOnlyProgram(t *testing.T) {
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	fs = utils.NewOverlayVFS(fs, map[string]string{targetFile: "let a: any = 10;\na.b = 20;\n"})
 
-	programSession := loader.NewSession(fs)
+	programSession := loader.NewSession(fs, nil)
 	loaded, err := programSession.LoadCLI(
 		loader.ProjectSet{},
 		target.Plan{Files: []target.File{{PathIdentity: rslintconfig.PathIdentity{Path: targetFile,

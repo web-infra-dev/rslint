@@ -247,6 +247,7 @@ func TestStandaloneLintProjectRequestReusesParsedConfigSnapshot(t *testing.T) {
 			},
 		},
 		fs,
+		nil,
 	)
 	metadata, err := request.metadata(configPath)
 	if err != nil {
@@ -299,7 +300,7 @@ func TestStandaloneLintProjectRequestKeepsReferenceSnapshot(t *testing.T) {
 	}
 	fsys := bundled.WrapFS(osvfs.FS())
 	target := lspConfigTarget(tspath.ResolvePath(directory, "app/target.ts"), directory, fsys)
-	request := newStandaloneLintProjectRequestWithFS(target, fsys)
+	request := newStandaloneLintProjectRequestWithFS(target, fsys, nil)
 
 	metadata, err := request.metadata(rootPath)
 	if err != nil {
@@ -346,11 +347,11 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 		files[tspath.ResolvePath("c:/Repo", name)] = string(content)
 	}
 	fsys := utils.NewOverlayVFS(&caseInsensitiveLSPTestFS{}, files)
-	upper, err := parseStandaloneLintProject("C:/Repo/tsconfig.json", fsys, fsys)
+	upper, err := parseStandaloneLintProject("C:/Repo/tsconfig.json", fsys, fsys, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lower, err := parseStandaloneLintProject("c:/Repo/tsconfig.json", fsys, fsys)
+	lower, err := parseStandaloneLintProject("c:/Repo/tsconfig.json", fsys, fsys, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +361,7 @@ func TestLintProjectSnapshotNormalizesWindowsDrive(t *testing.T) {
 	if !lintProjectSnapshotsEqual(upper.commandLine, lower.commandLine, fsys) {
 		t.Fatal("Drive normalization made unchanged roots or path options incompatible")
 	}
-	request := newStandaloneLintProjectRequestWithFS(lspConfigTarget("c:/Repo/target.ts", "c:/Repo", fsys), fsys)
+	request := newStandaloneLintProjectRequestWithFS(lspConfigTarget("c:/Repo/target.ts", "c:/Repo", fsys), fsys, nil)
 	program, _, err := request.program(lower)
 	if err != nil {
 		t.Fatal(err)
@@ -468,7 +469,7 @@ func TestDocumentProjectPolicyPreservesSymlinkDeclarationPath(t *testing.T) {
 	if len(paths) != 1 || paths[0] != tspath.NormalizePath(aliasConfig) {
 		t.Fatalf("resolved project paths = %v, want lexical %q", paths, aliasConfig)
 	}
-	metadata, err := parseStandaloneLintProject(paths[0], fs, fs)
+	metadata, err := parseStandaloneLintProject(paths[0], fs, fs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,7 +747,7 @@ func TestSelectConfiguredLintProjectServiceDoesNotProbePrograms(t *testing.T) {
 			directory := tspath.NormalizePath(archive.Materialize(t, test.fixture))
 			fsys := bundled.WrapFS(osvfs.FS())
 			target := lspConfigTarget(tspath.ResolvePath(directory, test.file), directory, fsys)
-			request := newStandaloneLintProjectRequestWithFS(target, fsys)
+			request := newStandaloneLintProjectRequestWithFS(target, fsys, nil)
 
 			loaders := request.loaders()
 			var built []string
@@ -796,7 +797,7 @@ func TestProjectServiceLSPDoesNotUseIndirectMembership(t *testing.T) {
 		Rules:           config.Rules{"no-debugger": "error"},
 	}}
 	snapshot := documentLintSnapshotForTest(server, uri, entries, directory, false, nil)
-	request := newStandaloneLintProjectRequestWithFS(snapshot.target, server.fs)
+	request := newStandaloneLintProjectRequestWithFS(snapshot.target, server.fs, nil)
 	provider := &documentGenerationProvider{
 		server: server, uri: uri, snapshot: snapshot,
 		requestPrograms: func(context.Context, lsproto.DocumentUri, target.File) (lintProjectLoaders, linter.ReleaseFunc) {

@@ -51,6 +51,7 @@ func main() {
 		"bundled",
 		"checker",
 		"compiler",
+		"contentmapper",
 		"core",
 		"diagnostics",
 		"evaluator",

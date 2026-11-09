@@ -32,7 +32,7 @@ func TestFreezeProgramRootIdentitiesUsesTargetHintsAndCanonicalUnion(t *testing.
 	second := createBindingIndexTestProgram(t, fsys, physicalA, missing)
 	fsys.resetCalls()
 
-	identities, err := NewSession(fsys).FreezeProgramRootIdentities(
+	identities, err := NewSession(fsys, nil).FreezeProgramRootIdentities(
 		[]*lintprogram.Program{
 			lintprogram.NewFromCompiler(first),
 			lintprogram.NewFromCompiler(second),
@@ -80,7 +80,7 @@ func TestFreezeProgramRootIdentitiesSkipsSourceOnlyPrograms(t *testing.T) {
 	zeroValue := &lintprogram.Program{}
 	fsys.resetCalls()
 
-	identities, err := NewSession(fsys).FreezeProgramRootIdentities(
+	identities, err := NewSession(fsys, nil).FreezeProgramRootIdentities(
 		[]*lintprogram.Program{
 			nil,
 			zeroValue,
@@ -319,7 +319,7 @@ func TestFreezeProgramRootIdentitiesProtectsCanonicalTargetIdentity(t *testing.T
 	fsys := newBindingIndexTestFS([]string{rootPath}, nil)
 	program := createBindingIndexTestProgram(t, fsys, rootPath)
 
-	identities, err := NewSession(fsys).FreezeProgramRootIdentities(
+	identities, err := NewSession(fsys, nil).FreezeProgramRootIdentities(
 		[]*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		[]target.File{
 			{PathIdentity: rslintconfig.PathIdentity{Path: rootPath, CanonicalPath: otherCanonical}},
@@ -348,7 +348,7 @@ func TestFreezeProgramRootIdentitiesResolvesWithoutTargetPlan(t *testing.T) {
 	program := createBindingIndexTestProgram(t, fsys, aliasPath)
 	fsys.resetCalls()
 
-	identities, err := NewSession(fsys).FreezeProgramRootIdentities(
+	identities, err := NewSession(fsys, nil).FreezeProgramRootIdentities(
 		[]*lintprogram.Program{lintprogram.NewFromCompiler(program)},
 		nil,
 		true,

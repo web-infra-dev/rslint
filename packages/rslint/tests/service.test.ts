@@ -331,6 +331,18 @@ describe('RSLintService reverse lint request scoping', () => {
     }
   });
 
+  test('forwards runExternalCode', async () => {
+    const backend = new ReverseLintBackend();
+    const service = new RSLintService(backend);
+
+    await service.lint(
+      { files: ['/work/a.ts'], runExternalCode: true },
+      { pluginLint: () => ({ diagnostics: [] }) },
+    );
+    expect(backend.lintPayloads[0]).toMatchObject({ runExternalCode: true });
+    await service.close();
+  });
+
   test('serializes concurrent lint frames so handlers cannot overwrite each other', async () => {
     const backend = new GatedReverseLintBackend();
     const service = new RSLintService(backend);
