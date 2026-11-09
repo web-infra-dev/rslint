@@ -178,8 +178,8 @@ catalogs:
       specifier: ^4.3.3
       version: 4.3.3
     tinybench:
-      specifier: ^6.1.1
-      version: 6.1.1
+      specifier: ^6.2.3
+      version: 6.2.3
     tw-animate-css:
       specifier: ^1.4.0
       version: 1.4.0
@@ -458,7 +458,7 @@ importers:
     devDependencies:
       '@codspeed/tinybench-plugin':
         specifier: 'catalog:'
-        version: 5.7.1(tinybench@6.1.1)
+        version: 5.7.1(tinybench@6.2.3)
       '@rslint/core':
         specifier: workspace:*
         version: link:../../packages/rslint
@@ -467,7 +467,7 @@ importers:
         version: 26.6.5
       tinybench:
         specifier: 'catalog:'
-        version: 6.1.1
+        version: 6.2.3
 
   website:
     dependencies:
@@ -4851,8 +4851,8 @@ packages:
     resolution: {integrity: sha512-9phl76Cqm6FhSX9Xe1ZUAMLtm1BLkKj2Qd5ApyWkXzsMRaA7dgr81kf4wJmQf/hAvg8EEyJxDo3du/0KlhPiKQ==}
     engines: {node: '>=0.6.0'}
 
-  tinybench@6.1.1:
-    resolution: {integrity: sha512-SDN4WuaFCTe7tT1sE6XqCW7J3kZctHdRGkHwVbTdeOyIOuMG2x9GwJudu7Kupv9rT2TfbhIyTiyiuXIQspAepA==}
+  tinybench@6.2.3:
+    resolution: {integrity: sha512-Al01C2JIBnO2CXCAPbpAl6sUiOZHeThGtHYNTa51JRw9PyWOCdr+9Ong05R4qg/Sk3+H645E8ov1h2c58ityNw==}
     engines: {node: '>=20.0.0'}
 
   tinyglobby@0.2.17:
@@ -5131,10 +5131,10 @@ snapshots:
       - debug
       - supports-color
 
-  '@codspeed/tinybench-plugin@5.7.1(tinybench@6.1.1)':
+  '@codspeed/tinybench-plugin@5.7.1(tinybench@6.2.3)':
     dependencies:
       '@codspeed/core': 5.7.1
-      tinybench: 6.1.1
+      tinybench: 6.2.3
     transitivePeerDependencies:
       - debug
       - supports-color
@@ -9624,7 +9624,7 @@ snapshots:
     dependencies:
       setimmediate: 1.0.5
 
-  tinybench@6.1.1: {}
+  tinybench@6.2.3: {}
 
   tinyglobby@0.2.17:
     dependencies:
