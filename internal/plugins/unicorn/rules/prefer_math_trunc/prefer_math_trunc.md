@@ -53,13 +53,21 @@ function truncate(Math, value) {
 }
 ```
 
-Rslint also omits the suggestion for a compound assignment whose target calls a
-tagged template. The rewrite would call the tag twice. To rewrite this example,
-compute the index once and use the result in the assignment.
+Rslint keeps the diagnostic and omits the suggestion when a compound assignment
+could call a getter or a template tag twice while evaluating its target. Store
+the receiver or index in a variable to evaluate it once. A direct target such as
+`object.value |= 0` still receives a suggestion when its receiver is safe to
+evaluate twice.
 
 ```javascript
+object.items[0] |= 0;
+object[indices.current] |= 0;
 values[key`index`] |= 0;
 ```
+
+Rslint skips double bitwise NOT on operands known to be BigInts, such as `~~1n`,
+`~~(-1n)`, and `~~BigInt(1)`. BigInts are already integers, and `Math.trunc()`
+throws if passed a BigInt.
 
 ## Original documentation
 

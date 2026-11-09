@@ -18,6 +18,8 @@ import (
 func TestPreferMathTruncExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
 		{Code: `0 | value; value >>> 0; value &= 0; value | 0n; value | "0";`, FileName: "input.js"},
+		{Code: `~~1n; ~~((1n)); ~~(-(1n)); ~~BigInt(1); ~~(1n + 2n);`, FileName: "input.js"},
+		{Code: `~~(-(1n as bigint));`, FileName: "input.ts"},
 		{Code: `value | 5e-324; parseInt(String(value), 10.000000000000002);`, FileName: "input.js"},
 		{Code: `parseInt(String?.(value), 10); (Number?.parseInt)(String(value), 10); parseInt(String(value), +10);`, FileName: "input.js"},
 		{Code: `~(~value as number); value | (0 as number); parseInt(String(value) as string, 10); (parseInt as typeof parseInt)(String(value), 10);`, FileName: "input.ts"},
@@ -49,6 +51,20 @@ func TestPreferMathTruncExtras(t *testing.T) {
 			truncationError("bitwise", "|= 0", 1, 1, 1, 13, ""),
 			truncationError("bitwise", ">>= 0", 1, 15, 1, 36, ""),
 			truncationError("bitwise", "<<= 0", 1, 38, 1, 63, "")),
+		truncationCase("input.js", `let reads = 0;
+const first = [3.9];
+const second = [8.9];
+const object = { get items() { return reads++ === 0 ? first : second; } };
+object.items[0] |= 0;`,
+			truncationError("bitwise", "|= 0", 5, 1, 5, 21, "")),
+		truncationCase("input.js", `object[indices.current] >>= 0;`,
+			truncationError("bitwise", ">>= 0", 1, 1, 1, 30, "")),
+		truncationCase("input.js", `object.value |= 0;`,
+			truncationError("bitwise", "|= 0", 1, 1, 1, 18, `object.value = Math.trunc(object.value);`)),
+		truncationCase("input.js", `const result = ~~(-1.5);`,
+			truncationError("bitwise-not", "~~", 1, 16, 1, 24, `const result = Math.trunc(-1.5);`)),
+		truncationCase("input.js", `function f(BigInt) { return ~~BigInt(1); }`,
+			truncationError("bitwise-not", "~~", 1, 29, 1, 40, `function f(BigInt) { return Math.trunc(BigInt(1)); }`)),
 		// Upstream would duplicate the tagged template call in its suggestion.
 		truncationCase("input.js", "values[key`index`] |= 0;",
 			truncationError("bitwise", "|= 0", 1, 1, 1, 24, "")),

@@ -1,6 +1,8 @@
 package prefer_math_trunc
 
 import (
+	"math/big"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -42,10 +44,8 @@ func checkBitwise(ctx *rule.RuleContext, node *ast.Node) {
 		if !ast.IsAssignmentOperator(operator.Kind) {
 			return replaceWithTruncatedOperand(ctx, node, sourceRange, left)
 		}
-		// The assignment repeats its target. The shared side-effect check also
-		// catches tagged template calls, which upstream's check can overlook.
 		if utils.HasCommentInSpan(ctx.Comments.All(), sourceRange.Pos(), sourceRange.End()) ||
-			utils.NewStaticStringEvaluatorWithoutScope().HasSideEffect(left, false) {
+			assignmentTargetHasSideEffect(left) {
 			return nil
 		}
 		return []rule.RuleFix{
@@ -53,6 +53,17 @@ func checkBitwise(ctx *rule.RuleContext, node *ast.Node) {
 			rule.RuleFixReplace(ctx.SourceFile, right, truncCallForOperand(ctx, left)),
 		}
 	})
+}
+
+func assignmentTargetHasSideEffect(target *ast.Node) bool {
+	target = utils.SkipAssertionsAndParens(target)
+	evaluator := utils.NewStaticStringEvaluatorWithoutScope()
+	if receiver, key := utils.MemberExpressionParts(target); receiver != nil {
+		// The rewrite evaluates the receiver and computed key twice, while
+		// reading the final property value once.
+		return evaluator.HasSideEffect(receiver, true) || evaluator.HasSideEffect(key, true)
+	}
+	return evaluator.HasSideEffect(target, true)
 }
 
 func checkDoubleNot(ctx *rule.RuleContext, node *ast.Node) {
@@ -65,12 +76,35 @@ func checkDoubleNot(ctx *rule.RuleContext, node *ast.Node) {
 		return
 	}
 	operand := inner.AsPrefixUnaryExpression().Operand
-	if isBitwiseNot(utils.ESTreeRuntimeExpression(operand)) {
+	if isBitwiseNot(utils.ESTreeRuntimeExpression(operand)) || isKnownBigInt(ctx, operand) {
 		return
 	}
 	report(ctx, node, "bitwise-not", "~~", nil, func(sourceRange core.TextRange) []rule.RuleFix {
 		return replaceWithTruncatedOperand(ctx, node, sourceRange, operand)
 	})
+}
+
+func isKnownBigInt(ctx *rule.RuleContext, operand *ast.Node) bool {
+	operand = utils.SkipAssertionsAndParens(operand)
+	if operand == nil {
+		return false
+	}
+	// Bitwise NOT preserves BigInt, which Math.trunc rejects.
+	switch operand.Kind {
+	case ast.KindBigIntLiteral:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		unary := operand.AsPrefixUnaryExpression()
+		return (unary.Operator == ast.KindMinusToken || unary.Operator == ast.KindTildeToken) && isKnownBigInt(ctx, unary.Operand)
+	case ast.KindCallExpression:
+		return !ast.IsOptionalChainRoot(operand) && isGlobalIdentifier(ctx, utils.ESTreeCallCallee(operand.Expression()), "BigInt")
+	case ast.KindBinaryExpression, ast.KindConditionalExpression:
+		value, _ := utils.NewStaticStringEvaluatorWithoutScope().EvalValue(operand)
+		_, isBigInt := value.(*big.Int)
+		return isBigInt
+	default:
+		return false
+	}
 }
 
 func checkParseInt(ctx *rule.RuleContext, node *ast.Node) {

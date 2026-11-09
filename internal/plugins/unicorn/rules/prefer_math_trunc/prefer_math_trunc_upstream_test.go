@@ -408,11 +408,10 @@ foo |= 0;`,
 						`let foo = 2;
 foo = Math.trunc(foo);`),
 				),
+				// Rslint withholds the upstream suggestion because it repeats the read of foo.a.
 				truncationCase("input.js", `const foo = {a: {b: 3.4}};
 foo.a.b |= 0;`,
-					truncationError("bitwise", "|= 0", 2, 1, 2, 13,
-						`const foo = {a: {b: 3.4}};
-foo.a.b = Math.trunc(foo.a.b);`),
+					truncationError("bitwise", "|= 0", 2, 1, 2, 13, ""),
 				),
 				truncationCase("input.js", `const foo = 10.01;
 const bar = ~~foo;`,
