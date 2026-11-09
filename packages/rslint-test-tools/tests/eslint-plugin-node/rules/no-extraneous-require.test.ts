@@ -91,52 +91,42 @@ tester.run('no-extraneous-require', {
     {
       filename: 'dependencies/a.js',
       code: "$.require('bbb')",
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('./bbb')",
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: 'require(bbb)',
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('aaa')",
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('aaa/bbb')",
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('@bbb/aaa')",
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('@bbb/aaa/bbb')",
-      errors: [],
     },
     {
       filename: 'devDependencies/a.js',
       code: "require('aaa')",
-      errors: [],
     },
     {
       filename: 'peerDependencies/a.js',
       code: "require('aaa')",
-      errors: [],
     },
     {
       filename: 'optionalDependencies/a.js',
       code: "require('aaa')",
-      errors: [],
     },
     {
       filename: 'workspace/packages/app/src/index.js',
@@ -146,7 +136,6 @@ tester.run('no-extraneous-require', {
           tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
       },
-      errors: [],
     },
     {
       filename: 'workspace-object/packages/app/src/index.js',
@@ -156,7 +145,6 @@ tester.run('no-extraneous-require', {
           tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
       },
-      errors: [],
     },
     {
       filename: 'workspace-nested/inner/packages/app/src/index.js',
@@ -166,22 +154,18 @@ tester.run('no-extraneous-require', {
           tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
       },
-      errors: [],
     },
     {
       filename: 'dependencies/a.js',
       code: "require('ccc')",
-      errors: [],
     },
     {
       filename: 'test.js',
       code: "require('virtual:package-name');",
-      errors: [],
     },
     {
       filename: 'test.js',
       code: "require('virtual:package-scope/name');",
-      errors: [],
     },
   ],
   invalid: [

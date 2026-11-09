@@ -4,7 +4,11 @@
  * See LICENSE file in root directory for full license.
  */
 
-import { RuleTester, type TestCase } from '@rslint/rule-tester';
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
 
 // The package metadata mirrors tests/fixtures/shebang at eslint-plugin-n v18.3.0.
 const packages = {
@@ -48,7 +52,7 @@ function expandErrors(item: TestCase): TestCase {
 }
 
 // Relative upstream filenames point into the shebang fixture directory.
-function fixtureRelative(item: TestCase): TestCase {
+function fixtureRelative<T extends ValidTestCase | TestCase>(item: T): T {
   return {
     ...item,
     filename: item.filename?.replace(/^tests\/fixtures\/shebang\//, ''),
@@ -56,7 +60,7 @@ function fixtureRelative(item: TestCase): TestCase {
 }
 
 const ruleTester = {
-  run(name: string, cases: { valid: TestCase[]; invalid: TestCase[] }) {
+  run(name: string, cases: { valid: ValidTestCase[]; invalid: TestCase[] }) {
     new RuleTester({
       plugin: 'node',
       fixtureFiles: Object.fromEntries(

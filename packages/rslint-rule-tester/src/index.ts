@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
+import { checkValidCase } from './cases.ts';
 import { checkSuggestions, type ExpectedSuggestion } from './suggestions.ts';
 
 export type { ExpectedSuggestion } from './suggestions.ts';
@@ -35,6 +36,12 @@ export interface TestCase {
   output?: string;
 }
 
+/** A valid case expects no diagnostics, so it carries no expectations. */
+export interface ValidTestCase extends Omit<TestCase, 'errors' | 'output'> {
+  errors?: never;
+  output?: never;
+}
+
 export interface RuleTesterConfig {
   /** Plugin name, used as the rule-name prefix. */
   plugin: string;
@@ -46,7 +53,10 @@ export interface RuleTesterConfig {
 export class RuleTester {
   constructor(private readonly config: RuleTesterConfig) {}
 
-  run(name: string, cases: { valid: TestCase[]; invalid: TestCase[] }): void {
+  run(
+    name: string,
+    cases: { valid: ValidTestCase[]; invalid: TestCase[] },
+  ): void {
     const { plugin, fixtureFiles = {}, languageOptions } = this.config;
     const ruleName = `${plugin}/${name}`;
     describe(ruleName, () => {
@@ -74,11 +84,15 @@ export class RuleTester {
           });
         }
       });
-      for (const [kind, entries] of Object.entries(cases)) {
+      for (const [kind, entries] of Object.entries(cases) as [
+        string,
+        TestCase[],
+      ][]) {
         entries.forEach((item, index) => {
           const run = item.skip ? test.skip : test;
           const label = item.skip ?? item.name;
           run(`${kind} ${index}${label ? `: ${label}` : ''}`, async () => {
+            if (kind === 'valid') checkValidCase(item);
             const filename = path.join(root, item.filename ?? 'input.js');
             const request = {
               configDirectory: root,

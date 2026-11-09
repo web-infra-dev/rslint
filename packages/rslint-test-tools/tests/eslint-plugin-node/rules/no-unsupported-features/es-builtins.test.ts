@@ -1334,15 +1334,17 @@ const patterns: ({ keyword: string } & Cases)[] = [
 
 const ruleTester = new RuleTester({ plugin: 'node' });
 for (const pattern of patterns) {
-  const ignored = pattern.invalid.map(({ errors: _errors, ...item }) => ({
-    ...item,
-    options: [
-      {
-        ...(item.options as Record<string, unknown>[] | undefined)?.[0],
-        ignores: [pattern.keyword],
-      },
-    ],
-  }));
+  const ignored = pattern.invalid.map(
+    ({ errors: _errors, output: _output, ...item }) => ({
+      ...item,
+      options: [
+        {
+          ...(item.options as Record<string, unknown>[] | undefined)?.[0],
+          ignores: [pattern.keyword],
+        },
+      ],
+    }),
+  );
   ruleTester.run('no-unsupported-features/es-builtins', {
     valid: [...pattern.valid, ...ignored].map((item) => ({
       ...item,
