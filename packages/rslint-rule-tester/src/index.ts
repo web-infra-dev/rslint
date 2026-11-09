@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, test } from 'rstack/test';
 import type { LanguageOptions } from '@rslint/core';
 import { lint } from '@rslint/core/internal';
-import { checkValidCase } from './cases.ts';
+import { checkExpectedError, checkValidCase } from './cases.ts';
 import { checkSuggestions, type ExpectedSuggestion } from './suggestions.ts';
 
 export type { ExpectedSuggestion } from './suggestions.ts';
@@ -31,8 +31,7 @@ export interface TestCase {
   options?: unknown[] | ((root: string) => unknown[]);
   settings?: Record<string, unknown>;
   languageOptions?: LanguageOptions;
-  /** A string compares only the message text. */
-  errors?: (string | ExpectedError)[];
+  errors?: ExpectedError[];
   output?: string;
 }
 
@@ -141,17 +140,10 @@ export class RuleTester {
             expect(result.ruleCount).toBe(1);
             expect(result.diagnostics).toHaveLength(item.errors?.length ?? 0);
             for (const [i, expected] of (item.errors ?? []).entries()) {
+              checkExpectedError(expected, i);
               const diagnostic = result.diagnostics[i];
               expect(diagnostic.ruleName).toBe(ruleName);
-              checkSuggestions(
-                item.code,
-                diagnostic,
-                typeof expected === 'string' ? undefined : expected.suggestions,
-              );
-              if (typeof expected === 'string') {
-                expect(diagnostic.message).toBe(expected);
-                continue;
-              }
+              checkSuggestions(item.code, diagnostic, expected.suggestions);
               expect(diagnostic.message).toBe(
                 typeof expected.message === 'function'
                   ? expected.message(root.replaceAll('\\', '/'))
