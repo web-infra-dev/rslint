@@ -406,9 +406,8 @@ for (const [key, { index, tags }] of [
   ...locales,
 ]) {
   const tag = tags[0];
-  const strings = corpus(tables[index], 0xbeef + index, 100).filter(
-    (s) => !/[\x00-\x1f\x7f]/.test(s),
-  );
+  // The corpus is printable ASCII, so it has no ignorable characters.
+  const strings = corpus(tables[index], 0xbeef + index, 100);
   const suffixes = ['', 'kf-upper', 'kf-lower'];
   if (key === 'root' || tag === 'da') suffixes.push('kn');
   for (const suffix of suffixes) {
@@ -422,10 +421,15 @@ for (const [key, { index, tags }] of [
     golden.push({ locale: oracleTag, sorted });
   }
 }
+const goldenFile = resolve(outDir, 'testdata/locale_collation_golden.json');
 await writeFile(
-  resolve(outDir, 'testdata/locale_collation_golden.json'),
+  goldenFile,
   `[\n${golden.map((entry) => JSON.stringify(entry)).join(',\n')}\n]\n`,
 );
+execFileSync('pnpm', ['exec', 'rs', 'fmt', goldenFile], {
+  cwd: resolve(import.meta.dirname, '..'),
+  stdio: 'ignore',
+});
 
 console.log(`tables: ${tables.length}, locales: ${locales.size}`);
 if (skipped.length) console.log(`skipped:\n  ${skipped.join('\n  ')}`);
