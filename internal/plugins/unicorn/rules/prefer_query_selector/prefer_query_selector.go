@@ -173,7 +173,7 @@ func getFirstElementAccess(ctx rule.RuleContext, call *ast.Node) *ast.Node {
 	if !ok || methodCall.Callee != parent || !isZeroLiteral(access.Arguments()[0]) {
 		return nil
 	}
-	if isReferenceTarget(access) || utils.HasCommentInSpan(ctx.Comments.All(), utils.OutermostParenthesizedExpression(call).End(), access.End()) {
+	if unicornutil.IsReferenceTarget(access) || utils.HasCommentInSpan(ctx.Comments.All(), utils.OutermostParenthesizedExpression(call).End(), access.End()) {
 		return nil
 	}
 	return access
@@ -194,11 +194,4 @@ func usesNamedItem(node *ast.Node) bool {
 func isZeroLiteral(node *ast.Node) bool {
 	node = utils.ESTreeRuntimeExpression(node)
 	return ast.IsNumericLiteral(node) && utils.NormalizeNumericLiteral(node.AsNumericLiteral().Text) == "0"
-}
-
-func isReferenceTarget(node *ast.Node) bool {
-	for parent := node.Parent; parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments); parent = node.Parent {
-		node = parent
-	}
-	return node.Parent != nil && (ast.IsAssignmentTarget(node) || node.Parent.Kind == ast.KindDeleteExpression)
 }

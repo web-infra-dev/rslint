@@ -1,6 +1,7 @@
 package unicorn_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/better_dom_traversing"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_template_literal_escape"
@@ -121,6 +122,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		prefer_optional_catch_binding.PreferOptionalCatchBindingRule,
+		better_dom_traversing.BetterDomTraversingRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,

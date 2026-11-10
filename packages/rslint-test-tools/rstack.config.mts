@@ -836,6 +836,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-unicorn
+    './tests/eslint-plugin-unicorn/rules/better-dom-traversing.test.ts',
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-template-literal-escape.test.ts',
