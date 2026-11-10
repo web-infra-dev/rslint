@@ -32,7 +32,7 @@ var PreferStringSliceRule = rule.Rule{
 				return
 			}
 			method := call.Property.Text()
-			if method == "substring" && isSingleCharacterSubstring(node.Arguments()) {
+			if method == "substring" && unicornutil.SingleCharacterSubstringIndex(node.Arguments()) != nil {
 				return
 			}
 			message := substrMessage
@@ -335,15 +335,6 @@ func isLengthProperty(node *ast.Node) bool {
 		ast.IsIdentifier(node.Name()) && node.Name().Text() == "length"
 }
 
-func isSafeIntegerLiteral(node *ast.Node) bool {
-	node = utils.ESTreeRuntimeExpression(node)
-	if node.Kind != ast.KindNumericLiteral {
-		return false
-	}
-	value, _ := numericValue(node)
-	return value >= 0 && value <= 9007199254740991 && math.Trunc(value) == value
-}
-
 func negativeIndex(ctx rule.RuleContext, arg, receiver *ast.Node) string {
 	node := utils.ESTreeRuntimeExpression(arg)
 	receiver = utils.ESTreeRuntimeExpression(receiver)
@@ -352,8 +343,8 @@ func negativeIndex(ctx rule.RuleContext, arg, receiver *ast.Node) string {
 	}
 	binary := node.AsBinaryExpression()
 	right := utils.ESTreeRuntimeExpression(binary.Right)
-	value, _ := numericValue(right)
-	if binary.OperatorToken.Kind != ast.KindMinusToken || !isSafeIntegerLiteral(right) || value == 0 || !isLengthProperty(binary.Left) {
+	value, isInteger := unicornutil.SafeIntegerLiteral(right)
+	if binary.OperatorToken.Kind != ast.KindMinusToken || !isInteger || value == 0 || !isLengthProperty(binary.Left) {
 		return ""
 	}
 	_, staticString := utils.GetStaticStringLiteralValue(receiver)
@@ -365,39 +356,4 @@ func negativeIndex(ctx rule.RuleContext, arg, receiver *ast.Node) string {
 		return ""
 	}
 	return "-" + utils.TrimmedNodeText(ctx.SourceFile, right)
-}
-
-func isSingleCharacterSubstring(args []*ast.Node) bool {
-	if len(args) != 2 {
-		return false
-	}
-	first, second := utils.ESTreeRuntimeExpression(args[0]), utils.ESTreeRuntimeExpression(args[1])
-	if isSafeIntegerLiteral(first) && isSafeIntegerLiteral(second) {
-		start, _ := numericValue(first)
-		end, _ := numericValue(second)
-		return math.Abs(start-end) == 1
-	}
-	plusOne := func(node, index *ast.Node) bool {
-		if node.Kind != ast.KindBinaryExpression || node.AsBinaryExpression().OperatorToken.Kind != ast.KindPlusToken {
-			return false
-		}
-		binary := node.AsBinaryExpression()
-		isOne := func(node *ast.Node) bool {
-			node = utils.ESTreeRuntimeExpression(node)
-			value, _ := numericValue(node)
-			return node.Kind == ast.KindNumericLiteral && value == 1
-		}
-		return (unicornutil.IsSameComparisonOperand(binary.Left, index) && isOne(binary.Right)) ||
-			(isOne(binary.Left) && unicornutil.IsSameComparisonOperand(binary.Right, index))
-	}
-	if plusOne(second, first) || plusOne(first, second) {
-		return true
-	}
-	if first.Kind == ast.KindBinaryExpression {
-		binary := first.AsBinaryExpression()
-		right := utils.ESTreeRuntimeExpression(binary.Right)
-		value, _ := numericValue(right)
-		return binary.OperatorToken.Kind == ast.KindMinusToken && right.Kind == ast.KindNumericLiteral && value == 1 && unicornutil.IsSameComparisonOperand(binary.Left, second)
-	}
-	return false
 }
