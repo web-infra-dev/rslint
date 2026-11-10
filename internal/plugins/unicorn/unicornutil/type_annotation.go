@@ -11,13 +11,26 @@ import (
 // ClassifyTypeAnnotation classifies authored type syntax without requiring a
 // TypeChecker. It resolves local aliases and constraints through the binder.
 func ClassifyTypeAnnotation(ctx rule.RuleContext, node *ast.Node, options TypeClassifierOptions) TypeClass {
-	return classifyTypeAnnotation(ctx, node, make(map[*ast.Symbol]bool), options)
+	walk := typeAnnotationWalk{
+		visiting:  make(map[*ast.Symbol]bool),
+		completed: make(map[*ast.Symbol]TypeClass),
+	}
+	class := classifyTypeAnnotation(ctx, node, &walk, options)
+	if class == typeAny || class == typeCyclic {
+		return TypeUnknown
+	}
+	return class
+}
+
+type typeAnnotationWalk struct {
+	visiting  map[*ast.Symbol]bool
+	completed map[*ast.Symbol]TypeClass
 }
 
 func classifyTypeAnnotation(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	walk *typeAnnotationWalk,
 	options TypeClassifierOptions,
 ) TypeClass {
 	if node == nil {
@@ -29,20 +42,22 @@ func classifyTypeAnnotation(
 		if typeOperator.Operator != ast.KindReadonlyKeyword {
 			return TypeUnknown
 		}
-		return classifyTypeAnnotation(ctx, typeOperator.Type, visitedSymbols, options)
+		return classifyTypeAnnotation(ctx, typeOperator.Type, walk, options)
 	}
 
 	switch node.Kind {
+	case ast.KindAnyKeyword, ast.KindJSDocAllType:
+		return typeAny
 	case ast.KindArrayType, ast.KindTupleType:
 		if classifyKnownTypeName("Array", options) == TypeTarget {
 			return TypeTarget
 		}
 		return TypeNonTarget
 	case ast.KindJSDocNonNullableType:
-		return classifyTypeAnnotation(ctx, node.Type(), visitedSymbols, options)
+		return classifyTypeAnnotation(ctx, node.Type(), walk, options)
 	case ast.KindJSDocNullableType, ast.KindJSDocOptionalType:
 		if options.AllowNullishInMixedUnion {
-			return classifyTypeAnnotation(ctx, node.Type(), visitedSymbols, options)
+			return classifyTypeAnnotation(ctx, node.Type(), walk, options)
 		}
 		return TypeUnknown
 	case ast.KindNullKeyword, ast.KindUndefinedKeyword:
@@ -52,21 +67,21 @@ func classifyTypeAnnotation(
 		return TypeNonTarget
 	case ast.KindLiteralType:
 		if literal := node.AsLiteralTypeNode().Literal; literal.Kind == ast.KindNullKeyword {
-			return classifyTypeAnnotation(ctx, literal, visitedSymbols, options)
+			return classifyTypeAnnotation(ctx, literal, walk, options)
 		}
 		return TypeNonTarget
 	case ast.KindUnionType:
 		types := node.AsUnionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyTypeAnnotation(ctx, part, visitedSymbols, options))
+			classes = append(classes, classifyTypeAnnotation(ctx, part, walk, options))
 		}
 		return combineSourceTypeUnion(classes, options)
 	case ast.KindIntersectionType:
 		types := node.AsIntersectionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
 		for _, part := range types {
-			classes = append(classes, classifyTypeAnnotation(ctx, part, visitedSymbols, options))
+			classes = append(classes, classifyTypeAnnotation(ctx, part, walk, options))
 		}
 		return combineSourceTypeIntersection(classes)
 	case ast.KindTypeReference:
@@ -75,7 +90,7 @@ func classifyTypeAnnotation(
 			(typeName.Text() == "Null" || typeName.Text() == "Undefined") {
 			return TypeNullish
 		}
-		return classifyTypeReference(ctx, typeName, visitedSymbols, options)
+		return classifyTypeReference(ctx, typeName, walk, options)
 	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
 		ast.KindNumberKeyword, ast.KindStringKeyword, ast.KindSymbolKeyword,
 		ast.KindVoidKeyword, ast.KindTypeLiteral,
@@ -89,9 +104,9 @@ func classifyTypeAnnotation(
 func classifyTypeReference(
 	ctx rule.RuleContext,
 	typeName *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	walk *typeAnnotationWalk,
 	options TypeClassifierOptions,
-) TypeClass {
+) (class TypeClass) {
 	if typeName == nil || !ast.IsIdentifier(typeName) {
 		return TypeUnknown
 	}
@@ -109,11 +124,19 @@ func classifyTypeReference(
 	if symbol == nil {
 		return known
 	}
-	if visitedSymbols[symbol] {
-		return TypeUnknown
+	if walk.visiting[symbol] {
+		// Propagate cycles so an enclosing intersection cannot cache a
+		// classification based only on its non-cyclic members.
+		return typeCyclic
 	}
-	visitedSymbols[symbol] = true
-	defer delete(visitedSymbols, symbol)
+	if completed, ok := walk.completed[symbol]; ok {
+		return completed
+	}
+	walk.visiting[symbol] = true
+	defer func() {
+		delete(walk.visiting, symbol)
+		walk.completed[symbol] = class
+	}()
 
 	for _, declaration := range symbol.Declarations {
 		if declaration == nil {
@@ -122,18 +145,20 @@ func classifyTypeReference(
 		switch declaration.Kind {
 		case ast.KindTypeAliasDeclaration:
 			return classifyTypeAnnotation(
-				ctx, declaration.AsTypeAliasDeclaration().Type, visitedSymbols, options,
+				ctx, declaration.AsTypeAliasDeclaration().Type, walk, options,
 			)
 		case ast.KindTypeParameter:
-			return classifyTypeAnnotation(
-				ctx, declaration.AsTypeParameterDeclaration().Constraint, visitedSymbols, options,
-			)
+			constraint := classifyTypeAnnotation(ctx, declaration.AsTypeParameterDeclaration().Constraint, walk, options)
+			if constraint == typeAny {
+				return TypeUnknown
+			}
+			return constraint
 		case ast.KindInterfaceDeclaration:
 			return classifyInterfaceAnnotation(
-				ctx, declaration, visitedSymbols, options,
+				ctx, declaration, walk, options,
 			)
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyClassReference(ctx, declaration, visitedSymbols, options)
+			return classifyClassReference(ctx, declaration, walk.visiting, options)
 		case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport:
 			importedName := name
 			if declaration.Kind == ast.KindImportSpecifier {
@@ -154,7 +179,7 @@ func classifyTypeReference(
 func classifyInterfaceAnnotation(
 	ctx rule.RuleContext,
 	node *ast.Node,
-	visitedSymbols map[*ast.Symbol]bool,
+	walk *typeAnnotationWalk,
 	options TypeClassifierOptions,
 ) TypeClass {
 	declaration := node.AsInterfaceDeclaration()
@@ -174,7 +199,7 @@ func classifyInterfaceAnnotation(
 				continue
 			}
 			classes = append(classes, classifyTypeReference(
-				ctx, heritage.TypeName, visitedSymbols, options,
+				ctx, heritage.TypeName, walk, options,
 			))
 		}
 	}
@@ -207,7 +232,10 @@ func classifyClassReference(ctx rule.RuleContext, node *ast.Node, visited map[*a
 		if symbol == nil {
 			return classifyKnownTypeName(node.Text(), options)
 		}
-		if visited[symbol] || len(symbol.Declarations) == 0 {
+		if visited[symbol] {
+			return typeCyclic
+		}
+		if len(symbol.Declarations) == 0 {
 			return TypeUnknown
 		}
 		visited[symbol] = true
@@ -234,6 +262,12 @@ func classifyClassReference(ctx rule.RuleContext, node *ast.Node, visited map[*a
 }
 
 func combineSourceTypeUnion(classes []TypeClass, options TypeClassifierOptions) TypeClass {
+	if slices.Contains(classes, typeAny) {
+		return typeAny
+	}
+	if slices.Contains(classes, typeCyclic) {
+		return typeCyclic
+	}
 	if options.AllowNullishInMixedUnion {
 		classes = slices.DeleteFunc(classes, func(class TypeClass) bool { return class == TypeNullish })
 		if len(classes) == 0 {
@@ -262,6 +296,14 @@ func combineSourceTypeUnion(classes []TypeClass, options TypeClassifierOptions) 
 }
 
 func combineSourceTypeIntersection(classes []TypeClass) TypeClass {
+	// An explicit any absorbs the intersection, even if another member is a
+	// known target. A cyclic reference has no usable type for this analysis.
+	if slices.Contains(classes, typeAny) {
+		return typeAny
+	}
+	if slices.Contains(classes, typeCyclic) {
+		return typeCyclic
+	}
 	allNonTarget := true
 	for _, class := range classes {
 		if class == TypeTarget {

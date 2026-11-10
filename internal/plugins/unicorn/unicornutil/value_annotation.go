@@ -89,56 +89,149 @@ func HasJSDocTypeReference(ctx rule.RuleContext, node *ast.Node, visited map[*as
 // or on a binding annotated as a function.
 func CallableReturnTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
 	annotation := declaration.Type()
-	if (ast.IsVariableDeclaration(declaration) || ast.IsParameterDeclaration(declaration)) && annotation != nil {
-		annotation = ast.SkipTypeParentheses(annotation)
-		if ast.IsFunctionTypeNode(annotation) {
-			annotation = annotation.Type()
-		} else {
-			annotation = nil
+	parameter := ast.IsParameterDeclaration(declaration)
+	host := declaration
+	if parameter {
+		var optional bool
+		annotation, optional = ValueTypeAnnotation(ctx, declaration)
+		if optional {
+			return nil
 		}
+		if annotation != nil && !isClosureCallableType(annotation) {
+			return callableBindingReturnType(annotation)
+		}
+		host = declaration.Parent
+	} else if ast.IsVariableDeclaration(declaration) {
+		if result := callableBindingReturnType(annotation); result != nil {
+			return result
+		}
+	} else if annotation != nil {
+		return annotation
 	}
-	if annotation == nil && ast.IsParameterDeclaration(declaration) {
-		if documented, optional := ValueTypeAnnotation(ctx, declaration); documented != nil && !optional {
-			if function := ast.SkipTypeParentheses(documented); ast.IsFunctionTypeNode(function) {
-				return function.Type()
+	for ; host != nil; host = ast.GetNextJSDocCommentLocation(host) {
+		for _, doc := range host.JSDoc(ctx.SourceFile) {
+			if doc.AsJSDoc().Tags == nil {
+				continue
 			}
-		}
-	}
-	if annotation == nil {
-		for host := declaration; host != nil && annotation == nil; host = ast.GetNextJSDocCommentLocation(host) {
-			for _, doc := range host.JSDoc(ctx.SourceFile) {
-				if doc.AsJSDoc().Tags == nil {
+			for _, tag := range doc.AsJSDoc().Tags.Nodes {
+				if tag.TypeExpression() == nil {
 					continue
 				}
-				for _, tag := range doc.AsJSDoc().Tags.Nodes {
-					if tag.TypeExpression() == nil {
+				tagType := tag.TypeExpression().Type()
+				if parameter {
+					if tag.Kind != ast.KindJSDocParameterTag || !isClosureCallableType(tagType) {
 						continue
 					}
-					tagType := tag.TypeExpression().Type()
-					if ast.IsJSDocReturnTag(tag) {
-						annotation = tagType
-					} else if ast.IsJSDocTypeTag(tag) && ast.IsFunctionTypeNode(tagType) {
-						annotation = tagType.Type()
-					} else if ast.IsJSDocTypeTag(tag) && ast.IsTypeReferenceNode(tagType) && ast.IsIdentifier(tagType.AsTypeReferenceNode().TypeName) && tagType.AsTypeReferenceNode().TypeName.Text() == "function" {
-						annotation = closureCallableReturnTypeAnnotation(ctx, tag, declaration)
+					if name := tag.Name().Text(); name != "" && name != declaration.Name().Text() {
+						continue
 					}
-					if annotation != nil {
-						break
+					if result := closureCallableReturnTypeAnnotation(ctx, tag, declaration); result != nil {
+						return result
+					}
+				} else if ast.IsJSDocReturnTag(tag) {
+					return tagType
+				} else if ast.IsJSDocTypeTag(tag) {
+					if result := callableBindingReturnType(tagType); result != nil {
+						return result
+					}
+					if isClosureCallableType(tagType) {
+						if result := closureCallableReturnTypeAnnotation(ctx, tag, declaration); result != nil {
+							return result
+						}
 					}
 				}
 			}
 		}
 	}
-	return annotation
+	return nil
+}
+
+func callableBindingReturnType(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	node = ast.SkipTypeParentheses(node)
+	if ast.IsFunctionTypeNode(node) {
+		return node.Type()
+	}
+	if !utils.IsJSDocSyntaxNode(node) {
+		return nil
+	}
+	var returns []*ast.Node
+	if !collectJSDocCallableReturns(node, &returns, false) || len(returns) == 0 {
+		return nil
+	}
+	if len(returns) == 1 {
+		return returns[0]
+	}
+	// Any overload may supply the result, so classify these as a union.
+	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+	return factory.NewUnionTypeNode(factory.NewNodeList(returns))
+}
+
+func collectJSDocCallableReturns(node *ast.Node, returns *[]*ast.Node, inIntersection bool) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipTypeParentheses(node)
+	switch node.Kind {
+	case ast.KindFunctionType:
+		if result := node.Type(); result != nil {
+			*returns = append(*returns, result)
+			return true
+		}
+	case ast.KindUnionType, ast.KindIntersectionType:
+		intersection := node.Kind == ast.KindIntersectionType
+		start := len(*returns)
+		invalid := node.ForEachChild(func(child *ast.Node) bool {
+			return !collectJSDocCallableReturns(child, returns, intersection)
+		})
+		return !invalid && (len(*returns) > start || (intersection && inIntersection))
+	case ast.KindTypeLiteral:
+		members := node.AsTypeLiteralNode().Members.Nodes
+		start := len(*returns)
+		for _, member := range members {
+			if member.Kind == ast.KindCallSignature {
+				if member.Type() == nil {
+					return false
+				}
+				*returns = append(*returns, member.Type())
+			}
+		}
+		return len(*returns) > start || (inIntersection && len(members) > 0)
+	}
+	return false
+}
+
+func isClosureCallableType(node *ast.Node) bool {
+	return node != nil && ast.IsTypeReferenceNode(node) && ast.IsIdentifier(node.AsTypeReferenceNode().TypeName) &&
+		node.AsTypeReferenceNode().TypeName.Text() == "function"
 }
 
 func closureCallableReturnTypeAnnotation(ctx rule.RuleContext, tag, declaration *ast.Node) *ast.Node {
 	// tsgo parses Closure's `function(): T` only as the name `function`.
-	// Wrapping it as a type-literal method lets its JSDoc parser read T,
-	// including multiline comments, without implementing a type parser here.
-	text := "/** @type {" + ctx.SourceFile.Text()[tag.TypeExpression().Pos():tag.End()] + "} */ const factory = undefined;"
+	// Add an opening brace so tsgo reads it as a type-literal method. The
+	// original closing brace ends the literal and JSDoc parsing recovers the
+	// rest of the tag, including the parameter name.
+	source := ctx.SourceFile.Text()
+	start := tag.TypeExpression().Pos()
+	text := "/** " + source[tag.Pos():start] + "{" + source[start:tag.End()] + " */ const factory = undefined;"
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
-	annotation := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
+	docs := file.Statements.Nodes[0].JSDoc(file)
+	if len(docs) == 0 || docs[0].AsJSDoc().Tags == nil || len(docs[0].AsJSDoc().Tags.Nodes) == 0 {
+		return nil
+	}
+	parsed := docs[0].AsJSDoc().Tags.Nodes[0]
+	if parsed.Kind != tag.Kind || parsed.TypeExpression() == nil {
+		return nil
+	}
+	if parsed.Kind == ast.KindJSDocParameterTag {
+		param := parsed.AsJSDocParameterOrPropertyTag()
+		if param.IsBracketed || param.Name().Text() != declaration.Name().Text() {
+			return nil
+		}
+	}
+	annotation := parsed.TypeExpression().Type()
 	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
 		return nil
 	}

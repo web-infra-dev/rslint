@@ -1,7 +1,9 @@
 package prefer_at
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -28,6 +30,13 @@ func TestPreferAtExtras(t *testing.T) {
 			{Code: `array[array["length"] - 1]; array[array?.length - 1];`, FileName: "file.js"},
 			{Code: "(arr?.slice(-1))[0]; arr.slice(-1, 0)[0];", FileName: "file.js"},
 			{Code: "/** @param {?NodeList} nodes */ function read(nodes) { return _.last(nodes); }", FileName: "file.js"},
+			{Code: "/** @param {function(): NodeList} read */ function f(read) { return _.last(read()); }", FileName: "file.js"},
+			{Code: "/** @param {number} count @param {function(): NodeList} read */ function f(read, count) { return _.last(read()); }", FileName: "file.js"},
+			{Code: "/** @param read {function(number):\n * (NodeList | HTMLCollection)} */ function f(read) { return _.last(read(0)); }", FileName: "file.js"},
+			{Code: "/** @param {(() => NodeList) | (() => HTMLCollection)} read */ function f(read) { return _.last(read()); }", FileName: "file.js"},
+			{Code: "/** @param {(() => NodeList) & (() => HTMLCollection)} read */ function f(read) { return _.last(read()); }", FileName: "file.js"},
+			{Code: "/** @param {(() => NodeList) & {tag: string}} read */ function f(read) { return _.last(read()); }", FileName: "file.js"},
+			{Code: "/** @type {(() => NodeList) | (() => HTMLCollection)} */ const read = makeReader(); _.last(read());", FileName: "file.js"},
 			{Code: "type NodeList = { length: number; [index: number]: Element }; function f(items: NodeList | null) { return items?.[items.length - 1]; }", FileName: "file.ts"},
 			{Code: "interface Elements extends NodeListOf<Element> {} function f(items: Elements) { return _.last(items); }", FileName: "file.ts"},
 			{Code: "const read = (((): NodeList => document.childNodes) satisfies () => NodeList)!; _.last(read());", FileName: "file.ts"},
@@ -35,6 +44,21 @@ func TestPreferAtExtras(t *testing.T) {
 			{Code: "function read() { arguments.slice = Array.prototype.slice; return arguments.slice(-1)[0]; }", FileName: "file.js"},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: "/** @param {function(): NodeList} other */\nfunction f(read) { return _.last(read()); }", FileName: "file.js",
+				Output: []string{"/** @param {function(): NodeList} other */\nfunction f(read) { return read().at(-1); }"},
+				Errors: []rule_tester.InvalidTestCaseError{upstreamError("get-last-function", 2, 27, 2, 33, "_.last")},
+			},
+			{
+				Code: "/** @param {(() => string[]) | (() => NodeList)} read */\nfunction f(read) { return _.last(read()); }", FileName: "file.js",
+				Output: []string{"/** @param {(() => string[]) | (() => NodeList)} read */\nfunction f(read) { return read().at(-1); }"},
+				Errors: []rule_tester.InvalidTestCaseError{upstreamError("get-last-function", 2, 27, 2, 33, "_.last")},
+			},
+			{
+				Code: "/** @param {(() => string[]) & {(): NodeList}} read */\nfunction f(read) { return _.last(read()); }", FileName: "file.js",
+				Output: []string{"/** @param {(() => string[]) & {(): NodeList}} read */\nfunction f(read) { return read().at(-1); }"},
+				Errors: []rule_tester.InvalidTestCaseError{upstreamError("get-last-function", 2, 27, 2, 33, "_.last")},
+			},
 			{
 				Code: "lodash.last(items);", FileName: "file.js", Options: defaults,
 				Output: []string{"items.at(-1);"},
@@ -144,6 +168,58 @@ func TestPreferAtExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 1, 3, 1, 16)},
 			},
 		},
+	)
+}
+
+func TestPreferAtTypeIntersections(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: "function f(a: NodeList & unknown) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "function f<T extends any>(a: NodeList & T) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type Nodes = NodeList & { children: Nodes }; function f(a: Nodes) { return a[a.length - 1]; }", FileName: "file.ts"},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, declaration := range []string{
+		"function f(a: NodeList & any)",
+		"function f(a: any & NodeList)",
+		"type Alias = any; function f(a: NodeList & (unknown | Alias))",
+		"type Cycle = Cycle | Cycle; function f(a: Cycle)",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:     declaration + " {\n  return a[a.length - 1];\n}",
+			FileName: "file.ts",
+			Output:   []string{declaration + " {\n  return a.at(-1);\n}"},
+			Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
+		})
+	}
+	for _, mode := range []string{"typed", "source-only"} {
+		t.Run(mode, func(t *testing.T) {
+			testRule := PreferAtRule
+			if mode == "source-only" {
+				testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+					ctx.TypeChecker = nil
+					return PreferAtRule.Run(ctx, options)
+				}
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, valid, invalid)
+		})
+	}
+}
+
+func TestPreferAtSharedTypeAliases(t *testing.T) {
+	const depth = 32
+	var source strings.Builder
+	source.WriteString("type T0 = NodeList;\n")
+	for i := 1; i <= depth; i++ {
+		fmt.Fprintf(&source, "type T%d = T%d | T%d;\n", i, i-1, i-1)
+	}
+	fmt.Fprintf(&source, "function f(a: T%d) { return a[a.length - 1] ?? _.last(a); }", depth)
+	testRule := PreferAtRule
+	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return PreferAtRule.Run(ctx, options)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule,
+		[]rule_tester.ValidTestCase{{Code: source.String(), FileName: "file.ts"}}, nil,
 	)
 }
 

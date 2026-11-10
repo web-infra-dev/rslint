@@ -18,6 +18,9 @@ const (
 	// TypeNullish is retained in authored annotations when the classifier
 	// ignores nullish branches of a mixed union.
 	TypeNullish
+	// Internal states used when walking authored annotations.
+	typeAny
+	typeCyclic
 )
 
 // TypeClassifierOptions configures the shared recursive portion of Unicorn's
