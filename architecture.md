@@ -1904,12 +1904,11 @@ admission, scheduling, generation transfer and editor integration remain follow-
 work. Meta-property keywords are scalar compiler fields, so their synthetic
 ESTree identifiers have no compiler node origin and reject semantic queries.
 The `@rslint/api` workspace package owns the binary syntax reader, decoder and
-enums from the same pinned compiler source as Go. Rslib resolves its
-`@typescript/source` entry and bundles the source into the worker. The worker's
-declaration build follows the API project reference, keeping its declarations
-in a local cache and checking the worker with core's strict settings. The API's
-published package retains its built entry points. Public plugin declarations
-are bundled from the public entries.
+enums from the same pinned compiler source as Go. Rslib selects its
+`@typescript/source` entry for runtime bundling. Core's workspace type check
+covers the worker with the same strict settings as the rest of core and
+resolves the public declarations from the API's own build. Public plugin
+declarations are bundled from the public entries.
 
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,

@@ -1,8 +1,7 @@
 {
-  "extends": "./tsconfig.build.json",
-  "compilerOptions": {
-    "emitDeclarationOnly": true,
-    "outDir": "${configDir}/node_modules/.cache/rslint-api-declarations",
-    "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-api-declarations/tsconfig.tsbuildinfo"
-  }
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ]
 }

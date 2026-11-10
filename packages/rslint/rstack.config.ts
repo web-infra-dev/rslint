@@ -26,9 +26,8 @@ import { generateRuleOptionTypesPlugin } from './plugins/generate-rule-option-ty
  *    fine here.
  *
  * 2. Plugin host and worker → `dist/eslint-plugin/`. The public plugin entries
- *    bundle declarations from `tsconfig.plugin-api.json`. The worker checks
- *    its full project and API reference with `dts.build`, keeping
- *    those private declarations in the build cache. Each runtime entry has
+ *    bundle declarations from `tsconfig.plugin-api.json`. Core checks the
+ *    worker through `tsconfig.build.json`. Each runtime entry has
  *    its own `lib` block (the public index shares its block with a type-only entry)
  *    so Rspack inlines each output's full module graph with NO shared chunks —
  *    crucial for the worker (`new Worker(...)` spawns a fresh V8 isolate that
@@ -114,7 +113,7 @@ define.lib(() => {
           tsconfigPath: './tsconfig.worker.json',
           entry: { 'lint-worker': './src/eslint-plugin/lint-worker.ts' },
         },
-        dts: { build: true },
+        dts: false,
       },
       {
         ...workerBase,
