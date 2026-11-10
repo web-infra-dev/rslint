@@ -13,7 +13,7 @@ var NoDebuggerRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
 				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "no-debugger",
+					Id:          "unexpected",
 					Description: "Unexpected 'debugger' statement.",
 				})
 			},

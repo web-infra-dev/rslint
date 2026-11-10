@@ -19,7 +19,7 @@ var NoTemplateCurlyInStringRule = rule.Rule{
 				if regex.MatchString(expr.Text) {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "unexpectedTemplateExpression",
-						Description: "Template literal placeholder syntax in regular strings is not allowed.",
+						Description: "Unexpected template string expression.",
 					})
 				}
 			},

@@ -1,20 +1,39 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+// Every case from typescript-eslint v8.67.0, with messages and full ranges
+// additionally pinned from the same upstream version. No upstream expectations are relaxed.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/tests/rules/no-namespace.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
-
-
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+});
 
 ruleTester.run('no-namespace', {
   valid: [
-    'declare global {}',
-    "declare module 'foo' {}",
+    {
+      code: 'declare global {}',
+      filename: 'file.ts',
+    },
+    {
+      code: "declare module 'foo' {}",
+      filename: 'file.ts',
+    },
     {
       code: 'declare module foo {}',
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: 'declare namespace foo {}',
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: `
@@ -22,7 +41,12 @@ declare global {
   namespace foo {}
 }
       `,
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: `
@@ -30,7 +54,12 @@ declare module foo {
   namespace bar {}
 }
       `,
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: `
@@ -40,7 +69,12 @@ declare global {
   }
 }
       `,
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: `
@@ -50,7 +84,12 @@ declare namespace foo {
   }
 }
       `,
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: `
@@ -60,184 +99,297 @@ export declare namespace foo {
   }
 }
       `,
-      options: [{ allowDeclarations: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
     },
     {
       code: 'namespace foo {}',
       filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: true }],
+      options: [
+        {
+          allowDefinitionFiles: true,
+        },
+      ],
     },
     {
       code: 'module foo {}',
       filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: true }],
+      options: [
+        {
+          allowDefinitionFiles: true,
+        },
+      ],
     },
   ],
   invalid: [
     {
       code: 'module foo {}',
+      filename: 'file.ts',
       errors: [
         {
-          column: 1,
-          line: 1,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
     },
     {
       code: 'namespace foo {}',
+      filename: 'file.ts',
       errors: [
         {
-          column: 1,
-          line: 1,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
     {
       code: 'module foo {}',
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: false,
         },
       ],
-      options: [{ allowDeclarations: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'namespace foo {}',
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: false,
         },
       ],
-      options: [{ allowDeclarations: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: 'module foo {}',
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'namespace foo {}',
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
-    },
-    {
-      code: 'declare module foo {}',
       errors: [
         {
-          column: 1,
-          line: 1,
           messageId: 'moduleSyntaxIsPreferred',
-        },
-      ],
-    },
-    {
-      code: 'declare namespace foo {}',
-      errors: [
-        {
-          column: 1,
+          message: 'ES2015 module syntax is preferred over namespaces.',
           line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
     {
       code: 'declare module foo {}',
+      filename: 'file.ts',
       errors: [
         {
-          column: 1,
-          line: 1,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
-      options: [{ allowDeclarations: false }],
     },
     {
       code: 'declare namespace foo {}',
+      filename: 'file.ts',
       errors: [
         {
-          column: 1,
-          line: 1,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-      options: [{ allowDeclarations: false }],
+    },
+    {
+      code: 'declare module foo {}',
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: 'declare namespace foo {}',
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: 'namespace foo {}',
-      errors: [
-        {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-      ],
       filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: false }],
+      options: [
+        {
+          allowDefinitionFiles: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: 'module foo {}',
-      errors: [
+      filename: 'test.d.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDefinitionFiles: false,
         },
       ],
-      filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'declare module foo {}',
-      errors: [
+      filename: 'test.d.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDefinitionFiles: false,
         },
       ],
-      filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: 'declare namespace foo {}',
-      errors: [
+      filename: 'test.d.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDefinitionFiles: false,
         },
       ],
-      filename: 'test.d.ts',
-      options: [{ allowDefinitionFiles: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: 'namespace Foo.Bar {}',
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: false,
         },
       ],
-      options: [{ allowDeclarations: false }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: `
@@ -247,16 +399,23 @@ namespace Foo.Bar {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 1,
-          line: 2,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
         },
         {
-          column: 3,
-          line: 3,
           messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
         },
       ],
     },
@@ -268,19 +427,30 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-        {
-          column: 3,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: `
@@ -290,19 +460,30 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-        {
-          column: 3,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: `
@@ -312,14 +493,22 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -329,14 +518,22 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -346,14 +543,22 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -363,14 +568,22 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -380,14 +593,22 @@ namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 1,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -397,19 +618,30 @@ namespace A {
   }
 }
       `,
+      filename: 'file.ts',
+      options: [
+        {
+          allowDeclarations: true,
+        },
+      ],
       errors: [
         {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
           column: 1,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          endLine: 6,
+          endColumn: 2,
         },
         {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
           column: 10,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          endLine: 5,
+          endColumn: 4,
         },
       ],
-      options: [{ allowDeclarations: true }],
     },
     {
       code: `
@@ -419,19 +651,30 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-        {
-          column: 3,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: `
@@ -441,19 +684,30 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-        {
-          column: 3,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: `
@@ -463,14 +717,22 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -480,14 +742,22 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -497,14 +767,22 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -514,14 +792,22 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -531,14 +817,22 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+      ],
     },
     {
       code: `
@@ -548,19 +842,30 @@ export namespace A {
   }
 }
       `,
-      errors: [
+      filename: 'file.ts',
+      options: [
         {
-          column: 8,
-          line: 2,
-          messageId: 'moduleSyntaxIsPreferred',
-        },
-        {
-          column: 10,
-          line: 3,
-          messageId: 'moduleSyntaxIsPreferred',
+          allowDeclarations: true,
         },
       ],
-      options: [{ allowDeclarations: true }],
+      errors: [
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 2,
+          column: 8,
+          endLine: 6,
+          endColumn: 2,
+        },
+        {
+          messageId: 'moduleSyntaxIsPreferred',
+          message: 'ES2015 module syntax is preferred over namespaces.',
+          line: 3,
+          column: 10,
+          endLine: 5,
+          endColumn: 4,
+        },
+      ],
     },
   ],
 });

@@ -35,6 +35,23 @@ if (instance.method) {
 typeof instance.method;
 ```
 
+## Differences from upstream
+
+For a receiver union mixing a function-valued class field with a built-in method,
+TypeScript-Go and TypeScript can visit the union constituents in a different order:
+
+```typescript
+class Foo {
+  floor = function () {};
+}
+const { floor } = Math.random() > 0.5 ? new Foo() : Math;
+```
+
+Rslint reports `unbound` for the class field. typescript-eslint v8.28.0 reports
+`unboundWithoutThisAnnotation` after visiting `Math` first. Both report the same
+location. Rslint retains its function-field message because adding `this: void`
+does not exempt a function-valued class field from this rule.
+
 ## Original Documentation
 
 - [typescript-eslint: unbound-method](https://typescript-eslint.io/rules/unbound-method)

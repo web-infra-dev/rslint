@@ -9,7 +9,7 @@ import (
 // Message builder
 func buildClassReassignmentMessage(className string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "classReassignment",
+		Id:          "class",
 		Description: "'" + className + "' is a class.",
 	}
 }

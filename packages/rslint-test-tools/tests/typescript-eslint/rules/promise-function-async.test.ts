@@ -1,40 +1,55 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootDir = getFixturesRootDir();
+// Every case from typescript-eslint v8.29.1, with messages and full ranges
+// additionally pinned from the same upstream version. No upstream expectations are relaxed.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.29.1/packages/eslint-plugin/tests/rules/promise-function-async.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
 const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  fixtureFiles: {
+    'tsconfig.json':
+      '{"compilerOptions":{"jsx":"preserve","target":"es2015","module":"commonjs","strict":true,"types":[],"lib":["es2015","es2017","esnext"],"experimentalDecorators":true},"include":["*.ts","*.tsx"]}',
+  },
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
     },
   },
 });
 
 ruleTester.run('promise-function-async', {
   valid: [
-    `
+    {
+      code: `
 const nonAsyncNonPromiseArrowFunction = (n: number) => n;
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 function nonAsyncNonPromiseFunctionDeclaration(n: number) {
   return n;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 const asyncPromiseFunctionExpressionA = async function (p: Promise<void>) {
   return p;
 };
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 const asyncPromiseFunctionExpressionB = async function () {
   return new Promise<void>();
 };
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Test {
   public nonAsyncNonPromiseArrowFunction = (n: number) => n;
   public nonAsyncNonPromiseMethod() {
@@ -50,7 +65,10 @@ class Test {
   }
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class InvalidAsyncModifiers {
   public constructor() {
     return new Promise<void>();
@@ -69,7 +87,10 @@ class InvalidAsyncModifiers {
   }
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 const invalidAsyncModifiers = {
   get asyncGetter() {
     return new Promise<void>();
@@ -85,35 +106,49 @@ const invalidAsyncModifiers = {
   },
 };
     `,
-    // https://github.com/typescript-eslint/typescript-eslint/issues/227
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
       export function valid(n: number) {
         return n;
       }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
       export default function invalid(n: number) {
         return n;
       }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
       class Foo {
         constructor() {}
       }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   async catch<T>(arg: Promise<T>) {
     return arg;
   }
 }
     `,
+      filename: 'file.ts',
+    },
     {
       code: `
 function returnsAny(): any {
   return 0;
 }
       `,
+      filename: 'file.ts',
       options: [
         {
           allowAny: true,
@@ -126,6 +161,7 @@ function returnsUnknown(): unknown {
   return 0;
 }
       `,
+      filename: 'file.ts',
       options: [
         {
           allowAny: true,
@@ -144,6 +180,7 @@ const foo = (options: Options): Return => {
   return options.stream ? asStream(options) : asPromise(options);
 };
       `,
+      filename: 'file.ts',
     },
     {
       code: `
@@ -151,6 +188,7 @@ function foo(): Promise<string> | boolean {
   return Math.random() > 0.5 ? Promise.resolve('value') : false;
 }
       `,
+      filename: 'file.ts',
     },
     {
       code: `
@@ -163,25 +201,36 @@ abstract class Test {
   }
 }
       `,
+      filename: 'file.ts',
     },
-    `
+    {
+      code: `
 function promiseInUnionWithExplicitReturnType(
   p: boolean,
 ): Promise<number> | number {
   return p ? Promise.resolve(5) : 5;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 function explicitReturnWithPromiseInUnion(): Promise<number> | number {
   return 5;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 async function asyncFunctionReturningUnion(p: boolean) {
   return p ? Promise.resolve(5) : 5;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 function overloadingThatCanReturnPromise(): Promise<number>;
 function overloadingThatCanReturnPromise(a: boolean): number;
 function overloadingThatCanReturnPromise(
@@ -190,7 +239,10 @@ function overloadingThatCanReturnPromise(
   return Promise.resolve(5);
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 function overloadingThatCanReturnPromise(a: boolean): number;
 function overloadingThatCanReturnPromise(): Promise<number>;
 function overloadingThatCanReturnPromise(
@@ -199,7 +251,10 @@ function overloadingThatCanReturnPromise(
   return Promise.resolve(5);
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 function a(): Promise<void>;
 function a(x: boolean): void;
 function a(x?: boolean) {
@@ -207,6 +262,8 @@ function a(x?: boolean) {
   throw new Error();
 }
     `,
+      filename: 'file.ts',
+    },
     {
       code: `
 function overloadingThatIncludeUnknown(): number;
@@ -215,7 +272,12 @@ function overloadingThatIncludeUnknown(a?: boolean): unknown | number {
   return Promise.resolve(5);
 }
       `,
-      options: [{ allowAny: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
     {
       code: `
@@ -225,7 +287,12 @@ function overloadingThatIncludeAny(a?: boolean): any | number {
   return Promise.resolve(5);
 }
       `,
-      options: [{ allowAny: true }],
+      filename: 'file.ts',
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
   ],
   invalid: [
@@ -235,17 +302,22 @@ function returnsAny(): any {
   return 0;
 }
       `,
-      errors: [
-        {
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           allowAny: false,
         },
       ],
-      output: null,
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `
@@ -253,17 +325,22 @@ function returnsUnknown(): unknown {
   return 0;
 }
       `,
-      errors: [
-        {
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           allowAny: false,
         },
       ],
-      output: null,
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
@@ -271,9 +348,15 @@ const nonAsyncPromiseFunctionExpressionA = function (p: Promise<void>) {
   return p;
 };
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 44,
+          endLine: 2,
+          endColumn: 53,
         },
       ],
       output: `
@@ -288,9 +371,15 @@ const nonAsyncPromiseFunctionExpressionB = function () {
   return new Promise<void>();
 };
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 44,
+          endLine: 2,
+          endColumn: 53,
         },
       ],
       output: `
@@ -305,9 +394,15 @@ function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
   return p;
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 45,
         },
       ],
       output: `
@@ -322,9 +417,15 @@ function nonAsyncPromiseFunctionDeclarationB() {
   return new Promise<void>();
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 45,
         },
       ],
       output: `
@@ -337,9 +438,15 @@ async function nonAsyncPromiseFunctionDeclarationB() {
       code: `
 const nonAsyncPromiseArrowFunctionA = (p: Promise<void>) => p;
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 58,
+          endLine: 2,
+          endColumn: 60,
         },
       ],
       output: `
@@ -350,9 +457,15 @@ const nonAsyncPromiseArrowFunctionA = async (p: Promise<void>) => p;
       code: `
 const nonAsyncPromiseArrowFunctionB = () => new Promise<void>();
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 42,
+          endLine: 2,
+          endColumn: 44,
         },
       ],
       output: `
@@ -367,10 +480,15 @@ const functions = {
   },
 };
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 24,
         },
       ],
       output: `
@@ -393,14 +511,23 @@ class Test {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 32,
         },
         {
-          line: 7,
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 7,
+          column: 3,
+          endLine: 7,
+          endColumn: 39,
         },
       ],
       output: `
@@ -433,25 +560,38 @@ class Test {
   }
 }
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 6,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 13,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           checkArrowFunctions: false,
         },
       ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 43,
+          endLine: 2,
+          endColumn: 52,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 6,
+          column: 1,
+          endLine: 6,
+          endColumn: 44,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 13,
+          column: 3,
+          endLine: 13,
+          endColumn: 31,
+        },
+      ],
       output: `
 const nonAsyncPromiseFunctionExpression = async function (p: Promise<void>) {
   return p;
@@ -488,25 +628,38 @@ class Test {
   }
 }
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 10,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 13,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           checkFunctionDeclarations: false,
         },
       ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 43,
+          endLine: 2,
+          endColumn: 52,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 10,
+          column: 57,
+          endLine: 10,
+          endColumn: 59,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 13,
+          column: 3,
+          endLine: 13,
+          endColumn: 31,
+        },
+      ],
       output: `
 const nonAsyncPromiseFunctionExpression = async function (p: Promise<void>) {
   return p;
@@ -543,23 +696,36 @@ class Test {
   }
 }
       `,
-      errors: [
-        {
-          line: 6,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 10,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 13,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           checkFunctionExpressions: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 6,
+          column: 1,
+          endLine: 6,
+          endColumn: 44,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 10,
+          column: 57,
+          endLine: 10,
+          endColumn: 59,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 13,
+          column: 3,
+          endLine: 13,
+          endColumn: 31,
         },
       ],
       output: `
@@ -598,23 +764,36 @@ class Test {
   }
 }
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 6,
-          messageId: 'missingAsync',
-        },
-        {
-          line: 10,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           checkMethodDeclarations: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 43,
+          endLine: 2,
+          endColumn: 52,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 6,
+          column: 1,
+          endLine: 6,
+          endColumn: 44,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 10,
+          column: 57,
+          endLine: 10,
+          endColumn: 59,
         },
       ],
       output: `
@@ -641,15 +820,20 @@ class PromiseType {}
 
 const returnAllowedType = () => new PromiseType();
       `,
-      errors: [
-        {
-          line: 4,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           allowedPromiseNames: ['PromiseType'],
+        },
+      ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 30,
+          endLine: 4,
+          endColumn: 32,
         },
       ],
       output: `
@@ -667,15 +851,20 @@ function foo(): Promise<string> | SPromise<boolean> {
     : Promise.resolve(false);
 }
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingAsync',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           allowedPromiseNames: ['SPromise'],
+        },
+      ],
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 13,
         },
       ],
       output: `
@@ -696,7 +885,17 @@ class Test {
   }
 }
       `,
-      errors: [{ column: 3, line: 4, messageId: 'missingAsync' }],
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 14,
+        },
+      ],
       output: `
 class Test {
   @decorator
@@ -707,7 +906,7 @@ class Test {
       `,
     },
     {
-      code: noFormat`
+      code: `
 class Test {
   @decorator(async () => {})
   static protected[(1)]() {
@@ -721,10 +920,32 @@ class Test {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
-        { column: 3, line: 4, messageId: 'missingAsync' },
-        { column: 3, line: 7, messageId: 'missingAsync' },
-        { column: 3, line: 10, messageId: 'missingAsync' },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 24,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 7,
+          column: 3,
+          endLine: 7,
+          endColumn: 14,
+        },
+        {
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 10,
+          column: 3,
+          endLine: 10,
+          endColumn: 17,
+        },
       ],
       output: `
 class Test {
@@ -741,7 +962,6 @@ class Test {
 }
       `,
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/5729
     {
       code: `
 class Foo {
@@ -759,21 +979,31 @@ class Foo {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 3,
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
           line: 3,
-          messageId: 'missingAsync',
+          column: 3,
+          endLine: 3,
+          endColumn: 8,
         },
         {
-          column: 3,
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
           line: 7,
-          messageId: 'missingAsync',
+          column: 3,
+          endLine: 7,
+          endColumn: 17,
         },
         {
-          column: 3,
-          line: 12,
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 12,
+          column: 3,
+          endLine: 12,
+          endColumn: 18,
         },
       ],
       output: `
@@ -801,11 +1031,15 @@ const foo = {
   },
 };
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 3,
-          line: 3,
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 8,
         },
       ],
       output: `
@@ -822,73 +1056,20 @@ function promiseInUnionWithoutExplicitReturnType(p: boolean) {
   return p ? Promise.resolve(5) : 5;
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          messageId: 'missingAsyncHybridReturn',
+          messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 49,
         },
       ],
       output: `
 async function promiseInUnionWithoutExplicitReturnType(p: boolean) {
   return p ? Promise.resolve(5) : 5;
-}
-      `,
-    },
-    {
-      code: `
-function test1(): 'one' | Promise<'one'>;
-function test1(a: number): Promise<number>;
-function test1(a?: number) {
-  if (a) {
-    return Promise.resolve(a);
-  }
-
-  return Math.random() > 0.5 ? 'one' : Promise.resolve('one');
-}
-      `,
-      errors: [
-        {
-          messageId: 'missingAsyncHybridReturn',
-        },
-      ],
-      output: `
-function test1(): 'one' | Promise<'one'>;
-function test1(a: number): Promise<number>;
-async function test1(a?: number) {
-  if (a) {
-    return Promise.resolve(a);
-  }
-
-  return Math.random() > 0.5 ? 'one' : Promise.resolve('one');
-}
-      `,
-    },
-    {
-      code: `
-class PromiseType {
-  s?: string;
-}
-
-function promiseInUnionWithoutExplicitReturnType(p: boolean) {
-  return p ? new PromiseType() : 5;
-}
-      `,
-      errors: [
-        {
-          messageId: 'missingAsyncHybridReturn',
-        },
-      ],
-      options: [
-        {
-          allowedPromiseNames: ['PromiseType'],
-        },
-      ],
-      output: `
-class PromiseType {
-  s?: string;
-}
-
-async function promiseInUnionWithoutExplicitReturnType(p: boolean) {
-  return p ? new PromiseType() : 5;
 }
       `,
     },
@@ -902,9 +1083,15 @@ function overloadingThatCanReturnPromise(
   return Promise.resolve(5);
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 41,
         },
       ],
       output: `
@@ -925,12 +1112,22 @@ function overloadingThatIncludeAny(a?: boolean): any | number {
   return Promise.resolve(5);
 }
       `,
+      filename: 'file.ts',
+      options: [
+        {
+          allowAny: false,
+        },
+      ],
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 35,
         },
       ],
-      options: [{ allowAny: false }],
     },
     {
       code: `
@@ -940,12 +1137,22 @@ function overloadingThatIncludeUnknown(a?: boolean): unknown | number {
   return Promise.resolve(5);
 }
       `,
+      filename: 'file.ts',
+      options: [
+        {
+          allowAny: false,
+        },
+      ],
       errors: [
         {
           messageId: 'missingAsync',
+          message: 'Functions that return promises must be async.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 39,
         },
       ],
-      options: [{ allowAny: false }],
     },
   ],
 });

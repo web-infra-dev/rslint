@@ -22,7 +22,7 @@ func TestNoDebuggerRule(t *testing.T) {
 			{
 				Code: `if (foo) debugger`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-debugger", Line: 1, Column: 10},
+					{MessageId: "unexpected", Line: 1, Column: 10},
 				},
 			},
 		},

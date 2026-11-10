@@ -95,7 +95,7 @@ const test = async (condition: boolean) =>
 		{
 			Code:    "const test = async () => await Promise.resolve(1);",
 			Options: "never",
-			Output:  []string{"const test = async () =>  Promise.resolve(1);"},
+			Output:  []string{`const test = async () => Promise.resolve(1);`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -589,7 +589,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  1;
+          return 1;
         }
       `,
 			},
@@ -610,7 +610,7 @@ class C<R extends unknown> {
 			Output: []string{`
         async function test() {
           const foo = 1;
-          return  { foo };
+          return { foo };
         }
       `,
 			},
@@ -631,7 +631,7 @@ class C<R extends unknown> {
 			Output: []string{`
         async function test() {
           const foo = 1;
-          return  foo;
+          return foo;
         }
       `,
 			},
@@ -644,7 +644,7 @@ class C<R extends unknown> {
 		},
 		{
 			Code:   "const test = async () => await 1;",
-			Output: []string{"const test = async () =>  1;"},
+			Output: []string{`const test = async () => 1;`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -654,7 +654,7 @@ class C<R extends unknown> {
 		},
 		{
 			Code:   "const test = async () => await /* comment */ 1;",
-			Output: []string{"const test = async () =>  /* comment */ 1;"},
+			Output: []string{`const test = async () => /* comment */ 1;`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "nonPromiseAwait",
@@ -664,7 +664,7 @@ class C<R extends unknown> {
 		},
 		{
 			Code:   "const test = async () => await Promise.resolve(1);",
-			Output: []string{"const test = async () =>  Promise.resolve(1);"},
+			Output: []string{`const test = async () => Promise.resolve(1);`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "disallowedPromiseAwait",
@@ -848,7 +848,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  Promise.resolve(1);
+          return Promise.resolve(1);
         }
       `,
 			},
@@ -867,7 +867,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  1;
+          return 1;
         }
       `,
 			},
@@ -881,7 +881,7 @@ class C<R extends unknown> {
 		},
 		{
 			Code:    "const test = async () => await 1;",
-			Output:  []string{"const test = async () =>  1;"},
+			Output:  []string{`const test = async () => 1;`},
 			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -892,7 +892,7 @@ class C<R extends unknown> {
 		},
 		{
 			Code:    "const test = async () => await Promise.resolve(1);",
-			Output:  []string{"const test = async () =>  Promise.resolve(1);"},
+			Output:  []string{`const test = async () => Promise.resolve(1);`},
 			Options: "in-try-catch",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -909,7 +909,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  Promise.resolve(1);
+          return Promise.resolve(1);
         }
       `,
 			},
@@ -929,7 +929,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  1;
+          return 1;
         }
       `,
 			},
@@ -964,7 +964,7 @@ class C<R extends unknown> {
 							Output: `
         async function test() {
           try {
-            return  Promise.resolve(1);
+            return Promise.resolve(1);
           } catch (e) {
             return await Promise.resolve(2);
           } finally {
@@ -986,7 +986,7 @@ class C<R extends unknown> {
           try {
             return await Promise.resolve(1);
           } catch (e) {
-            return  Promise.resolve(2);
+            return Promise.resolve(2);
           } finally {
             console.log('cleanup');
           }
@@ -1005,7 +1005,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  Promise.resolve(1);
+          return Promise.resolve(1);
         }
       `,
 			},
@@ -1025,7 +1025,7 @@ class C<R extends unknown> {
       `,
 			Output: []string{`
         async function test() {
-          return  1;
+          return 1;
         }
       `,
 			},
@@ -1158,7 +1158,7 @@ async function buzz() {
 async function foo() {}
 async function bar() {}
 async function buzz() {
-  return (await foo()) ?  1 : await bar();
+  return (await foo()) ? 1 : await bar();
 }
       `,
 			},
@@ -1209,7 +1209,7 @@ const buzz = async () => ((await foo()) ? await 1 : bar());
 			Output: []string{`
 async function foo() {}
 async function bar() {}
-const buzz = async () => ((await foo()) ?  1 : await bar());
+const buzz = async () => ((await foo()) ? 1 : await bar());
       `,
 			},
 			Options: "always",
@@ -1509,7 +1509,7 @@ async function func3() {
             }
             return await nested();
           } catch (error) {
-            return  Promise.resolve('error');
+            return Promise.resolve('error');
           }
         }
       `,
@@ -1761,7 +1761,7 @@ async function outerFunction() {
   };
 
   async function innerFunction() {
-    return  asyncFn();
+    return asyncFn();
   }
 }
       `,
@@ -1796,7 +1796,7 @@ async function outerFunction() {
     },
   };
 
-  const innerFunction = async () =>  asyncFn();
+  const innerFunction = async () => asyncFn();
 }
       `,
 			},
@@ -1816,7 +1816,7 @@ async function wrapper<T extends number>(value: T) {
       `,
 			Output: []string{`
 async function wrapper<T extends number>(value: T) {
-  return  value;
+  return value;
 }
       `,
 			},
@@ -1838,7 +1838,7 @@ class C<T> {
 			Output: []string{`
 class C<T> {
   async wrapper<T extends string>(value: T) {
-    return  value;
+    return value;
   }
 }
       `,
@@ -1861,7 +1861,7 @@ class C<R extends number> {
 			Output: []string{`
 class C<R extends number> {
   async wrapper<T extends R>(value: T) {
-    return  value;
+    return value;
   }
 }
       `,

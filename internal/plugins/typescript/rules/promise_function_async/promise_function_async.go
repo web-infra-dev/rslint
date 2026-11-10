@@ -2,6 +2,7 @@ package promise_function_async
 
 import (
 	_ "embed"
+	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -131,8 +132,7 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
 				if !opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
 					// Report without auto fixer because the return type is unknown
-					// TODO(port): getFunctionHeadLoc
-					ctx.ReportNode(node, buildMissingAsyncMessage())
+					ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, node), buildMissingAsyncMessage())
 					return
 				}
 
@@ -148,12 +148,29 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			insertAsyncBeforeNode := node
-			if ast.IsMethodDeclaration(node) {
-				insertAsyncBeforeNode = node.Name()
+			insertAt := utils.TrimNodeTextRange(ctx.SourceFile, node).Pos()
+			text := "async "
+			if ast.IsFunctionDeclaration(node) {
+				// Export modifiers belong to ESTree's wrapper, not the function.
+				insertAt = utils.FindFunctionKeywordPos(ctx.SourceFile, node)
+			} else if ast.IsMethodDeclaration(node) {
+				insertAt = utils.TrimNodeTextRange(ctx.SourceFile, node.Name()).Pos()
+				if previous, ok := utils.TokenBeforePosition(ctx.SourceFile, insertAt); ok {
+					// Match SourceCode.isSpaceBetween: comments alone do not
+					// count as whitespace, but gaps around them do.
+					end := previous.End
+					comments := ctx.Comments.All()
+					i := sort.Search(len(comments), func(i int) bool { return comments[i].End() > end })
+					for ; i < len(comments) && comments[i].Pos() == end && comments[i].End() <= insertAt; i++ {
+						end = comments[i].End()
+					}
+					if end == insertAt {
+						text = " " + text
+					}
+				}
 			}
-			// TODO(port): getFunctionHeadLoc
-			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(), rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, " async "))
+			insertion := node.Loc.WithPos(insertAt).WithEnd(insertAt)
+			ctx.ReportRangeWithFixes(utils.GetFunctionHeadLoc(ctx.SourceFile, node), buildMissingAsyncMessage(), rule.RuleFixReplaceRange(insertion, text))
 		}
 
 		if opts.CheckArrowFunctions {

@@ -702,12 +702,10 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 						{
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
-        const o = 
-          Object.fromEntries(new Map([
+        const o = Object.fromEntries(new Map([
             ['test-1', 1],
             ['test-2', 2],
-          ]))
-        ;
+          ]));
       `,
 						},
 					},
@@ -738,7 +736,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
           ['test-2', 2],
         ]);
 
-        const o =  Object.fromEntries(map) ;
+        const o = Object.fromEntries(map);
       `,
 						},
 					},
@@ -761,7 +759,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const map: Map<string, number>;
-        const o =  Object.fromEntries(map) ;
+        const o = Object.fromEntries(map);
       `,
 						},
 					},
@@ -784,7 +782,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const map: Map<string, number>;
-        const o =  Object.fromEntries((map)) ;
+        const o = Object.fromEntries(map);
       `,
 						},
 					},
@@ -807,7 +805,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const map: Map<string, number>;
-        const o =  Object.fromEntries((map, map)) ;
+        const o = Object.fromEntries((map, map));
       `,
 						},
 					},
@@ -878,7 +876,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const map: ReadonlyMap<string, number>;
-        const o =  Object.fromEntries(map) ;
+        const o = Object.fromEntries(map);
       `,
 						},
 					},
@@ -901,7 +899,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const map: WeakMap<{ a: number }, string>;
-        const o =  Object.fromEntries(map) ;
+        const o = Object.fromEntries(map);
       `,
 						},
 					},
@@ -938,7 +936,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare function getMap(): Map<string, number>;
-        const o =  Object.fromEntries(getMap()) ;
+        const o = Object.fromEntries(getMap());
       `,
 						},
 					},
@@ -961,7 +959,7 @@ func TestNoMisusedSpreadRule(t *testing.T) {
 							MessageId: "replaceMapSpreadInObject",
 							Output: `
         declare const a: Map<boolean, string> & Set<number>;
-        const o =  Object.fromEntries(a) ;
+        const o = Object.fromEntries(a);
       `,
 						},
 					},
