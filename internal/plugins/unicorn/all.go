@@ -76,6 +76,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_last_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_bigint_literals"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_blob_reading_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_block_statement_over_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_boolean_return"
@@ -195,6 +196,7 @@ func GetAllRules() []rule.Rule {
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_array_last_methods.PreferArrayLastMethodsRule,
 		prefer_array_some.PreferArraySomeRule,
+		prefer_bigint_literals.PreferBigIntLiteralsRule,
 		prefer_blob_reading_methods.PreferBlobReadingMethodsRule,
 		prefer_block_statement_over_iife.PreferBlockStatementOverIIFERule,
 		prefer_boolean_return.PreferBooleanReturnRule,
