@@ -43,6 +43,10 @@ For example, given `const values = [, 1]`,
 `values.findIndex(value => value === undefined)` returns `0` because the callback
 visits the hole. `values.indexOf(undefined)` skips the hole and returns `-1`.
 
+Rslint offers a suggestion when the search value might be `undefined` and the
+receiver could have holes. This covers arrays accessed through a property and
+arrays made sparse by `delete` or a `length` assignment.
+
 Rslint keeps the callback when moving the search value would take a TypeScript
 type parameter out of scope or change a reference to `new.target`, `this`, or
 `arguments`. In this example, `T` is available only inside the callback.

@@ -4,46 +4,98 @@ import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+type arrayDensity uint8
+
+const (
+	unknownDensity arrayDensity = iota
+	denseArray
+	sparseArray
+)
+
 // findIndex/findLastIndex visit holes as undefined, but indexOf/lastIndexOf
-// skip them. Follow stable initializers to find literals or constructors that
-// can create holes.
-func hasSparseReceiver(ctx rule.RuleContext, receiver *ast.Node, getEvaluator func() *utils.StaticStringEvaluator) bool {
+// skip them. An array reached through a binding can have holes even when its
+// initializer was dense, for example after delete or a length assignment.
+func receiverDensity(ctx rule.RuleContext, receiver *ast.Node, getEvaluator func() *utils.StaticStringEvaluator) arrayDensity {
 	seen := make(map[*ast.Node]bool)
-	for receiver = utils.SkipAssertionsAndParens(receiver); receiver != nil; receiver = utils.SkipAssertionsAndParens(receiver) {
-		switch receiver.Kind {
-		case ast.KindArrayLiteralExpression:
-			return slices.ContainsFunc(receiver.Elements(), ast.IsOmittedExpression)
-		case ast.KindIdentifier:
-			if seen[receiver] {
-				return false
-			}
-			seen[receiver] = true
-			initializer, ok := getEvaluator().ResolveIdentifierInitializer(receiver)
-			if !ok {
-				return false
-			}
-			receiver = initializer
-		case ast.KindCallExpression, ast.KindNewExpression:
-			callee := utils.ESTreeRuntimeExpression(receiver.Expression())
-			args := receiver.Arguments()
-			if len(args) != 1 || callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "Array" ||
-				!ctx.Globals.Access("Array").IsDeclared() || !unicornutil.IsGlobalReference(ctx, callee) {
-				return false
-			}
+	receiver = utils.SkipAssertionsAndParens(receiver)
+	for receiver != nil && ast.IsIdentifier(receiver) {
+		if seen[receiver] {
+			return unknownDensity
+		}
+		seen[receiver] = true
+		initializer, ok := getEvaluator().ResolveIdentifierInitializer(receiver)
+		if !ok {
+			return unknownDensity
+		}
+		receiver = utils.SkipAssertionsAndParens(initializer)
+	}
+	if receiver == nil {
+		return unknownDensity
+	}
+	density := arrayCreationDensity(ctx, receiver, getEvaluator)
+	if density == denseArray && len(seen) > 0 {
+		return unknownDensity
+	}
+	return density
+}
+
+func arrayCreationDensity(ctx rule.RuleContext, receiver *ast.Node, getEvaluator func() *utils.StaticStringEvaluator) arrayDensity {
+	switch receiver.Kind {
+	case ast.KindArrayLiteralExpression:
+		if slices.ContainsFunc(receiver.Elements(), ast.IsOmittedExpression) {
+			return sparseArray
+		}
+		return denseArray
+	case ast.KindCallExpression, ast.KindNewExpression:
+		callee := utils.ESTreeRuntimeExpression(receiver.Expression())
+		if callee == nil || !ast.IsIdentifier(callee) || callee.Text() != "Array" ||
+			!ctx.Globals.Access("Array").IsDeclared() || !unicornutil.IsGlobalReference(ctx, callee) {
+			return unknownDensity
+		}
+		args := receiver.Arguments()
+		if slices.ContainsFunc(args, ast.IsSpreadElement) {
+			return unknownDensity
+		}
+		if len(args) == 1 {
 			value, known := getEvaluator().EvalValueIfNoSideEffects(args[0])
 			length, numeric := value.(jsnum.Number)
-			return !known || (numeric && length > 0)
-		default:
-			return false
+			if !known || (numeric && length > 0) {
+				return sparseArray
+			}
 		}
+		return denseArray
+	default:
+		return unknownDensity
 	}
-	return false
+}
+
+func mayBeUndefined(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, value *ast.Node) bool {
+	value = utils.SkipAssertionsAndParens(value)
+	if ast.IsLiteralExpression(value) || value.Kind == ast.KindNullKeyword {
+		return false
+	}
+	if value.Kind == ast.KindMetaProperty && value.AsMetaProperty().KeywordToken == ast.KindNewKeyword {
+		// An ordinary function call can leave new.target undefined.
+		return true
+	}
+	if nullish, known := evaluator.EvalControlFlowNullish(value); known {
+		return nullish
+	}
+	tc := ctx.TypeChecker
+	if tc == nil {
+		return true
+	}
+	valueType := utils.GetConstrainedTypeAtLocation(tc, value)
+	// Keep null in the target type because only undefined can match a hole.
+	defined := tc.GetUnionType([]*checker.Type{tc.GetNonNullableType(valueType), tc.GetNullType()})
+	return tc.IsTypeAssignableTo(tc.GetUndefinedType(), defined) || !tc.IsTypeAssignableTo(valueType, defined)
 }
 
 func requiresSuggestion(evaluator *utils.StaticStringEvaluator, value *ast.Node) bool {

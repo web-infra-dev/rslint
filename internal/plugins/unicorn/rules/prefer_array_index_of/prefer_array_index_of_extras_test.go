@@ -43,31 +43,46 @@ func TestPreferArrayIndexOfExtras(t *testing.T) {
 	invalid := []rule_tester.InvalidTestCase{
 		first.invalid("case.js", `const label = '🧪'; values.FIND((x) => ((x) === ((label))));`,
 			`const label = '🧪'; values.INDEX((label));`, ""),
-		first.invalid("case.js", `(values.FIND)(x => x === needle);`, `(values.INDEX)(needle);`, ""),
-		last.invalid("case.js", `values?.items.FIND(x => x === needle);`, `values?.items.INDEX(needle);`, ""),
-		last.invalid("case.js", `(values?.items).FIND(x => x === needle);`, `(values?.items).INDEX(needle);`, ""),
-		first.invalid("case.jsx", `<List index={values.FIND(x => x === needle)} />;`, `<List index={values.INDEX(needle)} />;`, ""),
+		first.invalid("case.js", `(values.FIND)(x => x === needle);`, "", `(values.INDEX)(needle);`),
+		last.invalid("case.js", `values?.items.FIND(x => x === needle);`, "", `values?.items.INDEX(needle);`),
+		last.invalid("case.js", `(values?.items).FIND(x => x === needle);`, "", `(values?.items).INDEX(needle);`),
+		first.invalid("case.jsx", `<List index={values.FIND(x => x === needle)} />;`, "", `<List index={values.INDEX(needle)} />;`),
 		first.invalid("case.js", `values.FIND(x => x === item.x);`, "", `values.INDEX(item.x);`),
 		first.invalid("case.js", `[0, 2].FIND(x => x === ({ value: 2 }).value);`, `[0, 2].INDEX(({ value: 2 }).value);`, ""),
 		first.invalid("case.js", `let reads = 0; const target = { get value() { return ++reads; } }; [0, 2].FIND(x => x === target.value);`, "",
 			`let reads = 0; const target = { get value() { return ++reads; } }; [0, 2].INDEX(target.value);`),
 		first.invalid("case.js", `Array(0).FIND(x => x === undefined);`, `Array(0).INDEX(undefined);`, ""),
 		last.invalid("case.js", `new Array("item").FIND(x => x === "item");`, `new Array("item").INDEX("item");`, ""),
-		first.invalid("case.js", `function lookup(Array) { return Array(2).FIND(x => x === needle); }`,
-			`function lookup(Array) { return Array(2).INDEX(needle); }`, ""),
+		first.invalid("case.js", `function lookup(Array) { return Array(2).FIND(x => x === needle); }`, "",
+			`function lookup(Array) { return Array(2).INDEX(needle); }`),
+		// A dense initializer does not prove that a bound receiver stays dense.
+		first.invalid("case.js", `const object = { values: [, 1] }; object.values.FIND(x => x === undefined);`, "",
+			`const object = { values: [, 1] }; object.values.INDEX(undefined);`),
+		last.invalid("case.ts", `const object = { values: [1, , 2] }; object.values.FIND(x => x === undefined);`, "",
+			`const object = { values: [1, , 2] }; object.values.INDEX(undefined);`),
+		first.invalid("case.ts", `const values: (number | undefined)[] = [0, 1]; delete values[0]; values.FIND(x => x === undefined);`, "",
+			`const values: (number | undefined)[] = [0, 1]; delete values[0]; values.INDEX(undefined);`),
+		last.invalid("case.ts", `const values: (number | undefined)[] = [1]; values.length = 2; values.FIND(x => x === void 0);`, "",
+			`const values: (number | undefined)[] = [1]; values.length = 2; values.INDEX(void 0);`),
+		last.invalid("case.js", `const object = { values: [, 1] }; object.values.FIND(x => x === 1);`,
+			`const object = { values: [, 1] }; object.values.INDEX(1);`, ""),
+		first.invalid("case.ts", `function search(values: (number | undefined)[], needle?: number) { return values.FIND(x => x === needle!); }`, "",
+			`function search(values: (number | undefined)[], needle?: number) { return values.INDEX(needle!); }`),
+		first.invalid("case.ts", `function search<T extends number | null>(values: T[], needle: T) { return values.FIND(x => x === needle); }`,
+			`function search<T extends number | null>(values: T[], needle: T) { return values.INDEX(needle); }`, ""),
 		first.invalid("case.js", `values.FIND(x => x === ((x) => x)(needle));`, "", `values.INDEX(((x) => x)(needle));`),
-		last.invalid("case.js", `function outer() { return values.FIND(x => x === new.target); }`,
-			`function outer() { return values.INDEX(new.target); }`, ""),
+		last.invalid("case.js", `function outer() { return values.FIND(x => x === new.target); }`, "",
+			`function outer() { return values.INDEX(new.target); }`),
 		first.invalid("case.js", "values.FIND(x => x === makeValue`ready`);", "", "values.INDEX(makeValue`ready`);"),
 		last.invalid("case.js", `values.FIND(x => x === /* keep */ next());`, "", ""),
-		first.invalid("case.js", `values.FIND(/* before */ x => x === needle /* after */);`,
-			`values.INDEX(/* before */ needle /* after */);`, ""),
+		first.invalid("case.js", `values.FIND(/* before */ x => x === needle /* after */);`, "",
+			`values.INDEX(/* before */ needle /* after */);`),
 		first.invalid("case.js", `values.FIND(x => (/** @type {boolean} */ (x === needle)));`, "", ""),
 		first.invalid("case.js", `const values = ["foo"]; const needle = "foo"; values.FIND((/** @type {(x: string) => boolean} */ (x => x === needle)));`, "", ""),
 		first.invalid("case.js", `const values = ["foo"]; const needle = "foo"; values.FIND(/** @this {{name: string}} */ function (x) { return x === needle; });`,
 			`const values = ["foo"]; const needle = "foo"; values.INDEX(/** @this {{name: string}} */ needle);`, ""),
-		first.invalid("case.ts", `declare const values: unknown[], needle: unknown; values.FIND(<T>(x: T) => x === needle);`,
-			`declare const values: unknown[], needle: unknown; values.INDEX(needle);`, ""),
+		first.invalid("case.ts", `declare const values: unknown[], needle: unknown; values.FIND(<T>(x: T) => x === needle);`, "",
+			`declare const values: unknown[], needle: unknown; values.INDEX(needle);`),
 		last.invalid("case.js", `class Search { #id = "foo"; index(values) { return values.FIND(x => x === this.#id); } }`, "",
 			`class Search { #id = "foo"; index(values) { return values.INDEX(this.#id); } }`),
 	}
@@ -75,7 +90,7 @@ func TestPreferArrayIndexOfExtras(t *testing.T) {
 }
 
 func TestPreferArrayIndexOfEditDemand(t *testing.T) {
-	const code = "values.findIndex(x => x === needle);\n" +
+	const code = "values.findIndex(x => x === 2);\n" +
 		"values.findLastIndex(x => x === next());\n" +
 		"values.findIndex(x => x === /* keep */ next());"
 	root := fixtures.GetRootDir()

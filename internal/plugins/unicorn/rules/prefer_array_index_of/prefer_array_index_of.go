@@ -78,8 +78,11 @@ var PreferArrayIndexOfRule = rule.Rule{
 					replacement = &lastIndexOf
 				}
 				value := utils.ESTreeRuntimeExpression(search.value)
-				if incompatibleSearchValue(ctx, call, replacement.method, value) ||
-					hasSparseReceiver(ctx, call.Object, getEvaluator) || search.usesCallbackBindings(ctx, callback) {
+				if incompatibleSearchValue(ctx, call, replacement.method, value) || search.usesCallbackBindings(ctx, callback) {
+					return
+				}
+				density := receiverDensity(ctx, call.Object, getEvaluator)
+				if density == sparseArray {
 					return
 				}
 
@@ -101,7 +104,9 @@ var PreferArrayIndexOfRule = rule.Rule{
 						}
 						// The replacement evaluates the search value once, even for an empty array.
 						editKind = rule.EditDemandAutofix
-						if requiresSuggestion(getEvaluator(), value) {
+						evaluator := getEvaluator()
+						if requiresSuggestion(evaluator, value) ||
+							(density != denseArray && mayBeUndefined(ctx, evaluator, value)) {
 							editKind = rule.EditDemandSuggestion
 						}
 					}

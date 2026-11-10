@@ -149,7 +149,7 @@ const syntaxCases: SearchCase[] = [
   {
     code: 'values.FIND(item => item === target);',
     reports: true,
-    fixed: 'values.INDEX(target);',
+    suggested: 'values.INDEX(target);',
   },
   {
     code: 'values.FIND(item => item === target.id);',
@@ -174,12 +174,12 @@ const syntaxCases: SearchCase[] = [
   {
     code: 'values.FIND(item => item === +1n);',
     reports: true,
-    fixed: 'values.INDEX(+1n);',
+    suggested: 'values.INDEX(+1n);',
   },
   {
     code: 'values.FIND(item => item === undefined);',
     reports: true,
-    fixed: 'values.INDEX(undefined);',
+    suggested: 'values.INDEX(undefined);',
   },
   {
     code: 'values.FIND(item => item === /item/u);',
@@ -205,32 +205,32 @@ const syntaxCases: SearchCase[] = [
     code: 'const values = ["small", "medium", "large"] as const; declare const input: string; values.FIND(value => value === input);',
     extension: 'ts',
     reports: true,
-    fixed:
+    suggested:
       'const values = ["small", "medium", "large"] as const; declare const input: string; values.INDEX(input);',
   },
   {
     code: 'values.FIND(item => item === (target as number));',
     extension: 'ts',
     reports: true,
-    fixed: 'values.INDEX((target as number));',
+    suggested: 'values.INDEX((target as number));',
   },
   {
     code: 'values.FIND(item => item === (target satisfies number));',
     extension: 'ts',
     reports: true,
-    fixed: 'values.INDEX((target satisfies number));',
+    suggested: 'values.INDEX((target satisfies number));',
   },
   {
     code: 'values.FIND(item => item === target!);',
     extension: 'ts',
     reports: true,
-    fixed: 'values.INDEX(target!);',
+    suggested: 'values.INDEX(target!);',
   },
   {
     code: 'values.FIND(item => item === <number>target);',
     extension: 'ts',
     reports: true,
-    fixed: 'values.INDEX(<number>target);',
+    suggested: 'values.INDEX(<number>target);',
   },
   {
     code: 'values.FIND(item => item === (-2 as number));',
@@ -385,6 +385,8 @@ const typedCases: SearchCase[] = (
       'function check<Type>(input: Type, values: readonly Type[]) { return values.SEARCH; }',
       'value => value === input',
       'input',
+      'ts',
+      true,
     ],
     // compatible constrained receiver
     [
@@ -397,6 +399,8 @@ const typedCases: SearchCase[] = (
       'declare const values: (string | undefined)[]; declare const input: string | undefined; values.SEARCH;',
       'value => value === input',
       'input',
+      'ts',
+      true,
     ],
     // compatible union receiver
     [
@@ -454,7 +458,7 @@ const typedCases: SearchCase[] = (
       'input',
     ],
   ] satisfies [string, string, string?, ('js' | 'ts')?, boolean?][]
-).map(([template, callback, value, extension = 'ts', sideEffect = false]) => {
+).map(([template, callback, value, extension = 'ts', suggestion = false]) => {
   const code = template.replace('SEARCH', `FIND(${callback})`);
   if (value === undefined) return { code, extension };
   const output = template.replace('SEARCH', `INDEX(${value})`);
@@ -462,7 +466,7 @@ const typedCases: SearchCase[] = (
     code,
     extension,
     reports: true,
-    ...(sideEffect ? { suggested: output } : { fixed: output }),
+    ...(suggestion ? { suggested: output } : { fixed: output }),
   };
 });
 
