@@ -1061,5 +1061,37 @@
       "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
       "releaseVersion": null
     }
+  },
+  {
+    "version": "0.10.1",
+    "rules": [
+      "eslint-plugin-import:no-relative-packages",
+      "eslint-plugin-unicorn:no-chained-comparison",
+      "eslint-plugin-unicorn:no-constant-zero-expression",
+      "eslint-plugin-unicorn:no-double-comparison",
+      "eslint-plugin-unicorn:no-invalid-character-comparison",
+      "eslint-plugin-unicorn:no-redundant-comparison",
+      "eslint-plugin-unicorn:no-useless-fallback-in-spread",
+      "eslint-plugin-unicorn:no-useless-length-check",
+      "eslint-plugin-unicorn:prefer-block-statement-over-iife",
+      "eslint-plugin-unicorn:prefer-boolean-return",
+      "eslint-plugin-unicorn:prefer-export-from",
+      "eslint-plugin-unicorn:prefer-global-this",
+      "eslint-plugin-unicorn:prefer-math-trunc",
+      "eslint-plugin-unicorn:prefer-modern-math-apis",
+      "eslint-plugin-unicorn:prefer-module",
+      "eslint-plugin-unicorn:prefer-object-from-entries",
+      "eslint-plugin-unicorn:prefer-query-selector",
+      "eslint-plugin-unicorn:prefer-regexp-test",
+      "eslint-plugin-unicorn:prefer-string-raw",
+      "eslint-plugin-unicorn:prefer-string-slice",
+      "eslint-plugin-unicorn:prefer-string-starts-ends-with",
+      "eslint-plugin-unicorn:prefer-unary-minus",
+      "eslint-plugin-unicorn:prefer-while-loop-condition"
+    ],
+    "typescript": {
+      "commit": "1f70213d4922b434345f639b441681e470c7cfc1",
+      "releaseVersion": null
+    }
   }
 ]
