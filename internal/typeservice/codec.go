@@ -19,6 +19,9 @@ const (
 	packetSymbol
 	packetSignature
 	packetNodes
+	packetIndexInfos
+	packetTypePredicate
+	packetNamedSymbols
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -38,18 +41,24 @@ func EncodePacket(result Result) ([]byte, error) {
 	case Handles:
 		kind, words = packetHandles, 1
 	case *TypeFact:
-		kind, words = packetType, 9
+		kind, words = packetType, 13
 	case *SymbolFact:
 		kind, words = packetSymbol, 5
 	case *SignatureFact:
-		kind, words = packetSignature, 2
+		kind, words = packetSignature, 5
 	case NodeFacts:
 		kind, words = packetNodes, 1
+	case IndexInfos:
+		kind, words = packetIndexInfos, 1
+	case *TypePredicateFact:
+		kind, words = packetTypePredicate, 4
+	case NamedSymbols:
+		kind, words = packetNamedSymbols, 1
 	default:
 		return nil, errors.New("unsupported semantic fact")
 	}
 	w := packetWriter{data: make([]byte, 8+words*4), strings: make(map[string]uint32)}
-	copy(w.data, "RTS4")
+	copy(w.data, "RTS5")
 	w.put(4, kind)
 	switch fact := result.(type) {
 	case Handle:
@@ -61,6 +70,9 @@ func EncodePacket(result Result) ([]byte, error) {
 	case Text:
 		w.put(8, w.text(string(fact)))
 	case Handles:
+		if fact == nil {
+			fact = Handles{}
+		}
 		w.put(8, w.ids(fact))
 	case *TypeFact:
 		flags := make([]uint32, 0, len(fact.Flags))
@@ -90,7 +102,7 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(offset+4, w.text(fact.Literal.Text))
 			w.put(28, offset)
 		}
-		w.put(32, w.ids(fact.Types))
+		w.put(32, w.ids(fact.TypeOperands))
 		if fact.EscapedName != "" {
 			w.put(36, w.text(fact.EscapedName))
 		}
@@ -100,6 +112,18 @@ func EncodePacket(result Result) ([]byte, error) {
 				flags = append(flags, w.text(flag))
 			}
 			w.put(40, w.ids(flags))
+		}
+		w.put(44, fact.Target)
+		w.put(48, w.ids(fact.AliasTypeArguments))
+		w.put(52, w.ids(fact.TypeParameters))
+		if fact.Tuple != nil {
+			offset := uint32(len(w.data))
+			w.data = append(w.data, make([]byte, 8)...)
+			w.put(offset, fact.Tuple.CombinedFlags)
+			if fact.Tuple.Readonly {
+				w.put(offset+4, 1)
+			}
+			w.put(56, offset)
 		}
 	case *SymbolFact:
 		w.put(8, w.text(fact.Name))
@@ -136,6 +160,42 @@ func EncodePacket(result Result) ([]byte, error) {
 	case *SignatureFact:
 		w.put(8, w.ids(fact.Parameters))
 		w.put(12, w.node(fact.Declaration))
+		w.put(16, w.ids(fact.TypeParameters))
+		w.put(20, fact.ThisParameter)
+		w.put(24, uint32(fact.MinArgumentCount))
+	case IndexInfos:
+		offset := uint32(len(w.data))
+		w.data = append(w.data, make([]byte, 4+len(fact)*16)...)
+		w.put(offset, uint32(len(fact)))
+		for i, info := range fact {
+			at := offset + 4 + uint32(i)*16
+			w.put(at, info.KeyType)
+			w.put(at+4, info.Type)
+			if info.IsReadonly {
+				w.put(at+8, 1)
+			}
+			w.put(at+12, w.node(info.Declaration))
+		}
+		w.put(8, offset)
+	case *TypePredicateFact:
+		if fact != nil {
+			w.put(8, fact.Kind+1)
+			if fact.ParameterName != nil {
+				w.put(12, w.text(*fact.ParameterName))
+				w.put(16, uint32(fact.ParameterIndex))
+			}
+			w.put(20, fact.Type)
+		}
+	case NamedSymbols:
+		offset := uint32(len(w.data))
+		w.data = append(w.data, make([]byte, 4+len(fact)*8)...)
+		w.put(offset, uint32(len(fact)))
+		for i, symbol := range fact {
+			at := offset + 4 + uint32(i)*8
+			w.put(at, symbol.ID)
+			w.put(at+4, w.text(symbol.Name))
+		}
+		w.put(8, offset)
 	}
 	if uint64(len(w.data)) > math.MaxUint32 {
 		return nil, errors.New("semantic fact exceeds packet limit")

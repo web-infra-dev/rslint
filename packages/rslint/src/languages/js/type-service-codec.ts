@@ -6,6 +6,9 @@ import type {
   TypeFact,
   SymbolFact,
   SignatureFact,
+  IndexInfoFact,
+  TypePredicateFact,
+  NamedSymbolFact,
   ScalarOperation,
   QueryResults,
 } from './type-service-protocol.js';
@@ -24,9 +27,9 @@ export class TypePacketReader {
   constructor(bytes: Uint8Array) {
     this.bytes = bytes;
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (bytes.length < 12 || this.word(0) !== 0x34535452) invalid();
+    if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 9, 5, 2, 1][this.kind];
+    const words = [0, 1, 1, 1, 1, 13, 5, 5, 1, 1, 4, 1][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -68,6 +71,10 @@ export class TypePacketReader {
     return Array.from({ length: size }, (_, i) =>
       this.word(offset + 4 + i * 4),
     );
+  }
+  private optionalIDs(at: number): number[] | undefined {
+    const offset = this.word(at);
+    return offset ? this.ids(offset) : undefined;
   }
   private node(offset: number): NodeRef | undefined {
     return offset
@@ -122,9 +129,26 @@ export class TypePacketReader {
           : undefined;
         break;
       }
-      case 'types': {
-        const at = this.word(32);
-        value = at ? this.ids(at) : undefined;
+      case 'typeOperands':
+        value = this.optionalIDs(32);
+        break;
+      case 'target':
+        value = this.word(44);
+        break;
+      case 'aliasTypeArguments':
+        value = this.optionalIDs(48);
+        break;
+      case 'typeParameters':
+        value = this.optionalIDs(52);
+        break;
+      case 'tuple': {
+        const at = this.word(56);
+        value = at
+          ? {
+              combinedFlags: this.word(at),
+              readonly: this.word(at + 4) !== 0,
+            }
+          : undefined;
         break;
       }
       case 'value': {
@@ -184,13 +208,64 @@ export class TypePacketReader {
   }
   signatureField<K extends keyof SignatureFact>(field: K): SignatureFact[K] {
     if (this.kind !== 7) return invalid();
-    return (
-      field === 'parameters' ? this.ids(this.word(8)) : this.node(this.word(12))
-    ) as SignatureFact[K];
+    let value: SignatureFact[keyof SignatureFact];
+    switch (field) {
+      case 'parameters':
+        value = this.ids(this.word(8));
+        break;
+      case 'declaration':
+        value = this.node(this.word(12));
+        break;
+      case 'typeParameters':
+        value = this.optionalIDs(16);
+        break;
+      case 'thisParameter':
+        value = this.word(20);
+        break;
+      case 'minArgumentCount':
+        value = this.word(24);
+        break;
+    }
+    return value as SignatureFact[K];
+  }
+  private indexInfos(): readonly IndexInfoFact[] {
+    const at = this.word(8),
+      count = this.word(at);
+    if (at + 4 + count * 16 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 16;
+      return {
+        keyType: this.word(pos),
+        type: this.word(pos + 4),
+        isReadonly: this.word(pos + 8) !== 0,
+        declaration: this.node(this.word(pos + 12)),
+      };
+    });
+  }
+  private typePredicate(): TypePredicateFact | undefined {
+    const kind = this.word(8),
+      name = this.word(12);
+    return kind
+      ? {
+          kind: kind - 1,
+          parameterName: name ? this.text(name) : undefined,
+          parameterIndex: name ? this.word(16) | 0 : undefined,
+          type: this.word(20),
+        }
+      : undefined;
+  }
+  private namedSymbols(): readonly NamedSymbolFact[] {
+    const at = this.word(8),
+      count = this.word(at);
+    if (at + 4 + count * 8 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 8;
+      return { id: this.word(pos), name: this.text(this.word(pos + 4)) };
+    });
   }
   scalar<K extends ScalarOperation>(operation: K): QueryResults[K] {
     if (this.kind !== SCALAR_KINDS[operation]) return invalid();
-    let value: number | boolean | string | readonly number[];
+    let value: QueryResults[ScalarOperation];
     switch (this.kind) {
       case 1:
         value = this.word(8);
@@ -203,6 +278,15 @@ export class TypePacketReader {
         break;
       case 4:
         value = this.ids(this.word(8));
+        break;
+      case 9:
+        value = this.indexInfos();
+        break;
+      case 10:
+        value = this.typePredicate();
+        break;
+      case 11:
+        value = this.namedSymbols();
         break;
       default:
         return invalid();

@@ -52,8 +52,9 @@ type SignatureRequest struct {
 }
 type VoidRequest struct{}
 type PropertyRequest struct {
-	ID   uint32 `json:"id"`
-	Name Name   `json:"name"`
+	Op   Operation `json:"-"`
+	ID   uint32    `json:"id"`
+	Name Name      `json:"name"`
 }
 type SymbolTypeRequest struct {
 	ID   uint32  `json:"id"`
@@ -63,6 +64,29 @@ type SignaturesRequest struct {
 	ID   uint32 `json:"id"`
 	Kind uint32 `json:"kind"`
 }
+type AssignableRequest struct {
+	Source uint32 `json:"source"`
+	Target uint32 `json:"target"`
+}
+type IndexInfoRequest struct {
+	ID   uint32 `json:"id"`
+	Kind uint32 `json:"kind"`
+}
+type ScopeSymbolsRequest struct {
+	Node    NodeRef `json:"node"`
+	Meaning int32   `json:"meaning"`
+}
+type ParameterTypeRequest struct {
+	ID       uint32 `json:"id"`
+	Position int    `json:"position"`
+}
+type PrintRequest struct {
+	Op    Operation `json:"-"`
+	ID    uint32    `json:"id"`
+	Node  *NodeRef  `json:"node"`
+	Flags *uint32   `json:"flags"`
+	Kind  uint32    `json:"kind"` // SignatureKind, defaults to Call.
+}
 type ResolveNameRequest struct {
 	Name           Name     `json:"name"`
 	Node           *NodeRef `json:"node"`
@@ -70,14 +94,21 @@ type ResolveNameRequest struct {
 	ExcludeGlobals bool     `json:"excludeGlobals"`
 }
 
-func (r *NodeRequest) operation() Operation      { return r.Op }
-func (r *TypeRequest) operation() Operation      { return r.Op }
-func (r *SymbolRequest) operation() Operation    { return r.Op }
-func (r *SignatureRequest) operation() Operation { return r.Op }
-func (*VoidRequest) operation() Operation        { return "void" }
-func (*PropertyRequest) operation() Operation    { return "property" }
-func (*SymbolTypeRequest) operation() Operation  { return "symbolType" }
-func (*SignaturesRequest) operation() Operation  { return "signatures" }
+func (r *NodeRequest) operation() Operation       { return r.Op }
+func (r *TypeRequest) operation() Operation       { return r.Op }
+func (r *SymbolRequest) operation() Operation     { return r.Op }
+func (r *SignatureRequest) operation() Operation  { return r.Op }
+func (*VoidRequest) operation() Operation         { return "void" }
+func (r *PropertyRequest) operation() Operation   { return r.Op }
+func (*SymbolTypeRequest) operation() Operation   { return "symbolType" }
+func (*SignaturesRequest) operation() Operation   { return "signatures" }
+func (*AssignableRequest) operation() Operation   { return "isTypeAssignableTo" }
+func (*IndexInfoRequest) operation() Operation    { return "indexInfo" }
+func (*ScopeSymbolsRequest) operation() Operation { return "symbolsInScope" }
+func (*ParameterTypeRequest) operation() Operation {
+	return "parameterType"
+}
+func (r *PrintRequest) operation() Operation     { return r.Op }
 func (*ResolveNameRequest) operation() Operation { return "resolveName" }
 
 type Query struct {
@@ -96,22 +127,33 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord":
+	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol":
 		request = &NodeRequest{Op: wire.Op}
-	case "constraint", "apparent", "baseLiteral", "nonNullable", "typeString", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "typeRecord":
+	case "constraint", "apparent", "baseLiteral", "nonNullable", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "stringIndexType", "typeRecord",
+		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos":
 		request = &TypeRequest{Op: wire.Op}
-	case "aliasedSymbol", "declaredType", "symbolRecord":
+	case "aliasedSymbol", "declaredType", "symbolRecord", "typeOfSymbol", "exportsOfModule", "exportSymbol", "immediateAliasedSymbol", "isUnknownSymbol":
 		request = &SymbolRequest{Op: wire.Op}
-	case "returnType", "signatureRecord":
+	case "returnType", "signatureRecord", "typePredicate":
 		request = &SignatureRequest{Op: wire.Op}
 	case "void":
 		request = &VoidRequest{}
-	case "property":
-		request = &PropertyRequest{}
+	case "property", "propertyType":
+		request = &PropertyRequest{Op: wire.Op}
 	case "symbolType":
 		request = &SymbolTypeRequest{}
 	case "signatures":
 		request = &SignaturesRequest{}
+	case "isTypeAssignableTo":
+		request = &AssignableRequest{}
+	case "indexInfo":
+		request = &IndexInfoRequest{}
+	case "symbolsInScope":
+		request = &ScopeSymbolsRequest{}
+	case "parameterType":
+		request = &ParameterTypeRequest{}
+	case "typeString", "signatureString":
+		request = &PrintRequest{Op: wire.Op}
 	case "resolveName":
 		request = &ResolveNameRequest{}
 	default:
@@ -130,6 +172,10 @@ func requestNode(request Request) *NodeRef {
 		return &r.Node
 	case *SymbolTypeRequest:
 		return &r.Node
+	case *ScopeSymbolsRequest:
+		return &r.Node
+	case *PrintRequest:
+		return r.Node
 	case *ResolveNameRequest:
 		return r.Node
 	default:
@@ -151,7 +197,15 @@ type TypeFact struct {
 	EscapedName         string
 	ObjectFlags         []string
 	Literal             Literal
-	Types               []uint32
+	TypeOperands        []uint32 // Contents follow the type flags.
+	Target              uint32
+	AliasTypeArguments  []uint32
+	TypeParameters      []uint32
+	Tuple               *TupleFact
+}
+type TupleFact struct {
+	CombinedFlags uint32
+	Readonly      bool
 }
 type Literal struct {
 	Kind     uint32
@@ -188,16 +242,40 @@ type Record struct {
 }
 
 type SignatureFact struct {
-	Parameters  []uint32
-	Declaration *NodeRef
-	node        *ast.Node
+	Parameters       []uint32
+	Declaration      *NodeRef
+	TypeParameters   []uint32
+	ThisParameter    uint32
+	MinArgumentCount int
+	node             *ast.Node
+}
+type NamedSymbols []NamedSymbol
+type NamedSymbol struct {
+	ID   uint32
+	Name string
+}
+type IndexInfos []IndexInfo
+type IndexInfo struct {
+	KeyType, Type uint32
+	IsReadonly    bool
+	Declaration   *NodeRef
+	node          *ast.Node
+}
+type TypePredicateFact struct {
+	Kind           uint32
+	ParameterName  *string
+	ParameterIndex int32
+	Type           uint32
 }
 
-func (NodeFacts) result()      {}
-func (Handle) result()         {}
-func (Handles) result()        {}
-func (Boolean) result()        {}
-func (Text) result()           {}
-func (*TypeFact) result()      {}
-func (*SymbolFact) result()    {}
-func (*SignatureFact) result() {}
+func (NodeFacts) result()          {}
+func (Handle) result()             {}
+func (Handles) result()            {}
+func (Boolean) result()            {}
+func (Text) result()               {}
+func (*TypeFact) result()          {}
+func (*SymbolFact) result()        {}
+func (*SignatureFact) result()     {}
+func (NamedSymbols) result()       {}
+func (IndexInfos) result()         {}
+func (*TypePredicateFact) result() {}

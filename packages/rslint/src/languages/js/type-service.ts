@@ -21,6 +21,8 @@ import {
   type TypeFact,
   type SymbolFact,
   type SignatureFact,
+  type IndexInfoFact,
+  type NamedSymbolFact,
   type ServiceRequest,
   type ScalarRequest,
   type BatchTransport,
@@ -42,6 +44,18 @@ export interface TypeView {
   readonly objectFlags: number | undefined;
   readonly value: TypeFact['value'];
   readonly types: readonly TypeView[] | undefined;
+  readonly type: TypeView | undefined;
+  readonly objectType: TypeView | undefined;
+  readonly indexType: TypeView | undefined;
+  readonly checkType: TypeView | undefined;
+  readonly extendsType: TypeView | undefined;
+  readonly target: TypeView | undefined;
+  readonly typeArguments: readonly TypeView[] | undefined;
+  readonly aliasTypeArguments: readonly TypeView[] | undefined;
+  readonly typeParameters: readonly TypeView[] | undefined;
+  readonly combinedFlags: number | undefined;
+  readonly readonly: boolean | undefined;
+  getFlags(): number;
   getSymbol(): SymbolView | undefined;
   isUnion(): boolean;
   isIntersection(): boolean;
@@ -50,12 +64,19 @@ export interface TypeView {
   isStringLiteral(): boolean;
   isNumberLiteral(): boolean;
   isTypeParameter(): boolean;
+  isClassOrInterface(): boolean;
+  isClass(): boolean;
+  isIndexType(): boolean;
   getCallSignatures(): readonly SignatureView[];
   getConstructSignatures(): readonly SignatureView[];
   getProperties(): readonly SymbolView[];
+  getApparentProperties(): readonly SymbolView[];
   getProperty(name: string): SymbolView | undefined;
   getNonNullableType(): TypeView | undefined;
   getConstraint(): TypeView | undefined;
+  getDefault(): TypeView | undefined;
+  getBaseTypes(): readonly TypeView[] | undefined;
+  getStringIndexType(): TypeView | undefined;
   getNumberIndexType(): TypeView | undefined;
 }
 export interface SymbolView {
@@ -66,6 +87,7 @@ export interface SymbolView {
   readonly declarations: readonly object[] | undefined;
   readonly valueDeclaration: object | undefined;
   getName(): string;
+  getEscapedName(): string;
   getFlags(): number;
   getDeclarations(): readonly object[] | undefined;
 }
@@ -73,9 +95,26 @@ export interface SignatureView {
   readonly id: number;
   readonly parameters: readonly SymbolView[];
   readonly declaration: object | undefined;
+  readonly typeParameters: readonly TypeView[] | undefined;
+  readonly thisParameter: SymbolView | undefined;
+  readonly minArgumentCount: number;
   getParameters(): readonly SymbolView[];
+  getTypeParameters(): readonly TypeView[] | undefined;
+  getTypeParameterAtPosition(position: number): TypeView | undefined;
   getDeclaration(): object | undefined;
   getReturnType(): TypeView | undefined;
+}
+export interface IndexInfoView {
+  readonly keyType: TypeView;
+  readonly type: TypeView;
+  readonly isReadonly: boolean;
+  readonly declaration: object | undefined;
+}
+export interface TypePredicateView {
+  readonly kind: number;
+  readonly parameterName: string | undefined;
+  readonly parameterIndex: number | undefined;
+  readonly type: TypeView | undefined;
 }
 export interface CheckerView {
   getTypeAtLocation(n: object): TypeView | undefined;
@@ -86,8 +125,20 @@ export interface CheckerView {
   getApparentType(t: object): TypeView | undefined;
   getBaseTypeOfLiteralType(t: object): TypeView | undefined;
   getNonNullableType(t: object): TypeView | undefined;
+  getAwaitedType(t: object): TypeView | undefined;
+  getWidenedType(t: object): TypeView | undefined;
+  getBaseTypes(t: object): readonly TypeView[];
+  getDefaultFromTypeParameter(t: object): TypeView | undefined;
+  isTypeAssignableTo(source: object, target: object): boolean;
   typeToString(t: object, enclosing?: object, flags?: number): string;
+  signatureToString(
+    s: object,
+    enclosing?: object,
+    flags?: number,
+    kind?: number,
+  ): string;
   getSymbolAtLocation(n: object): SymbolView | undefined;
+  getSymbolsInScope(n: object, meaning: number): readonly SymbolView[];
   resolveName(
     name: string,
     location: object | undefined,
@@ -95,10 +146,22 @@ export interface CheckerView {
     excludeGlobals: boolean,
   ): SymbolView | undefined;
   getAliasedSymbol(s: object): SymbolView | undefined;
+  getImmediateAliasedSymbol(s: object): SymbolView | undefined;
+  isUnknownSymbol(s: object): boolean;
+  getExportsOfModule(s: object): readonly SymbolView[];
+  getExportSymbolOfSymbol(s: object): SymbolView | undefined;
+  getShorthandAssignmentValueSymbol(
+    n: object | undefined,
+  ): SymbolView | undefined;
+  getTypeOfSymbol(s: object): TypeView | undefined;
   getTypeOfSymbolAtLocation(s: object, n: object): TypeView | undefined;
   getDeclaredTypeOfSymbol(s: object): TypeView | undefined;
   getPropertiesOfType(t: object): readonly SymbolView[];
   getPropertyOfType(t: object, name: string): SymbolView | undefined;
+  getTypeOfPropertyOfType(t: object, name: string): TypeView | undefined;
+  getIndexTypeOfType(t: object, kind: number): TypeView | undefined;
+  getIndexInfoOfType(t: object, kind: number): IndexInfoView | undefined;
+  getIndexInfosOfType(t: object): readonly IndexInfoView[];
   getTypeArguments(t: object): readonly TypeView[];
   isArrayType(t: object): boolean;
   isArrayLikeType(t: object): boolean;
@@ -110,6 +173,7 @@ export interface CheckerView {
     argumentCount?: unknown,
   ): SignatureView | undefined;
   getReturnTypeOfSignature(s: object): TypeView | undefined;
+  getTypePredicateOfSignature(s: object): TypePredicateView | undefined;
   getSignaturesOfType(t: object, kind: number): readonly SignatureView[];
 }
 export interface ProgramView {
@@ -181,6 +245,11 @@ interface QueryProfile {
   maxQueries: number;
 }
 type ObjectKind = 'type' | 'symbol' | 'signature';
+interface ObjectBrand {
+  readonly kind: ObjectKind;
+  readonly id: number;
+  knownName?: string;
+}
 type TypeScriptEnums = Pick<
   typeof ts,
   | 'SyntaxKind'
@@ -206,10 +275,7 @@ export class TypeServiceClient {
   private readonly types = new WeakObjectCache<number, TypeView>();
   private readonly symbols = new WeakObjectCache<number, SymbolView>();
   private readonly signatures = new WeakObjectCache<number, SignatureView>();
-  private readonly brands = new WeakMap<
-    object,
-    { kind: ObjectKind; id: number }
-  >();
+  private readonly brands = new WeakMap<object, ObjectBrand>();
   private shared: SharedTypeCacheReader | undefined;
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
@@ -278,7 +344,16 @@ export class TypeServiceClient {
         this.query({ op: op, args: { node: this.syntax.location(n) } }),
       );
     const typeType = (
-      op: 'constraint' | 'apparent' | 'baseLiteral' | 'nonNullable',
+      op:
+        | 'constraint'
+        | 'apparent'
+        | 'baseLiteral'
+        | 'nonNullable'
+        | 'awaited'
+        | 'widened'
+        | 'defaultType'
+        | 'stringIndexType'
+        | 'numberIndexType',
       t: object,
     ) => this.type(this.query({ op: op, args: { id: this.id(t, 'type') } }));
     this.checker = guarded<CheckerView>(
@@ -291,19 +366,52 @@ export class TypeServiceClient {
         getApparentType: (t) => typeType('apparent', t),
         getBaseTypeOfLiteralType: (t) => typeType('baseLiteral', t),
         getNonNullableType: (t) => typeType('nonNullable', t),
-        typeToString: (t, enclosing, flags) => {
-          if (enclosing !== undefined || flags !== undefined)
-            unsupported('checker.typeToString formatting arguments');
-          return this.query({
+        getAwaitedType: (t) => typeType('awaited', t),
+        getWidenedType: (t) => typeType('widened', t),
+        getDefaultFromTypeParameter: (t) => typeType('defaultType', t),
+        getBaseTypes: (t) =>
+          this.typesFor(
+            this.query({ op: 'baseTypes', args: { id: this.id(t, 'type') } }),
+          ),
+        isTypeAssignableTo: (source, target) =>
+          this.query({
+            op: 'isTypeAssignableTo',
+            args: {
+              source: this.id(source, 'type'),
+              target: this.id(target, 'type'),
+            },
+          }),
+        typeToString: (t, enclosing, flags) =>
+          this.query({
             op: 'typeString',
-            args: { id: this.id(t, 'type') },
-          });
-        },
+            args: {
+              id: this.id(t, 'type'),
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          }),
+        signatureToString: (s, enclosing, flags, kind = 0) =>
+          this.query({
+            op: 'signatureString',
+            args: {
+              id: this.id(s, 'signature'),
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+              kind,
+            },
+          }),
         getSymbolAtLocation: (n) =>
           this.symbol(
             this.query({
               op: 'symbol',
               args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getSymbolsInScope: (n, meaning) =>
+          this.namedSymbolsFor(
+            this.query({
+              op: 'symbolsInScope',
+              args: { node: this.syntax.location(n), meaning: meaning | 0 },
             }),
           ),
         resolveName: (name, location, kind, excludeGlobals) =>
@@ -322,6 +430,47 @@ export class TypeServiceClient {
           this.symbol(
             this.query({
               op: 'aliasedSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        getImmediateAliasedSymbol: (s) =>
+          this.symbol(
+            this.query({
+              op: 'immediateAliasedSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        isUnknownSymbol: (s) =>
+          this.query({
+            op: 'isUnknownSymbol',
+            args: { id: this.id(s, 'symbol') },
+          }),
+        getExportsOfModule: (s) =>
+          this.namedSymbolsFor(
+            this.query({
+              op: 'exportsOfModule',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        getExportSymbolOfSymbol: (s) =>
+          this.symbol(
+            this.query({
+              op: 'exportSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        getShorthandAssignmentValueSymbol: (n) =>
+          n &&
+          this.symbol(
+            this.query({
+              op: 'shorthandValueSymbol',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getTypeOfSymbol: (s) =>
+          this.type(
+            this.query({
+              op: 'typeOfSymbol',
               args: { id: this.id(s, 'symbol') },
             }),
           ),
@@ -353,6 +502,27 @@ export class TypeServiceClient {
               args: { id: this.id(t, 'type'), name: nameToUnits(name) },
             }),
           ),
+        getTypeOfPropertyOfType: (t, name) =>
+          this.type(
+            this.query({
+              op: 'propertyType',
+              args: { id: this.id(t, 'type'), name: nameToUnits(name) },
+            }),
+          ),
+        getIndexTypeOfType: (t, kind) =>
+          typeType(kind === 0 ? 'stringIndexType' : 'numberIndexType', t),
+        getIndexInfoOfType: (t, kind) => {
+          const [info] = this.query({
+            op: 'indexInfo',
+            args: { id: this.id(t, 'type'), kind },
+          });
+          return info && this.indexInfo(info);
+        },
+        getIndexInfosOfType: (t) =>
+          this.query({
+            op: 'indexInfos',
+            args: { id: this.id(t, 'type') },
+          }).map((info) => this.indexInfo(info)),
         getTypeArguments: (t) =>
           this.typesFor(
             this.query({
@@ -390,6 +560,13 @@ export class TypeServiceClient {
               args: { id: this.id(s, 'signature') },
             }),
           ),
+        getTypePredicateOfSignature: (s) => {
+          const fact = this.query({
+            op: 'typePredicate',
+            args: { id: this.id(s, 'signature') },
+          });
+          return fact && { ...fact, type: this.type(fact.type) };
+        },
         getSignaturesOfType: (t, kind) =>
           this.signaturesFor(
             this.query({
@@ -637,20 +814,21 @@ export class TypeServiceClient {
     map: WeakObjectCache<number, T>,
     kind: ObjectKind,
     id: number,
-    create: () => T,
+    create: (brand: ObjectBrand) => T,
   ): T | undefined {
     this.ensure();
     if (!id) return undefined;
     const old = map.get(id);
     if (old) return old;
+    const brand = { kind, id };
     const object = guarded(
-      create(),
+      create(brand),
       () => {
         this.ensure();
       },
       kind,
     );
-    this.brands.set(object, { kind, id });
+    this.brands.set(object, brand);
     map.set(id, object);
     return object;
   }
@@ -660,8 +838,19 @@ export class TypeServiceClient {
   private symbolsFor(ids: readonly number[]): SymbolView[] {
     return ids.map((id) => this.symbol(id)!);
   }
+  private namedSymbolsFor(facts: readonly NamedSymbolFact[]): SymbolView[] {
+    return facts.map(({ id, name }) => this.symbol(id, name)!);
+  }
   private signaturesFor(ids: readonly number[]): SignatureView[] {
     return ids.map((id) => this.signature(id)!);
+  }
+  private indexInfo(fact: IndexInfoFact): IndexInfoView {
+    return {
+      keyType: this.type(fact.keyType)!,
+      type: this.type(fact.type)!,
+      isReadonly: fact.isReadonly,
+      declaration: this.syntax.nodeRef(fact.declaration),
+    };
   }
   private type(id: number): TypeView | undefined {
     return this.intern(this.types, 'type', id, () => {
@@ -691,10 +880,32 @@ export class TypeServiceClient {
       const intrinsic = memo(ensure, () => this.typeField(id, 'intrinsicName')),
         escapedName = memo(ensure, () => this.typeField(id, 'escapedName')),
         value = memo(ensure, () => this.typeField(id, 'value'));
-      const types = memo(ensure, () => {
-        const ids = this.typeField(id, 'types');
+      const typeOperands = memo(ensure, () => {
+        const ids = this.typeField(id, 'typeOperands');
         return ids ? this.typesFor(ids) : undefined;
       });
+      const target = memo(ensure, () =>
+          this.type(this.typeField(id, 'target')),
+        ),
+        aliasTypeArguments = memo(ensure, () => {
+          const ids = this.typeField(id, 'aliasTypeArguments');
+          return ids ? this.typesFor(ids) : undefined;
+        }),
+        typeParameters = memo(ensure, () => {
+          const ids = this.typeField(id, 'typeParameters');
+          return ids ? this.typesFor(ids) : undefined;
+        }),
+        tuple = memo(ensure, () => this.typeField(id, 'tuple'));
+      const flag = (mask: number) => Boolean(flags() & mask),
+        objectFlag = (mask: number) => Boolean((objectFlags() ?? 0) & mask),
+        tf = this.typescript.TypeFlags,
+        of = this.typescript.ObjectFlags;
+      const typeArguments = memo(ensure, () =>
+        objectFlag(of.Reference)
+          ? this.typesFor(this.query({ op: 'typeArguments', args: { id } }))
+          : undefined,
+      );
+      const isClassOrInterface = () => objectFlag(of.ClassOrInterface);
       const calls = memo(ensure, () =>
           this.signaturesFor(
             this.query({ op: 'signatures', args: { id, kind: 0 } }),
@@ -708,6 +919,21 @@ export class TypeServiceClient {
       const properties = memo(ensure, () =>
           this.symbolsFor(this.query({ op: 'properties', args: { id } })),
         ),
+        apparentProperties = memo(ensure, () =>
+          this.symbolsFor(
+            this.query({ op: 'apparentProperties', args: { id } }),
+          ),
+        ),
+        bases = memo(ensure, () =>
+          isClassOrInterface()
+            ? this.typesFor(this.query({ op: 'baseTypes', args: { id } }))
+            : undefined,
+        ),
+        defaultType = memo(ensure, () =>
+          flag(tf.TypeParameter)
+            ? this.type(this.query({ op: 'defaultType', args: { id } }))
+            : undefined,
+        ),
         nonNullable = memo(ensure, () =>
           this.type(this.query({ op: 'nonNullable', args: { id } })),
         ),
@@ -716,9 +942,10 @@ export class TypeServiceClient {
         ),
         numberIndexType = memo(ensure, () =>
           this.type(this.query({ op: 'numberIndexType', args: { id } })),
+        ),
+        stringIndexType = memo(ensure, () =>
+          this.type(this.query({ op: 'stringIndexType', args: { id } })),
         );
-      const flag = (mask: number) => Boolean(flags() & mask),
-        tf = this.typescript.TypeFlags;
       return {
         id,
         get flags() {
@@ -743,8 +970,46 @@ export class TypeServiceClient {
           return value();
         },
         get types() {
-          return types();
+          return flag(tf.UnionOrIntersection | tf.TemplateLiteral)
+            ? typeOperands()
+            : undefined;
         },
+        get type() {
+          return flag(tf.Index | tf.StringMapping)
+            ? typeOperands()?.[0]
+            : undefined;
+        },
+        get objectType() {
+          return flag(tf.IndexedAccess) ? typeOperands()?.[0] : undefined;
+        },
+        get indexType() {
+          return flag(tf.IndexedAccess) ? typeOperands()?.[1] : undefined;
+        },
+        get checkType() {
+          return flag(tf.Conditional) ? typeOperands()?.[0] : undefined;
+        },
+        get extendsType() {
+          return flag(tf.Conditional) ? typeOperands()?.[1] : undefined;
+        },
+        get target() {
+          return target();
+        },
+        get typeArguments() {
+          return typeArguments();
+        },
+        get aliasTypeArguments() {
+          return aliasTypeArguments();
+        },
+        get typeParameters() {
+          return typeParameters();
+        },
+        get combinedFlags() {
+          return tuple()?.combinedFlags;
+        },
+        get readonly() {
+          return tuple()?.readonly;
+        },
+        getFlags: flags,
         getSymbol: symbol,
         isUnion: () => flag(tf.Union),
         isIntersection: () => flag(tf.Intersection),
@@ -754,9 +1019,13 @@ export class TypeServiceClient {
         isStringLiteral: () => flag(tf.StringLiteral),
         isNumberLiteral: () => flag(tf.NumberLiteral),
         isTypeParameter: () => flag(tf.TypeParameter),
+        isClassOrInterface,
+        isClass: () => objectFlag(of.Class),
+        isIndexType: () => flag(tf.Index),
         getCallSignatures: calls,
         getConstructSignatures: constructs,
         getProperties: properties,
+        getApparentProperties: apparentProperties,
         getProperty: (name) =>
           this.symbol(
             this.query({
@@ -766,16 +1035,22 @@ export class TypeServiceClient {
           ),
         getNonNullableType: nonNullable,
         getConstraint: constraint,
+        getDefault: defaultType,
+        getBaseTypes: bases,
+        getStringIndexType: stringIndexType,
         getNumberIndexType: numberIndexType,
       };
     });
   }
-  private symbol(id: number): SymbolView | undefined {
-    return this.intern(this.symbols, 'symbol', id, () => {
+  private symbol(id: number, knownName?: string): SymbolView | undefined {
+    const view = this.intern(this.symbols, 'symbol', id, (brand) => {
       const ensure = () => {
         this.ensure();
       };
-      const name = memo(ensure, () => this.symbolField(id, 'name')),
+      const name = memo(
+          ensure,
+          () => brand.knownName ?? this.symbolField(id, 'name'),
+        ),
         escaped = memo(ensure, () => this.symbolField(id, 'escapedName')),
         flags = memo(ensure, () => this.symbolField(id, 'flags'));
       const declarations = memo(ensure, () =>
@@ -804,10 +1079,14 @@ export class TypeServiceClient {
           return value();
         },
         getName: name,
+        getEscapedName: escaped,
         getFlags: flags,
         getDeclarations: declarations,
       };
     });
+    if (view && knownName !== undefined)
+      this.brands.get(view)!.knownName = knownName;
+    return view;
   }
   private signature(id: number): SignatureView | undefined {
     return this.intern(this.signatures, 'signature', id, () => {
@@ -820,6 +1099,16 @@ export class TypeServiceClient {
         declaration = memo(ensure, () =>
           this.syntax.nodeRef(this.signatureField(id, 'declaration')),
         ),
+        typeParameters = memo(ensure, () => {
+          const ids = this.signatureField(id, 'typeParameters');
+          return ids ? this.typesFor(ids) : undefined;
+        }),
+        thisParameter = memo(ensure, () =>
+          this.symbol(this.signatureField(id, 'thisParameter')),
+        ),
+        minArgumentCount = memo(ensure, () =>
+          this.signatureField(id, 'minArgumentCount'),
+        ),
         returned = memo(ensure, () =>
           this.type(this.query({ op: 'returnType', args: { id } })),
         );
@@ -831,7 +1120,21 @@ export class TypeServiceClient {
         get declaration() {
           return declaration();
         },
+        get typeParameters() {
+          return typeParameters();
+        },
+        get thisParameter() {
+          return thisParameter();
+        },
+        get minArgumentCount() {
+          return minArgumentCount();
+        },
         getParameters: parameters,
+        getTypeParameters: typeParameters,
+        getTypeParameterAtPosition: (position) =>
+          this.type(
+            this.query({ op: 'parameterType', args: { id, position } }),
+          ),
         getDeclaration: declaration,
         getReturnType: returned,
       };
@@ -928,10 +1231,18 @@ export class TypeServiceFile {
       program: this.owner.program,
       esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
       tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
+      getContextualType: (node: ESTreeNode) =>
+        this.owner.checker.getContextualType(toTS(node)),
+      getResolvedSignature: (node: ESTreeNode) =>
+        this.owner.checker.getResolvedSignature(toTS(node)),
       getTypeAtLocation: (node: ESTreeNode) =>
         this.owner.checker.getTypeAtLocation(toTS(node)),
       getSymbolAtLocation: (node: ESTreeNode) =>
         this.owner.checker.getSymbolAtLocation(toTS(node)),
+      getTypeFromTypeNode: (node: ESTreeNode) =>
+        this.owner.checker.getTypeFromTypeNode(toTS(node)),
+      getTypeOfSymbolAtLocation: (symbol: SymbolView, node: ESTreeNode) =>
+        this.owner.checker.getTypeOfSymbolAtLocation(symbol, toTS(node)),
       emitDecoratorMetadata: options.emitDecoratorMetadata === true,
       experimentalDecorators: options.experimentalDecorators === true,
       isolatedDeclarations: options.isolatedDeclarations === true,

@@ -58,7 +58,11 @@ export interface TypeFact {
   readonly objectFlags: readonly string[] | undefined;
   readonly value:
     string | number | { negative: boolean; base10Value: string } | undefined;
-  readonly types: readonly number[] | undefined;
+  readonly typeOperands: readonly number[] | undefined;
+  readonly target: number;
+  readonly aliasTypeArguments: readonly number[] | undefined;
+  readonly typeParameters: readonly number[] | undefined;
+  readonly tuple: { combinedFlags: number; readonly: boolean } | undefined;
 }
 export interface SymbolFact {
   readonly name: string;
@@ -70,9 +74,32 @@ export interface SymbolFact {
 export interface SignatureFact {
   readonly parameters: readonly number[];
   readonly declaration: NodeRef | undefined;
+  readonly typeParameters: readonly number[] | undefined;
+  readonly thisParameter: number;
+  readonly minArgumentCount: number;
+}
+export interface IndexInfoFact {
+  readonly keyType: number;
+  readonly type: number;
+  readonly isReadonly: boolean;
+  readonly declaration: NodeRef | undefined;
+}
+export interface TypePredicateFact {
+  readonly kind: number;
+  readonly parameterName: string | undefined;
+  readonly parameterIndex: number | undefined;
+  readonly type: number;
+}
+export interface NamedSymbolFact {
+  readonly id: number;
+  readonly name: string;
 }
 type NodeArgs = { node: NodeRef };
 type IDArgs = { id: number };
+type PrintArgs = IDArgs & {
+  node: NodeRef | undefined;
+  flags: number | undefined;
+};
 export interface QueryArguments {
   nodeRecord: NodeArgs;
   type: NodeArgs;
@@ -81,25 +108,45 @@ export interface QueryArguments {
   symbol: NodeArgs;
   signature: NodeArgs;
   resolvedSignature: NodeArgs;
+  shorthandValueSymbol: NodeArgs;
   constraint: IDArgs;
   apparent: IDArgs;
   baseLiteral: IDArgs;
   nonNullable: IDArgs;
-  typeString: IDArgs;
+  typeString: PrintArgs;
+  signatureString: PrintArgs & { kind: number };
+  awaited: IDArgs;
+  widened: IDArgs;
+  baseTypes: IDArgs;
+  defaultType: IDArgs;
+  isTypeAssignableTo: { source: number; target: number };
   properties: IDArgs;
+  apparentProperties: IDArgs;
   typeArguments: IDArgs;
   isArray: IDArgs;
   isArrayLike: IDArgs;
   isTuple: IDArgs;
   numberIndexType: IDArgs;
+  stringIndexType: IDArgs;
+  indexInfo: IDArgs & { kind: number };
+  indexInfos: IDArgs;
   typeRecord: IDArgs;
   aliasedSymbol: IDArgs;
+  immediateAliasedSymbol: IDArgs;
+  isUnknownSymbol: IDArgs;
+  exportsOfModule: IDArgs;
+  exportSymbol: IDArgs;
+  symbolsInScope: NodeArgs & { meaning: number };
   declaredType: IDArgs;
+  typeOfSymbol: IDArgs;
   symbolRecord: IDArgs;
   returnType: IDArgs;
+  typePredicate: IDArgs;
+  parameterType: IDArgs & { position: number };
   signatureRecord: IDArgs;
   void: Record<string, never>;
   property: IDArgs & { name: readonly number[] };
+  propertyType: IDArgs & { name: readonly number[] };
   symbolType: IDArgs & NodeArgs;
   signatures: IDArgs & { kind: number };
   resolveName: {
@@ -117,25 +164,45 @@ export interface QueryResults {
   symbol: number;
   signature: number;
   resolvedSignature: number;
+  shorthandValueSymbol: number;
   constraint: number;
   apparent: number;
   baseLiteral: number;
   nonNullable: number;
   typeString: string;
+  signatureString: string;
+  awaited: number;
+  widened: number;
+  baseTypes: readonly number[];
+  defaultType: number;
+  isTypeAssignableTo: boolean;
   properties: readonly number[];
+  apparentProperties: readonly number[];
   typeArguments: readonly number[];
   isArray: boolean;
   isArrayLike: boolean;
   isTuple: boolean;
   numberIndexType: number;
+  stringIndexType: number;
+  indexInfo: readonly IndexInfoFact[];
+  indexInfos: readonly IndexInfoFact[];
   typeRecord: TypeFact;
   aliasedSymbol: number;
+  immediateAliasedSymbol: number;
+  isUnknownSymbol: boolean;
+  exportsOfModule: readonly NamedSymbolFact[];
+  exportSymbol: number;
+  symbolsInScope: readonly NamedSymbolFact[];
   declaredType: number;
+  typeOfSymbol: number;
   symbolRecord: SymbolFact;
   returnType: number;
+  typePredicate: TypePredicateFact | undefined;
+  parameterType: number;
   signatureRecord: SignatureFact;
   void: number;
   property: number;
+  propertyType: number;
   symbolType: number;
   signatures: readonly number[];
   resolveName: number;
@@ -178,6 +245,26 @@ const operations = [
   'signatures',
   'resolveName',
   'nodeRecord',
+  'shorthandValueSymbol',
+  'signatureString',
+  'awaited',
+  'widened',
+  'baseTypes',
+  'defaultType',
+  'isTypeAssignableTo',
+  'apparentProperties',
+  'stringIndexType',
+  'indexInfo',
+  'indexInfos',
+  'immediateAliasedSymbol',
+  'isUnknownSymbol',
+  'exportsOfModule',
+  'exportSymbol',
+  'symbolsInScope',
+  'typeOfSymbol',
+  'typePredicate',
+  'parameterType',
+  'propertyType',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -199,15 +286,28 @@ export function typeQueryKey(
     case 'symbol':
     case 'signature':
     case 'resolvedSignature':
+    case 'shorthandValueSymbol':
       return prefix + nodeKey(q.args.node);
     case 'void':
       return prefix;
     case 'property':
+    case 'propertyType':
       return `${prefix}${q.args.id}:${q.args.name.length}:${q.args.name.join(',')}`;
     case 'symbolType':
       return `${prefix}${q.args.id}:${nodeKey(q.args.node)}`;
     case 'signatures':
+    case 'indexInfo':
       return `${prefix}${q.args.id}:${q.args.kind}`;
+    case 'isTypeAssignableTo':
+      return `${prefix}${q.args.source}:${q.args.target}`;
+    case 'symbolsInScope':
+      return `${prefix}${nodeKey(q.args.node)}:${q.args.meaning}`;
+    case 'parameterType':
+      return `${prefix}${q.args.id}:${q.args.position}`;
+    case 'typeString':
+      return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
+    case 'signatureString':
+      return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}:${q.args.kind}`;
     case 'resolveName':
       return `${prefix}${q.args.name.length}:${q.args.name.join(',')}:${nodeKey(q.args.node)}:${q.args.kind}:${q.args.excludeGlobals}`;
     default:
@@ -226,22 +326,42 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   symbol: 1,
   signature: 1,
   resolvedSignature: 1,
+  shorthandValueSymbol: 1,
   constraint: 1,
   apparent: 1,
   baseLiteral: 1,
   nonNullable: 1,
   typeString: 3,
+  signatureString: 3,
+  awaited: 1,
+  widened: 1,
+  baseTypes: 4,
+  defaultType: 1,
+  isTypeAssignableTo: 2,
   properties: 4,
+  apparentProperties: 4,
   typeArguments: 4,
   isArray: 2,
   isArrayLike: 2,
   isTuple: 2,
   numberIndexType: 1,
+  stringIndexType: 1,
+  indexInfo: 9,
+  indexInfos: 9,
   aliasedSymbol: 1,
+  immediateAliasedSymbol: 1,
+  isUnknownSymbol: 2,
+  exportsOfModule: 11,
+  exportSymbol: 1,
+  symbolsInScope: 11,
   declaredType: 1,
+  typeOfSymbol: 1,
   returnType: 1,
+  typePredicate: 10,
+  parameterType: 1,
   void: 1,
   property: 1,
+  propertyType: 1,
   symbolType: 1,
   signatures: 4,
   resolveName: 1,
