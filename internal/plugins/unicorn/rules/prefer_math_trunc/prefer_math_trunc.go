@@ -1,9 +1,10 @@
 package prefer_math_trunc
 
 import (
-	"math/big"
+	"strconv"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
@@ -39,7 +40,7 @@ func checkBitwise(ctx *rule.RuleContext, node *ast.Node) {
 	}
 	operatorText := scanner.TokenToString(operator.Kind)
 	value := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, right, false)
-	report(ctx, node, "bitwise", operatorText+" "+value, map[string]string{"operator": operatorText, "value": value}, func(sourceRange core.TextRange) []rule.RuleFix {
+	report(ctx, node, binary.Left, "bitwise", operatorText+" "+value, map[string]string{"operator": operatorText, "value": value}, func(sourceRange core.TextRange) []rule.RuleFix {
 		left := binary.Left
 		if !ast.IsAssignmentOperator(operator.Kind) {
 			return replaceWithTruncatedOperand(ctx, node, sourceRange, left)
@@ -76,35 +77,223 @@ func checkDoubleNot(ctx *rule.RuleContext, node *ast.Node) {
 		return
 	}
 	operand := inner.AsPrefixUnaryExpression().Operand
-	if isBitwiseNot(utils.ESTreeRuntimeExpression(operand)) || isKnownBigInt(ctx, operand) {
+	if isBitwiseNot(utils.ESTreeRuntimeExpression(operand)) {
 		return
 	}
-	report(ctx, node, "bitwise-not", "~~", nil, func(sourceRange core.TextRange) []rule.RuleFix {
+	report(ctx, node, operand, "bitwise-not", "~~", nil, func(sourceRange core.TextRange) []rule.RuleFix {
 		return replaceWithTruncatedOperand(ctx, node, sourceRange, operand)
 	})
 }
 
-func isKnownBigInt(ctx *rule.RuleContext, operand *ast.Node) bool {
+type bigIntKind uint8
+
+const (
+	bigIntUnknown bigIntKind = iota
+	bigIntPossible
+	bigIntKnown
+	bigIntExcluded
+)
+
+func classifyBigInt(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
+	syntax := bigIntFromSyntax(ctx, operand)
+	if syntax == bigIntKnown || syntax == bigIntExcluded || ctx.TypeChecker == nil {
+		return syntax
+	}
+	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, operand)
+	parts := utils.UnionTypeParts(t)
+	allBigInt, hasBigInt := len(parts) > 0, false
+	for _, part := range parts {
+		if utils.IsTypeFlagSet(part, checker.TypeFlagsBigIntLike) {
+			hasBigInt = true
+		} else {
+			allBigInt = false
+		}
+	}
+	if allBigInt {
+		return bigIntKnown
+	}
+	if hasBigInt {
+		return bigIntPossible
+	}
+	// Even a number result can originate from an any operand. Type information
+	// may strengthen the syntax evidence, but must not erase it.
+	return syntax
+}
+
+// Classify the result without evaluating source-controlled arithmetic or
+// requiring values for conditions, identifiers or BigInt call arguments.
+func bigIntFromSyntax(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 	operand = utils.SkipAssertionsAndParens(operand)
 	if operand == nil {
-		return false
+		return bigIntUnknown
 	}
 	// Bitwise NOT preserves BigInt, which Math.trunc rejects.
 	switch operand.Kind {
 	case ast.KindBigIntLiteral:
-		return true
+		return bigIntKnown
+	case ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return bigIntExcluded
 	case ast.KindPrefixUnaryExpression:
 		unary := operand.AsPrefixUnaryExpression()
-		return (unary.Operator == ast.KindMinusToken || unary.Operator == ast.KindTildeToken) && isKnownBigInt(ctx, unary.Operand)
+		if unary.Operator == ast.KindMinusToken || unary.Operator == ast.KindTildeToken {
+			return bigIntFromSyntax(ctx, unary.Operand)
+		}
 	case ast.KindCallExpression:
-		return !ast.IsOptionalChainRoot(operand) && isGlobalIdentifier(ctx, utils.ESTreeCallCallee(operand.Expression()), "BigInt")
-	case ast.KindBinaryExpression, ast.KindConditionalExpression:
-		value, _ := utils.NewStaticStringEvaluatorWithoutScope().EvalValue(operand)
-		_, isBigInt := value.(*big.Int)
-		return isBigInt
+		if isGlobalIdentifier(ctx, utils.ESTreeCallCallee(operand.Expression()), "BigInt") {
+			if ast.IsOptionalChainRoot(operand) {
+				return bigIntPossible
+			}
+			return bigIntKnown
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if value, resolved := literalMemberValue(operand); resolved {
+			return bigIntFromSyntax(ctx, value)
+		}
+		if literalMemberMayBeBigInt(ctx, utils.AccessExpressionObject(operand)) {
+			return bigIntPossible
+		}
+	case ast.KindConditionalExpression:
+		conditional := operand.AsConditionalExpression()
+		condition := utils.SkipAssertionsAndParens(conditional.Condition)
+		if condition != nil && condition.Kind == ast.KindTrueKeyword {
+			return bigIntFromSyntax(ctx, conditional.WhenTrue)
+		}
+		if condition != nil && condition.Kind == ast.KindFalseKeyword {
+			return bigIntFromSyntax(ctx, conditional.WhenFalse)
+		}
+		return mergeBigIntKinds(bigIntFromSyntax(ctx, conditional.WhenTrue), bigIntFromSyntax(ctx, conditional.WhenFalse))
+	case ast.KindBinaryExpression:
+		binary := operand.AsBinaryExpression()
+		switch binary.OperatorToken.Kind {
+		case ast.KindCommaToken, ast.KindEqualsToken:
+			return bigIntFromSyntax(ctx, binary.Right)
+		case ast.KindPlusToken:
+			// String concatenation produces a string even with a BigInt operand.
+			if ast.IsStringLiteralLike(utils.SkipAssertionsAndParens(binary.Left)) ||
+				ast.IsStringLiteralLike(utils.SkipAssertionsAndParens(binary.Right)) {
+				return bigIntExcluded
+			}
+		case ast.KindMinusToken, ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken,
+			ast.KindAsteriskAsteriskToken, ast.KindBarToken, ast.KindAmpersandToken, ast.KindCaretToken,
+			ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+			ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+		default:
+			return bigIntUnknown
+		}
+		return mergeBigIntKinds(bigIntFromSyntax(ctx, binary.Left), bigIntFromSyntax(ctx, binary.Right))
+	}
+	return bigIntUnknown
+}
+
+// Select a literal member's source expression without evaluating arithmetic,
+// getters or computed keys. Unknown spreads and keys can override a member.
+func literalMemberValue(node *ast.Node) (*ast.Node, bool) {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsAccessExpression(node) {
+		return node, true
+	}
+	receiver, resolved := literalMemberValue(utils.AccessExpressionObject(node))
+	receiver = utils.SkipAssertionsAndParens(receiver)
+	key, static := utils.AccessExpressionStaticName(node)
+	if !resolved || receiver == nil || !static {
+		return nil, false
+	}
+	switch receiver.Kind {
+	case ast.KindArrayLiteralExpression:
+		index, err := strconv.Atoi(key)
+		if err != nil || index < 0 || strconv.Itoa(index) != key {
+			return nil, true
+		}
+		elements := receiver.AsArrayLiteralExpression().Elements
+		if elements == nil {
+			return nil, true
+		}
+		for position, element := range elements.Nodes {
+			if ast.IsSpreadElement(element) {
+				return nil, false
+			}
+			if position == index {
+				return element, true
+			}
+		}
+		return nil, true
+	case ast.KindObjectLiteralExpression:
+		var value *ast.Node
+		resolved = true
+		properties := receiver.AsObjectLiteralExpression().Properties
+		if properties == nil {
+			return nil, true
+		}
+		for _, property := range properties.Nodes {
+			name := property.Name()
+			if property.Kind == ast.KindSpreadAssignment || name == nil {
+				value, resolved = nil, false
+				continue
+			}
+			propertyKey, static := utils.GetStaticPropertyName(name)
+			if name.Kind == ast.KindComputedPropertyName {
+				propertyKey, static = utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(name.AsComputedPropertyName().Expression))
+			}
+			if propertyKey == "__proto__" && property.Kind == ast.KindPropertyAssignment && name.Kind != ast.KindComputedPropertyName {
+				if value == nil {
+					resolved = false
+				}
+				continue
+			}
+			if !static {
+				value, resolved = nil, false
+			} else if propertyKey == key {
+				switch property.Kind {
+				case ast.KindPropertyAssignment:
+					value, resolved = property.AsPropertyAssignment().Initializer, true
+				case ast.KindShorthandPropertyAssignment:
+					value, resolved = name, true
+				default:
+					value, resolved = nil, false
+				}
+			}
+		}
+		return value, resolved
 	default:
+		return nil, false
+	}
+}
+
+// An unresolved literal lookup may still contain BigInt values. Preserve that
+// evidence conservatively, including literal spreads and prototype objects.
+func literalMemberMayBeBigInt(ctx *rule.RuleContext, node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
 		return false
 	}
+	switch node.Kind {
+	case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+		return node.ForEachChild(func(child *ast.Node) bool { return literalMemberMayBeBigInt(ctx, child) })
+	case ast.KindPropertyAssignment:
+		property := node.AsPropertyAssignment()
+		return literalMemberMayBeBigInt(ctx, property.Initializer)
+	case ast.KindSpreadElement, ast.KindSpreadAssignment:
+		return literalMemberMayBeBigInt(ctx, node.Expression())
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return literalMemberMayBeBigInt(ctx, utils.AccessExpressionObject(node))
+	default:
+		kind := bigIntFromSyntax(ctx, node)
+		return kind == bigIntKnown || kind == bigIntPossible
+	}
+}
+
+func mergeBigIntKinds(left, right bigIntKind) bigIntKind {
+	if left == bigIntKnown && right == bigIntKnown {
+		return bigIntKnown
+	}
+	if left == bigIntKnown || left == bigIntPossible || right == bigIntKnown || right == bigIntPossible {
+		return bigIntPossible
+	}
+	if left == bigIntExcluded && right == bigIntExcluded {
+		return bigIntExcluded
+	}
+	return bigIntUnknown
 }
 
 func checkParseInt(ctx *rule.RuleContext, node *ast.Node) {
@@ -132,7 +321,7 @@ func checkParseInt(ctx *rule.RuleContext, node *ast.Node) {
 	if stringArgs == nil || len(stringArgs.Nodes) != 1 || ast.IsSpreadElement(stringArgs.Nodes[0]) {
 		return
 	}
-	report(ctx, node, "parse-int", name+"(String(...), 10)", map[string]string{"name": name}, func(sourceRange core.TextRange) []rule.RuleFix {
+	report(ctx, node, stringArgs.Nodes[0], "parse-int", name+"(String(...), 10)", map[string]string{"name": name}, func(sourceRange core.TextRange) []rule.RuleFix {
 		// The argument list starts just after the opening parenthesis. Copy its
 		// interior verbatim, including comments, parentheses and a trailing comma.
 		closeParen, ok := utils.TokenAtOrAfter(ctx.SourceFile, stringArgs.End())
@@ -202,14 +391,18 @@ func canSuggestMathTrunc(ctx *rule.RuleContext, node *ast.Node) bool {
 	return !utils.IsShadowed(node, "Math")
 }
 
-func report(ctx *rule.RuleContext, node *ast.Node, kind, pattern string, data map[string]string, buildFixes func(core.TextRange) []rule.RuleFix) {
+func report(ctx *rule.RuleContext, node, operand *ast.Node, kind, pattern string, data map[string]string, buildFixes func(core.TextRange) []rule.RuleFix) {
+	bigInt := classifyBigInt(ctx, operand)
+	if bigInt == bigIntKnown {
+		return
+	}
 	sourceRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 	ctx.ReportRangeWithDeferredSuggestions(sourceRange, rule.RuleMessage{
 		Id:          "error-" + kind,
 		Description: "Use `Math.trunc` instead of `" + pattern + "`.",
 		Data:        data,
 	}, func() []rule.RuleSuggestion {
-		if !canSuggestMathTrunc(ctx, node) {
+		if bigInt == bigIntPossible || !canSuggestMathTrunc(ctx, node) {
 			return nil
 		}
 		fixes := buildFixes(sourceRange)
