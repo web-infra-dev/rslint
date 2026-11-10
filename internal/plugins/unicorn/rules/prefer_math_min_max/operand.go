@@ -91,7 +91,7 @@ func isBigInt(ctx *rule.RuleContext, evaluator *utils.StaticStringEvaluator, nod
 	if ctx.TypeChecker != nil && typeIncludesBigInt(utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)) {
 		return true
 	}
-	if bigIntFromSyntax(ctx, node, make(map[*ast.Node]bool)) {
+	if bigIntFromSyntax(ctx, node, make(map[*ast.Node]bigIntAnnotationClass)) {
 		return true
 	}
 	value, ok := evaluator.EvalValueIfNoSideEffects(node)
@@ -107,9 +107,17 @@ func typeIncludesBigInt(value *checker.Type) bool {
 		slices.ContainsFunc(value.Types(), typeIncludesBigInt)
 }
 
+type bigIntAnnotationClass uint8
+
+const (
+	annotationOther bigIntAnnotationClass = iota
+	annotationBigInt
+	annotationAny
+)
+
 // Type information is optional. Recognize BigInt from the operand's syntax
 // and authored annotations even in a project-free file.
-func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bool) bool {
+func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bool {
 	node = utils.ESTreeRuntimeExpression(node)
 	if node == nil {
 		return false
@@ -119,11 +127,12 @@ func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.N
 		return true
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
 		annotation := node.Type()
-		return bigIntAnnotation(ctx, annotation, bindings) ||
+		return classifyBigIntAnnotation(ctx, annotation, bindings) == annotationBigInt ||
 			((annotation.Kind == ast.KindAnyKeyword || annotation.Kind == ast.KindUnknownKeyword) &&
 				bigIntFromSyntax(ctx, node.Expression(), bindings))
 	case ast.KindSatisfiesExpression:
-		return bigIntAnnotation(ctx, node.Type(), bindings) || bigIntFromSyntax(ctx, node.Expression(), bindings)
+		return classifyBigIntAnnotation(ctx, node.Type(), bindings) == annotationBigInt ||
+			bigIntFromSyntax(ctx, node.Expression(), bindings)
 	case ast.KindNonNullExpression:
 		return bigIntFromSyntax(ctx, node.Expression(), bindings)
 	case ast.KindIdentifier:
@@ -133,20 +142,22 @@ func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.N
 		}
 		declaration := symbol.Declarations[0]
 		if result, ok := bindings[declaration]; ok {
-			return result
+			return result == annotationBigInt
 		}
 		annotation, _ := unicornutil.ValueTypeAnnotation(*ctx, declaration)
 		if annotation != nil {
-			return bigIntAnnotation(ctx, annotation, bindings)
+			return classifyBigIntAnnotation(ctx, annotation, bindings) == annotationBigInt
 		}
 		if declaration.Kind != ast.KindVariableDeclaration || !ast.IsVarConst(declaration.Parent) {
 			return false
 		}
 		// Break cycles and reuse the result for repeated aliases in this operand.
-		bindings[declaration] = false
-		result := bigIntFromSyntax(ctx, declaration.Initializer(), bindings)
-		bindings[declaration] = result
-		return result
+		bindings[declaration] = annotationOther
+		if bigIntFromSyntax(ctx, declaration.Initializer(), bindings) {
+			bindings[declaration] = annotationBigInt
+			return true
+		}
+		return false
 	case ast.KindCallExpression:
 		return bigIntCall(ctx, node, bindings)
 	case ast.KindConditionalExpression:
@@ -176,57 +187,75 @@ func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.N
 	return false
 }
 
-func bigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindings map[*ast.Node]bool) bool {
+func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bigIntAnnotationClass {
 	if annotation == nil {
-		return false
+		return annotationOther
 	}
+	var parts []*ast.Node
 	switch annotation.Kind {
 	case ast.KindBigIntKeyword:
-		return true
+		return annotationBigInt
+	case ast.KindAnyKeyword, ast.KindJSDocAllType:
+		return annotationAny
 	case ast.KindLiteralType:
 		literal := annotation.AsLiteralTypeNode().Literal
 		if ast.IsPrefixUnaryExpression(literal) {
 			literal = literal.AsPrefixUnaryExpression().Operand
 		}
-		return ast.IsBigIntLiteral(literal)
+		if ast.IsBigIntLiteral(literal) {
+			return annotationBigInt
+		}
+		return annotationOther
 	case ast.KindParenthesizedType, ast.KindJSDocNullableType, ast.KindJSDocNonNullableType, ast.KindJSDocOptionalType:
-		return bigIntAnnotation(ctx, annotation.Type(), bindings)
+		return classifyBigIntAnnotation(ctx, annotation.Type(), bindings)
 	case ast.KindTypeReference:
 		symbol := ctx.Refs.ResolveInFileWithMeaning(annotation.AsTypeReferenceNode().TypeName, ast.SymbolFlagsType)
 		if symbol == nil {
-			return false
+			return annotationOther
 		}
 		declaration := ast.GetDeclarationOfKind(symbol, ast.KindTypeAliasDeclaration)
-		if declaration == nil {
-			return false
+		var referencedType *ast.Node
+		if declaration != nil {
+			referencedType = declaration.Type()
+		} else {
+			declaration = ast.GetDeclarationOfKind(symbol, ast.KindTypeParameter)
+			// A generic alias's constraint alone cannot determine its type
+			// argument. Follow constraints from the enclosing scope.
+			if declaration == nil || ast.IsTypeAliasDeclaration(declaration.Parent) {
+				return annotationOther
+			}
+			referencedType = declaration.AsTypeParameterDeclaration().Constraint
 		}
 		if result, ok := bindings[declaration]; ok {
 			return result
 		}
-		bindings[declaration] = false
-		result := bigIntAnnotation(ctx, declaration.Type(), bindings)
+		bindings[declaration] = annotationOther
+		result := classifyBigIntAnnotation(ctx, referencedType, bindings)
 		bindings[declaration] = result
 		return result
 	case ast.KindUnionType:
-		return slices.ContainsFunc(annotation.AsUnionTypeNode().Types.Nodes, func(part *ast.Node) bool {
-			return bigIntAnnotation(ctx, part, bindings)
-		})
+		parts = annotation.AsUnionTypeNode().Types.Nodes
 	case ast.KindIntersectionType:
-		parts := annotation.AsIntersectionTypeNode().Types.Nodes
-		for _, part := range parts {
-			switch part.Kind {
-			case ast.KindAnyKeyword, ast.KindUnknownKeyword, ast.KindJSDocAllType:
-				return false
-			}
-		}
-		return slices.ContainsFunc(parts, func(part *ast.Node) bool {
-			return bigIntAnnotation(ctx, part, bindings)
-		})
+		parts = annotation.AsIntersectionTypeNode().Types.Nodes
+	default:
+		return annotationOther
 	}
-	return false
+
+	// An explicit any overrides the other members, even through an alias.
+	// An unknown member contributes no evidence and is neutral in an intersection.
+	result := annotationOther
+	for _, part := range parts {
+		switch classifyBigIntAnnotation(ctx, part, bindings) {
+		case annotationAny:
+			return annotationAny
+		case annotationBigInt:
+			result = annotationBigInt
+		}
+	}
+	return result
 }
 
-func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bool) bool {
+func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bool {
 	if ast.IsOptionalChain(node) {
 		return false
 	}
@@ -271,6 +300,6 @@ func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bo
 			annotation, _ = unicornutil.ValueTypeAnnotation(*ctx, function)
 		}
 	}
-	return bigIntAnnotation(ctx, annotation, bindings) &&
+	return classifyBigIntAnnotation(ctx, annotation, bindings) == annotationBigInt &&
 		!slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference)
 }

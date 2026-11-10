@@ -80,6 +80,26 @@ type Branded = bigint & { tag: true };
 declare function readBranded(): Branded;
 const branded = readBranded();
 branded > 0 ? branded : 0;
+function outer<T extends bigint, U extends T>(input: U) {
+  function read(): T { return input; }
+  const constrained = read();
+  constrained > 0 ? constrained : 0;
+  type Value = U;
+  function readAlias(): Value { return input; }
+  const aliased = readAlias();
+  aliased > 0 ? aliased : 0;
+}
+function readIntersection(): bigint & unknown { return 1n; }
+const intersection = readIntersection();
+intersection > 0 ? intersection : 0;
+type Any = any;
+function readAny(): bigint & Any { return 1; }
+const numeric = readAny();
+numeric > 0 ? numeric : 0;
+type NestedAny = Any & unknown;
+function readNestedAny(): bigint & NestedAny { return 1; }
+const nestedNumeric = readNestedAny();
+nestedNumeric > 0 ? nestedNumeric : 0;
 declare const readBig: () => bigint;
 const big = readBig();
 big > 0 ? big : 0;
@@ -101,12 +121,14 @@ const uncertain = readCycle();
 uncertain > 0 ? uncertain : 0;
 ` + "String.raw`value` > 0 ? String.raw`value` : 0;"
 	comparisons := []string{
+		"numeric > 0 ? numeric : 0",
+		"nestedNumeric > 0 ? nestedNumeric : 0",
 		"value > 0 ? value : 0",
 		"read() > 0 ? read() : 0",
 		"uncertain > 0 ? uncertain : 0",
 		"String.raw`value` > 0 ? String.raw`value` : 0",
 	}
-	replacements := []string{"Math.max(value, 0)", "", "Math.max(uncertain, 0)", ""}
+	replacements := []string{"Math.max(numeric, 0)", "Math.max(nestedNumeric, 0)", "Math.max(value, 0)", "", "Math.max(uncertain, 0)", ""}
 	root := fixtures.GetRootDir()
 	fileName := tspath.ResolvePath(root.Dir, "edit-demand.ts")
 	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})

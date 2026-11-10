@@ -54,12 +54,20 @@ const capped = (delete cache.key, height) > 50 ? 50 : (delete cache.key, height)
 
 Rslint skips comparisons with values returned by a callback typed as
 `() => bigint` or a function with a signed BigInt literal return type such
-as `-1n`, even in files outside a TypeScript project.
+as `-1n`, even in files outside a TypeScript project. It also skips return
+types of `bigint & unknown`, which simplify to `bigint`. Passing these
+values to `Math.min()` or `Math.max()` throws a `TypeError`.
 
 ```typescript
 declare const read: () => bigint;
 const value = read();
 value > 0 ? value : 0;
+
+function readLimit(): bigint & unknown {
+  return 1n;
+}
+const limit = readLimit();
+limit > 0 ? limit : 0;
 ```
 
 ## Original documentation
