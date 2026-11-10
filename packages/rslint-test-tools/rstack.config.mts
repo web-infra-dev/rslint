@@ -170,6 +170,8 @@ const ecosystemTests = {
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
     './tests/eslint/rules/no-warning-comments.test.ts',
+    // rule tester
+    './tests/rule-tester/suggestions.test.ts',
     // eslint-plugin-node
     './tests/eslint-plugin-node/rules/callback-return.test.ts',
     './tests/eslint-plugin-node/rules/exports-style.test.ts',

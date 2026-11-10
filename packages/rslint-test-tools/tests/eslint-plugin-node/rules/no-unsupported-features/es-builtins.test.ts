@@ -1,6 +1,10 @@
 // Every test group and ignore variant from eslint-plugin-n v18.3.0:
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unsupported-features/es-builtins.js
-import { RuleTester } from '@rslint/rule-tester';
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
 
 function unsupported(
   name: string,
@@ -21,7 +25,7 @@ function unsupported(
   };
 }
 
-type Cases = Parameters<RuleTester['run']>[2];
+type Cases = { valid: ValidTestCase[]; invalid: TestCase[] };
 const patterns: ({ keyword: string } & Cases)[] = [
   {
     keyword: 'AggregateError',
@@ -1334,29 +1338,29 @@ const patterns: ({ keyword: string } & Cases)[] = [
 
 const ruleTester = new RuleTester({ plugin: 'node' });
 for (const pattern of patterns) {
-  const ignored = pattern.invalid.map(({ errors: _errors, ...item }) => ({
-    ...item,
-    options: [
-      {
-        ...(item.options as Record<string, unknown>[] | undefined)?.[0],
-        ignores: [pattern.keyword],
-      },
-    ],
-  }));
-  ruleTester.run(
-    'no-unsupported-features/es-builtins',
-    {},
-    {
-      valid: [...pattern.valid, ...ignored].map((item) => ({
+  const ignored = pattern.invalid.map(
+    ({ errors: _errors, output: _output, ...item }) => {
+      // Like upstream, append the keyword to any existing ignores.
+      const option = (
+        item.options as Record<string, unknown>[] | undefined
+      )?.[0];
+      const ignores = (option?.ignores as string[] | undefined) ?? [];
+      return {
         ...item,
-        name: pattern.keyword,
-      })),
-      invalid: pattern.invalid.map((item) => ({
-        ...item,
-        name: pattern.keyword,
-      })),
+        options: [{ ...option, ignores: [...ignores, pattern.keyword] }],
+      };
     },
   );
+  ruleTester.run('no-unsupported-features/es-builtins', {
+    valid: [...pattern.valid, ...ignored].map((item) => ({
+      ...item,
+      name: pattern.keyword,
+    })),
+    invalid: pattern.invalid.map((item) => ({
+      ...item,
+      name: pattern.keyword,
+    })),
+  });
 }
 
 // The two configuration examples in the pinned documentation.
@@ -1364,29 +1368,23 @@ for (const settings of [undefined, { node: { version: '>=16.0.0' } }]) {
   const options = [
     { ...(settings ? {} : { version: '>=16.0.0' }), ignores: [] },
   ];
-  ruleTester.run(
-    'no-unsupported-features/es-builtins',
-    {},
-    {
-      valid: [
-        {
-          name: 'documented version configuration',
-          code: 'Object.fromEntries(entries)',
-          options,
-          settings,
-        },
-      ],
-      invalid: [
-        {
-          name: 'documented version configuration',
-          code: 'Map.groupBy(items, key)',
-          options,
-          settings,
-          errors: [
-            unsupported('Map.groupBy', '21.0.0', '>=16.0.0', 1, 1, 1, 12),
-          ],
-        },
-      ],
-    },
-  );
+  ruleTester.run('no-unsupported-features/es-builtins', {
+    valid: [
+      {
+        name: 'documented version configuration',
+        code: 'Object.fromEntries(entries)',
+        options,
+        settings,
+      },
+    ],
+    invalid: [
+      {
+        name: 'documented version configuration',
+        code: 'Map.groupBy(items, key)',
+        options,
+        settings,
+        errors: [unsupported('Map.groupBy', '21.0.0', '>=16.0.0', 1, 1, 1, 12)],
+      },
+    ],
+  });
 }

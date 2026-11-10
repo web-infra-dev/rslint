@@ -28,7 +28,7 @@ const ruleTester = new RuleTester({
   fixtureFiles,
   languageOptions: { sourceType: 'module' },
 });
-ruleTester.run('no-missing-import', null, {
+ruleTester.run('no-missing-import', {
   valid: [
     {
       name: 'upstream valid 1',

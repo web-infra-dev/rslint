@@ -4,8 +4,11 @@
  * See LICENSE file in root directory for full license.
  */
 
-import { RuleTester, type TestCase } from '@rslint/rule-tester';
-const rule = undefined;
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
 
 // The package metadata mirrors tests/fixtures/shebang at eslint-plugin-n v18.3.0.
 const packages = {
@@ -19,37 +22,35 @@ const packages = {
   unpublished: { name: 'test', version: '0.0.0', files: ['./published.js'] },
 };
 
-// Upstream expects message strings. Each hashbang diagnostic covers the
-// complete first line and has an autofix.
-function expandErrors(item: TestCase): TestCase {
+// Upstream writes each expected error as its message text.
+type UpstreamCase = Omit<TestCase, 'errors'> & { errors: string[] };
+
+// Each hashbang diagnostic covers the complete first line and has an autofix.
+function expandErrors(item: UpstreamCase): TestCase {
   const end =
     item.code.replace(/^\uFEFF/, '').split(/\r\n|[\r\n\u2028\u2029]/)[0]
       .length + 1;
   return {
     ...item,
-    errors: item.errors?.map((message) =>
-      typeof message !== 'string'
-        ? message
-        : {
-            message,
-            messageId: message.includes('needs shebang')
-              ? 'expectedHashbangNode'
-              : message.includes('needs no shebang')
-                ? 'expectedHashbang'
-                : message.includes('Unicode BOM')
-                  ? 'unexpectedBOM'
-                  : 'expectedLF',
-            line: 1,
-            column: 1,
-            endLine: 1,
-            endColumn: end,
-          },
-    ),
+    errors: item.errors.map((message) => ({
+      message,
+      messageId: message.includes('needs shebang')
+        ? 'expectedHashbangNode'
+        : message.includes('needs no shebang')
+          ? 'expectedHashbang'
+          : message.includes('Unicode BOM')
+            ? 'unexpectedBOM'
+            : 'expectedLF',
+      line: 1,
+      column: 1,
+      endLine: 1,
+      endColumn: end,
+    })),
   };
 }
 
 // Relative upstream filenames point into the shebang fixture directory.
-function fixtureRelative(item: TestCase): TestCase {
+function fixtureRelative<T extends ValidTestCase | UpstreamCase>(item: T): T {
   return {
     ...item,
     filename: item.filename?.replace(/^tests\/fixtures\/shebang\//, ''),
@@ -59,8 +60,7 @@ function fixtureRelative(item: TestCase): TestCase {
 const ruleTester = {
   run(
     name: string,
-    _rule: unknown,
-    cases: { valid: TestCase[]; invalid: TestCase[] },
+    cases: { valid: ValidTestCase[]; invalid: UpstreamCase[] },
   ) {
     new RuleTester({
       plugin: 'node',
@@ -70,7 +70,7 @@ const ruleTester = {
           JSON.stringify(pkg),
         ]),
       ),
-    }).run(name, _rule, {
+    }).run(name, {
       valid: cases.valid.map(fixtureRelative),
       invalid: cases.invalid.map((item) => expandErrors(fixtureRelative(item))),
     });
@@ -86,7 +86,7 @@ function fixture(name: string) {
   return name;
 }
 
-ruleTester.run('hashbang', rule, {
+ruleTester.run('hashbang', {
   valid: [
     {
       name: 'string-bin/bin/test.js',

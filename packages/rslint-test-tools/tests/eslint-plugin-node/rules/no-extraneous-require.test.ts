@@ -86,216 +86,196 @@ const tester = new RuleTester({
   },
 });
 
-tester.run(
-  'no-extraneous-require',
-  {},
-  {
-    valid: [
-      {
-        filename: 'dependencies/a.js',
-        code: "$.require('bbb')",
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('./bbb')",
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: 'require(bbb)',
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('aaa')",
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('aaa/bbb')",
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('@bbb/aaa')",
-        errors: [],
-      },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('@bbb/aaa/bbb')",
-        errors: [],
-      },
-      {
-        filename: 'devDependencies/a.js',
-        code: "require('aaa')",
-        errors: [],
-      },
-      {
-        filename: 'peerDependencies/a.js',
-        code: "require('aaa')",
-        errors: [],
-      },
-      {
-        filename: 'optionalDependencies/a.js',
-        code: "require('aaa')",
-        errors: [],
-      },
-      {
-        filename: 'workspace/packages/app/src/index.js',
-        code: "require('root-dep')",
-        settings: {
-          n: {
-            tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
-          },
+tester.run('no-extraneous-require', {
+  valid: [
+    {
+      filename: 'dependencies/a.js',
+      code: "$.require('bbb')",
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('./bbb')",
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: 'require(bbb)',
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('aaa')",
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('aaa/bbb')",
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('@bbb/aaa')",
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('@bbb/aaa/bbb')",
+    },
+    {
+      filename: 'devDependencies/a.js',
+      code: "require('aaa')",
+    },
+    {
+      filename: 'peerDependencies/a.js',
+      code: "require('aaa')",
+    },
+    {
+      filename: 'optionalDependencies/a.js',
+      code: "require('aaa')",
+    },
+    {
+      filename: 'workspace/packages/app/src/index.js',
+      code: "require('root-dep')",
+      settings: {
+        n: {
+          tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
-        errors: [],
       },
-      {
-        filename: 'workspace-object/packages/app/src/index.js',
-        code: "require('root-dep')",
-        settings: {
-          n: {
-            tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
-          },
+    },
+    {
+      filename: 'workspace-object/packages/app/src/index.js',
+      code: "require('root-dep')",
+      settings: {
+        n: {
+          tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
-        errors: [],
       },
-      {
-        filename: 'workspace-nested/inner/packages/app/src/index.js',
-        code: "require('root-dep')",
-        settings: {
-          n: {
-            tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
-          },
+    },
+    {
+      filename: 'workspace-nested/inner/packages/app/src/index.js',
+      code: "require('root-dep')",
+      settings: {
+        n: {
+          tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
         },
-        errors: [],
       },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('ccc')",
-        errors: [],
-      },
-      {
-        filename: 'test.js',
-        code: "require('virtual:package-name');",
-        errors: [],
-      },
-      {
-        filename: 'test.js',
-        code: "require('virtual:package-scope/name');",
-        errors: [],
-      },
-    ],
-    invalid: [
-      {
-        filename: 'dependencies/a.js',
-        code: "require('bbb')",
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"bbb" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 14,
-          },
-        ],
-      },
-      {
-        filename: 'devDependencies/a.js',
-        code: "require('bbb')",
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"bbb" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 14,
-          },
-        ],
-      },
-      {
-        filename: 'peerDependencies/a.js',
-        code: "require('bbb')",
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"bbb" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 14,
-          },
-        ],
-      },
-      {
-        filename: 'optionalDependencies/a.js',
-        code: "require('bbb')",
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"bbb" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 14,
-          },
-        ],
-      },
-      {
-        filename: 'workspace-negated/packages/excluded/src/index.js',
-        code: "require('root-dep')",
-        settings: {
-          n: {
-            tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
-          },
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('ccc')",
+    },
+    {
+      filename: 'test.js',
+      code: "require('virtual:package-name');",
+    },
+    {
+      filename: 'test.js',
+      code: "require('virtual:package-scope/name');",
+    },
+  ],
+  invalid: [
+    {
+      filename: 'dependencies/a.js',
+      code: "require('bbb')",
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"bbb" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
         },
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"root-dep" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 19,
-          },
-        ],
-      },
-      {
-        filename: 'workspace-nested/inner/packages/app/src/index.js',
-        code: "require('outer-dep')",
-        settings: {
-          n: {
-            tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
-          },
+      ],
+    },
+    {
+      filename: 'devDependencies/a.js',
+      code: "require('bbb')",
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"bbb" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
         },
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"outer-dep" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 20,
-          },
-        ],
+      ],
+    },
+    {
+      filename: 'peerDependencies/a.js',
+      code: "require('bbb')",
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"bbb" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      filename: 'optionalDependencies/a.js',
+      code: "require('bbb')",
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"bbb" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      filename: 'workspace-negated/packages/excluded/src/index.js',
+      code: "require('root-dep')",
+      settings: {
+        n: {
+          tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
+        },
       },
-      {
-        filename: 'dependencies/a.js',
-        code: "require('b'+'bb')",
-        errors: [
-          {
-            messageId: 'extraneous',
-            message: '"bbb" is extraneous.',
-            line: 1,
-            column: 9,
-            endLine: 1,
-            endColumn: 17,
-          },
-        ],
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"root-dep" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      filename: 'workspace-nested/inner/packages/app/src/index.js',
+      code: "require('outer-dep')",
+      settings: {
+        n: {
+          tryExtensions: ['.js', '.json', '.node', '.mjs', '.cjs'],
+        },
       },
-    ],
-  },
-);
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"outer-dep" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      filename: 'dependencies/a.js',
+      code: "require('b'+'bb')",
+      errors: [
+        {
+          messageId: 'extraneous',
+          message: '"bbb" is extraneous.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+  ],
+});
