@@ -152,11 +152,12 @@ items[index++] |= 0;
 }
 
 func TestPreferMathTruncBigIntSyntax(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		code   string
 		report bool
 		output string
-	}{
+	}
+	tests := []testCase{
 		{code: `~~(flag ? 1n : 2n);`},
 		{code: `~~(BigInt(1) + 1n);`},
 		{code: `~~(-(BigInt(value) as bigint));`},
@@ -166,6 +167,8 @@ func TestPreferMathTruncBigIntSyntax(t *testing.T) {
 		{code: `~~(0, [1n][0]);`},
 		{code: `~~({value: 1n}).value;`},
 		{code: `~~([{value: 1n}][0].value);`},
+		{code: `~~({a: ({x: 1n})}).a.x;`},
+		{code: `~~([({x: 1n})][0].x);`},
 		{code: `~~({values: [1n]}).values[0];`},
 		{code: `~~([1n]["0"]);`},
 		{code: `~~({value: 1.5, value: 1n}).value;`},
@@ -187,6 +190,23 @@ func TestPreferMathTruncBigIntSyntax(t *testing.T) {
 		{code: `~~(1n < 2n);`, report: true, output: `Math.trunc(1n < 2n);`},
 		{code: `~~(flag ? 1.5 : 2.5);`, report: true, output: `Math.trunc(flag ? 1.5 : 2.5);`},
 		{code: `function f(BigInt) { return ~~BigInt(1); }`, report: true, output: `function f(BigInt) { return Math.trunc(BigInt(1)); }`},
+	}
+	for _, wrapper := range []string{
+		`(%s)`, `(%s as {x: number})`, `(%s satisfies {x: number})`, `(%s!)`, `(<{x: number}>%s)`,
+	} {
+		initializer := fmt.Sprintf(wrapper, `{x: 1.5}`)
+		tests = append(tests, testCase{
+			code:   fmt.Sprintf(`~~({a: %s, unused: 1n}).a.x;`, initializer),
+			report: true,
+			output: fmt.Sprintf(`Math.trunc(({a: %s, unused: 1n}).a.x);`, initializer),
+		})
+	}
+	for _, key := range []string{`"x"`, `("x")`, `("x" as string)`, `("x" satisfies string)`, `("x"!)`, `(<string>"x")`} {
+		tests = append(tests, testCase{
+			code:   fmt.Sprintf(`~~({[%s]: 1.5, unused: 1n}).x;`, key),
+			report: true,
+			output: fmt.Sprintf(`Math.trunc(({[%s]: 1.5, unused: 1n}).x);`, key),
+		}, testCase{code: fmt.Sprintf(`~~({[%s]: 1n, unused: 1.5}).x;`, key)})
 	}
 	for _, typed := range []bool{false, true} {
 		for _, test := range tests {

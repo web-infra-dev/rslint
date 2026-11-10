@@ -91,11 +91,12 @@ const (
 	bigIntUnknown bigIntKind = iota
 	bigIntPossible
 	bigIntKnown
+	bigIntExcluded
 )
 
 func classifyBigInt(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 	syntax := bigIntFromSyntax(ctx, operand)
-	if syntax == bigIntKnown || ctx.TypeChecker == nil {
+	if syntax == bigIntKnown || syntax == bigIntExcluded || ctx.TypeChecker == nil {
 		return syntax
 	}
 	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, operand)
@@ -130,6 +131,9 @@ func bigIntFromSyntax(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 	switch operand.Kind {
 	case ast.KindBigIntLiteral:
 		return bigIntKnown
+	case ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return bigIntExcluded
 	case ast.KindPrefixUnaryExpression:
 		unary := operand.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindMinusToken || unary.Operator == ast.KindTildeToken {
@@ -168,7 +172,7 @@ func bigIntFromSyntax(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 			// String concatenation produces a string even with a BigInt operand.
 			if ast.IsStringLiteralLike(utils.SkipAssertionsAndParens(binary.Left)) ||
 				ast.IsStringLiteralLike(utils.SkipAssertionsAndParens(binary.Right)) {
-				return bigIntUnknown
+				return bigIntExcluded
 			}
 		case ast.KindMinusToken, ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken,
 			ast.KindAsteriskAsteriskToken, ast.KindBarToken, ast.KindAmpersandToken, ast.KindCaretToken,
@@ -190,6 +194,7 @@ func literalMemberValue(node *ast.Node) (*ast.Node, bool) {
 		return node, true
 	}
 	receiver, resolved := literalMemberValue(utils.AccessExpressionObject(node))
+	receiver = utils.SkipAssertionsAndParens(receiver)
 	key, static := utils.AccessExpressionStaticName(node)
 	if !resolved || receiver == nil || !static {
 		return nil, false
@@ -227,6 +232,9 @@ func literalMemberValue(node *ast.Node) (*ast.Node, bool) {
 				continue
 			}
 			propertyKey, static := utils.GetStaticPropertyName(name)
+			if name.Kind == ast.KindComputedPropertyName {
+				propertyKey, static = utils.GetStaticExpressionValue(utils.SkipAssertionsAndParens(name.AsComputedPropertyName().Expression))
+			}
 			if propertyKey == "__proto__" && property.Kind == ast.KindPropertyAssignment && name.Kind != ast.KindComputedPropertyName {
 				if value == nil {
 					resolved = false
@@ -270,7 +278,8 @@ func literalMemberMayBeBigInt(ctx *rule.RuleContext, node *ast.Node) bool {
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 		return literalMemberMayBeBigInt(ctx, utils.AccessExpressionObject(node))
 	default:
-		return bigIntFromSyntax(ctx, node) != bigIntUnknown
+		kind := bigIntFromSyntax(ctx, node)
+		return kind == bigIntKnown || kind == bigIntPossible
 	}
 }
 
@@ -278,8 +287,11 @@ func mergeBigIntKinds(left, right bigIntKind) bigIntKind {
 	if left == bigIntKnown && right == bigIntKnown {
 		return bigIntKnown
 	}
-	if left != bigIntUnknown || right != bigIntUnknown {
+	if left == bigIntKnown || left == bigIntPossible || right == bigIntKnown || right == bigIntPossible {
 		return bigIntPossible
+	}
+	if left == bigIntExcluded && right == bigIntExcluded {
+		return bigIntExcluded
 	}
 	return bigIntUnknown
 }
