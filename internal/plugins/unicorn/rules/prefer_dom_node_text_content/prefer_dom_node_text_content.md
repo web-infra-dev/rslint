@@ -32,19 +32,16 @@ This rule has no options.
 
 ## Differences from upstream
 
-In JavaScript linted without project type information, rslint reports
-`make().innerText` with the annotation below. eslint-plugin-unicorn uses the
-callback's documented return type and skips the access.
+With project type information, rslint can distinguish browser DOM types from
+application types that share their names. For example, if `./library` exports
+its own `Node` class, eslint-plugin-unicorn reports the access below and rslint
+skips it.
 
-```javascript
-/** @param {function(): {innerText: string}} make */
-function read(make) {
-  return make().innerText;
-}
+```typescript
+import { Node as Model } from './library';
+
+new Model().innerText;
 ```
-
-Use `@param {() => {innerText: string}} make` to let rslint recognize the
-callback's return type in this case.
 
 ## Original Documentation
 

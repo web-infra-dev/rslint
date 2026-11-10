@@ -3,6 +3,7 @@ package unicornutil
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -75,13 +76,23 @@ func (c *domNodeTypeClassifier) expression(node *ast.Node) TypeClass {
 			class = c.callReturnType(utils.ESTreeCallCallee(node.Expression()))
 		}
 	}
-	if class == TypeUnknown && c.ctx.TypeChecker != nil {
-		return ClassifyType(c.ctx, c.ctx.TypeChecker.GetTypeAtLocation(node), TypeClassifierOptions{
-			TargetTypeNames:     domNodeTypeNames,
-			HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
-		})
+	if class == TypeUnknown {
+		return c.checkedType(node)
 	}
 	return class
+}
+
+func (c *domNodeTypeClassifier) checkedType(node *ast.Node) TypeClass {
+	if c.ctx.TypeChecker == nil {
+		return TypeUnknown
+	}
+	return ClassifyType(c.ctx, c.ctx.TypeChecker.GetTypeAtLocation(node), TypeClassifierOptions{
+		IsTargetType: func(t *checker.Type) bool {
+			symbol := checker.Type_symbol(t)
+			return symbol != nil && domNodeTypeNames.Has(symbol.Name) && utils.IsSymbolFromDefaultLibrary(c.ctx.Program(), symbol)
+		},
+		HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
+	})
 }
 
 func (c *domNodeTypeClassifier) identifier(node *ast.Node) TypeClass {
@@ -109,44 +120,6 @@ func (c *domNodeTypeClassifier) identifier(node *ast.Node) TypeClass {
 	return TypeUnknown
 }
 
-func (c *domNodeTypeClassifier) bindingAnnotation(declaration *ast.Node) (*ast.Node, bool) {
-	annotation, optional := ValueTypeAnnotation(c.ctx, declaration)
-	if !utils.IsJSDocSyntaxNode(annotation) || !ast.IsVariableDeclaration(declaration) {
-		return annotation, optional
-	}
-	// A native assertion on the initializer takes precedence over binding JSDoc.
-	if hasNativeTypeAssertion(declaration.Initializer()) {
-		return nil, false
-	}
-	// Statement-level JSDoc describes a single binding. Conflicting tags leave
-	// the binding's type to its initializer or the project checker.
-	var typeExpression *ast.Node
-	for host := declaration.Name(); host != nil; host = ast.GetNextJSDocCommentLocation(host) {
-		if ast.IsVariableDeclarationList(host) && len(host.AsVariableDeclarationList().Declarations.Nodes) > 1 {
-			break
-		}
-		for _, doc := range host.JSDoc(c.ctx.SourceFile) {
-			tags := doc.AsJSDoc().Tags
-			if tags == nil {
-				continue
-			}
-			for _, tag := range tags.Nodes {
-				if !ast.IsJSDocTypeTag(tag) || tag.TypeExpression() == nil {
-					continue
-				}
-				if typeExpression != nil {
-					return nil, false
-				}
-				typeExpression = tag.TypeExpression()
-			}
-		}
-	}
-	if typeExpression != nil {
-		return typeExpression.Type(), optional
-	}
-	return nil, false
-}
-
 func hasNativeTypeAssertion(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -165,6 +138,14 @@ func (c *domNodeTypeClassifier) annotation(node *ast.Node) TypeClass {
 		case ast.KindArrayType, ast.KindTupleType, ast.KindNeverKeyword:
 			// Unicorn's JSDoc parser leaves Array and unsupported types unknown.
 			return TypeUnknown
+		case ast.KindTypeLiteral:
+			if len(node.Members()) == 0 {
+				return TypeUnknown
+			}
+		case ast.KindJSDocTypeLiteral:
+			if len(node.AsJSDocTypeLiteral().JSDocPropertyTags) == 0 {
+				return TypeUnknown
+			}
 		case ast.KindTypeReference:
 			name := node.AsTypeReferenceNode().TypeName
 			if !ast.IsIdentifier(name) {
@@ -216,10 +197,20 @@ func (c *domNodeTypeClassifier) typeReference(name *ast.Node) TypeClass {
 	if name == nil || !ast.IsIdentifier(name) {
 		return TypeUnknown
 	}
+	symbol := c.ctx.Refs.ResolveInFileWithMeaning(name, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
+	if symbol != nil && len(symbol.Declarations) > 0 {
+		declaration := symbol.Declarations[0]
+		if ast.IsImportSpecifier(declaration) &&
+			(domNodeTypeNames.Has(declaration.PropertyNameOrName().Text()) || domNodeTypeNames.Has(name.Text())) {
+			if class := c.checkedType(name.Parent); class != TypeUnknown {
+				return class
+			}
+			return TypeNonTarget
+		}
+	}
 	if domNodeTypeNames.Has(name.Text()) {
 		return TypeTarget
 	}
-	symbol := c.ctx.Refs.ResolveInFileWithMeaning(name, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
 	if symbol == nil || len(symbol.Declarations) == 0 || !c.enter(symbol) {
 		return TypeUnknown
 	}
@@ -323,16 +314,12 @@ func (c *domNodeTypeClassifier) callReturnType(callee *ast.Node) TypeClass {
 			if optional {
 				return TypeUnknown
 			}
-			// The Closure-style fallback reads @type on variable bindings.
-			if ast.IsVariableDeclaration(declaration) && isClosureFunctionType(ast.SkipTypeParentheses(annotation)) {
-				return c.annotation(factoryReturnAnnotation(c.ctx, declaration))
-			}
 			return classifyCallableReturnType(annotation, c.annotation)
 		}
 	}
 	if function != nil {
-		annotation, _ := ValueTypeAnnotation(c.ctx, function)
-		return c.annotation(annotation)
+		tag := c.uniqueJSDocTag(function, ast.KindJSDocReturnTag)
+		return c.annotation(c.jsDocType(tag, function))
 	}
 	return TypeUnknown
 }

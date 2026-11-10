@@ -1,0 +1,9 @@
+-- typed/tsconfig.json --
+{"compilerOptions":{"target":"esnext","module":"commonjs","strict":true},"files":["caller.ts","library.ts"]}
+-- typed/caller.ts --
+export {};
+-- typed/library.ts --
+export class Node {
+  innerText = '';
+}
+export type Element = HTMLDivElement;

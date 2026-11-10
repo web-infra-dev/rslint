@@ -201,19 +201,27 @@ func closureFactoryReturnAnnotation(ctx rule.RuleContext, tag, declaration *ast.
 	text := "/** @type {" + ctx.SourceFile.Text()[tag.TypeExpression().Pos():tag.End()] + "} */ const factory = undefined;"
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
 	annotation := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
-	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
+	method := closureFunctionMethod(annotation)
+	if method == nil {
 		return nil
 	}
-	members := annotation.AsTypeLiteralNode().Members.Nodes
-	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
-		return nil
-	}
-	result := members[0].Type()
+	result := method.Type()
 	if result != nil {
 		// Resolve return-type names in the original factory's lexical scope.
 		result.Parent = declaration
 	}
 	return result
+}
+
+func closureFunctionMethod(annotation *ast.Node) *ast.Node {
+	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
+		return nil
+	}
+	members := annotation.Members()
+	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
+		return nil
+	}
+	return members[0]
 }
 
 // HasJSDocTypeReference reports an authored JSDoc type through an alias or a

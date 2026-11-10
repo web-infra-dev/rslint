@@ -1,17 +1,22 @@
 package prefer_dom_node_text_content_test
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/bundled"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_text_content"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
 func TestPreferDomNodeTextContentExtras(t *testing.T) {
@@ -28,10 +33,23 @@ func TestPreferDomNodeTextContentExtras(t *testing.T) {
 		{Code: `declare const item: {innerText: string}; (item as any).innerText; (item satisfies {innerText: string}).innerText; item!.innerText;`},
 		{Code: `interface A {innerText: string} interface B {innerText: string; extra: true} declare const union: A | B; declare const intersection: A & B; union.innerText; intersection.innerText;`},
 		{Code: `declare function value(): {innerText: string}; value().innerText;`},
+		{Code: `import {Node as Model} from './library'; declare const x: Model; x.innerText;`},
 		{FileName: "case.js", Code: `/** @type {{innerText: string}} */ const value = {innerText: ''}; value.innerText;`},
 		{FileName: "case.js", Code: `/** @param {{innerText: string}} value */ function read(value) { return value.innerText; }`},
 		{FileName: "case.js", Code: `/** @returns {{innerText: string}} */ function make() { return {innerText: ''}; } make().innerText;`},
+		{FileName: "case.js", Code: `/** @type {function(): string} */ const f = () => ''; f.innerText;`},
+		{FileName: "case.js", Code: `/** @type {function()} */ const f = () => ''; f.innerText;`},
+		{FileName: "case.js", Code: `/** @returns {function(): string} */ function make() { return () => ''; } make().innerText;`},
+		{FileName: "case.js", Code: `/** @returns {HTMLElement} */ const make = /** @returns {{innerText: string}} */ () => value; make().innerText;`},
+		{FileName: "case.js", Code: `/** @param {HTMLElement} value */ const read = /** @param {{innerText: string}} value */ value => value.innerText;`},
 		{FileName: "case.js", Code: `/** @type {function(): {innerText: string}} */ const make = () => ({innerText: ''}); make().innerText;`},
+		{FileName: "case.js", Code: `/** @param {function(): {innerText: string}} make */ function read(make) { make.innerText; return make().innerText; }`},
+		{FileName: "case.js", Code: `/** @param make {function(): {innerText: string}} */ function read(make) { return make().innerText; }`},
+		{FileName: "case.js", Code: `
+/** @param {function():
+ *   {innerText: '{'}} make */
+function read(other, make = () => ({innerText: '{'})) { return make().innerText; }
+`},
 		{FileName: "case.js", Code: `/** @type {() => {innerText: string}} */ const make = /** @returns {HTMLElement} */ () => node; make().innerText;`},
 		{FileName: "case.js", Code: `/** @param {() => {innerText: string}} make */ function read(make) { return make().innerText; }`},
 		{FileName: "case.js", Code: `/** @param {() => {innerText: string}} make */ function read(make = () => ({innerText: ''})) { return make().innerText; }`},
@@ -110,10 +128,39 @@ union().innerText; intersection().innerText; signature().innerText;
 		{Code: `/** @param {() => {innerText: string}} make */ function read(make = (): HTMLElement => node) { return make().innerText; }`, Errors: []rule_tester.InvalidTestCaseError{
 			textContentError(1, 110, 119, `/** @param {() => {innerText: string}} make */ function read(make = (): HTMLElement => node) { return make().textContent; }`),
 		}},
-		// The arrow-style equivalent is covered above. See Differences from upstream.
-		{FileName: "case.js", Code: `/** @param {function(): {innerText: string}} make */ function read(make) { return make().innerText; }`, Errors: []rule_tester.InvalidTestCaseError{
-			textContentError(1, 90, 99, `/** @param {function(): {innerText: string}} make */ function read(make) { return make().textContent; }`),
+		{FileName: "case.js", Code: "/** @type {function} */ const f = () => '';\nf.innerText;", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 3, 12, "/** @type {function} */ const f = () => '';\nf.textContent;"),
 		}},
+		{FileName: "case.js", Code: "/** @param {function(): {innerText: string}} make */ function read(other, make) {\n  other().innerText; make().innerText;\n}", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 11, 20, "/** @param {function(): {innerText: string}} make */ function read(other, make) {\n  other().textContent; make().innerText;\n}"),
+		}},
+		{FileName: "case.js", Code: "/** @param {function(): {innerText: string}} [make=identity] */ function read(make) {\n  make.innerText;\n  make().innerText;\n}", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(3, 10, 19, "/** @param {function(): {innerText: string}} [make=identity] */ function read(make) {\n  make.innerText;\n  make().textContent;\n}"),
+		}},
+		{FileName: "case.js", Code: "/** @param {function(): {innerText: string}} make */ function read(make) {\n  make = replacement;\n  make().innerText;\n}", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(3, 10, 19, "/** @param {function(): {innerText: string}} make */ function read(make) {\n  make = replacement;\n  make().textContent;\n}"),
+		}},
+		{FileName: "case.js", Code: "/** @type {{}} */ const value = document.createElement('div');\nvalue.innerText;", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 7, 16, "/** @type {{}} */ const value = document.createElement('div');\nvalue.textContent;"),
+		}},
+		{FileName: "case.js", Code: "/** @param {{}} value */ function read(value) {\n  value.innerText;\n}", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 9, 18, "/** @param {{}} value */ function read(value) {\n  value.textContent;\n}"),
+		}},
+		{FileName: "case.js", Code: "/** @returns {{}} */ function make() { return document.createElement('div'); }\nmake().innerText;", Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 8, 17, "/** @returns {{}} */ function make() { return document.createElement('div'); }\nmake().textContent;"),
+		}},
+	}
+	for _, types := range [][2]string{{"{innerText: string}", "HTMLElement"}, {"HTMLElement", "{innerText: string}"}} {
+		parameter := fmt.Sprintf("/** @param {%s} value\n * @param {%s} value\n * @param {{innerText: string}} other\n */ function read(value, other) {\n  value.innerText; other.innerText;\n}", types[0], types[1])
+		returns := fmt.Sprintf("/** @returns {%s}\n * @returns {%s}\n */ function make() { return node; }\nmake().innerText;", types[0], types[1])
+		invalid = append(invalid,
+			rule_tester.InvalidTestCase{FileName: "case.js", Code: parameter, Errors: []rule_tester.InvalidTestCaseError{
+				textContentError(5, 9, 18, strings.Replace(parameter, ".innerText", ".textContent", 1)),
+			}},
+			rule_tester.InvalidTestCase{FileName: "case.js", Code: returns, Errors: []rule_tester.InvalidTestCaseError{
+				textContentError(4, 8, 17, strings.Replace(returns, ".innerText", ".textContent", 1)),
+			}},
+		)
 	}
 	testedRule := preferDomNodeTextContentWithoutTypes()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule, valid, invalid)
@@ -128,6 +175,24 @@ func TestPreferDomNodeTextContentTypeInformation(t *testing.T) {
 			Code: "const div = document.createElement('div');\ndiv.innerText;",
 			Errors: []rule_tester.InvalidTestCaseError{
 				textContentError(2, 5, 14, "const div = document.createElement('div');\ndiv.textContent;"),
+			},
+		}},
+	)
+}
+
+func TestPreferDomNodeTextContentImportedTypes(t *testing.T) {
+	directory := txtarfs.MustParseFile(t, "testdata/imported_types.txtar").Materialize(t, "typed")
+	root := rule_tester.Root{Dir: tspath.NormalizePath(directory), FS: bundled.WrapFS(osvfs.FS())}
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &prefer_dom_node_text_content.PreferDomNodeTextContentRule,
+		[]rule_tester.ValidTestCase{{
+			FileName: "caller.ts",
+			Code:     "import {Node as Model} from './library';\ndeclare const x: Model;\nx.innerText;\nnew Model().innerText;",
+		}},
+		[]rule_tester.InvalidTestCase{{
+			FileName: "caller.ts",
+			Code:     "import {Element as View} from './library';\ndeclare const view: View;\nview.innerText;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				textContentError(3, 6, 15, "import {Element as View} from './library';\ndeclare const view: View;\nview.textContent;"),
 			},
 		}},
 	)
