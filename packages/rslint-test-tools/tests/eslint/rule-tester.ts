@@ -7,7 +7,15 @@ import assert from 'node:assert';
 import { buildConfigForSettings } from '../src/util/load-test-config';
 import { rejectFocusedCases } from '../src/util/reject-focused-cases';
 
-type TestLanguageOptions = NonNullable<RslintConfigEntry['languageOptions']>;
+// Preserve ESLint parser settings in copied upstream suites even though
+// Rslint's parser accepts modern syntax independently of ecmaVersion.
+type TestLanguageOptions = NonNullable<RslintConfigEntry['languageOptions']> & {
+  parserOptions?: {
+    ecmaVersion?: number;
+    sourceType?: 'module' | 'script';
+    ecmaFeatures?: { globalReturn?: boolean };
+  };
+};
 
 interface TsDiagnostic {
   line?: number;
@@ -15,6 +23,7 @@ interface TsDiagnostic {
   endLine?: number;
   endColumn?: number;
   messageId?: string;
+  data?: Record<string, string | number>;
 }
 
 function toCamelCase(name: string): string {

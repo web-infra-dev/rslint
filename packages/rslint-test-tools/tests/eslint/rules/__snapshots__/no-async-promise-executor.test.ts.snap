@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-async-promise-executor > invalid 1`] = `
+{
+  "code": "new Promise(async function foo(resolve, reject) {})",
+  "diagnostics": [
+    {
+      "message": "Promise executor functions should not be async.",
+      "messageId": "async",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-async-promise-executor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-async-promise-executor > invalid 2`] = `
+{
+  "code": "new Promise(async (resolve, reject) => {})",
+  "diagnostics": [
+    {
+      "message": "Promise executor functions should not be async.",
+      "messageId": "async",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-async-promise-executor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-async-promise-executor > invalid 3`] = `
+{
+  "code": "new Promise(((((async () => {})))))",
+  "diagnostics": [
+    {
+      "message": "Promise executor functions should not be async.",
+      "messageId": "async",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-async-promise-executor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

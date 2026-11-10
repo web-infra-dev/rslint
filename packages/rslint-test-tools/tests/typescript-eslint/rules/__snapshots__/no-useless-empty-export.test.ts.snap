@@ -1,0 +1,288 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-empty-export > invalid 1`] = `
+{
+  "code": "
+export const _ = {};
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export const _ = {};
+
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 2`] = `
+{
+  "code": "
+export * from '_';
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export * from '_';
+
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 3`] = `
+{
+  "code": "
+export {};
+export * from '_';
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+
+export * from '_';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 4`] = `
+{
+  "code": "
+const _ = {};
+export default _;
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const _ = {};
+export default _;
+
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 5`] = `
+{
+  "code": "
+export {};
+const _ = {};
+export default _;
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+
+const _ = {};
+export default _;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 6`] = `
+{
+  "code": "
+const _ = {};
+export { _ };
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const _ = {};
+export { _ };
+
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 7`] = `
+{
+  "code": "
+import _ = require('_');
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+import _ = require('_');
+
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-empty-export > invalid 8`] = `
+{
+  "code": "
+import _ = require('_');
+export {};
+export {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+    {
+      "message": "Empty export does nothing and can be removed.",
+      "messageId": "uselessExport",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-useless-empty-export",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+import _ = require('_');
+
+
+      ",
+  "ruleCount": 1,
+}
+`;
