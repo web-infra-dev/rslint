@@ -50,10 +50,10 @@ export class RuleTester {
       ];
       for (const [kind, entries] of groups) {
         entries.forEach((item, index) => {
+          checkSkip(item);
           const run = item.skip ? test.skip : test;
           const label = item.skip ?? item.name;
           run(`${kind} ${index}${label ? `: ${label}` : ''}`, async () => {
-            checkSkip(item);
             if (kind === 'valid') checkValidCase(item);
             else checkInvalidCase(item);
             const errors = item.errors ?? [];
