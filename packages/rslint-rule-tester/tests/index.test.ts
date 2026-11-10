@@ -11,7 +11,9 @@ const runner = rs.hoisted(() => ({
 
 rs.mock('rstack/test', () => ({
   ...actualTest,
-  describe: (_name: string, callback: () => void) => callback(),
+  describe: (_name: string, callback: () => void) => {
+    callback();
+  },
   beforeAll: rs.fn(),
   afterAll: rs.fn(),
   test: Object.assign(runner.test, { skip: runner.skip }),
