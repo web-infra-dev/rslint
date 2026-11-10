@@ -1,9 +1,10 @@
 // Every upstream test and documentation example from eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/prefer-promises/fs.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/prefer-promises/fs.md
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'module',
     globals: { require: 'readonly', process: 'readonly' },

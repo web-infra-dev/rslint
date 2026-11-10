@@ -1,7 +1,7 @@
 // All tests and JavaScript documentation examples from eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-top-level-await.js
 import { readFileSync } from 'node:fs';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const archive = readFileSync(
   new URL(
@@ -17,6 +17,7 @@ const fixtureFiles: Record<string, string> = {};
 for (let i = 0; i < entries.length; i += 2)
   fixtureFiles[entries[i]] = entries[i + 1];
 const ruleTester = new RuleTester({
+  plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'module' },
 });

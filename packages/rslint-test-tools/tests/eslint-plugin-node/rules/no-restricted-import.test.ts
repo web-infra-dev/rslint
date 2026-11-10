@@ -2,9 +2,12 @@
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-restricted-import.js
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/docs/rules/no-restricted-import.md
 import path from 'node:path';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
-new RuleTester({ languageOptions: { sourceType: 'module' } }).run(
+new RuleTester({
+  plugin: 'node',
+  languageOptions: { sourceType: 'module' },
+}).run(
   'no-restricted-import',
   {},
   {

@@ -1,6 +1,6 @@
 // Every test group and ignore variant from eslint-plugin-n v18.3.0:
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unsupported-features/es-builtins.js
-import { RuleTester } from '../../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 function unsupported(
   name: string,
@@ -1332,7 +1332,7 @@ const patterns: ({ keyword: string } & Cases)[] = [
   },
 ];
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({ plugin: 'node' });
 for (const pattern of patterns) {
   const ignored = pattern.invalid.map(({ errors: _errors, ...item }) => ({
     ...item,

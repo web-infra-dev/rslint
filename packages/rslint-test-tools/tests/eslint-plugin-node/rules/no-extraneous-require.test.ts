@@ -1,8 +1,9 @@
 // All upstream cases from eslint-plugin-n v18.3.0:
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-extraneous-require.js
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const tester = new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'commonjs',
     globals: { require: 'readonly', global: 'readonly' },

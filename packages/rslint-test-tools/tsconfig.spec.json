@@ -3,6 +3,7 @@
   "include": [
     "tests/**/*.ts",
     "../rslint/src/**/*.ts",
+    "../rslint-rule-tester/src/**/*.ts",
     "../../internal/plugins/unicorn/rules/name_replacements/testdata/name_replacements_v77.json"
   ],
   "compilerOptions": {

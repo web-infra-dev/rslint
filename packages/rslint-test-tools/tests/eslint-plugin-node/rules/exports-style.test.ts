@@ -1,9 +1,10 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 // Every upstream case and documentation example, pinned to eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/exports-style.js
 // Diagnostics match upstream; unsafe fixes are intentionally omitted as documented.
 new RuleTester({
+  plugin: 'node',
   languageOptions: {
     sourceType: 'commonjs',
     globals: { exports: 'writable', module: 'readonly' },

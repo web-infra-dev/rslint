@@ -4,7 +4,7 @@ import path from 'node:path';
 import { expect, test } from 'rstack/test';
 import { lint } from '@rslint/core/internal';
 import { createTempDir, cleanupTempDir } from '../../cli/js-config/helpers';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const archive = readFileSync(
   new URL(
@@ -26,7 +26,11 @@ const languageOptions = {
   sourceType: 'commonjs' as const,
   globals: { require: 'readonly' as const },
 };
-const ruleTester = new RuleTester({ fixtureFiles, languageOptions });
+const ruleTester = new RuleTester({
+  plugin: 'node',
+  fixtureFiles,
+  languageOptions,
+});
 ruleTester.run('no-missing-require', null, {
   valid: [
     {

@@ -1,7 +1,7 @@
 // Mirrors every case in eslint-plugin-n v18.3.0 tests/lib/rules/no-extraneous-import.js.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-extraneous-import.js
 import { readFileSync } from 'node:fs';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 // Share the original package trees with Go; no installed workspace dependency
 // can accidentally satisfy a fixture import.
@@ -19,6 +19,7 @@ const fixtureFiles: Record<string, string> = {};
 for (let i = 0; i < entries.length; i += 2)
   fixtureFiles[entries[i]] = entries[i + 1];
 const ruleTester = new RuleTester({
+  plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'module' },
 });

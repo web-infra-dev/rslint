@@ -1,6 +1,7 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const ruleTester = new RuleTester({
+  plugin: 'node',
   languageOptions: {
     globals: { exports: 'writable', module: 'readonly' },
   },

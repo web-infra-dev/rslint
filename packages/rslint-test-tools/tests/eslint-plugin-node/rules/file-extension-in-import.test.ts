@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 // All upstream cases and documentation examples, pinned to eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/file-extension-in-import.js
 new RuleTester({
+  plugin: 'node',
   languageOptions: { sourceType: 'module' },
   fixtureFiles: {
     'a.js': '',
