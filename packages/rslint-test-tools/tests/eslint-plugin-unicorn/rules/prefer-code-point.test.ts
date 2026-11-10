@@ -1,22 +1,57 @@
 // Ported from eslint-plugin-unicorn v79.0.0 tests and documentation. See LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-code-point.js
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { transpileModule, ScriptTarget } from 'typescript';
+import { lint } from '@rslint/core/internal';
+
 import { RuleTester } from '../rule-tester';
 
-const charCodeAt = { messageId: 'error/charCodeAt' };
-const fromCharCode = { messageId: 'error/fromCharCode' };
+const charCodeAt = { messageId: 'error/charCodeAt' } as const;
+const fromCharCode = { messageId: 'error/fromCharCode' } as const;
 
 const js = (code: string) => ({ code, filename: 'file.mjs' });
 
+const methodSuggestions = {
+  'error/charCodeAt': {
+    method: 'charCodeAt',
+    suggestionId: 'suggestion/codePointAt',
+    replacement: 'codePointAt',
+  },
+  'error/fromCharCode': {
+    method: 'fromCharCode',
+    suggestionId: 'suggestion/fromCodePoint',
+    replacement: 'fromCodePoint',
+  },
+} as const;
+
 const invalid = (
   code: string,
-  message: { messageId: string },
+  message: { messageId: keyof typeof methodSuggestions },
   suggestion: boolean,
   filename = 'file.mjs',
-) => ({
-  code,
-  filename,
-  errors: [{ ...message, suggestions: suggestion ? [{}] : [] }],
-});
+) => {
+  const { method, suggestionId, replacement } =
+    methodSuggestions[message.messageId];
+  return {
+    code,
+    filename,
+    errors: [
+      {
+        ...message,
+        suggestions: suggestion
+          ? [
+              {
+                messageId: suggestionId,
+                output: code.replace(method, replacement),
+              },
+            ]
+          : [],
+      },
+    ],
+  };
+};
 
 new RuleTester().run('prefer-code-point', {} as never, {
   valid: [
@@ -125,4 +160,38 @@ new RuleTester().run('prefer-code-point', {} as never, {
     invalid('-(text.charCodeAt(0) as number);', charCodeAt, false, 'file.ts'),
     invalid('const value = text.charCodeAt(0)!;', charCodeAt, true, 'file.ts'),
   ],
+});
+
+// Upstream's final node:test executes the transpiled output to prove that a
+// suggestion in this numeric context would change the string hash. The rename
+// suggestion is withheld, so the value must remain the first UTF-16 code unit.
+test('type wrappers do not enable suggestions that change string hashes', async () => {
+  const code = 'const text = "𝌆"; text.charCodeAt(0)! ^ 0;';
+  const filename = path.resolve(import.meta.dirname, 'src/virtual.ts');
+  const result = await lint({
+    config: [
+      {
+        plugins: ['unicorn'],
+        languageOptions: {
+          parserOptions: { project: false, projectService: false },
+        },
+        rules: { 'unicorn/prefer-code-point': 'error' },
+      },
+    ],
+    configDirectory: import.meta.dirname,
+    workingDirectory: process.cwd(),
+    fileContents: { [filename]: code },
+  });
+
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0]!.messageId, 'error/charCodeAt');
+  assert.equal(result.diagnostics[0]!.suggestions, undefined);
+  assert.equal(result.output, undefined);
+
+  const { outputText, diagnostics } = transpileModule(code, {
+    compilerOptions: { target: ScriptTarget.ESNext },
+    reportDiagnostics: true,
+  });
+  assert.deepEqual(diagnostics, []);
+  assert.equal(runInNewContext(outputText), 55_348);
 });

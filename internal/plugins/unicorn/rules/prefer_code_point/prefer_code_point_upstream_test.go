@@ -1,9 +1,9 @@
 // TestPreferCodePointUpstream migrates the valid/invalid suite from upstream
 // test/prefer-code-point.js 1:1, including the TypeScript wrapper cases that
 // assert whether a suggestion is offered. Upstream's final node:test executes
-// the transpiled output and checks that the suggested rename would change a
-// string hash; that runtime assertion corresponds to the "no suggestion"
-// cases below and is not reproducible as a rule diagnostic.
+// the transpiled output to prove the suggestion would change a string hash;
+// prefer-code-point.test.ts reproduces that runtime assertion against the
+// compiled binary.
 package prefer_code_point_test
 
 import (

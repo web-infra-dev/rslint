@@ -80,9 +80,10 @@ var PreferCodePointRule = rule.Rule{
 }
 
 // matchStringFromCharCode mirrors `isMemberExpression(node, {object: 'String',
-// property: 'fromCharCode', optional: false})`. Parentheses are transparent in
-// ESTree, so they are skipped, but other receivers keep their wrapper node and
-// therefore do not match the `String` identifier constraint.
+// property: 'fromCharCode', optional: false})`. Parentheses and JSDoc casts are
+// transparent in ESTree, so they are skipped, but authored TypeScript
+// assertions keep their wrapper node and therefore do not match the `String`
+// identifier constraint.
 func matchStringFromCharCode(node *ast.Node) (*ast.Node, bool) {
 	propertyAccess := node.AsPropertyAccessExpression()
 	if propertyAccess == nil || propertyAccess.QuestionDotToken != nil {
@@ -95,7 +96,7 @@ func matchStringFromCharCode(node *ast.Node) (*ast.Node, bool) {
 		return nil, false
 	}
 
-	object := ast.SkipParentheses(propertyAccess.Expression)
+	object := utils.ESTreeRuntimeExpression(propertyAccess.Expression)
 	if object == nil || !ast.IsIdentifier(object) ||
 		object.AsIdentifier().Text != "String" {
 		return nil, false
