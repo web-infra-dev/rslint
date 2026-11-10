@@ -1,16 +1,7 @@
 {
   "extends": "../../tsconfig.build.json",
-  "references": [{ "path": "../rslint-api" }],
   "compilerOptions": {
-    "customConditions": ["@typescript/source"],
     "types": ["node"],
-    "declarationDir": "${configDir}/node_modules/.cache/rslint-core-worker-dts",
-    "emitDeclarationOnly": true,
-    "paths": {
-      "#enums/*": [
-        "../../typescript-go/packages/typescript/src/enums/*.enum.ts"
-      ]
-    },
     "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-core-worker-dts.tsbuildinfo"
   },
   "include": [
