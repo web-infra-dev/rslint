@@ -1,47 +1,33 @@
 // Regenerate with: node scripts/gen-locale-collation.mjs
 //
 // Derives the printable-ASCII part of ICU collation from the running Node.js
-// build and writes it as compact tables for internal/utils/ecmascript. Each
-// locale is checked against Intl.Collator on a randomized corpus before it is
-// emitted; a locale whose ASCII order the table model cannot reproduce falls
-// back to the root order instead of shipping a wrong tailoring.
+// build and writes it as compact tables for internal/utils/ecmascript.
+//
+// Intl.Collator selects collation data by canonicalizing the tag and then
+// truncating it until an available locale matches; it never adds likely
+// subtags, so "sr-ME" keeps the Serbian default rather than Serbian Latin and
+// "az-IR" keeps Azerbaijani. Instead of reimplementing that resolution, the
+// generator enumerates every language code, every script and region under the
+// languages ICU knows, and every collation type, records the order Intl.Collator
+// actually uses, and emits the sparse set of lookup keys that the Go resolver
+// (truncation of the tag as written) needs to reproduce all of them. Subtags
+// outside the enumerated sets are unknown to ICU and truncated by both sides.
+//
+// Each distinct order is derived into a table and checked against
+// Intl.Collator on a randomized corpus; one the table model cannot reproduce
+// falls back to the root order instead of shipping a wrong tailoring.
+// cspell:ignore Qzzz aaland arevela arevmda heploc polytoni
 import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const outDir = resolve(import.meta.dirname, '../internal/utils/ecmascript');
 
-// Candidate locales. Anything that does not change printable-ASCII order is
-// dropped after derivation, so this list may be generous.
-const candidates = [
-  ...'af am ar as az be bg bn bo br bs ca ceb chr cs cy da de dsb dz ee el en eo es et eu fa ff fi fil fo fr fy ga gl gu ha haw he hi hr hsb hu hy id ig is it ja ka kk kl km kn ko kok ku ky lb lkt ln lo lt lv mk ml mn mr ms mt my nb ne nl nn no om or pa pl ps pt ro ru sa se si sk sl smn sq sr sv sw ta te th tk to tr ug uk ur uz vi wo xh yi yo zh zu'.split(
-    ' ',
-  ),
-  'sr-Latn',
-  'bs-Cyrl',
-  'uz-Cyrl',
-  'az-Cyrl',
-  'es-u-co-trad',
-  'sv-u-co-trad',
-  'fi-u-co-trad',
-  'de-u-co-phonebk',
-  'ln-u-co-phonetic',
-  'zh-u-co-pinyin',
-  'zh-u-co-stroke',
-];
-
 const CGJ = '͏';
 const printable = Array.from({ length: 0x7f - 0x20 }, (_, i) =>
   String.fromCharCode(0x20 + i),
 );
 const letters = printable.filter((c) => /[A-Za-z]/.test(c));
-
-function lookupKey(tag) {
-  const locale = new Intl.Locale(tag);
-  const max = locale.maximize();
-  const co = locale.collation;
-  return `${max.language}-${max.script}${co ? `-u-co-${co}` : ''}`;
-}
 
 // --- derivation -----------------------------------------------------------
 
@@ -113,8 +99,14 @@ function rank(units, compare, groupOf) {
 function derive(tag) {
   const make = (options) => new Intl.Collator(tag, options).compare;
   const full = make({ caseFirst: 'false' });
+  // A locale that ignores punctuation by default, such as Thai, makes space
+  // and punctuation completely ignorable.
+  const ignorableChars = printable.filter((c) => full(c, '') === 0);
   const contractions = findContractions(full);
-  const units = [...printable, ...contractions];
+  const units = [
+    ...printable.filter((c) => !ignorableChars.includes(c)),
+    ...contractions,
+  ];
 
   const base = make({ sensitivity: 'base' });
   const accent = make({ sensitivity: 'accent' });
@@ -144,22 +136,39 @@ function derive(tag) {
       throw new Error(`${tag}: caseFirst false and lower disagree on ${unit}`);
     }
   }
-  const elem = (u) => [
-    primary.get(u),
-    secondary.get(u),
-    tertiary.lower.get(u),
-    tertiary.upper.get(u),
-  ];
+  const elem = (u) =>
+    ignorableChars.includes(u)
+      ? [0, 0, 0, 0]
+      : [
+          primary.get(u),
+          secondary.get(u),
+          tertiary.lower.get(u),
+          tertiary.upper.get(u),
+        ];
   const digitZero = primary.get('0');
   for (let d = 1; d <= 9; d++) {
     if (primary.get(String(d)) !== digitZero + d) {
       throw new Error(`${tag}: digits are not consecutive primaries`);
     }
   }
+  // With kn, ICU gives digit runs the primary of the root digit group, which
+  // a tailoring such as POSIX can move every ASCII character above.
+  const numericBase = make({ numeric: true, sensitivity: 'base' });
+  const others = printable.filter(
+    (c) => !/[0-9]/.test(c) && !ignorableChars.includes(c),
+  );
+  const numericFirst = others.every((c) => numericBase('0', c) < 0);
+  if (
+    !numericFirst &&
+    others.some((c) => numericBase('0', c) < 0 !== primary.get(c) > digitZero)
+  ) {
+    throw new Error(`${tag}: numbers do not sort with the digit zero`);
+  }
   return {
     tag,
-    key: lookupKey(tag),
     upperFirst: new Intl.Collator(tag).resolvedOptions().caseFirst === 'upper',
+    numericFirst,
+    ignorableChars: ignorableChars.join(''),
     singles: printable.map(elem),
     contractions: contractions.map((u) => [u, elem(u)]),
   };
@@ -175,7 +184,7 @@ function elements(text, table, { numeric, upperFirst }) {
   for (let i = 0; i < points.length;) {
     const ch = points[i];
     const code = ch.codePointAt(0);
-    if (code < 0x20 || code === 0x7f) {
+    if (code < 0x20 || code === 0x7f || table.ignorableChars.includes(ch)) {
       i++;
       continue;
     }
@@ -188,7 +197,10 @@ function elements(text, table, { numeric, upperFirst }) {
       while (j < points.length && points[j] >= '0' && points[j] <= '9') j++;
       let digits = points.slice(i, j).join('').replace(/^0+/, '');
       if (digits === '') digits = '0';
-      out.push([zero[0], zero[1], zero[tIndex]], [digits.length, 0, 0]);
+      out.push(
+        [table.numericFirst ? -1 : zero[0], zero[1], zero[tIndex]],
+        [digits.length, 0, 0],
+      );
       for (const d of digits) {
         const e = table.singles[d.charCodeAt(0) - 0x20];
         out.push([e[0], e[1], e[tIndex]]);
@@ -271,7 +283,7 @@ function sign(value) {
   return value < 0 ? -1 : value > 0 ? 1 : 0;
 }
 
-function verify(table, tag) {
+function verify(table, tag, iterations = 60000) {
   const variants = [
     { suffix: '', options: { numeric: false, upperFirst: table.upperFirst } },
     { suffix: 'kf-upper', options: { numeric: false, upperFirst: true } },
@@ -286,7 +298,7 @@ function verify(table, tag) {
       : tag;
     const oracle = new Intl.Collator(oracleTag).compare;
     const model = modelCompare(table, options);
-    for (let n = 0; n < 60000; n++) {
+    for (let n = 0; n < iterations; n++) {
       const a = strings[Math.floor(random() * strings.length)];
       const b = strings[Math.floor(random() * strings.length)];
       if (sign(oracle(a, b)) !== sign(model(a, b))) {
@@ -297,13 +309,151 @@ function verify(table, tag) {
   return undefined;
 }
 
-// --- emit -----------------------------------------------------------------
+// --- tag model (mirrors parseLocaleTag and lookupCollationLocale) ---------
+
+const alpha = /^[a-z]+$/;
+const digit = /^[0-9]+$/;
+
+// parseTag splits a tag the way the Go resolver does: subtags are matched by
+// shape in BCP 47 order, and anything that does not fit is skipped.
+function parseTag(input) {
+  const subtags = input
+    .toLowerCase()
+    .split(/[-_]/)
+    .filter((s) => s !== '');
+  const first = subtags[0];
+  if (
+    !first ||
+    !alpha.test(first) ||
+    !(first.length <= 3
+      ? first.length >= 2
+      : first.length >= 5 && first.length <= 8)
+  ) {
+    return undefined;
+  }
+  const tag = {
+    language: first,
+    script: '',
+    region: '',
+    posix: false,
+    keys: {},
+  };
+  let i = 1;
+  if (i < subtags.length && subtags[i].length === 4 && alpha.test(subtags[i])) {
+    tag.script = subtags[i++];
+  }
+  if (
+    i < subtags.length &&
+    ((subtags[i].length === 2 && alpha.test(subtags[i])) ||
+      (subtags[i].length === 3 && digit.test(subtags[i])))
+  ) {
+    tag.region = subtags[i++];
+  }
+  for (; i < subtags.length && subtags[i].length > 1; i++) {
+    if (subtags[i] === 'posix') tag.posix = true;
+  }
+  while (i < subtags.length) {
+    const singleton = subtags[i++];
+    if (singleton === 'x') break;
+    const start = i;
+    while (i < subtags.length && subtags[i].length > 1) i++;
+    if (singleton !== 'u') continue;
+    let key = '';
+    let types = [];
+    const flush = () => {
+      if (key && !(key in tag.keys))
+        tag.keys[key] = types.length ? types.join('-') : 'true';
+    };
+    for (const subtag of subtags.slice(start, i)) {
+      if (subtag.length === 2) {
+        flush();
+        key = subtag;
+        types = [];
+      } else if (key) {
+        types.push(subtag);
+      }
+    }
+    flush();
+  }
+  if (tag.keys.va === 'posix') tag.posix = true;
+  return tag;
+}
+
+function extensionSuffixes(co, posix) {
+  const suffixes = [];
+  if (co && posix) suffixes.push(`-u-co-${co}-va-posix`);
+  if (posix) suffixes.push('-u-va-posix');
+  if (co) suffixes.push(`-u-co-${co}`);
+  suffixes.push('');
+  return suffixes;
+}
+
+function chainOf({ language, script, region }) {
+  // "-*" stands for any script without its own key: a language alias that
+  // carries a script, such as "sh" for "sr-Latn", loses it to an explicit one.
+  if (script) {
+    return region
+      ? [
+          `${language}-${script}-${region}`,
+          `${language}-${script}`,
+          `${language}-*`,
+          language,
+        ]
+      : [`${language}-${script}`, `${language}-*`, language];
+  }
+  return region ? [`${language}-${region}`, language] : [language];
+}
+
+const entries = new Map();
+const rootOutcome = { table: 0, upperFirst: false };
+
+function lookup(tag) {
+  for (const suffix of extensionSuffixes(tag.keys.co, tag.posix)) {
+    // "*" stands for every language, for collation types such as emoji that
+    // replace any tailoring.
+    for (const key of suffix ? [...chainOf(tag), '*'] : chainOf(tag)) {
+      const entry = entries.get(key + suffix);
+      if (entry) return entry;
+    }
+  }
+  return rootOutcome;
+}
 
 function sameTable(a, b) {
   return (
-    JSON.stringify([a.singles, a.contractions]) ===
-    JSON.stringify([b.singles, b.contractions])
+    JSON.stringify([
+      a.singles,
+      a.contractions,
+      a.numericFirst,
+      a.ignorableChars,
+    ]) ===
+    JSON.stringify([
+      b.singles,
+      b.contractions,
+      b.numericFirst,
+      b.ignorableChars,
+    ])
   );
+}
+
+const sameOutcome = (a, b) =>
+  a.table === b.table && a.upperFirst === b.upperFirst;
+
+// --- what Intl.Collator does -----------------------------------------------
+
+// Only the collation-relevant identity of a tag: the locale Intl.Collator
+// resolves to, which includes a supported co and va. An unsupported tag
+// resolves to the host default, which the Go comparer replaces with root.
+const resolvedCache = new Map();
+function resolvedLocale(tag) {
+  let resolved = resolvedCache.get(tag);
+  if (resolved === undefined) {
+    resolved = Intl.Collator.supportedLocalesOf([tag]).length
+      ? new Intl.Collator(tag).resolvedOptions().locale
+      : '';
+    resolvedCache.set(tag, resolved);
+  }
+  return resolved;
 }
 
 // "en" uses the CLDR root collation; "und" would resolve to the host locale.
@@ -311,38 +461,285 @@ const root = derive('en');
 const rootFailure = verify(root, 'en');
 if (rootFailure) throw new Error(`root model mismatch: ${rootFailure}`);
 if (root.contractions.length) throw new Error('root has ASCII contractions');
+root.locales = ['root'];
 
 const tables = [root];
-const locales = new Map();
 const skipped = [];
-for (const tag of candidates) {
-  // An unsupported tag would silently resolve to the host default locale.
-  if (Intl.Collator.supportedLocalesOf([tag]).length === 0) continue;
-  const table = derive(tag);
-  const failure = verify(table, tag);
-  if (failure) {
-    skipped.push(`${tag} (${failure})`);
-    continue;
+const outcomeCache = new Map([['', rootOutcome]]);
+function outcomeOf(resolved) {
+  let outcome = outcomeCache.get(resolved);
+  if (outcome) return outcome;
+  outcome = rootOutcome;
+  let table;
+  let failure;
+  try {
+    table = derive(resolved);
+  } catch (error) {
+    failure = error.message;
   }
-  let index = tables.findIndex((t) => sameTable(t, table));
-  if (index === 0 && !table.upperFirst) continue;
-  if (index < 0) {
-    index = tables.length;
-    tables.push(table);
+  if (table) {
+    const index = tables.findIndex((t) => sameTable(t, table));
+    // A table that matches a verified one needs only a shorter check.
+    failure = verify(table, resolved, index < 0 ? 60000 : 10000);
+    if (!failure) {
+      if (index < 0) {
+        table.locales = [resolved];
+        outcome = { table: tables.length, upperFirst: table.upperFirst };
+        tables.push(table);
+      } else {
+        tables[index].locales.push(resolved);
+        outcome = { table: index, upperFirst: table.upperFirst };
+      }
+    }
   }
-  const previous = locales.get(table.key);
-  if (
-    previous &&
-    (previous.index !== index || previous.upperFirst !== table.upperFirst)
-  ) {
-    throw new Error(`${tag}: lookup key ${table.key} is ambiguous`);
-  }
-  locales.set(table.key, {
-    index,
-    upperFirst: table.upperFirst,
-    tags: [...(previous?.tags ?? []), tag],
-  });
+  if (failure) skipped.push(`${resolved} (${failure})`);
+  if (outcome.table === 0 && !outcome.upperFirst) outcome = rootOutcome;
+  outcomeCache.set(resolved, outcome);
+  return outcome;
 }
+
+// --- enumeration -------------------------------------------------------------
+
+const lower = 'abcdefghijklmnopqrstuvwxyz';
+const languages = [];
+for (const a of lower) {
+  for (const b of lower) {
+    languages.push(a + b);
+    for (const c of lower) languages.push(a + b + c);
+  }
+}
+const scriptNames = new Intl.DisplayNames('en', {
+  type: 'script',
+  fallback: 'none',
+});
+const scripts = [];
+for (const a of lower.toUpperCase())
+  for (const b of lower)
+    for (const c of lower)
+      for (const d of lower) {
+        const script = a + b + c + d;
+        if (scriptNames.of(script)) scripts.push(script);
+      }
+const regions = [];
+for (const a of lower)
+  for (const b of lower) regions.push((a + b).toUpperCase());
+for (let i = 0; i < 1000; i++) regions.push(String(i).padStart(3, '0'));
+// Every type a tag can request; "standard" and "search" cannot be requested.
+const collations = Intl.supportedValuesOf('collation');
+
+// Languages ICU has data for, or that canonicalize to one, such as "sh".
+// Scripts and regions under any other language are unknown to ICU.
+const known = languages.filter(
+  (language) =>
+    Intl.Collator.supportedLocalesOf([language]).length > 0 ||
+    Intl.getCanonicalLocales(language)[0] !== language,
+);
+
+// Tags in order of specificity: a key's entry never affects a less specific
+// tag, so most entries are final the first time they are set.
+// Qzzz is not a registered script and stands for every unknown one.
+const unknownScript = 'Qzzz';
+if (scripts.includes(unknownScript))
+  throw new Error(`${unknownScript} is registered`);
+const tags = languages.map((language) => ({ text: language, level: 0 }));
+for (const language of known) {
+  tags.push({
+    text: `${language}-${unknownScript}`,
+    level: 0.5,
+    wildcard: true,
+  });
+  for (const script of scripts) {
+    const text = `${language}-${script}`;
+    tags.push({ text, level: 1 });
+    // A region under a script only matters when that script has data.
+    if (resolvedLocale(text).includes(`-${script}`)) {
+      for (const region of regions)
+        tags.push({ text: `${text}-${region}`, level: 2 });
+    }
+  }
+  for (const region of regions)
+    tags.push({ text: `${language}-${region}`, level: 1 });
+}
+tags.sort((a, b) => a.level - b.level);
+const enumeratedCount = tags.length;
+
+const extensions = [
+  ...collations.map((co) => ({ co, posix: false })),
+  { co: '', posix: true },
+  ...collations.map((co) => ({ co, posix: true })),
+];
+const suffixOf = ({ co, posix }) => extensionSuffixes(co, posix)[0];
+
+// Intl.Collator resolves the locale and then the extension keys, so a tag's
+// order with an extension is that of its resolved locale with the extension.
+const extended = (resolved, extension) =>
+  resolved === '' ? '' : resolvedLocale(resolved + suffixOf(extension));
+
+for (const tag of tags) {
+  tag.resolved = resolvedLocale(tag.text);
+  tag.parsed = parseTag(tag.text);
+  tag.expected = outcomeOf(tag.resolved);
+}
+// Pairs whose order differs from the plain tag. Every other pair is checked
+// only when its language has an entry for that extension.
+const special = [];
+const resolvedSet = [...new Set(tags.map((tag) => tag.resolved))].sort();
+const specialExtensions = new Map();
+for (const resolved of resolvedSet) {
+  const plain = outcomeOf(resolved);
+  const list = extensions.filter(
+    (extension) =>
+      !sameOutcome(outcomeOf(extended(resolved, extension)), plain),
+  );
+  if (list.length) specialExtensions.set(resolved, list);
+}
+for (const tag of tags) {
+  for (const extension of specialExtensions.get(tag.resolved) ?? []) {
+    // Check the assumption above directly for every pair that matters.
+    const direct = outcomeOf(resolvedLocale(tag.text + suffixOf(extension)));
+    special.push({
+      text: tag.text + suffixOf(extension),
+      parsed: parseTag(tag.text + suffixOf(extension)),
+      level: tag.level,
+      wildcard: tag.wildcard,
+      expected: direct,
+    });
+  }
+}
+
+// --- emit entries --------------------------------------------------------------
+
+// An extension that gives every tailored language the same order gets one
+// "*" entry instead of one per language.
+const tailoredLanguages = tags.filter(
+  (tag) => tag.level === 0 && tag.expected !== rootOutcome,
+);
+for (const extension of extensions) {
+  const outcomes = tailoredLanguages.map((tag) =>
+    outcomeOf(resolvedLocale(tag.text + suffixOf(extension))),
+  );
+  if (
+    outcomes.every((outcome) => sameOutcome(outcome, outcomes[0])) &&
+    !tailoredLanguages.every((tag, i) => sameOutcome(tag.expected, outcomes[i]))
+  ) {
+    entries.set(`*${suffixOf(extension)}`, outcomes[0]);
+  }
+}
+
+const keyOf = (parsed, wildcard) =>
+  (wildcard ? `${parsed.language}-*` : chainOf(parsed)[0]) +
+  extensionSuffixes(parsed.keys.co, parsed.posix)[0];
+const languagesWithExtension = new Set();
+function settle(list) {
+  let changed = false;
+  for (const tag of list) {
+    if (!sameOutcome(lookup(tag.parsed), tag.expected)) {
+      const key = keyOf(tag.parsed, tag.wildcard);
+      entries.set(key, tag.expected);
+      if (key.includes('-u-')) languagesWithExtension.add(tag.parsed.language);
+      changed = true;
+    }
+  }
+  return changed;
+}
+special.sort((a, b) => a.level - b.level);
+for (let pass = 0; ; pass++) {
+  if (pass > 10) throw new Error('lookup entries do not converge');
+  let changed = settle(tags);
+  changed = settle(special) || changed;
+  // A plain pair can be shadowed by an extension entry of its language.
+  const shadowed = [];
+  for (const tag of tags) {
+    if (!languagesWithExtension.has(tag.parsed.language)) continue;
+    const listed = new Set(specialExtensions.get(tag.resolved) ?? []);
+    for (const extension of extensions) {
+      if (listed.has(extension)) continue;
+      shadowed.push({
+        parsed: parseTag(tag.text + suffixOf(extension)),
+        wildcard: tag.wildcard,
+        expected: tag.expected,
+      });
+    }
+  }
+  changed = settle(shadowed) || changed;
+  if (!changed) break;
+}
+
+// --- verify the resolver beyond the enumeration -------------------------------
+
+function checkTag(text) {
+  // Intl.Collator rejects malformed tags; the Go comparer uses root for them.
+  if (!isValidTag(text)) return;
+  const parsed = parseTag(text);
+  const expected = outcomeOf(resolvedLocale(text));
+  const got = parsed ? lookup(parsed) : rootOutcome;
+  if (!sameOutcome(got, expected)) {
+    throw new Error(
+      `${text}: resolver picks ${JSON.stringify(got)}, Intl.Collator uses ${resolvedLocale(text) || 'root'} ${JSON.stringify(expected)}`,
+    );
+  }
+}
+function isValidTag(text) {
+  try {
+    Intl.getCanonicalLocales(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+const random = mulberry32(0x10ca1e);
+const pick = (list) => list[Math.floor(random() * list.length)];
+// Unknown languages, invented subtags, and every extension on random tags.
+for (let n = 0; n < 30000; n++) {
+  const base = pick(tags).text;
+  checkTag(base + suffixOf(pick(extensions)));
+  checkTag(`${base}-Qzzz`);
+  checkTag(`${pick(languages)}-${pick(scripts)}-${pick(regions)}`);
+}
+// Variants other than posix are truncated; these include CLDR variant aliases.
+const tailored = [
+  ...new Set([...entries.keys()].map((key) => key.split('-')[0])),
+];
+for (const language of tailored) {
+  for (const variant of [
+    'posix',
+    'aaland',
+    'arevela',
+    'arevmda',
+    'heploc',
+    'polytoni',
+    'fonipa',
+    'valencia',
+    '1901',
+    '1996',
+    'pinyin',
+    'phonebk',
+    'trad',
+  ]) {
+    for (const middle of ['', '-US', '-Latn', '-Cyrl-RS'])
+      checkTag(`${language}${middle}-${variant}`);
+  }
+  for (const key of [
+    'ka-shifted',
+    'kr-latn-digit',
+    'ks-level1',
+    'kc',
+    'va-other',
+  ]) {
+    checkTag(`${language}-u-${key}`);
+  }
+}
+for (const tag of [
+  'art-lojban',
+  'zh-guoyu',
+  'zh-hakka',
+  'en-US-POSIX-u-co-phonebk',
+  'en-US-u-kf-lower-va-posix',
+]) {
+  checkTag(tag);
+}
+
+// --- write -------------------------------------------------------------------
 
 const hex = (bytes) =>
   `"${bytes.map((b) => `\\x${b.toString(16).padStart(2, '0')}`).join('')}"`;
@@ -359,8 +756,11 @@ const collationICUVersion = ${JSON.stringify(process.versions.icu)}
 var collationTables = [...]collationTable{
 `;
 for (const [index, table] of tables.entries()) {
-  go += `\t{ // ${index === 0 ? 'root' : tables[index].tag}\n`;
+  go += `\t{ // ${index === 0 ? 'root' : table.locales[0]}\n`;
   go += `\t\tsingles: ${hex(table.singles.flat())},\n`;
+  if (table.numericFirst) go += `\t\tnumericFirst: true,\n`;
+  if (table.ignorableChars)
+    go += `\t\tignorableChars: ${JSON.stringify(table.ignorableChars)},\n`;
   if (table.contractions.length) {
     go += `\t\tcontractions: []collationContraction{\n`;
     for (const [unit, e] of [...table.contractions].sort(([a], [b]) =>
@@ -374,42 +774,44 @@ for (const [index, table] of tables.entries()) {
 }
 go += `}
 
-// collationLocales maps language-Script[-u-co-type] to a table. Locales that
-// keep the root order for printable ASCII are absent.
+// collationLocales maps lowercase language[-script][-region] keys, optionally
+// followed by -u-co-<type> and -va-posix, to a table. The resolver tries the
+// tag's own key and then its truncations, so only keys whose order differs
+// from their truncation are listed.
 var collationLocales = map[string]collationLocale{
 `;
-for (const [key, { index, upperFirst, tags }] of [...locales].sort(
-  ([a], [b]) => (a < b ? -1 : 1),
+for (const [key, { table, upperFirst }] of [...entries].sort(([a], [b]) =>
+  a < b ? -1 : 1,
 )) {
-  go += `\t${JSON.stringify(key)}: {table: ${index}, upperFirst: ${upperFirst}}, // ${tags.join(', ')}\n`;
+  go += `\t${JSON.stringify(key)}: {table: ${table}, upperFirst: ${upperFirst}},\n`;
 }
 go += `}
 `;
-if (skipped.length) {
+const skippedLocales = [
+  ...new Set(skipped.map((s) => s.split(' (')[0])),
+].sort();
+if (skippedLocales.length) {
   go += `
 // Locales whose ASCII order this model cannot reproduce and that therefore use
 // the root order:
-${skipped.map((s) => `//   - ${s.split(' (')[0]}`).join('\n')}
+${skippedLocales.map((s) => `//   - ${s}`).join('\n')}
 `;
 }
 const goFile = resolve(outDir, 'locale_collation_table.go');
 await writeFile(goFile, go);
 execFileSync('gofmt', ['-w', goFile]);
 
-// Golden data for the Go test: per lookup key, a corpus sorted by Intl.Collator
+// Golden data for the Go test: per table, a corpus sorted by Intl.Collator
 // with the locale's default and opposite case order, plus numeric collation
 // for the root and one upper-first tailoring. Strings that tie are excluded so
 // the expected order is unique.
 const golden = [];
-for (const [key, { index, tags }] of [
-  ['root', { index: 0, tags: ['en'] }],
-  ...locales,
-]) {
-  const tag = tags[0];
+for (const [index, table] of tables.entries()) {
+  const tag = index === 0 ? 'en' : table.locales[0];
   // The corpus is printable ASCII, so it has no ignorable characters.
-  const strings = corpus(tables[index], 0xbeef + index, 100);
+  const strings = corpus(table, 0xbeef + index, 100);
   const suffixes = ['', 'kf-upper', 'kf-lower'];
-  if (key === 'root' || tag === 'da') suffixes.push('kn');
+  if (index === 0 || table.locales.includes('da')) suffixes.push('kn');
   for (const suffix of suffixes) {
     const oracleTag = suffix
       ? `${tag}${tag.includes('-u-') ? '-' : '-u-'}${suffix}`
@@ -421,15 +823,53 @@ for (const [key, { index, tags }] of [
     golden.push({ locale: oracleTag, sorted });
   }
 }
+
+// Resolution data: the table Intl.Collator's order corresponds to for every
+// tag that needed an entry, the tags it truncates to, and a sample of the
+// enumeration with random extensions.
+const resolution = new Map();
+const addResolution = (text) => {
+  if (!resolution.has(text))
+    resolution.set(text, outcomeOf(resolvedLocale(text)));
+};
+for (const tag of [...tags, ...special]) {
+  if (entries.has(keyOf(tag.parsed, tag.wildcard))) addResolution(tag.text);
+}
+const sample = mulberry32(0x5a3e1e);
+for (let n = 0; n < 1500; n++) {
+  const tag = tags[Math.floor(sample() * tags.length)];
+  addResolution(
+    n % 3
+      ? tag.text
+      : tag.text +
+          suffixOf(extensions[Math.floor(sample() * extensions.length)]),
+  );
+}
+
 const goldenFile = resolve(outDir, 'testdata/locale_collation_golden.json');
 await writeFile(
   goldenFile,
   `[\n${golden.map((entry) => JSON.stringify(entry)).join(',\n')}\n]\n`,
 );
-execFileSync('pnpm', ['exec', 'rs', 'fmt', goldenFile], {
+const resolutionFile = resolve(
+  outDir,
+  'testdata/locale_collation_resolution.json',
+);
+await writeFile(
+  resolutionFile,
+  `[\n${[...resolution]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([locale, { table, upperFirst }]) =>
+      JSON.stringify({ locale, table, upperFirst }),
+    )
+    .join(',\n')}\n]\n`,
+);
+execFileSync('pnpm', ['exec', 'rs', 'fmt', goldenFile, resolutionFile], {
   cwd: resolve(import.meta.dirname, '..'),
   stdio: 'ignore',
 });
 
-console.log(`tables: ${tables.length}, locales: ${locales.size}`);
+console.log(
+  `tables: ${tables.length}, entries: ${entries.size}, enumerated tags: ${tags.length}, resolved locales: ${resolvedSet.length}`,
+);
 if (skipped.length) console.log(`skipped:\n  ${skipped.join('\n  ')}`);

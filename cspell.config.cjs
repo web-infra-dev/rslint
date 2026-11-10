@@ -37,6 +37,7 @@ module.exports = {
     'internal/plugins/unicorn/rules/name_replacements/testdata/name_replacements_v77.json',
     'internal/plugins/unicorn/rules/no_for_each/testdata/no_for_each_v77.json',
     'internal/utils/ecmascript/testdata/locale_collation_golden.json',
+    'internal/utils/ecmascript/testdata/locale_collation_resolution.json',
     'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],

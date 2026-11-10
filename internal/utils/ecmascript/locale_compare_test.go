@@ -44,6 +44,27 @@ func TestLocaleComparer(t *testing.T) {
 		{name: "numeric false", locale: "en-u-kn-false", input: []string{"a2", "a10"}, want: []string{"a10", "a2"}},
 		{name: "unsupported Nordic collation falls back to default", locale: "nb-u-co-phonebk", input: []string{"aa", "b"}, want: []string{"b", "aa"}},
 		{name: "irrelevant strength key", locale: "en-u-ks-level1", input: []string{"A", "a"}, want: []string{"a", "A"}},
+		// Locales select tables by truncation, without likely subtags.
+		{name: "region does not imply Serbian Latin", locale: "sr-ME", input: []string{"lz", "lj"}, want: []string{"lj", "lz"}},
+		{name: "explicit Serbian Latin", locale: "sr-Latn-ME", input: []string{"lj", "lz"}, want: []string{"lz", "lj"}},
+		{name: "region does not imply Arabic script", locale: "az-IR", input: []string{"I", "x"}, want: []string{"x", "I"}},
+		{name: "script without data keeps the language", locale: "da-Cyrl", input: []string{"aa", "b"}, want: []string{"b", "aa"}},
+		{name: "alias with script", locale: "sh", input: []string{"lj", "lz"}, want: []string{"lz", "lj"}},
+		{name: "alias loses its script to an explicit one", locale: "sh-Cyrl", input: []string{"lz", "lj"}, want: []string{"lj", "lz"}},
+		{name: "individual language code", locale: "azj", input: []string{"I", "x"}, want: []string{"x", "I"}},
+		{name: "deprecated language code", locale: "tl", input: []string{"ng", "nz"}, want: []string{"nz", "ng"}},
+		{name: "collation type with region", locale: "es-MX-u-co-trad", input: []string{"d", "ch", "cz"}, want: []string{"cz", "ch", "d"}},
+		{name: "unsupported collation type", locale: "hr-u-co-trad", input: []string{"lz", "lj"}, want: []string{"lz", "lj"}},
+		{name: "emoji collation replaces tailoring", locale: "cs-u-co-emoji", input: []string{"i", "ch"}, want: []string{"ch", "i"}},
+		{name: "POSIX variant", locale: "en-US-posix", input: []string{"a", "_", "B"}, want: []string{"B", "_", "a"}},
+		{name: "POSIX extension", locale: "en-US-u-va-posix", input: []string{"a", "_", "B"}, want: []string{"B", "_", "a"}},
+		{name: "POSIX needs the US region", locale: "en-GB-posix", input: []string{"B", "_", "a"}, want: []string{"_", "a", "B"}},
+		{name: "POSIX numbers precede punctuation", locale: "en-US-u-va-posix-kn", input: []string{"!", "a10", "a9"}, want: []string{"!", "a9", "a10"}},
+		{name: "case-insensitive tag", locale: "SR-latn", input: []string{"lj", "lz"}, want: []string{"lz", "lj"}},
+		{name: "private use is ignored", locale: "en-x-cs", input: []string{"i", "ch"}, want: []string{"ch", "i"}},
+		{name: "Thai ignores punctuation", locale: "th", input: []string{"a_c", "ab"}, want: []string{"ab", "a_c"}},
+		{name: "Thai keeps symbols", locale: "th", input: []string{"ab", "a$c"}, want: []string{"a$c", "ab"}},
+		{name: "Thai space is ignorable", locale: "th-TH", input: []string{"a c", "ab"}, want: []string{"ab", "a c"}},
 		// Combining marks are secondary differences after NFD.
 		{name: "accent is secondary", locale: "", input: []string{"É", "f", "é", "E", "e"}, want: []string{"e", "E", "é", "É", "f"}},
 		{name: "accented letter sorts with its base", locale: "", input: []string{"zeta", "bé", "alpha"}, want: []string{"alpha", "bé", "zeta"}},
@@ -125,11 +146,46 @@ func TestLocaleComparerMatchesICU(t *testing.T) {
 	}
 }
 
+// TestLocaleComparerResolvesLikeICU checks the table each tag selects against
+// the order Intl.Collator used for it when the tables were generated.
+func TestLocaleComparerResolvesLikeICU(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("testdata/locale_collation_resolution.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resolution []struct {
+		Locale     string `json:"locale"`
+		Table      int    `json:"table"`
+		UpperFirst bool   `json:"upperFirst"`
+	}
+	if err := json.Unmarshal(data, &resolution); err != nil {
+		t.Fatal(err)
+	}
+	if len(resolution) == 0 {
+		t.Fatal("empty resolution data")
+	}
+	for _, entry := range resolution {
+		comparer := NewLocaleComparer(entry.Locale)
+		table := -1
+		for i := range collationTables {
+			if comparer.table == &collationTables[i] {
+				table = i
+			}
+		}
+		if table != entry.Table || comparer.upperFirst != entry.UpperFirst {
+			t.Errorf("%s: got table %d (upper first %t), ICU %s uses table %d (upper first %t)",
+				entry.Locale, table, comparer.upperFirst, collationICUVersion, entry.Table, entry.UpperFirst)
+		}
+	}
+}
+
 func TestLocaleComparerIsTotalOrder(t *testing.T) {
 	t.Parallel()
 
 	values := []string{"A", "Ａ", "Ⓐ", "a", "ａ", "ⓐ", "I", "Ⅰ", "i", "ⅰ", "ch", "Ch", "cH", "CH", "c", "h", "a1", "a10", "a01", "a_", "é", "E"}
-	for _, locale := range []string{"", "en-u-kf-upper", "cs", "da", "cy-u-kn"} {
+	for _, locale := range []string{"", "en-u-kf-upper", "cs", "da", "cy-u-kn", "th", "en-US-u-va-posix-kn"} {
 		comparer := NewLocaleComparer(locale)
 		for _, left := range values {
 			for _, right := range values {

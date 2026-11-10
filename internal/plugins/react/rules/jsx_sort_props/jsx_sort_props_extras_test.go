@@ -41,6 +41,13 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App ä z />`, Tsx: true, Options: map[string]any{"locale": "sv"}},
 		// Documented difference: Hungarian uses the default order for ASCII.
 		{Code: `<App cs cz />`, Tsx: true, Options: map[string]any{"locale": "hu"}},
+		// A region or script without its own collation keeps the language's,
+		// as Intl.Collator truncates the tag instead of adding likely subtags.
+		{Code: `<App lj lz />`, Tsx: true, Options: map[string]any{"locale": "sr-ME"}},
+		{Code: `<App x I />`, Tsx: true, Options: map[string]any{"locale": "az-IR"}},
+		{Code: `<App b aa />`, Tsx: true, Options: map[string]any{"locale": "da-Cyrl"}},
+		// Thai ignores punctuation by default, so "a_c" compares as "ac".
+		{Code: `<App ab a_c />`, Tsx: true, Options: map[string]any{"locale": "th"}},
 	}, []rule_tester.InvalidTestCase{
 		// A moved line comment carries its exact terminator when the destination
 		// slot would otherwise let it consume the closing tag.
@@ -76,6 +83,9 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App aa b />`, Tsx: true, Options: map[string]any{"locale": "nb"}, Output: []string{`<App b aa />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App AA aA />`, Tsx: true, Options: map[string]any{"locale": "da"}, Output: []string{`<App aA AA />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App a A />`, Tsx: true, Options: map[string]any{"locale": "mt"}, Output: []string{`<App A a />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App lj lz />`, Tsx: true, Options: map[string]any{"locale": "sr-Latn-ME"}, Output: []string{`<App lz lj />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App aa b />`, Tsx: true, Options: map[string]any{"locale": "da-Cyrl"}, Output: []string{`<App b aa />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
+		{Code: `<App a_c ab />`, Tsx: true, Options: map[string]any{"locale": "th"}, Output: []string{`<App ab a_c />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "en-u-kf-upper"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "da"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},
 		{Code: `<App ⅰ Ⅰ />`, Tsx: true, Options: map[string]any{"locale": "mt"}, Output: []string{`<App Ⅰ ⅰ />`}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "sortPropsByAlpha"}}},

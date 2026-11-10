@@ -7,7 +7,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -24,7 +23,9 @@ import (
 //     Czech "ch" or Danish "aa", reordered letters, and upper-first case
 //     order). The tables are generated from Node.js's ICU and verified against
 //     Intl.Collator, so this domain matches Node exactly.
-//   - Control characters are ignorable, as in ICU.
+//   - Control characters are ignorable, as in ICU, and so are space and
+//     punctuation in locales that ignore punctuation by default, such as
+//     Thai.
 //   - Other text is compared in NFD, where a combining mark is a secondary
 //     difference on its base letter, so "é" sorts with "e" as in ICU. Any
 //     other character sorts after printable ASCII by its simple lowercase
@@ -32,14 +33,19 @@ import (
 //     ICU's order for compatibility characters such as "Ⅰ" or for locale
 //     rules for non-ASCII letters.
 //
-// Locales with no table, or whose ASCII tailoring the tables cannot express,
-// use the root order. The Unicode extension keys Intl.Collator reads (co, kf,
-// and kn) are honored; all others are ignored.
+// A locale selects its table the way Intl.Collator selects collation data:
+// the tag is truncated, without adding likely subtags, until a key matches.
+// The generated keys include language aliases and every script and region ICU
+// distinguishes. Locales with no table, or whose ASCII tailoring the tables
+// cannot express, use the root order. The Unicode extension keys Intl.Collator
+// reads (co, kf, and kn) and the POSIX variant are honored; all others are
+// ignored.
 type LocaleComparer struct {
 	table       *collationTable
 	upperFirst  bool
 	numeric     bool
 	starts      [128]bool
+	ignorable   [128]bool
 	left, right []collationElement
 }
 
@@ -49,6 +55,13 @@ type collationTable struct {
 	// first.
 	singles      string
 	contractions []collationContraction
+	// numericFirst puts digit runs before every ASCII character under kn,
+	// where ICU keeps the root digit primary although the tailoring moved the
+	// digits.
+	numericFirst bool
+	// ignorableChars lists the printable ASCII characters the locale ignores by
+	// default, such as Thai's space and punctuation.
+	ignorableChars string
 }
 
 type collationContraction struct {
@@ -62,7 +75,8 @@ type collationLocale struct {
 }
 
 // collationElement holds one collation element's weights. A zero weight is
-// ignorable at that level, so table ranks are stored shifted by one.
+// ignorable at that level, so table ranks are stored shifted by one, and
+// primaries by two to leave room for a numericFirst digit run.
 type collationElement struct {
 	primary, secondary, tertiary uint32
 }
@@ -70,7 +84,10 @@ type collationElement struct {
 const (
 	// Primary weights of characters outside the tables start above every
 	// table weight, which fits in a byte.
-	collationOtherPrimary = 0x100
+	collationOtherPrimary = 0x200
+	// The primary of a digit run in a numericFirst table, below every table
+	// primary.
+	collationNumericFirstPrimary = 1
 	// Secondary weights of combining marks start above every table weight.
 	collationMarkSecondary = 0x100
 )
@@ -81,49 +98,98 @@ const (
 func NewLocaleComparer(locale string) *LocaleComparer {
 	comparer := &LocaleComparer{table: &collationTables[0]}
 	if locale != "" && locale != "auto" {
-		tag := language.Make(locale)
-		keys := unicodeExtensionKeys(tag)
-		base, _ := tag.Base()
-		script, _ := tag.Script()
-		key := base.String() + "-" + script.String()
-		// Intl.Collator falls back to the default collation when the requested
-		// one is not available.
-		entry, ok := collationLocales[key]
-		if co := keys["co"]; co != "" {
-			if collation, found := collationLocales[key+"-u-co-"+co]; found {
-				entry, ok = collation, true
+		if tag, ok := parseLocaleTag(locale); ok {
+			if entry, found := lookupCollationLocale(tag); found {
+				comparer.table = &collationTables[entry.table]
+				comparer.upperFirst = entry.upperFirst
 			}
+			switch tag.keys["kf"] {
+			case "upper":
+				comparer.upperFirst = true
+			case "lower", "false":
+				comparer.upperFirst = false
+			}
+			comparer.numeric = tag.keys["kn"] == "true"
 		}
-		if ok {
-			comparer.table = &collationTables[entry.table]
-			comparer.upperFirst = entry.upperFirst
-		}
-		switch keys["kf"] {
-		case "upper":
-			comparer.upperFirst = true
-		case "lower", "false":
-			comparer.upperFirst = false
-		}
-		comparer.numeric = keys["kn"] == "true"
 	}
 	for _, contraction := range comparer.table.contractions {
 		comparer.starts[contraction.text[0]] = true
 	}
+	for i := range len(comparer.table.ignorableChars) {
+		comparer.ignorable[comparer.table.ignorableChars[i]] = true
+	}
 	return comparer
 }
 
-// unicodeExtensionKeys returns the keys of tag's -u- extension. A key without
-// a type has the type "true", as in BCP 47.
-func unicodeExtensionKeys(tag language.Tag) map[string]string {
-	extension, ok := tag.Extension('u')
-	if !ok {
-		return nil
+// localeTag holds the subtags of a locale that select collation data, in
+// lowercase.
+type localeTag struct {
+	language, script, region string
+	posix                    bool
+	// keys holds the -u- extension keys. A key without a type has the type
+	// "true", as in BCP 47, and a repeated key keeps its first type.
+	keys map[string]string
+}
+
+// parseLocaleTag splits a BCP 47 tag into the subtags collation depends on.
+// Subtags are recognized by shape in BCP 47 order, and any that do not fit
+// are skipped, so the result is the tag Intl.Collator would read for any tag
+// it accepts. Tags are not canonicalized: aliases such as "sh" are keys of
+// their own. It reports false when the tag has no language subtag.
+func parseLocaleTag(locale string) (localeTag, bool) {
+	subtags := strings.FieldsFunc(strings.ToLower(locale), func(r rune) bool {
+		return r == '-' || r == '_'
+	})
+	if len(subtags) == 0 || !isASCIILetters(subtags[0]) || len(subtags[0]) < 2 || len(subtags[0]) == 4 || len(subtags[0]) > 8 {
+		return localeTag{}, false
 	}
+	tag := localeTag{language: subtags[0]}
+	i := 1
+	if i < len(subtags) && len(subtags[i]) == 4 && isASCIILetters(subtags[i]) {
+		tag.script = subtags[i]
+		i++
+	}
+	if i < len(subtags) && (len(subtags[i]) == 2 && isASCIILetters(subtags[i]) || len(subtags[i]) == 3 && isASCIIDigits(subtags[i])) {
+		tag.region = subtags[i]
+		i++
+	}
+	// Variants. Intl.Collator maps the POSIX variant to -u-va-posix; others
+	// have no collation data.
+	for ; i < len(subtags) && len(subtags[i]) > 1; i++ {
+		if subtags[i] == "posix" {
+			tag.posix = true
+		}
+	}
+	for i < len(subtags) {
+		singleton := subtags[i]
+		i++
+		if singleton == "x" {
+			break
+		}
+		start := i
+		for i < len(subtags) && len(subtags[i]) > 1 {
+			i++
+		}
+		if singleton == "u" {
+			tag.keys = unicodeExtensionKeys(subtags[start:i])
+		}
+	}
+	if tag.keys["va"] == "posix" {
+		tag.posix = true
+	}
+	return tag, true
+}
+
+// unicodeExtensionKeys returns the keys of a -u- extension's subtags.
+func unicodeExtensionKeys(subtags []string) map[string]string {
 	keys := map[string]string{}
 	key := ""
 	var types []string
 	flush := func() {
 		if key == "" {
+			return
+		}
+		if _, seen := keys[key]; seen {
 			return
 		}
 		if len(types) == 0 {
@@ -132,7 +198,7 @@ func unicodeExtensionKeys(tag language.Tag) map[string]string {
 			keys[key] = strings.Join(types, "-")
 		}
 	}
-	for _, subtag := range strings.Split(extension.String(), "-")[1:] {
+	for _, subtag := range subtags {
 		if len(subtag) == 2 {
 			flush()
 			key, types = subtag, nil
@@ -142,6 +208,69 @@ func unicodeExtensionKeys(tag language.Tag) map[string]string {
 	}
 	flush()
 	return keys
+}
+
+// lookupCollationLocale finds the table for tag: it tries the requested
+// extension types first, and for each it truncates the tag from the right, as
+// Intl.Collator does. A script without its own key falls back to the
+// language's "-*" key, which differs only for a language alias that carries a
+// script. An extension type then falls back to the "*" language, for types
+// such as emoji that replace every tailoring.
+func lookupCollationLocale(tag localeTag) (collationLocale, bool) {
+	var chain []string
+	switch {
+	case tag.script != "" && tag.region != "":
+		chain = []string{tag.language + "-" + tag.script + "-" + tag.region, tag.language + "-" + tag.script, tag.language + "-*", tag.language}
+	case tag.script != "":
+		chain = []string{tag.language + "-" + tag.script, tag.language + "-*", tag.language}
+	case tag.region != "":
+		chain = []string{tag.language + "-" + tag.region, tag.language}
+	default:
+		chain = []string{tag.language}
+	}
+	co := tag.keys["co"]
+	var suffixes []string
+	if co != "" && tag.posix {
+		suffixes = append(suffixes, "-u-co-"+co+"-va-posix")
+	}
+	if tag.posix {
+		suffixes = append(suffixes, "-u-va-posix")
+	}
+	if co != "" {
+		suffixes = append(suffixes, "-u-co-"+co)
+	}
+	suffixes = append(suffixes, "")
+	for _, suffix := range suffixes {
+		for _, key := range chain {
+			if entry, ok := collationLocales[key+suffix]; ok {
+				return entry, true
+			}
+		}
+		if suffix != "" {
+			if entry, ok := collationLocales["*"+suffix]; ok {
+				return entry, true
+			}
+		}
+	}
+	return collationLocale{}, false
+}
+
+func isASCIILetters(value string) bool {
+	for i := range len(value) {
+		if b := value[i] | 0x20; b < 'a' || b > 'z' {
+			return false
+		}
+	}
+	return value != ""
+}
+
+func isASCIIDigits(value string) bool {
+	for i := range len(value) {
+		if !isASCIIDigit(value[i]) {
+			return false
+		}
+	}
+	return value != ""
 }
 
 // Compare returns -1, 0, or 1 according to the configured locale order.
@@ -218,7 +347,7 @@ func (c *LocaleComparer) appendElements(out []collationElement, value string) []
 			i += size
 			continue
 		}
-		if b < 0x20 || b == 0x7f {
+		if b < 0x20 || b == 0x7f || c.ignorable[b] {
 			i++
 			continue
 		}
@@ -250,7 +379,11 @@ func (c *LocaleComparer) appendNumber(out []collationElement, value string, star
 	if digits == "" {
 		digits = "0"
 	}
-	out = append(out, c.single('0'), collationElement{primary: uint32(len(digits)), secondary: 1, tertiary: 1})
+	lead := c.single('0')
+	if c.table.numericFirst {
+		lead.primary = collationNumericFirstPrimary
+	}
+	out = append(out, lead, collationElement{primary: uint32(len(digits)), secondary: 1, tertiary: 1})
 	for i := range len(digits) {
 		out = append(out, c.single(digits[i]))
 	}
@@ -276,7 +409,7 @@ func (c *LocaleComparer) element(data string) collationElement {
 	if c.upperFirst {
 		tertiary = data[3]
 	}
-	return collationElement{primary: uint32(data[0]) + 1, secondary: uint32(data[1]) + 1, tertiary: uint32(tertiary) + 1}
+	return collationElement{primary: uint32(data[0]) + 2, secondary: uint32(data[1]) + 1, tertiary: uint32(tertiary) + 1}
 }
 
 func otherCollationElement(r rune, upperFirst bool) collationElement {
