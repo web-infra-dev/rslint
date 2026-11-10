@@ -7,11 +7,14 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestPreferAtExtras(t *testing.T) {
@@ -171,9 +174,42 @@ func TestPreferAtExtras(t *testing.T) {
 	)
 }
 
+func TestPreferAtCallableAnnotations(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: "type Nodes = NodeList; /** @param {(function(): Nodes) | (function(): HTMLCollection)} read */ function f(read) { return _.last(read()); }", FileName: "file.ts"},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, file := range []string{"file.js", "file.ts"} {
+		for _, source := range []string{
+			"/** @param {(function(): NodeList) | (function(): HTMLCollection)} read */ function f(read) { return _.last(read()); }",
+			"/** @type {(function(): NodeList) | (function(): HTMLCollection)} */ const read = getCallback(); _.last(read());",
+			"/** @param {(function(function(number): number): NodeList) & (() => HTMLCollection)} read */ function f(read) { return _.last(read()); }",
+			"const unused = 0; /** @param {() => NodeList} read */ function f(read) { return _.last(read()); }",
+			"const unused = 0; /** @param {(function(): NodeList) | (function(): HTMLCollection)} read */ function f(read) { return _.last(read()); }",
+		} {
+			valid = append(valid, rule_tester.ValidTestCase{Code: source, FileName: file})
+		}
+		for _, prefix := range []string{
+			"/** @param {(function(): string[]) | (function(): NodeList)} read */\n",
+			"const unused = 0; /** @param {() => NodeList} read */ const unrelated = 1;\n",
+		} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code:     prefix + "function f(read) { return _.last(read()); }",
+				FileName: file,
+				Output:   []string{prefix + "function f(read) { return read().at(-1); }"},
+				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("get-last-function", 2, 27, 2, 33, "_.last")},
+			})
+		}
+	}
+	runPreferAtAnnotationTests(t, valid, invalid)
+}
+
 func TestPreferAtTypeIntersections(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
 		{Code: "function f(a: NodeList & unknown) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "function f(a: NodeList & ReturnType<() => unknown>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "export {}; type ReturnType<T> = unknown; function f(a: NodeList & ReturnType<() => any>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "declare const value: unknown; function f(a: NodeList & typeof value) { return a[a.length - 1]; }", FileName: "file.ts"},
 		{Code: "function f<T extends any>(a: NodeList & T) { return a[a.length - 1]; }", FileName: "file.ts"},
 		{Code: "type Nodes = NodeList & { children: Nodes }; function f(a: Nodes) { return a[a.length - 1]; }", FileName: "file.ts"},
 	}
@@ -181,6 +217,9 @@ func TestPreferAtTypeIntersections(t *testing.T) {
 	for _, declaration := range []string{
 		"function f(a: NodeList & any)",
 		"function f(a: any & NodeList)",
+		"function f(a: NodeList & ReturnType<() => any>)",
+		"type Alias = any; declare const value: Alias; function f(a: NodeList & typeof value)",
+		"interface Value { tag: string }; declare const Value: any; function f(a: NodeList & Value & typeof Value)",
 		"type Alias = any; function f(a: NodeList & (unknown | Alias))",
 		"type Cycle = Cycle | Cycle; function f(a: Cycle)",
 	} {
@@ -191,6 +230,38 @@ func TestPreferAtTypeIntersections(t *testing.T) {
 			Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
 		})
 	}
+	runPreferAtAnnotationTests(t, valid, invalid)
+}
+
+func TestPreferAtResolvedIntersections(t *testing.T) {
+	root := fixtures.GetRootDir()
+	archive := txtarfs.MustParseFile(t, "testdata/intersection_types.txtar")
+	types, err := archive.ReadFile("types.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, "types.ts"): string(types)})
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &PreferAtRule,
+		[]rule_tester.ValidTestCase{
+			{Code: "import type { Unconstrained } from './types'; function f(a: NodeList & Unconstrained) { return a[a.length - 1]; }", FileName: "file.ts"},
+		}, []rule_tester.InvalidTestCase{
+			{
+				Code:     "import type { Erased } from './types'; function f(a: NodeList & Erased) {\n  return a[a.length - 1];\n}",
+				FileName: "file.ts",
+				Output:   []string{"import type { Erased } from './types'; function f(a: NodeList & Erased) {\n  return a.at(-1);\n}"},
+				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
+			},
+			{
+				Code:     "type WithDOM<T> = NodeList & T; function f(a: WithDOM<any>) {\n  return a[a.length - 1];\n}",
+				FileName: "file.ts",
+				Output:   []string{"type WithDOM<T> = NodeList & T; function f(a: WithDOM<any>) {\n  return a.at(-1);\n}"},
+				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
+			},
+		})
+}
+
+func runPreferAtAnnotationTests(t *testing.T, valid []rule_tester.ValidTestCase, invalid []rule_tester.InvalidTestCase) {
+	t.Helper()
 	for _, mode := range []string{"typed", "source-only"} {
 		t.Run(mode, func(t *testing.T) {
 			testRule := PreferAtRule

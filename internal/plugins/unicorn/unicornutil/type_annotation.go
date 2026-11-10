@@ -12,8 +12,8 @@ import (
 // TypeChecker. It resolves local aliases and constraints through the binder.
 func ClassifyTypeAnnotation(ctx rule.RuleContext, node *ast.Node, options TypeClassifierOptions) TypeClass {
 	walk := typeAnnotationWalk{
-		visiting:  make(map[*ast.Symbol]bool),
-		completed: make(map[*ast.Symbol]TypeClass),
+		visiting:  make(map[annotationReference]bool),
+		completed: make(map[annotationReference]TypeClass),
 	}
 	class := classifyTypeAnnotation(ctx, node, &walk, options)
 	if class == typeAny || class == typeCyclic {
@@ -23,8 +23,30 @@ func ClassifyTypeAnnotation(ctx rule.RuleContext, node *ast.Node, options TypeCl
 }
 
 type typeAnnotationWalk struct {
-	visiting  map[*ast.Symbol]bool
-	completed map[*ast.Symbol]TypeClass
+	visiting  map[annotationReference]bool
+	completed map[annotationReference]TypeClass
+}
+
+// Type aliases and typeof queries can resolve to the same merged symbol.
+type annotationReference struct {
+	symbol *ast.Symbol
+	value  bool
+}
+
+func (walk *typeAnnotationWalk) classifyReference(ref annotationReference, classify func() TypeClass) TypeClass {
+	if walk.visiting[ref] {
+		// Propagate cycles so an enclosing intersection cannot cache a
+		// classification based only on its non-cyclic members.
+		return typeCyclic
+	}
+	if completed, ok := walk.completed[ref]; ok {
+		return completed
+	}
+	walk.visiting[ref] = true
+	class := classify()
+	delete(walk.visiting, ref)
+	walk.completed[ref] = class
+	return class
 }
 
 func classifyTypeAnnotation(
@@ -90,7 +112,9 @@ func classifyTypeAnnotation(
 			(typeName.Text() == "Null" || typeName.Text() == "Undefined") {
 			return TypeNullish
 		}
-		return classifyTypeReference(ctx, typeName, walk, options)
+		return classifyTypeReference(ctx, typeName, node.TypeArguments(), walk, options)
+	case ast.KindTypeQuery:
+		return classifyTypeQuery(ctx, node, walk, options)
 	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
 		ast.KindNumberKeyword, ast.KindStringKeyword, ast.KindSymbolKeyword,
 		ast.KindVoidKeyword, ast.KindTypeLiteral,
@@ -104,9 +128,10 @@ func classifyTypeAnnotation(
 func classifyTypeReference(
 	ctx rule.RuleContext,
 	typeName *ast.Node,
+	typeArguments []*ast.Node,
 	walk *typeAnnotationWalk,
 	options TypeClassifierOptions,
-) (class TypeClass) {
+) TypeClass {
 	if typeName == nil || !ast.IsIdentifier(typeName) {
 		return TypeUnknown
 	}
@@ -122,22 +147,19 @@ func classifyTypeReference(
 		)
 	}
 	if symbol == nil {
+		if name == "ReturnType" && len(typeArguments) == 1 {
+			if function := ast.SkipTypeParentheses(typeArguments[0]); ast.IsFunctionTypeNode(function) {
+				return classifyTypeAnnotation(ctx, function.Type(), walk, options)
+			}
+		}
 		return known
 	}
-	if walk.visiting[symbol] {
-		// Propagate cycles so an enclosing intersection cannot cache a
-		// classification based only on its non-cyclic members.
-		return typeCyclic
-	}
-	if completed, ok := walk.completed[symbol]; ok {
-		return completed
-	}
-	walk.visiting[symbol] = true
-	defer func() {
-		delete(walk.visiting, symbol)
-		walk.completed[symbol] = class
-	}()
+	return walk.classifyReference(annotationReference{symbol: symbol}, func() TypeClass {
+		return classifyTypeDeclaration(ctx, symbol, name, walk, options)
+	})
+}
 
+func classifyTypeDeclaration(ctx rule.RuleContext, symbol *ast.Symbol, name string, walk *typeAnnotationWalk, options TypeClassifierOptions) TypeClass {
 	for _, declaration := range symbol.Declarations {
 		if declaration == nil {
 			continue
@@ -158,7 +180,7 @@ func classifyTypeReference(
 				ctx, declaration, walk, options,
 			)
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyClassReference(ctx, declaration, walk.visiting, options)
+			return classifyClassReference(ctx, declaration, make(map[*ast.Symbol]bool), options)
 		case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport:
 			importedName := name
 			if declaration.Kind == ast.KindImportSpecifier {
@@ -174,6 +196,25 @@ func classifyTypeReference(
 		}
 	}
 	return TypeUnknown
+}
+
+func classifyTypeQuery(ctx rule.RuleContext, node *ast.Node, walk *typeAnnotationWalk, options TypeClassifierOptions) TypeClass {
+	name := node.AsTypeQueryNode().ExprName
+	if name == nil || !ast.IsIdentifier(name) || len(node.TypeArguments()) != 0 {
+		return TypeUnknown
+	}
+	symbol := ctx.Refs.ResolveInFileWithMeaning(name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias)
+	if symbol == nil || symbol.ValueDeclaration == nil {
+		return TypeUnknown
+	}
+	declaration := symbol.ValueDeclaration
+	if declaration.Kind != ast.KindVariableDeclaration && declaration.Kind != ast.KindParameter {
+		return TypeUnknown
+	}
+	return walk.classifyReference(annotationReference{symbol: symbol, value: true}, func() TypeClass {
+		annotation, _ := ValueTypeAnnotation(ctx, declaration)
+		return classifyTypeAnnotation(ctx, annotation, walk, options)
+	})
 }
 
 func classifyInterfaceAnnotation(
@@ -199,7 +240,7 @@ func classifyInterfaceAnnotation(
 				continue
 			}
 			classes = append(classes, classifyTypeReference(
-				ctx, heritage.TypeName, walk, options,
+				ctx, heritage.TypeName, nil, walk, options,
 			))
 		}
 	}

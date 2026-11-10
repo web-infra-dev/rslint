@@ -1,9 +1,12 @@
 package unicornutil
 
 import (
+	"strings"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -97,8 +100,11 @@ func CallableReturnTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) *
 		if optional {
 			return nil
 		}
-		if annotation != nil && !isClosureCallableType(annotation) {
-			return callableBindingReturnType(annotation)
+		if result := callableBindingReturnType(annotation); result != nil {
+			return result
+		}
+		if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) {
+			return nil
 		}
 		host = declaration.Parent
 	} else if ast.IsVariableDeclaration(declaration) {
@@ -109,7 +115,8 @@ func CallableReturnTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) *
 		return annotation
 	}
 	for ; host != nil; host = ast.GetNextJSDocCommentLocation(host) {
-		for _, doc := range host.JSDoc(ctx.SourceFile) {
+		docs, source := callableJSDoc(ctx, host)
+		for _, doc := range docs {
 			if doc.AsJSDoc().Tags == nil {
 				continue
 			}
@@ -117,27 +124,24 @@ func CallableReturnTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) *
 				if tag.TypeExpression() == nil {
 					continue
 				}
-				tagType := tag.TypeExpression().Type()
 				if parameter {
-					if tag.Kind != ast.KindJSDocParameterTag || !isClosureCallableType(tagType) {
+					if tag.Kind != ast.KindJSDocParameterTag {
 						continue
 					}
 					if name := tag.Name().Text(); name != "" && name != declaration.Name().Text() {
 						continue
 					}
-					if result := closureCallableReturnTypeAnnotation(ctx, tag, declaration); result != nil {
-						return result
+					tag = adaptClosureCallableTag(tag, source, declaration)
+					param := tag.AsJSDocParameterOrPropertyTag()
+					if !param.IsBracketed && param.Name().Text() == declaration.Name().Text() {
+						return callableBindingReturnType(param.TypeExpression.Type())
 					}
 				} else if ast.IsJSDocReturnTag(tag) {
-					return tagType
+					return tag.TypeExpression().Type()
 				} else if ast.IsJSDocTypeTag(tag) {
-					if result := callableBindingReturnType(tagType); result != nil {
+					tag = adaptClosureCallableTag(tag, source, declaration)
+					if result := callableBindingReturnType(tag.TypeExpression().Type()); result != nil {
 						return result
-					}
-					if isClosureCallableType(tagType) {
-						if result := closureCallableReturnTypeAnnotation(ctx, tag, declaration); result != nil {
-							return result
-						}
 					}
 				}
 			}
@@ -203,46 +207,123 @@ func collectJSDocCallableReturns(node *ast.Node, returns *[]*ast.Node, inInterse
 	return false
 }
 
-func isClosureCallableType(node *ast.Node) bool {
-	return node != nil && ast.IsTypeReferenceNode(node) && ast.IsIdentifier(node.AsTypeReferenceNode().TypeName) &&
-		node.AsTypeReferenceNode().TypeName.Text() == "function"
+func callableJSDoc(ctx rule.RuleContext, host *ast.Node) ([]*ast.Node, string) {
+	source := ctx.SourceFile.Text()
+	if docs := host.JSDoc(ctx.SourceFile); len(docs) != 0 {
+		return docs, source
+	}
+	// tsgo may attach a same-line JSDoc as trailing trivia of the previous
+	// statement. Use the closest comment in this node's leading trivia.
+	start, end := host.Pos(), scanner.SkipTrivia(source, host.Pos())
+	if !strings.Contains(source[start:end], "/**") {
+		return nil, ""
+	}
+	comments := utils.CommentsInSpan(ctx.Comments.All(), start, end)
+	if len(comments) == 0 {
+		return nil, ""
+	}
+	comment := comments[len(comments)-1]
+	if comment.Pos() < start || comment.End() > end || comment.Kind != ast.KindMultiLineCommentTrivia {
+		return nil, ""
+	}
+	text := source[comment.Pos():comment.End()]
+	return parseCallableJSDoc(text, host), text
 }
 
-func closureCallableReturnTypeAnnotation(ctx rule.RuleContext, tag, declaration *ast.Node) *ast.Node {
-	// tsgo parses Closure's `function(): T` only as the name `function`.
-	// Add an opening brace so tsgo reads it as a type-literal method. The
-	// original closing brace ends the literal and JSDoc parsing recovers the
-	// rest of the tag, including the parameter name.
-	source := ctx.SourceFile.Text()
-	start := tag.TypeExpression().Pos()
-	text := "/** " + source[tag.Pos():start] + "{" + source[start:tag.End()] + " */ const factory = undefined;"
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
+func parseCallableJSDoc(comment string, scope *ast.Node) []*ast.Node {
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"},
+		comment+"\nconst documented = 0;", core.ScriptKindJS)
 	docs := file.Statements.Nodes[0].JSDoc(file)
-	if len(docs) == 0 || docs[0].AsJSDoc().Tags == nil || len(docs[0].AsJSDoc().Tags.Nodes) == 0 {
-		return nil
+	for _, doc := range docs {
+		// Resolve names in the original lexical scope.
+		doc.Parent = scope
 	}
-	parsed := docs[0].AsJSDoc().Tags.Nodes[0]
-	if parsed.Kind != tag.Kind || parsed.TypeExpression() == nil {
-		return nil
+	return docs
+}
+
+func adaptClosureCallableTag(tag *ast.Node, source string, scope *ast.Node) *ast.Node {
+	expression := tag.TypeExpression()
+	text := source[expression.Pos():tag.End()]
+	if !strings.Contains(text, "function") || !containsClosureCallableType(expression.Type()) {
+		return tag
 	}
-	if parsed.Kind == ast.KindJSDocParameterTag {
-		param := parsed.AsJSDocParameterOrPropertyTag()
-		if param.IsBracketed || param.Name().Text() != declaration.Name().Text() {
-			return nil
+	if rewritten, ok := rewriteClosureCallables(text); ok {
+		comment := "/** " + source[tag.Pos():expression.Pos()] + rewritten + " */"
+		for _, doc := range parseCallableJSDoc(comment, scope) {
+			if tags := doc.AsJSDoc().Tags; tags != nil && len(tags.Nodes) != 0 {
+				if parsed := tags.Nodes[0]; parsed.Kind == tag.Kind && parsed.TypeExpression() != nil {
+					return parsed
+				}
+			}
 		}
 	}
-	annotation := parsed.TypeExpression().Type()
-	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
-		return nil
+	return tag
+}
+
+func containsClosureCallableType(node *ast.Node) bool {
+	if node == nil {
+		return false
 	}
-	members := annotation.AsTypeLiteralNode().Members.Nodes
-	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
-		return nil
+	if ast.IsTypeReferenceNode(node) {
+		name := node.AsTypeReferenceNode().TypeName
+		if ast.IsIdentifier(name) && name.Text() == "function" {
+			return true
+		}
 	}
-	result := members[0].Type()
-	if result != nil {
-		// Resolve return-type names in the original factory's lexical scope.
-		result.Parent = declaration
+	return node.ForEachChild(containsClosureCallableType)
+}
+
+// tsgo stops at Closure's `function` keyword in a type. Adapt callable
+// members to arrow syntax and let tsgo parse the enclosing type and tag.
+func rewriteClosureCallables(text string) (string, bool) {
+	tokens := scanner.NewScanner()
+	tokens.SetText(text)
+	tokens.SetSkipJSDocLeadingAsterisks(true)
+	if tokens.Scan() != ast.KindOpenBraceToken {
+		return "", false
 	}
-	return result
+	var result strings.Builder
+	depth, written := 1, 0
+	for kind := tokens.Scan(); kind != ast.KindEndOfFile; kind = tokens.Scan() {
+		switch kind {
+		case ast.KindOpenBraceToken:
+			depth++
+		case ast.KindCloseBraceToken:
+			depth--
+			if depth == 0 {
+				if written == 0 {
+					return "", false
+				}
+				result.WriteString(text[written:])
+				return result.String(), true
+			}
+		case ast.KindFunctionKeyword:
+			// A function-named method inside a record is ordinary type syntax.
+			if depth != 1 {
+				continue
+			}
+			start, state := tokens.TokenStart(), tokens.Mark()
+			if tokens.Scan() != ast.KindOpenParenToken {
+				tokens.Rewind(state)
+				continue
+			}
+			for parentheses := 1; parentheses > 0; {
+				switch tokens.Scan() {
+				case ast.KindOpenParenToken:
+					parentheses++
+				case ast.KindCloseParenToken:
+					parentheses--
+				case ast.KindEndOfFile:
+					return "", false
+				}
+			}
+			if tokens.Scan() != ast.KindColonToken {
+				return "", false
+			}
+			result.WriteString(text[written:start])
+			result.WriteString("() =>")
+			written = tokens.TokenEnd()
+		}
+	}
+	return "", false
 }

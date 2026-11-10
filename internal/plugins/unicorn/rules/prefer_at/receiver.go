@@ -28,6 +28,19 @@ func isDOMCollection(ctx rule.RuleContext, node *ast.Node) bool {
 		unicornutil.ClassifyType(ctx, ctx.TypeChecker.GetTypeAtLocation(node), domCollectionTypes) == unicornutil.TypeTarget
 }
 
+func classifyDOMAnnotation(ctx rule.RuleContext, annotation *ast.Node) unicornutil.TypeClass {
+	class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, domCollectionTypes)
+	if class == unicornutil.TypeTarget && ctx.TypeChecker != nil && annotation.Parent != nil && !utils.IsJSDocSyntaxNode(annotation) {
+		// TypeScript can erase a native intersection to any through an import
+		// or a type argument that the source annotation walk cannot resolve.
+		resolved := ctx.TypeChecker.GetTypeAtLocation(annotation)
+		if utils.IsTypeAnyType(resolved) && !utils.IsIntrinsicErrorType(resolved) {
+			return unicornutil.TypeUnknown
+		}
+	}
+	return class
+}
+
 func classifyDOMExpression(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Symbol]bool) unicornutil.TypeClass {
 	node = ast.SkipParentheses(node)
 	if node == nil {
@@ -35,7 +48,7 @@ func classifyDOMExpression(ctx rule.RuleContext, node *ast.Node, visiting map[*a
 	}
 	switch node.Kind {
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		if class := unicornutil.ClassifyTypeAnnotation(ctx, node.Type(), domCollectionTypes); class != unicornutil.TypeUnknown {
+		if class := classifyDOMAnnotation(ctx, node.Type()); class != unicornutil.TypeUnknown {
 			return class
 		}
 		return classifyDOMExpression(ctx, node.Expression(), visiting)
@@ -46,7 +59,7 @@ func classifyDOMExpression(ctx rule.RuleContext, node *ast.Node, visiting map[*a
 			declaration := symbol.Declarations[0]
 			if declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter {
 				annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration)
-				if class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, domCollectionTypes); class != unicornutil.TypeUnknown {
+				if class := classifyDOMAnnotation(ctx, annotation); class != unicornutil.TypeUnknown {
 					return class
 				}
 			}
@@ -59,7 +72,7 @@ func classifyDOMExpression(ctx rule.RuleContext, node *ast.Node, visiting map[*a
 		}
 	case ast.KindCallExpression:
 		if annotation := callReturnAnnotation(ctx, node); annotation != nil {
-			return unicornutil.ClassifyTypeAnnotation(ctx, annotation, domCollectionTypes)
+			return classifyDOMAnnotation(ctx, annotation)
 		}
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
