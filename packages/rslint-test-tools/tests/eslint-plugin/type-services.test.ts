@@ -198,12 +198,254 @@ const cases: Case[] = [
     },
     reports: 1,
   },
+  // See packages/eslint-plugin/tests/rules in typescript-eslint v8.65.0.
+  {
+    name: 'unsafe assignment through matching generic targets',
+    plugin: typedPlugin,
+    rule: 'no-unsafe-assignment',
+    code: `
+      declare const source: Map<string, Set<any>>;
+      const unsafe: Map<string, Set<number>> = source;
+      const safe: Map<string, Set<unknown>> = source;
+      const differentTarget: ReadonlyMap<string, Set<number>> = source;
+    `,
+    reports: 1,
+    requiredOps: ['typeArguments'],
+  },
+  {
+    name: 'unsafe arguments after fixed and variadic tuple spreads',
+    plugin: typedPlugin,
+    rule: 'no-unsafe-argument',
+    code: `
+      declare function collect(first: number, second: string, third: number, ...rest: unknown[]): void;
+      declare const fixed: readonly [number, string];
+      declare const variadic: readonly [number, ...string[]];
+      declare const unsafe: any;
+      collect(...fixed, unsafe);
+      collect(...variadic, unsafe);
+    `,
+    reports: 1,
+    requiredOps: ['resolvedSignature', 'typeArguments'],
+  },
+  {
+    name: 'async returns with unknown and concrete fulfillment types',
+    plugin: typedPlugin,
+    rule: 'no-unsafe-return',
+    code: `
+      declare const source: Promise<any>;
+      async function safe(): Promise<unknown> { return source; }
+      async function unsafe(): Promise<number> { return source; }
+    `,
+    reports: 1,
+    requiredOps: ['awaited'],
+  },
+  {
+    name: 'unsafe narrowing and safe widening of a fresh object literal',
+    plugin: typedPlugin,
+    rule: 'no-unsafe-type-assertion',
+    code: `
+      const safe = { name: 'leaf', count: 1 } as { name: string };
+      declare const source: string | number;
+      const unsafe = source as string;
+    `,
+    reports: 1,
+    requiredOps: ['widened', 'isTypeAssignableTo'],
+  },
+  {
+    name: 'redundant type guards, assertions and optional chaining',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-condition',
+    options: [{ checkTypePredicates: true }],
+    code: `
+      declare function isString(value: unknown): value is string;
+      declare function assert(value: unknown): asserts value;
+      declare const text: string;
+      declare const input: string | number;
+      isString(text);
+      isString(input);
+      assert(true);
+      declare const present: { [key: string]: string } | null;
+      declare const optional: { [key: string]: string | undefined } | null;
+      present?.item?.trim();
+      optional?.item?.trim();
+    `,
+    reports: 3,
+    requiredOps: [
+      'typePredicate',
+      'isTypeAssignableTo',
+      'propertyType',
+      'indexInfos',
+    ],
+  },
+  {
+    name: 'structurally redundant assertions respect readonly properties',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-assertion',
+    code: `
+      interface Source { value: string }
+      interface Equivalent { value: string }
+      interface ReadonlySource { readonly value: string }
+      declare const source: Source;
+      const redundant = source as Equivalent;
+      const readonlyView = source as ReadonlySource;
+    `,
+    reports: 1,
+    requiredOps: ['indexInfos', 'isTypeAssignableTo'],
+  },
+  {
+    name: 'type parameter usage through signatures and derived types',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-parameters',
+    code: `
+      declare function mutable<T>(): [T];
+      declare function immutable<T>(): readonly [T];
+      declare function dictionary<T>(): { [key: string]: T };
+      function echo<T>(this: T) { return this; }
+      type Guard = <T>(value: unknown) => value is T;
+      function label<T extends string>(value: T) { return \`label:\${value}\` as const; }
+      function uppercase<T extends string>(value: T) { return value.toUpperCase() as Uppercase<T>; }
+      function pick<T extends { value: string }, Key extends 'value'>(value: T, key: Key) {
+        return value[key];
+      }
+      function compare<T, U>(value: T, target: U) { return 0 as T extends U ? 1 : 0; }
+      declare function keys<T>(): keyof T;
+    `,
+    reports: 3,
+    requiredOps: ['stringIndexType', 'typeOfSymbol', 'typePredicate'],
+  },
+  {
+    name: 'default type arguments of a constructor-valued base class',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-arguments',
+    code: `
+      interface Base {}
+      declare var Base: { new <T = string>(value: T): Base };
+      class Redundant extends Base<string> {}
+      class Explicit extends Base<number> {}
+    `,
+    reports: 1,
+    requiredOps: ['typeOfSymbol'],
+  },
+  {
+    name: 'bracket access through index signatures and named properties',
+    plugin: typedPlugin,
+    rule: 'dot-notation',
+    options: [{ allowIndexSignaturePropertyAccess: true }],
+    code: `
+      declare const dictionary: { readonly [key: string]: number; known: number };
+      dictionary['fromIndex'];
+      dictionary['known'];
+    `,
+    reports: 1,
+    requiredOps: ['indexInfos'],
+  },
+  {
+    name: 'string conversion preserves the enum member exemption',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-conversion',
+    code: `
+      enum Status { Ready = 'ready' }
+      Status.Ready.toString();
+      declare const text: string;
+      text.toString();
+    `,
+    reports: 1,
+  },
+  {
+    name: 'namespace qualification depends on scope and symbol identity',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-qualifier',
+    code: `
+      namespace Outer {
+        export type Value = number;
+        export const direct: Outer.Value = 1;
+        export namespace Inner {
+          type Value = string;
+          export const shadowed: Outer.Value = 1;
+        }
+      }
+    `,
+    reports: 1,
+    requiredOps: ['symbolsInScope', 'exportSymbol'],
+  },
+  {
+    name: 'named and star exports distinguish types from values across files',
+    plugin: typedPlugin,
+    rule: 'consistent-type-exports',
+    code: `
+      export { Item, count } from './dependency';
+      export { Missing } from './dependency';
+      export * from './types';
+      export * from './dependency';
+    `,
+    dependencies: {
+      'dependency.ts': 'export interface Item {} export const count = 1;',
+      'types.ts': "export type * from './dependency';",
+    },
+    reports: 2,
+    requiredOps: ['isUnknownSymbol', 'immediateAliasedSymbol', 'typeOfSymbol'],
+  },
+  {
+    name: 'readonly parameters check index signatures and their value types',
+    plugin: typedPlugin,
+    rule: 'prefer-readonly-parameter-types',
+    code: `
+      declare function immutable(values: { readonly [key: string]: { readonly item: number } }): void;
+      declare function mutableIndex(values: { [key: number]: number }): void;
+      declare function mutableValue(values: { readonly [key: string]: { item: number } }): void;
+    `,
+    reports: 2,
+    requiredOps: ['indexInfo', 'propertyType'],
+  },
+  {
+    name: 'promise catch callback parameter types and suggestions',
+    plugin: typedPlugin,
+    rule: 'use-unknown-in-catch-callback-variable',
+    code: `
+      declare const promise: Promise<void>;
+      promise.catch((error: unknown) => {});
+      promise.catch(error => {});
+    `,
+    reports: 1,
+    requiredOps: ['typeOfSymbol'],
+  },
+  {
+    name: 'template interpolation inherits an allowlisted interface',
+    plugin: typedPlugin,
+    rule: 'restrict-template-expressions',
+    options: [{ allow: ['Trusted'] }],
+    code: `
+      interface Trusted {}
+      interface Derived extends Trusted {}
+      interface Other {}
+      declare const derived: Derived;
+      declare const other: Other;
+      \`\${derived}\`;
+      \`\${other}\`;
+    `,
+    reports: 1,
+    requiredOps: ['baseTypes'],
+  },
   {
     name: 'collection size semantics',
     plugin: sonarPlugin,
     rule: 'no-collection-size-mischeck',
     code: 'declare const list: number[]; declare const set: Set<number>; declare const other: { length: number }; if (list.length < 0) {} if (set.size < 0) {} if (other.length < 0) {}',
     reports: 2,
+  },
+  {
+    // SonarJS S3403 uses assignability in both directions for strict equality.
+    name: 'SonarJS strict equality checks operand assignability',
+    plugin: sonarPlugin,
+    rule: 'different-types-comparison',
+    code: `
+      declare const count: number;
+      declare const text: string;
+      count === 1;
+      count === text;
+    `,
+    reports: 1,
+    requiredOps: ['isTypeAssignableTo'],
   },
   {
     name: 'Effector store naming',
@@ -250,6 +492,8 @@ const cases: Case[] = [
 
 function normMessages(messages: any[]) {
   return messages.map((m) => ({
+    ruleId: m.ruleId,
+    messageId: m.messageId,
     message: m.message,
     line: m.line,
     column: m.column,
@@ -257,6 +501,7 @@ function normMessages(messages: any[]) {
     endColumn: m.endColumn,
     fix: m.fix ? { range: m.fix.range, text: m.fix.text } : undefined,
     suggestions: m.suggestions?.map((s: any) => ({
+      messageId: s.messageId,
       desc: s.desc,
       fix: { range: s.fix.range, text: s.fix.text },
     })),
@@ -285,18 +530,24 @@ function normResult(result: ReturnType<typeof lintFile>, code: string) {
     const lines = prefix.split('\n');
     return { line: lines.length, column: lines.at(-1)!.length + 1 };
   };
-  return result.diagnostics.map((d) => ({
-    message: d.message,
-    line: loc(d.startPos).line,
-    column: loc(d.startPos).column,
-    endLine: loc(d.endPos).line,
-    endColumn: loc(d.endPos).column,
-    fix: fix(d.fixes),
-    suggestions: d.suggestions?.map((s) => ({
-      desc: s.desc,
-      fix: fix(s.fixes),
-    })),
-  }));
+  // The CLI and lint API sort worker diagnostics by source position.
+  return [...result.diagnostics]
+    .sort((a, b) => a.startPos - b.startPos)
+    .map((d) => ({
+      ruleId: d.ruleName,
+      messageId: d.messageId,
+      message: d.message,
+      line: loc(d.startPos).line,
+      column: loc(d.startPos).column,
+      endLine: loc(d.endPos).line,
+      endColumn: loc(d.endPos).column,
+      fix: fix(d.fixes),
+      suggestions: d.suggestions?.map((s) => ({
+        messageId: s.messageId,
+        desc: s.desc,
+        fix: fix(s.fixes),
+      })),
+    }));
 }
 
 describe('original npm typed rules over Go type services', () => {
@@ -751,12 +1002,13 @@ await Promise.resolve(1);
       1024,
     );
     const published = new Map<string, Uint8Array>();
-    const makeClient = () =>
+    const makeClient = (maxFactsBytes = 1 << 16) =>
       new FileTypeServiceClient(
         enums,
         descriptor,
         projection.binding,
         (query, key) => {
+          host.requests++;
           const packet = Buffer.from(
             host.request({ method: 'query', query }),
             'base64',
@@ -777,8 +1029,10 @@ await Promise.resolve(1);
         },
         host.source,
         {
-          maxFactsBytes: 1 << 16,
-          shared: new SharedTypeCacheReader(cache.descriptor),
+          maxFactsBytes,
+          shared: maxFactsBytes
+            ? new SharedTypeCacheReader(cache.descriptor)
+            : undefined,
         },
       );
     const client = makeClient();
@@ -1016,11 +1270,70 @@ await Promise.resolve(1);
     ).toEqual(['1', '"two"', 'true']);
 
     const referenceChecker = upstream.services.program!.getTypeChecker();
-    const referenceSpread = (upstream.ast.body as any[])
-      .flatMap((node) => node.declarations ?? [])
-      .find((entry) => entry.id.name === 'spreadKeys').init;
+    const referenceBody = upstream.ast.body as any[];
+    const referenceVariable = (name: string) =>
+      referenceBody
+        .flatMap((node) => node.declarations ?? [])
+        .find((entry) => entry.id.name === name);
+    const referenceNodes = upstream.services.esTreeNodeToTSNodeMap!;
+    const referenceFn = referenceNodes.get(
+      referenceBody.find((node) => node.type === 'ExportNamedDeclaration')
+        .declaration,
+    ) as ts.FunctionDeclaration;
+    const formatted = (
+      typeChecker: ts.TypeChecker,
+      declaration: ts.FunctionDeclaration,
+      unique: ts.Type,
+    ) => {
+      const namespace = declaration
+        .getSourceFile()
+        .statements.filter(ts.isModuleDeclaration)
+        .find((node) => node.name.text === 'N')!;
+      const item = (namespace.body as ts.ModuleBlock).statements[1];
+      const itemType = typeChecker.getTypeAtLocation(item);
+      const rest = typeChecker.getTypeAtLocation(declaration.parameters[2]);
+      const signature = typeChecker.getSignatureFromDeclaration(declaration)!;
+      const none = ts.TypeFormatFlags.None;
+      return [
+        typeChecker.typeToString(unique),
+        typeChecker.typeToString(unique, undefined, none),
+        typeChecker.typeToString(rest, declaration, none),
+        typeChecker.typeToString(
+          rest,
+          declaration,
+          ts.TypeFormatFlags.WriteArrayAsGenericType,
+        ),
+        typeChecker.typeToString(itemType, item, none),
+        typeChecker.typeToString(itemType, declaration, none),
+        ...[ts.SignatureKind.Call, ts.SignatureKind.Construct].map((kind) =>
+          typeChecker.signatureToString(
+            signature,
+            declaration,
+            ts.TypeFormatFlags.WriteArrowStyleSignature,
+            kind,
+          ),
+        ),
+      ];
+    };
+    const expectedFormats = formatted(
+      referenceChecker,
+      referenceFn,
+      referenceChecker.getTypeAtLocation(
+        referenceNodes.get(referenceVariable('unique').id),
+      ),
+    );
+    expect(new Set(expectedFormats).size).toBe(expectedFormats.length);
+    expect(formatted(checker, nativeFn, uniqueType)).toEqual(expectedFormats);
+    expect(() =>
+      checker.typeToString(
+        keyType,
+        nativeFn,
+        ts.TypeFormatFlags.MultilineObjectLiterals,
+      ),
+    ).toThrow('MultilineObjectLiterals');
+
     const referenceSpreadType = referenceChecker.getTypeAtLocation(
-      upstream.services.esTreeNodeToTSNodeMap!.get(referenceSpread),
+      referenceNodes.get(referenceVariable('spreadKeys').init),
     ) as ts.ObjectType;
     expect(
       referenceSpreadType.objectFlags & ts.ObjectFlags.ContainsSpread,
@@ -1032,11 +1345,9 @@ await Promise.resolve(1);
     const truthLocation = services.esTreeNodeToTSNodeMap.get(
       variable('truth').id,
     );
-    const referenceTruth = (upstream.ast.body as any[])
-      .flatMap((node) => node.declarations ?? [])
-      .find((entry) => entry.id.name === 'truth').id;
-    const referenceTruthLocation =
-      upstream.services.esTreeNodeToTSNodeMap!.get(referenceTruth);
+    const referenceTruthLocation = referenceNodes.get(
+      referenceVariable('truth').id,
+    );
     for (const meaning of [
       ts.SymbolFlags.Value,
       ts.SymbolFlags.Type,
@@ -1076,6 +1387,22 @@ await Promise.resolve(1);
       referencePromise?.name,
       referencePromise?.flags,
     ]);
+
+    // A bulk scope result seeds a previously interned symbol without its fact packet.
+    const uncached = makeClient(0);
+    try {
+      const checker = uncached.program.getTypeChecker();
+      const source = uncached.program.getSourceFile(file)!;
+      const meaning = ts.SymbolFlags.BlockScopedVariable;
+      const truth = checker.resolveName('truth', source, meaning, false);
+      expect(truth).toBeDefined();
+      const symbols = checker.getSymbolsInScope(source, meaning);
+      const before = host.requests;
+      expect(symbols.find((symbol) => symbol.name === 'truth')).toBe(truth);
+      expect(host.requests).toBe(before);
+    } finally {
+      uncached.close();
+    }
 
     expect(
       services.getSymbolAtLocation(expression('Identifier')).declarations,

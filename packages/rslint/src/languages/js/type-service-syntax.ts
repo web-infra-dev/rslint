@@ -283,17 +283,29 @@ export class GenerationSyntaxViews {
     const proxy: object = new Proxy(
       {},
       {
-        get: (_target, key) => this.get(identity, key),
-        has: (_target, key) => {
+        get: (target, key, receiver) => {
+          if (!Object.hasOwn(target, key)) return this.get(identity, key);
           this.ensure();
-          return key in this.raw(proxy);
+          // TypeScript helpers write node-local caches, such as modifier flags.
+          return Reflect.get(target, key, receiver);
         },
-        ownKeys: () => {
+        has: (target, key) => {
           this.ensure();
-          return Reflect.ownKeys(this.raw(proxy));
+          return Object.hasOwn(target, key) || key in this.raw(proxy);
         },
-        getOwnPropertyDescriptor: (_target, key) => {
+        ownKeys: (target) => {
           this.ensure();
+          return [
+            ...new Set([
+              ...Reflect.ownKeys(this.raw(proxy)),
+              ...Reflect.ownKeys(target),
+            ]),
+          ];
+        },
+        getOwnPropertyDescriptor: (target, key) => {
+          this.ensure();
+          const own = Reflect.getOwnPropertyDescriptor(target, key);
+          if (own) return own;
           const raw = this.raw(proxy);
           return Object.hasOwn(raw, key)
             ? {
@@ -367,6 +379,8 @@ export class GenerationSyntaxViews {
     const source = this.source(ref.file);
     if (!source) throw new Error('foreign source');
     const raw = source.getOrCreateNodeAtIndex(ref.index);
+    if (key === 'default' && raw.kind === SyntaxKind.TypeParameter)
+      return this.wrap(Reflect.get(raw, 'defaultType', raw));
     const heritageReference =
       raw.kind === SyntaxKind.TypeReference &&
       raw.parent?.kind === SyntaxKind.HeritageClause;

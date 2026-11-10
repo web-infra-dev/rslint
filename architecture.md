@@ -1850,6 +1850,13 @@ An injected synchronous transport uses a finite request/fact protocol and
 offset-addressed binary records. Property/name arguments and packet strings
 preserve UTF-16 code units. Scalar answers include shallow facts for their
 direct handles and symbols, without recursively exporting member or type graphs.
+Reference targets, type parameters, alias arguments and operands of derived
+types are handles on those facts. Index signatures and type predicates come from
+the checker on demand.
+Scope and export lists carry symbol names and handles so name searches can
+defer declaration facts. Type and signature formatting use the checker printer
+with TypeScript's defaults. Passing `MultilineObjectLiterals` raises an
+unsupported-operation error because the Go printer uses different line breaks.
 Workers and brokers retain each supplemental fact under its canonical key,
 rather than duplicating it under every node query. Fields decode on demand;
 wrappers retain requested immutable values and translated flags, never packet
@@ -1876,6 +1883,8 @@ Copied source buffers have their own byte-bounded generation LRU. Full syntax
 and compact summaries use the same proxies and enum/heritage adapters, preserving
 identity through hydration. File origin maps continue to reference the exact
 compiler nodes and preferred reverse aliases.
+Node-local values written by TypeScript helpers stay on the JavaScript proxy,
+so helper caches remain observable without modifying the compiler tree.
 
 A broker may publish immutable packets into `SharedTypeCacheOwner`, a portable
 JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. When an
