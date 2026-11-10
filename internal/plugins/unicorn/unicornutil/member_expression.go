@@ -9,6 +9,16 @@ import (
 
 var decimalIntegerPattern = regexp.MustCompile(`^(?:0|0[0-7]*[89][0-9]*|[1-9](?:_?[0-9])*)$`)
 
+// IsReferenceTarget reports whether an expression is written, updated, or
+// deleted through any enclosing parentheses and TypeScript assertions.
+func IsReferenceTarget(node *ast.Node) bool {
+	for parent := node.Parent; parent != nil &&
+		ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments); parent = node.Parent {
+		node = parent
+	}
+	return node.Parent != nil && (ast.IsAssignmentTarget(node) || node.Parent.Kind == ast.KindDeleteExpression)
+}
+
 // ShouldAddParenthesesToMemberExpressionObject mirrors Unicorn's conservative
 // helper for turning node into the object of a member expression. This is not
 // a general precedence check: decimal integers need parentheses for lexical
@@ -59,15 +69,20 @@ func ShouldAddParenthesesToMemberExpressionObject(
 func ShouldAddParenthesesToMemberExpressionObjectAt(source *ast.SourceFile, node, replacement *ast.Node) bool {
 	first, _ := utils.TokenAtOrAfter(source, utils.TrimNodeTextRange(source, node).Pos())
 	next, _ := utils.TokenAtOrAfter(source, first.End)
-	if first.Kind == ast.KindOpenBraceToken || first.Kind == ast.KindFunctionKeyword || first.Kind == ast.KindClassKeyword ||
-		(first.Text == "async" && next.Kind == ast.KindFunctionKeyword) ||
-		(first.Text == "let" && next.Kind == ast.KindOpenBracketToken) {
+	startsWithObject := first.Kind == ast.KindOpenBraceToken
+	startsWithDeclaration := first.Kind == ast.KindFunctionKeyword || first.Kind == ast.KindClassKeyword ||
+		(first.Text == "async" && next.Kind == ast.KindFunctionKeyword)
+	startsWithLetBracket := first.Text == "let" && next.Kind == ast.KindOpenBracketToken
+	if startsWithObject || startsWithDeclaration || startsWithLetBracket {
 		for current := replacement; current.Parent != nil; current = current.Parent {
 			parent := current.Parent
 			if ast.IsParenthesizedExpression(parent) {
 				break
 			}
-			if parent.Kind == ast.KindExpressionStatement || (parent.Kind == ast.KindArrowFunction && parent.Body() == current && first.Kind == ast.KindOpenBraceToken) {
+			if parent.Kind == ast.KindExpressionStatement ||
+				(parent.Kind == ast.KindArrowFunction && parent.Body() == current && startsWithObject) ||
+				(parent.Kind == ast.KindForStatement && parent.Initializer() == current && startsWithLetBracket) ||
+				(parent.Kind == ast.KindExportAssignment && !parent.AsExportAssignment().IsExportEquals && parent.Expression() == current && startsWithDeclaration) {
 				return true
 			}
 			if utils.TrimNodeTextRange(source, parent).Pos() != utils.TrimNodeTextRange(source, current).Pos() {
@@ -78,7 +93,7 @@ func ShouldAddParenthesesToMemberExpressionObjectAt(source *ast.SourceFile, node
 	switch node.Kind {
 	case ast.KindFunctionExpression, ast.KindObjectLiteralExpression:
 		return true
-	case ast.KindTaggedTemplateExpression, ast.KindNonNullExpression, ast.KindMetaProperty:
+	case ast.KindTaggedTemplateExpression, ast.KindNonNullExpression, ast.KindMetaProperty, ast.KindSuperKeyword:
 		return false
 	case ast.KindCallExpression:
 		return false

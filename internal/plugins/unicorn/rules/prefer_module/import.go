@@ -1,15 +1,14 @@
 package prefer_module
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 func importFixes(ctx rule.RuleContext, identifier *ast.Node) []rule.RuleFix {
@@ -30,7 +29,7 @@ func importFixes(ctx rule.RuleContext, identifier *ast.Node) []rule.RuleFix {
 	}
 	text := utils.TrimmedNodeText(ctx.SourceFile, source)
 	if source.Kind != ast.KindStringLiteral {
-		text = quoteModuleSource(value)
+		text = unicornutil.QuoteString(value, '\'')
 	}
 	attributes := ""
 	json := strings.HasSuffix(value, ".json")
@@ -135,42 +134,4 @@ func isModuleBindingName(name string) bool {
 	}
 	keyword := scanner.StringToToken(name)
 	return (keyword < ast.KindFirstReservedWord || keyword > ast.KindLastFutureReservedWord) && scanner.IsValidIdentifier(name)
-}
-
-// Static templates have no raw string token to reuse. Match Unicorn's
-// quote-js-string spelling, including control characters and lone surrogates.
-// The tsgo printer uses different escapes for NUL, DEL, and U+0085; a local
-// adapter keeps suggestion output identical without introducing a printer API.
-func quoteModuleSource(value string) string {
-	var result strings.Builder
-	result.WriteByte('\'')
-	for len(value) > 0 {
-		character, size := ecmascript.DecodeStringRune(value)
-		value = value[size:]
-		switch character {
-		case '\\', '\'':
-			result.WriteByte('\\')
-			result.WriteRune(character)
-		case '\n':
-			result.WriteString(`\n`)
-		case '\r':
-			result.WriteString(`\r`)
-		case '\t':
-			result.WriteString(`\t`)
-		case '\b':
-			result.WriteString(`\b`)
-		case '\f':
-			result.WriteString(`\f`)
-		case '\v':
-			result.WriteString(`\v`)
-		default:
-			if character < 0x20 || character == 0x7f || character == 0x2028 || character == 0x2029 || (character >= 0xd800 && character <= 0xdfff) {
-				result.WriteString(`\u{` + strconv.FormatUint(uint64(character), 16) + `}`)
-			} else {
-				result.WriteRune(character)
-			}
-		}
-	}
-	result.WriteByte('\'')
-	return result.String()
 }
