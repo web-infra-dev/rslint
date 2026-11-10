@@ -53,8 +53,8 @@ export interface ValidTestCase extends Omit<TestCase, 'errors' | 'output'> {
 }
 
 export interface RuleTesterConfig {
-  /** Plugin name, used as the rule-name prefix. Empty for ESLint core rules. */
-  plugin: string;
+  /** Plugin name and rule-name prefix. Omit or leave empty for ESLint core rules. */
+  plugin?: string;
   /** Default for each case's `filename`. Defaults to `input.js`. */
   filename?: string;
   /** Files written to the fixture root before the cases run. */

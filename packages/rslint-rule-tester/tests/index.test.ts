@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, rs, test } from 'rstack/test' with {
   rstest: 'importActual',
 };
 import * as actualTest from 'rstack/test' with { rstest: 'importActual' };
+import { lint } from '@rslint/core/internal';
 import { RuleTester } from '../src/index.ts';
 
 const runner = rs.hoisted(() => ({
@@ -26,6 +27,32 @@ describe('RuleTester.run', () => {
 
   beforeEach(() => {
     rs.clearAllMocks();
+  });
+
+  test('runs core rules with the default constructor config', async () => {
+    rs.mocked(lint).mockResolvedValue({
+      diagnostics: [],
+      fileCount: 1,
+      ruleCount: 1,
+    } as Awaited<ReturnType<typeof lint>>);
+    new RuleTester().run('constructor-super', {
+      valid: ['class A {}'],
+      invalid: [],
+    });
+    await runner.test.mock.calls[0][1]();
+    expect(lint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: [
+          expect.objectContaining({
+            rules: { 'constructor-super': ['error'] },
+          }),
+        ],
+      }),
+    );
+    expect(rs.mocked(lint).mock.calls[0][0].config?.[0]).toHaveProperty(
+      'plugins',
+      [],
+    );
   });
 
   test.each(['valid', 'invalid'] as const)(
