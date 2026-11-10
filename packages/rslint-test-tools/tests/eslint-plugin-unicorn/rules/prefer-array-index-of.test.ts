@@ -560,8 +560,8 @@ function applyEdits(
   code: string,
   fixes: NonNullable<Diagnostic['fixes']>,
 ): string {
-  return fixes
-    .toSorted((a, b) => b.startPos - a.startPos)
+  return [...fixes]
+    .sort((a, b) => b.startPos - a.startPos)
     .reduce(
       (text, edit) =>
         text.slice(0, edit.startPos) + edit.text + text.slice(edit.endPos),
