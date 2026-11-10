@@ -163,11 +163,26 @@ func TestPreferMathTruncBigIntSyntax(t *testing.T) {
 		{code: `~~(1n << 1048576n); ~~(2n ** 1000000000n);`},
 		{code: `~~(true ? 1n : 1.5); ~~(false ? 1.5 : 1n);`},
 		{code: `~~(0, 1n); ~~(value = 1n);`},
+		{code: `~~(0, [1n][0]);`},
+		{code: `~~({value: 1n}).value;`},
+		{code: `~~([{value: 1n}][0].value);`},
+		{code: `~~({values: [1n]}).values[0];`},
+		{code: `~~([1n]["0"]);`},
+		{code: `~~({value: 1.5, value: 1n}).value;`},
+		{code: `parseInt(String([1n][0]), 10);`},
 		{code: `parseInt(String(1n), 10); Number.parseInt(String(BigInt(value)), 10);`},
 		{code: `~~(flag ? 1n : 1.5);`, report: true},
 		{code: `~~(value + 1n);`, report: true},
 		{code: `~~(value && 1n);`, report: true},
 		{code: `parseInt(String(flag ? 1n : 1.5), 10);`, report: true},
+		{code: `declare const value: any; ~~(-(1 ? 1n : value));`, report: true},
+		{code: `declare const value: string; ~~(value + 1n);`, report: true},
+		{code: `~~(0, [1.5][0]);`, report: true, output: `Math.trunc((0, [1.5][0]));`},
+		{code: `~~({value: 1.5}).value;`, report: true, output: `Math.trunc(({value: 1.5}).value);`},
+		{code: `~~({value: 1n, value: 1.5}).value;`, report: true, output: `Math.trunc(({value: 1n, value: 1.5}).value);`},
+		{code: `~~([][0]);`, report: true, output: `Math.trunc([][0]);`},
+		{code: `~~({}.missing);`, report: true, output: `Math.trunc({}.missing);`},
+		{code: `declare const value: number; ~~(-(1 ? 1.5 : value));`, report: true, output: `declare const value: number; Math.trunc(-(1 ? 1.5 : value));`},
 		{code: `~~(1n + "2");`, report: true, output: `Math.trunc(1n + "2");`},
 		{code: `~~(1n < 2n);`, report: true, output: `Math.trunc(1n < 2n);`},
 		{code: `~~(flag ? 1.5 : 2.5);`, report: true, output: `Math.trunc(flag ? 1.5 : 2.5);`},
@@ -180,6 +195,17 @@ func TestPreferMathTruncBigIntSyntax(t *testing.T) {
 				assertMathTruncSuggestion(t, test.code, diagnostics, test.report, test.output)
 			})
 		}
+	}
+	for _, code := range []string{
+		`~~([...[1n]][0]);`,
+		`~~({value: 1n, ...other}).value;`,
+		`~~({value: 1n, [key]: 1.5}).value;`,
+		`~~({__proto__: {value: 1n}}).value;`,
+		`~~([1n, 1.5][index]);`,
+	} {
+		t.Run("source-only/"+code, func(t *testing.T) {
+			assertMathTruncSuggestion(t, code, lintMathTruncBigInt(t, code, false), true, "")
+		})
 	}
 }
 

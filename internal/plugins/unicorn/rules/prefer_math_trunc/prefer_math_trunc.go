@@ -1,6 +1,8 @@
 package prefer_math_trunc
 
 import (
+	"strconv"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -98,13 +100,12 @@ func classifyBigInt(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 	}
 	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, operand)
 	parts := utils.UnionTypeParts(t)
-	allBigInt, hasBigInt, uncertain := len(parts) > 0, false, false
+	allBigInt, hasBigInt := len(parts) > 0, false
 	for _, part := range parts {
 		if utils.IsTypeFlagSet(part, checker.TypeFlagsBigIntLike) {
 			hasBigInt = true
 		} else {
 			allBigInt = false
-			uncertain = uncertain || utils.IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter)
 		}
 	}
 	if allBigInt {
@@ -113,11 +114,9 @@ func classifyBigInt(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 	if hasBigInt {
 		return bigIntPossible
 	}
-	// An unresolved type must not erase BigInt evidence from the syntax.
-	if uncertain || t == nil {
-		return syntax
-	}
-	return bigIntUnknown
+	// Even a number result can originate from an any operand. Type information
+	// may strengthen the syntax evidence, but must not erase it.
+	return syntax
 }
 
 // Classify the result without evaluating source-controlled arithmetic or
@@ -142,6 +141,13 @@ func bigIntFromSyntax(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 				return bigIntPossible
 			}
 			return bigIntKnown
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if value, resolved := literalMemberValue(operand); resolved {
+			return bigIntFromSyntax(ctx, value)
+		}
+		if literalMemberMayBeBigInt(ctx, utils.AccessExpressionObject(operand)) {
+			return bigIntPossible
 		}
 	case ast.KindConditionalExpression:
 		conditional := operand.AsConditionalExpression()
@@ -174,6 +180,98 @@ func bigIntFromSyntax(ctx *rule.RuleContext, operand *ast.Node) bigIntKind {
 		return mergeBigIntKinds(bigIntFromSyntax(ctx, binary.Left), bigIntFromSyntax(ctx, binary.Right))
 	}
 	return bigIntUnknown
+}
+
+// Select a literal member's source expression without evaluating arithmetic,
+// getters or computed keys. Unknown spreads and keys can override a member.
+func literalMemberValue(node *ast.Node) (*ast.Node, bool) {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsAccessExpression(node) {
+		return node, true
+	}
+	receiver, resolved := literalMemberValue(utils.AccessExpressionObject(node))
+	key, static := utils.AccessExpressionStaticName(node)
+	if !resolved || receiver == nil || !static {
+		return nil, false
+	}
+	switch receiver.Kind {
+	case ast.KindArrayLiteralExpression:
+		index, err := strconv.Atoi(key)
+		if err != nil || index < 0 || strconv.Itoa(index) != key {
+			return nil, true
+		}
+		elements := receiver.AsArrayLiteralExpression().Elements
+		if elements == nil {
+			return nil, true
+		}
+		for position, element := range elements.Nodes {
+			if ast.IsSpreadElement(element) {
+				return nil, false
+			}
+			if position == index {
+				return element, true
+			}
+		}
+		return nil, true
+	case ast.KindObjectLiteralExpression:
+		var value *ast.Node
+		resolved = true
+		properties := receiver.AsObjectLiteralExpression().Properties
+		if properties == nil {
+			return nil, true
+		}
+		for _, property := range properties.Nodes {
+			name := property.Name()
+			if property.Kind == ast.KindSpreadAssignment || name == nil {
+				value, resolved = nil, false
+				continue
+			}
+			propertyKey, static := utils.GetStaticPropertyName(name)
+			if propertyKey == "__proto__" && property.Kind == ast.KindPropertyAssignment && name.Kind != ast.KindComputedPropertyName {
+				if value == nil {
+					resolved = false
+				}
+				continue
+			}
+			if !static {
+				value, resolved = nil, false
+			} else if propertyKey == key {
+				switch property.Kind {
+				case ast.KindPropertyAssignment:
+					value, resolved = property.AsPropertyAssignment().Initializer, true
+				case ast.KindShorthandPropertyAssignment:
+					value, resolved = name, true
+				default:
+					value, resolved = nil, false
+				}
+			}
+		}
+		return value, resolved
+	default:
+		return nil, false
+	}
+}
+
+// An unresolved literal lookup may still contain BigInt values. Preserve that
+// evidence conservatively, including literal spreads and prototype objects.
+func literalMemberMayBeBigInt(ctx *rule.RuleContext, node *ast.Node) bool {
+	node = utils.SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+		return node.ForEachChild(func(child *ast.Node) bool { return literalMemberMayBeBigInt(ctx, child) })
+	case ast.KindPropertyAssignment:
+		property := node.AsPropertyAssignment()
+		return literalMemberMayBeBigInt(ctx, property.Initializer)
+	case ast.KindSpreadElement, ast.KindSpreadAssignment:
+		return literalMemberMayBeBigInt(ctx, node.Expression())
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return literalMemberMayBeBigInt(ctx, utils.AccessExpressionObject(node))
+	default:
+		return bigIntFromSyntax(ctx, node) != bigIntUnknown
+	}
 }
 
 func mergeBigIntKinds(left, right bigIntKind) bigIntKind {

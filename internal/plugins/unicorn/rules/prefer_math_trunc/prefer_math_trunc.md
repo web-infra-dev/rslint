@@ -75,7 +75,11 @@ includes both Number and BigInt still receives a diagnostic, but no suggestion.
 The rule does not require type information and continues to run without a
 project. In that mode, it recognizes BigInt literals, global `BigInt()` calls,
 and their arithmetic and conditional combinations without evaluating their
-values. Expressions with a possible BigInt result receive no suggestion.
+values. It also recognizes literal array and object members, such as `[1n][0]`
+and `({value: 1n}).value`. Expressions with a possible BigInt result receive no
+suggestion. Type information can strengthen existing syntax evidence but does
+not remove it: an operation involving `any` can be inferred as Number even when
+its runtime value is a BigInt.
 
 ```javascript
 // No diagnostic: both branches produce BigInts.
