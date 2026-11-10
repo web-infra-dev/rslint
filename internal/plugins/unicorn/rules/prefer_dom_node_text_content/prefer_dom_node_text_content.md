@@ -28,7 +28,7 @@ foo.textContent = '🦄';
 
 ## Options
 
-This rule has no options. Enable it explicitly as `unicorn/prefer-dom-node-text-content` in your rules configuration.
+This rule has no options.
 
 ## Differences from upstream
 
