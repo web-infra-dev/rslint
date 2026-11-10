@@ -86,6 +86,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_code_point"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_date_now"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_append"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_dom_node_text_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_export_from"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_flat_math_min_max"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_number_constants"
@@ -211,6 +212,7 @@ func GetAllRules() []rule.Rule {
 		prefer_code_point.PreferCodePointRule,
 		prefer_date_now.PreferDateNowRule,
 		prefer_dom_node_append.PreferDomNodeAppendRule,
+		prefer_dom_node_text_content.PreferDomNodeTextContentRule,
 		prefer_export_from.PreferExportFromRule,
 		prefer_flat_math_min_max.PreferFlatMathMinMaxRule,
 		prefer_global_number_constants.PreferGlobalNumberConstantsRule,

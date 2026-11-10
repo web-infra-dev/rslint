@@ -1,6 +1,7 @@
 package unicornutil
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -57,6 +58,162 @@ func ValueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotatio
 		host = ast.GetNextJSDocCommentLocation(host)
 	}
 	return annotation, optional
+}
+
+// unmodifiedFunctionValue finds a local callable whose authored return type can
+// be used without a checker. A nil function with ok set can still have a JSDoc
+// callable annotation on the binding.
+func unmodifiedFunctionValue(ctx rule.RuleContext, symbol *ast.Symbol) (function *ast.Node, ok bool) {
+	declaration := symbol.Declarations[0]
+	if declaration.Kind != ast.KindFunctionDeclaration && declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
+		return nil, false
+	}
+	for _, reference := range ctx.Refs.References(symbol) {
+		if reference != declaration.Name() && utils.IsWriteReference(reference) {
+			return nil, false
+		}
+	}
+	switch declaration.Kind {
+	case ast.KindFunctionDeclaration:
+		function = declaration
+	case ast.KindVariableDeclaration:
+		initializer := utils.ESTreeRuntimeExpression(declaration.AsVariableDeclaration().Initializer)
+		for initializer != nil && (initializer.Kind == ast.KindSatisfiesExpression || initializer.Kind == ast.KindNonNullExpression) {
+			initializer = utils.ESTreeRuntimeExpression(initializer.Expression())
+		}
+		if initializer != nil && (initializer.Kind == ast.KindFunctionExpression || initializer.Kind == ast.KindArrowFunction) {
+			function = initializer
+		}
+	}
+	if function != nil && (isAsyncOrGenerator(function) || len(function.TypeParameters()) > 0) {
+		return nil, false
+	}
+	return function, true
+}
+
+func isAsyncOrGenerator(function *ast.Node) bool {
+	body := function.BodyData()
+	return ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync) || (body != nil && body.AsteriskToken != nil)
+}
+
+// classifyCallableReturnType handles JSDoc function types and call signatures.
+func classifyCallableReturnType(annotation *ast.Node, classify func(*ast.Node) TypeClass) TypeClass {
+	if annotation == nil {
+		return TypeUnknown
+	}
+	annotation = ast.SkipTypeParentheses(annotation)
+	switch annotation.Kind {
+	case ast.KindFunctionType:
+		return classify(annotation.Type())
+	case ast.KindTypeLiteral:
+		var classes []TypeClass
+		for _, member := range annotation.AsTypeLiteralNode().Members.Nodes {
+			if member.Kind == ast.KindCallSignature {
+				classes = append(classes, classify(member.Type()))
+			}
+		}
+		if len(classes) > 0 {
+			return combineTypeClassUnion(classes)
+		}
+	case ast.KindUnionType:
+		var classes []TypeClass
+		for _, member := range annotation.AsUnionTypeNode().Types.Nodes {
+			classes = append(classes, classifyCallableReturnType(member, classify))
+		}
+		if len(classes) > 0 {
+			return combineTypeClassUnion(classes)
+		}
+	case ast.KindIntersectionType:
+		var classes []TypeClass
+		var visit func(*ast.Node)
+		visit = func(member *ast.Node) {
+			member = ast.SkipTypeParentheses(member)
+			if member.Kind == ast.KindIntersectionType {
+				for _, part := range member.AsIntersectionTypeNode().Types.Nodes {
+					visit(part)
+				}
+				return
+			}
+			if member.Kind == ast.KindTypeLiteral && !slices.ContainsFunc(member.AsTypeLiteralNode().Members.Nodes, func(part *ast.Node) bool { return part.Kind == ast.KindCallSignature }) {
+				return
+			}
+			classes = append(classes, classifyCallableReturnType(member, classify))
+		}
+		visit(annotation)
+		if len(classes) > 0 {
+			return combineTypeClassUnion(classes)
+		}
+	}
+	return TypeUnknown
+}
+
+// factoryReturnAnnotation reads the return type of a function or a variable
+// with a callable annotation, including Closure-style JSDoc function types.
+func factoryReturnAnnotation(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
+	annotation := declaration.Type()
+	if ast.IsVariableDeclaration(declaration) && annotation != nil {
+		if ast.IsFunctionTypeNode(annotation) {
+			annotation = annotation.Type()
+		} else {
+			annotation = nil
+		}
+	}
+	if annotation == nil && ast.IsInJSFile(declaration) {
+		for host := declaration; host != nil && annotation == nil; host = ast.GetNextJSDocCommentLocation(host) {
+			for _, doc := range host.JSDoc(ctx.SourceFile) {
+				if doc.AsJSDoc().Tags == nil {
+					continue
+				}
+				for _, tag := range doc.AsJSDoc().Tags.Nodes {
+					if tag.TypeExpression() == nil {
+						continue
+					}
+					tagType := tag.TypeExpression().Type()
+					if ast.IsJSDocReturnTag(tag) {
+						annotation = tagType
+					} else if ast.IsJSDocTypeTag(tag) && ast.IsFunctionTypeNode(tagType) {
+						annotation = tagType.Type()
+					} else if ast.IsJSDocTypeTag(tag) && isClosureFunctionType(tagType) {
+						annotation = closureFactoryReturnAnnotation(ctx, tag, declaration)
+					}
+					if annotation != nil {
+						break
+					}
+				}
+			}
+		}
+	}
+	return annotation
+}
+
+func isClosureFunctionType(node *ast.Node) bool {
+	if node == nil || !ast.IsTypeReferenceNode(node) {
+		return false
+	}
+	name := node.AsTypeReferenceNode().TypeName
+	return name != nil && ast.IsIdentifier(name) && name.Text() == "function"
+}
+
+func closureFactoryReturnAnnotation(ctx rule.RuleContext, tag, declaration *ast.Node) *ast.Node {
+	// tsgo parses Closure's `function(): T` only as the name `function`.
+	// Wrapping it as a type-literal method lets its JSDoc parser read T,
+	// including multiline comments, without implementing a type parser here.
+	text := "/** @type {" + ctx.SourceFile.Text()[tag.TypeExpression().Pos():tag.End()] + "} */ const factory = undefined;"
+	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
+	annotation := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
+	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
+		return nil
+	}
+	members := annotation.AsTypeLiteralNode().Members.Nodes
+	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
+		return nil
+	}
+	result := members[0].Type()
+	if result != nil {
+		// Resolve return-type names in the original factory's lexical scope.
+		result.Parent = declaration
+	}
+	return result
 }
 
 // HasJSDocTypeReference reports an authored JSDoc type through an alias or a

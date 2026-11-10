@@ -238,7 +238,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-dom-node-html-methods': 'error', // not implemented
     // 'unicorn/prefer-dom-node-remove': 'error', // not implemented
     // 'unicorn/prefer-dom-node-replace-children': 'error', // not implemented
-    // 'unicorn/prefer-dom-node-text-content': 'error', // not implemented
+    'unicorn/prefer-dom-node-text-content': 'error',
     // 'unicorn/prefer-early-return': 'error', // not implemented
     // 'unicorn/prefer-else-if': 'error', // not implemented
     // 'unicorn/prefer-error-is-error': 'off', // not implemented

@@ -102,7 +102,7 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 	}
 	if node.Kind == ast.KindConditionalExpression {
 		conditional := node.AsConditionalExpression()
-		class := combineStringUnion([]TypeClass{
+		class := combineTypeClassUnion([]TypeClass{
 			classifyStringReceiver(ctx, conditional.WhenTrue, state),
 			classifyStringReceiver(ctx, conditional.WhenFalse, state),
 		})
@@ -249,7 +249,7 @@ func classifyStringTypeSyntax(ctx rule.RuleContext, node *ast.Node, state *strin
 		for _, part := range types {
 			classes = append(classes, classifyStringTypeSyntax(ctx, part, state, includeJSDoc))
 		}
-		return combineStringUnion(classes)
+		return combineTypeClassUnion(classes)
 	case ast.KindIntersectionType:
 		types := node.AsIntersectionTypeNode().Types.Nodes
 		classes := make([]TypeClass, 0, len(types))
@@ -420,25 +420,6 @@ func classifyStringClassReference(
 	return TypeUnknown
 }
 
-func combineStringUnion(classes []TypeClass) TypeClass {
-	if len(classes) == 0 {
-		return TypeNonTarget
-	}
-	allTarget := true
-	allNonTarget := true
-	for _, class := range classes {
-		allTarget = allTarget && class == TypeTarget
-		allNonTarget = allNonTarget && class == TypeNonTarget
-	}
-	if allTarget {
-		return TypeTarget
-	}
-	if allNonTarget {
-		return TypeNonTarget
-	}
-	return TypeUnknown
-}
-
 func combineStringIntersection(classes []TypeClass) TypeClass {
 	allNonTarget := true
 	for _, class := range classes {
@@ -503,7 +484,7 @@ func classifyStringCheckerType(ctx rule.RuleContext, t *checker.Type) TypeClass 
 		for _, part := range parts {
 			classes = append(classes, classifyStringCheckerType(ctx, part))
 		}
-		return combineStringUnion(classes)
+		return combineTypeClassUnion(classes)
 	}
 	if utils.IsIntersectionType(t) {
 		parts := utils.IntersectionTypeParts(t)
