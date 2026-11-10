@@ -54,6 +54,13 @@ var PreferArrayIndexOfRule = rule.Rule{
 			AllowOptionalMember: true,
 		}
 		var evaluator *utils.StaticStringEvaluator
+		getEvaluator := func() *utils.StaticStringEvaluator {
+			if evaluator == nil {
+				evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+				evaluator.GlobalAccess = ctx.Globals.Access
+			}
+			return evaluator
+		}
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call, ok := unicornutil.MatchDotMethodCall(node, options)
@@ -66,18 +73,13 @@ var PreferArrayIndexOfRule = rule.Rule{
 				if !ok || unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, call.Object) {
 					return
 				}
-				// findIndex/findLastIndex visit holes as undefined, but indexOf/lastIndexOf skip them.
-				if receiver := utils.SkipAssertionsAndParens(call.Object); receiver != nil && ast.IsArrayLiteralExpression(receiver) &&
-					slices.ContainsFunc(receiver.Elements(), ast.IsOmittedExpression) {
-					return
-				}
-
 				replacement := &indexOf
 				if call.Property.Text() == "findLastIndex" {
 					replacement = &lastIndexOf
 				}
 				value := utils.ESTreeRuntimeExpression(search.value)
-				if incompatibleSearchValue(ctx, call, replacement.method, value) || search.usesCallbackBindings(ctx, callback) {
+				if incompatibleSearchValue(ctx, call, replacement.method, value) ||
+					hasSparseReceiver(ctx, call.Object, getEvaluator) || search.usesCallbackBindings(ctx, callback) {
 					return
 				}
 
@@ -97,12 +99,9 @@ var PreferArrayIndexOfRule = rule.Rule{
 								return nil
 							}
 						}
-						if evaluator == nil {
-							evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
-						}
 						// The replacement evaluates the search value once, even for an empty array.
 						editKind = rule.EditDemandAutofix
-						if evaluator.HasSideEffect(value, false) {
+						if requiresSuggestion(getEvaluator(), value) {
 							editKind = rule.EditDemandSuggestion
 						}
 					}

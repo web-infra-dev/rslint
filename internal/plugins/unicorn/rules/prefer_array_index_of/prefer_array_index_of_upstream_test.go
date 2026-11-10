@@ -135,13 +135,14 @@ func testUpstreamSyntax(t *testing.T, search indexSearch) {
 		search.invalid("case.js", "foo.FIND(function (element) {\n\treturn element === bar.FIND(x => x === 1);\n});", "foo.FIND(function (element) {\n\treturn element === bar.INDEX(1);\n});", "foo.INDEX(bar.FIND(x => x === 1));"),
 		search.invalid("case.js", "values.FIND(x => x === (0, \"foo\"))", "values.INDEX((0, \"foo\"))", ""),
 		search.invalid("case.js", "values.FIND((x => x === (0, \"foo\")))", "values.INDEX((0, \"foo\"))", ""),
-		search.invalid("case.js", "function fn() {\n\tfoo.FIND(x => x === arguments.length)\n}", "function fn() {\n\tfoo.INDEX(arguments.length)\n}", ""),
-		search.invalid("case.js", "function fn() {\n\tfoo.FIND(x => x === this[1])\n}", "function fn() {\n\tfoo.INDEX(this[1])\n}", ""),
+		// A property read that might invoke a getter receives a suggestion.
+		search.invalid("case.js", "function fn() {\n\tfoo.FIND(x => x === arguments.length)\n}", "", "function fn() {\n\tfoo.INDEX(arguments.length)\n}"),
+		search.invalid("case.js", "function fn() {\n\tfoo.FIND(x => x === this[1])\n}", "", "function fn() {\n\tfoo.INDEX(this[1])\n}"),
 		search.invalid("case.js", "values.FIND(x => x === foo())", "", "values.INDEX(foo())"),
 		search.invalid("case.js", "foo.FIND(function a(x) {\n\treturn x === (function (a) {\n\t\treturn a(this) === arguments[1]\n\t}).call(thisObject, anotherFunctionNamedA, secondArgument)\n})", "", "foo.INDEX((function (a) {\n\t\treturn a(this) === arguments[1]\n\t}).call(thisObject, anotherFunctionNamedA, secondArgument))"),
 		search.invalid("case.js", "values.FIND(item => item === target);", "values.INDEX(target);", ""),
-		search.invalid("case.js", "values.FIND(item => item === target.id);", "values.INDEX(target.id);", ""),
-		search.invalid("case.js", "values.FIND(item => item === target?.id);", "values.INDEX(target?.id);", ""),
+		search.invalid("case.js", "values.FIND(item => item === target.id);", "", "values.INDEX(target.id);"),
+		search.invalid("case.js", "values.FIND(item => item === target?.id);", "", "values.INDEX(target?.id);"),
 		search.invalid("case.js", "values.FIND(item => item === 1 + 2);", "values.INDEX(1 + 2);", ""),
 		search.invalid("case.js", "values.FIND(item => item === -2n);", "values.INDEX(-2n);", ""),
 		search.invalid("case.js", "values.FIND(item => item === +1n);", "values.INDEX(+1n);", ""),
@@ -182,16 +183,21 @@ func testUpstreamSyntax(t *testing.T, search indexSearch) {
 			`let value = 1; const index = [].INDEX((value += 1)); JSON.stringify({index, value});`),
 	)
 
-	// The upstream runtime matrix also checks these fixes on empty and nonempty arrays.
+	// The upstream runtime matrix checks the replacements on empty and nonempty arrays.
 	for _, value := range []string{
 		"0", "-0", "+2", "-(-2)", "1e999", "-1e999", `"item"`, "true", "false", "null", "2n",
 		"undefined", "`item`", "/item/u", "target", "object.id", "object?.id", "object.missing",
 	} {
 		for _, values := range []string{`[]`, `[0, 2, "item", true, false, null, 2n, 1e999, undefined]`} {
 			base := `const target = 2; const object = {id: "item"}; ` + values
+			fixed, suggestion := base+".INDEX("+value+");", ""
+			switch value {
+			case "object.id", "object?.id", "object.missing":
+				fixed, suggestion = "", fixed
+			}
 			invalid = append(invalid, search.invalid("case.js",
 				base+".FIND(item => item === "+value+");",
-				base+".INDEX("+value+");", ""))
+				fixed, suggestion))
 		}
 	}
 

@@ -29,6 +29,9 @@ func TestPreferArrayIndexOfExtras(t *testing.T) {
 		{Code: `values.findIndex(x => x === ({x}));`, FileName: "case.js"},
 		{Code: `[, 1].findIndex(x => x === undefined);`, FileName: "case.js"},
 		{Code: `([1, , 2] as (number | undefined)[]).findLastIndex(x => x === undefined);`, FileName: "case.ts"},
+		{Code: `const values = [, 1]; const alias = values; values.findIndex(x => x === undefined); alias.findLastIndex(x => x === undefined);`, FileName: "case.js"},
+		{Code: `new Array(2).findIndex(x => x === undefined); const values = Array(2); values.findLastIndex(x => x === undefined);`, FileName: "case.js"},
+		{Code: `function last(length: number) { return new Array(length).findLastIndex(x => x === undefined); }`, FileName: "case.ts"},
 		// These bindings would change if moved out of the ordinary callback.
 		{Code: `values.findIndex(function (x) { return x === new.target; });`, FileName: "case.js"},
 		{Code: `values.findIndex(function (x) { return x === (() => this.value)(); });`, FileName: "case.js"},
@@ -44,7 +47,14 @@ func TestPreferArrayIndexOfExtras(t *testing.T) {
 		last.invalid("case.js", `values?.items.FIND(x => x === needle);`, `values?.items.INDEX(needle);`, ""),
 		last.invalid("case.js", `(values?.items).FIND(x => x === needle);`, `(values?.items).INDEX(needle);`, ""),
 		first.invalid("case.jsx", `<List index={values.FIND(x => x === needle)} />;`, `<List index={values.INDEX(needle)} />;`, ""),
-		first.invalid("case.js", `values.FIND(x => x === item.x);`, `values.INDEX(item.x);`, ""),
+		first.invalid("case.js", `values.FIND(x => x === item.x);`, "", `values.INDEX(item.x);`),
+		first.invalid("case.js", `[0, 2].FIND(x => x === ({ value: 2 }).value);`, `[0, 2].INDEX(({ value: 2 }).value);`, ""),
+		first.invalid("case.js", `let reads = 0; const target = { get value() { return ++reads; } }; [0, 2].FIND(x => x === target.value);`, "",
+			`let reads = 0; const target = { get value() { return ++reads; } }; [0, 2].INDEX(target.value);`),
+		first.invalid("case.js", `Array(0).FIND(x => x === undefined);`, `Array(0).INDEX(undefined);`, ""),
+		last.invalid("case.js", `new Array("item").FIND(x => x === "item");`, `new Array("item").INDEX("item");`, ""),
+		first.invalid("case.js", `function lookup(Array) { return Array(2).FIND(x => x === needle); }`,
+			`function lookup(Array) { return Array(2).INDEX(needle); }`, ""),
 		first.invalid("case.js", `values.FIND(x => x === ((x) => x)(needle));`, "", `values.INDEX(((x) => x)(needle));`),
 		last.invalid("case.js", `function outer() { return values.FIND(x => x === new.target); }`,
 			`function outer() { return values.INDEX(new.target); }`, ""),
@@ -58,8 +68,8 @@ func TestPreferArrayIndexOfExtras(t *testing.T) {
 			`const values = ["foo"]; const needle = "foo"; values.INDEX(/** @this {{name: string}} */ needle);`, ""),
 		first.invalid("case.ts", `declare const values: unknown[], needle: unknown; values.FIND(<T>(x: T) => x === needle);`,
 			`declare const values: unknown[], needle: unknown; values.INDEX(needle);`, ""),
-		last.invalid("case.js", `class Search { #id = "foo"; index(values) { return values.FIND(x => x === this.#id); } }`,
-			`class Search { #id = "foo"; index(values) { return values.INDEX(this.#id); } }`, ""),
+		last.invalid("case.js", `class Search { #id = "foo"; index(values) { return values.FIND(x => x === this.#id); } }`, "",
+			`class Search { #id = "foo"; index(values) { return values.INDEX(this.#id); } }`),
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_array_index_of.PreferArrayIndexOfRule, valid, invalid)
 }

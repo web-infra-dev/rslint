@@ -128,12 +128,12 @@ const syntaxCases: SearchCase[] = [
   {
     code: 'function fn() {\n\tfoo.FIND(x => x === arguments.length)\n}',
     reports: true,
-    fixed: 'function fn() {\n\tfoo.INDEX(arguments.length)\n}',
+    suggested: 'function fn() {\n\tfoo.INDEX(arguments.length)\n}',
   },
   {
     code: 'function fn() {\n\tfoo.FIND(x => x === this[1])\n}',
     reports: true,
-    fixed: 'function fn() {\n\tfoo.INDEX(this[1])\n}',
+    suggested: 'function fn() {\n\tfoo.INDEX(this[1])\n}',
   },
   {
     code: 'values.FIND(x => x === foo())',
@@ -154,12 +154,12 @@ const syntaxCases: SearchCase[] = [
   {
     code: 'values.FIND(item => item === target.id);',
     reports: true,
-    fixed: 'values.INDEX(target.id);',
+    suggested: 'values.INDEX(target.id);',
   },
   {
     code: 'values.FIND(item => item === target?.id);',
     reports: true,
-    fixed: 'values.INDEX(target?.id);',
+    suggested: 'values.INDEX(target?.id);',
   },
   {
     code: 'values.FIND(item => item === 1 + 2);',
@@ -496,6 +496,7 @@ function runtimeCases(method: string): SearchCase[] {
       },
     },
   ];
+  const memberReads = ['object.id', 'object?.id', 'object.missing'];
   for (const value of [
     '0',
     '-0',
@@ -512,19 +513,20 @@ function runtimeCases(method: string): SearchCase[] {
     '`item`',
     '/item/u',
     'target',
-    'object.id',
-    'object?.id',
-    'object.missing',
+    ...memberReads,
   ]) {
     for (const values of [
       '[]',
       '[0, 2, "item", true, false, null, 2n, 1e999, undefined]',
     ]) {
       const base = `const target = 2; const object = {id: "item"}; ${values}`;
+      const output = `${base}.INDEX(${value});`;
       cases.push({
         code: `${base}.FIND(item => item === ${value});`,
         reports: true,
-        fixed: `${base}.INDEX(${value});`,
+        ...(memberReads.includes(value)
+          ? { suggested: output }
+          : { fixed: output }),
         runtime: 'unchanged',
       });
     }
@@ -674,8 +676,13 @@ async function verifyCases(
     );
 
     if (item.runtime === 'unchanged') {
-      const output = fixedFiles.get(file);
-      expect(output, code).toBe(expand(item.fixed!));
+      let output = fixedFiles.get(file);
+      if (item.suggested) {
+        expect(output, code).toBeUndefined();
+        output = suggested[0].output;
+      } else {
+        expect(output, code).toBe(expand(item.fixed!));
+      }
       expect(runInNewContext(output!)).toBe(runInNewContext(code));
     } else if (item.runtime) {
       expect(fixedFiles.has(file), code).toBe(false);

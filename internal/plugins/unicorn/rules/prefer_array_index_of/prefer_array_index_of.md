@@ -7,9 +7,10 @@ reports `findIndex()` and `findLastIndex()` callbacks that only compare their
 single parameter to a value using `===`.
 
 The replacement evaluates the search value once, even for an empty array.
-Search values with explicit side effects, such as function calls and assignments,
-receive an editor suggestion. If replacing the callback would remove a comment,
-the rule reports the comparison without offering an edit.
+Search values with side effects, such as function calls, assignments, or property
+reads that might invoke a getter, receive an editor suggestion. If replacing the
+callback would remove a comment, the rule reports the comparison without offering
+an edit.
 
 When type information is available, the rule skips searches whose value type
 is incompatible with the parameter of `indexOf()` or `lastIndexOf()`.
@@ -36,9 +37,11 @@ This rule has no options.
 
 ## Differences from upstream
 
-Rslint skips sparse array literals. For example,
-`[, 1].findIndex(value => value === undefined)` returns `0` because the callback
-visits the hole. `[, 1].indexOf(undefined)` skips the hole and returns `-1`.
+Rslint skips sparse array literals and single-argument `Array()` or `new Array()`
+calls that can create holes, including when the array is assigned to a variable.
+For example, given `const values = [, 1]`,
+`values.findIndex(value => value === undefined)` returns `0` because the callback
+visits the hole. `values.indexOf(undefined)` skips the hole and returns `-1`.
 
 Rslint keeps the callback when moving the search value would take a TypeScript
 type parameter out of scope or change a reference to `new.target`, `this`, or
@@ -54,6 +57,10 @@ callback. The replacement would apply the function's type to the search value.
 
 A search value such as `` makeValue`ready` `` receives an editor suggestion.
 The tag function can run a different number of times after the replacement.
+
+A property read such as `target.value` receives a suggestion when Rslint cannot
+rule out a getter. The callback can call the getter for every visited element,
+while the replacement reads it once before searching.
 
 ## Original documentation
 
