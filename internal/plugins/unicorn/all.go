@@ -75,6 +75,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_add_event_listener_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_index_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_last_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_some"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_bigint_literals"
@@ -197,6 +198,7 @@ func GetAllRules() []rule.Rule {
 		prefer_add_event_listener_options.PreferAddEventListenerOptionsRule,
 		prefer_array_flat.PreferArrayFlatRule,
 		prefer_array_flat_map.PreferArrayFlatMapRule,
+		prefer_array_index_of.PreferArrayIndexOfRule,
 		prefer_array_last_methods.PreferArrayLastMethodsRule,
 		prefer_array_some.PreferArraySomeRule,
 		prefer_bigint_literals.PreferBigIntLiteralsRule,
