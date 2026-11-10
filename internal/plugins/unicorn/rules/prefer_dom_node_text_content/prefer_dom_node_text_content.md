@@ -28,7 +28,7 @@ foo.textContent = '🦄';
 
 ## Options
 
-This rule has no options. `unicornPlugin.configs.recommended` enables it at `error` severity.
+This rule has no options. Enable it explicitly as `unicorn/prefer-dom-node-text-content` in your rules configuration.
 
 ## Differences from upstream
 
