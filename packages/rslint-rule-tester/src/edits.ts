@@ -24,7 +24,12 @@ export function applyEdits(code: string, edits: readonly Edit[]): string {
   }
   for (const edit of sorted.reverse()) {
     const start = Math.max(0, edit.startPos);
-    if (edit.startPos < 0) keepBom = false;
+    if (
+      edit.startPos < 0 ||
+      (edit.startPos === 0 && edit.text.startsWith(BOM))
+    ) {
+      keepBom = false;
+    }
     text = text.slice(0, start) + edit.text + text.slice(edit.endPos);
   }
   return (keepBom ? bom : '') + text;

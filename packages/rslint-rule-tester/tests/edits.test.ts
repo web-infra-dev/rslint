@@ -19,6 +19,14 @@ describe('applyEdits', () => {
     ).toBe('\uFEFFvar a;');
   });
 
+  test('uses the replacement BOM without duplicating the original', () => {
+    expect(
+      applyEdits('\uFEFFlet a;', [
+        { startPos: 0, endPos: 3, text: '\uFEFFvar' },
+      ]),
+    ).toBe('\uFEFFvar a;');
+  });
+
   test('removes the byte order mark for an edit starting at -1', () => {
     expect(
       applyEdits('\uFEFFlet a;', [{ startPos: -1, endPos: 0, text: '' }]),
