@@ -3,6 +3,7 @@ package ecmascript
 //go:generate node ../../../scripts/gen-locale-collation.mjs
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -155,11 +156,9 @@ func parseLocaleTag(locale string) (localeTag, bool) {
 	}
 	// Variants have no collation data, except that POSIX can select the
 	// POSIX order.
-	variants := 0
-	posixVariant := false
+	var variants []string
 	for ; i < len(subtags) && len(subtags[i]) > 1; i++ {
-		variants++
-		posixVariant = posixVariant || subtags[i] == "posix"
+		variants = append(variants, subtags[i])
 	}
 	var vaTypes []string
 	for i < len(subtags) {
@@ -176,8 +175,67 @@ func parseLocaleTag(locale string) (localeTag, bool) {
 			tag.keys, vaTypes = unicodeExtensionKeys(subtags[start:i])
 		}
 	}
-	tag.posix = selectsPOSIX(variants, posixVariant, vaTypes)
+	tag.posix = selectsPOSIX(applyVariantRules(&tag, variants), vaTypes)
 	return tag, true
+}
+
+// collationVariantRule is a CLDR alias rule that involves variants.
+type collationVariantRule struct {
+	// language is the language spelling the rule applies to, or empty for
+	// any language.
+	language string
+	variants []string
+	// replacement is the new language, or empty to keep the language.
+	replacement string
+	// region is added to a tag without a region.
+	region string
+	add    []string
+}
+
+// applyVariantRules rewrites the tag's language and region and returns its
+// variants after the CLDR alias rules that involve variants, as
+// canonicalization does before the POSIX variant is counted.
+func applyVariantRules(tag *localeTag, variants []string) []string {
+	for {
+		var rule *collationVariantRule
+		for i := range collationVariantRules {
+			candidate := &collationVariantRules[i]
+			if (candidate.language == "" || candidate.language == tag.language) && containsAll(variants, candidate.variants) {
+				rule = candidate
+				break
+			}
+		}
+		if rule == nil {
+			return variants
+		}
+		var next []string
+		for _, variant := range variants {
+			if !slices.Contains(rule.variants, variant) {
+				next = append(next, variant)
+			}
+		}
+		for _, variant := range rule.add {
+			if !slices.Contains(next, variant) {
+				next = append(next, variant)
+			}
+		}
+		variants = next
+		if rule.replacement != "" {
+			tag.language = rule.replacement
+		}
+		if rule.region != "" && tag.region == "" {
+			tag.region = rule.region
+		}
+	}
+}
+
+func containsAll(values, required []string) bool {
+	for _, value := range required {
+		if !slices.Contains(values, value) {
+			return false
+		}
+	}
+	return true
 }
 
 // selectsPOSIX reports whether a tag selects the POSIX order, which canonical
@@ -185,11 +243,11 @@ func parseLocaleTag(locale string) (localeTag, bool) {
 // when it is the only variant. With other variants, the first va type is
 // kept; without them, every va-posix becomes the variant and any other va
 // type overrides it.
-func selectsPOSIX(variants int, posixVariant bool, vaTypes []string) bool {
+func selectsPOSIX(variants []string, vaTypes []string) bool {
 	if len(vaTypes) == 0 {
-		return variants == 1 && posixVariant
+		return len(variants) == 1 && variants[0] == "posix"
 	}
-	if variants > 0 {
+	if len(variants) > 0 {
 		return vaTypes[0] == "posix"
 	}
 	for _, vaType := range vaTypes {

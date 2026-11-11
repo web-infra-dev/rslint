@@ -1,3 +1,5 @@
+// cspell:ignore aaland arevela heploc
+
 package ecmascript
 
 import (
@@ -63,6 +65,10 @@ func TestLocaleComparer(t *testing.T) {
 		{name: "later va overrides a leading va-posix", locale: "en-US-u-va-posix-va-other", input: []string{"B", "a"}, want: []string{"a", "B"}},
 		{name: "first va wins with another variant", locale: "en-US-fonipa-u-va-posix-va-other", input: []string{"a", "B"}, want: []string{"B", "a"}},
 		{name: "POSIX variant needs to be the only variant", locale: "en-US-posix-fonipa", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "removed alias variant does not count", locale: "en-US-aaland-posix", input: []string{"a", "B"}, want: []string{"B", "a"}},
+		{name: "removed alias variant does not count again", locale: "en-US-arevela-posix", input: []string{"a", "B"}, want: []string{"B", "a"}},
+		{name: "replaced alias variant still counts", locale: "en-US-heploc-posix", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "variant rule changes the language", locale: "zh-hakka-u-kn", input: []string{"a9", "a10"}, want: []string{"a10", "a9"}},
 		{name: "numeric type alias", locale: "en-u-kn-yes", input: []string{"a10", "a9"}, want: []string{"a9", "a10"}},
 		{name: "repeated key keeps the first type", locale: "en-u-kn-false-kn-true", input: []string{"a9", "a10"}, want: []string{"a10", "a9"}},
 		{name: "unsupported language ignores extension keys", locale: "xx-u-kn", input: []string{"a9", "a10"}, want: []string{"a10", "a9"}},

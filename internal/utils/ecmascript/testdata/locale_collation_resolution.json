@@ -53,6 +53,12 @@
     "upperFirst": false,
     "numeric": false
   },
+  {
+    "locale": "aa-US-xiang-arevmda-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "aam-FZ", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "aao", "table": 0, "upperFirst": false, "numeric": false },
   {
@@ -62,6 +68,24 @@
     "numeric": false
   },
   { "locale": "aar-SZ", "table": 0, "upperFirst": false, "numeric": false },
+  {
+    "locale": "aar-US-aaland-polytoni",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "aar-US-fonipa-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "aar-alalc97-xiang-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   {
     "locale": "abk-248-u-co-searchjl",
     "table": 0,
@@ -146,6 +170,78 @@
   { "locale": "arg-RC", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "arm-NK", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "arm-OW", "table": 0, "upperFirst": false, "numeric": false },
+  {
+    "locale": "arm-US-alalc97-lojban-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-US-fonipa-bokmal-u-kf-upper",
+    "table": 0,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "arm-US-hepburn-arevela",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-US-nynorsk-polytoni-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-US-polyton-alalc97-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-fonipa-lojban-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-nynorsk-arevmda-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "arm-polytoni-bokmal-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "art-US-alalc97-aaland-posix-u-kn",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "art-US-lojban-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "art-US-nynorsk-gaulish-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "art-alalc97-polytoni",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "as-798", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "asm-239", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "asm-641", "table": 0, "upperFirst": false, "numeric": false },
@@ -530,6 +626,18 @@
     "upperFirst": false,
     "numeric": false
   },
+  {
+    "locale": "cel-aaland-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "cel-xiang-saaho-posix-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "ces", "table": 7, "upperFirst": false, "numeric": false },
   { "locale": "ces-703", "table": 7, "upperFirst": false, "numeric": false },
   { "locale": "ces-834", "table": 7, "upperFirst": false, "numeric": false },
@@ -626,6 +734,24 @@
   },
   {
     "locale": "chi-Hant-PK",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "chi-arevela-hakka-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "chi-arevmda-bokmal-posix-u-kf-upper",
+    "table": 0,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "chi-gaulish-heploc-posix-u-va-posix",
     "table": 0,
     "upperFirst": false,
     "numeric": false
@@ -727,7 +853,25 @@
     "numeric": false
   },
   { "locale": "cmn-IH", "table": 0, "upperFirst": false, "numeric": false },
+  {
+    "locale": "cmn-US-fonipa-alalc97-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "cmn-US-polyton-arevmda-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "cmn-ZO", "table": 0, "upperFirst": false, "numeric": false },
+  {
+    "locale": "cmn-guoyu-alalc97-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
   {
     "locale": "cnr-Cyrl-969",
     "table": 0,
@@ -983,6 +1127,24 @@
   },
   {
     "locale": "da-fonipa-u-va-true-co-trad-kf-yes",
+    "table": 9,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "da-hakka-saaho-posix-u-kf-upper",
+    "table": 9,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "da-polyton-u-kn",
+    "table": 9,
+    "upperFirst": true,
+    "numeric": true
+  },
+  {
+    "locale": "da-polytoni-aaland-u-va-posix",
     "table": 9,
     "upperFirst": true,
     "numeric": false
@@ -1734,6 +1896,12 @@
   {
     "locale": "en-US-1901-posix-u-va-posix-co-kf-yes",
     "table": 23,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "en-US-alalc97-arevela-posix",
+    "table": 0,
     "upperFirst": false,
     "numeric": false
   },
@@ -3522,6 +3690,24 @@
   { "locale": "hy-101", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "hy-980", "table": 0, "upperFirst": false, "numeric": false },
   {
+    "locale": "hy-US-lojban-gaulish-posix-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "hy-US-nynorsk-posix-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "hy-US-xiang-polytoni-u-kn",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": true
+  },
+  {
     "locale": "hye-216-u-co-emoji",
     "table": 0,
     "upperFirst": false,
@@ -3529,6 +3715,24 @@
   },
   {
     "locale": "hye-HF-u-co-phonebk-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "hye-US-polytoni-alalc97-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "hye-US-polytoni-arevmda-u-va-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "hye-hakka-alalc97-posix-u-va-other",
     "table": 0,
     "upperFirst": false,
     "numeric": false
@@ -4634,6 +4838,12 @@
   { "locale": "no-086", "table": 9, "upperFirst": false, "numeric": false },
   { "locale": "no-CQ", "table": 9, "upperFirst": false, "numeric": false },
   { "locale": "no-JH", "table": 9, "upperFirst": false, "numeric": false },
+  {
+    "locale": "no-US-polyton-hepburn-u-va-other",
+    "table": 9,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "no-WN", "table": 9, "upperFirst": false, "numeric": false },
   { "locale": "nob", "table": 9, "upperFirst": false, "numeric": false },
   {
@@ -4648,6 +4858,24 @@
   { "locale": "noo-726", "table": 0, "upperFirst": false, "numeric": false },
   { "locale": "nor", "table": 9, "upperFirst": false, "numeric": false },
   { "locale": "nor-SS", "table": 9, "upperFirst": false, "numeric": false },
+  {
+    "locale": "nor-US-polyton-xiang-posix-u-co-trad",
+    "table": 9,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "nor-US-polytoni-alalc97-posix-u-kf-upper",
+    "table": 9,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "nor-US-polytoni-hakka-posix-u-co-trad",
+    "table": 9,
+    "upperFirst": false,
+    "numeric": false
+  },
   { "locale": "npi-QP", "table": 0, "upperFirst": false, "numeric": false },
   {
     "locale": "nso-140-u-co-zhuyin",
@@ -5903,6 +6131,12 @@
     "upperFirst": false,
     "numeric": false
   },
+  {
+    "locale": "sr-Latn-hakka-fonipa-posix-u-kn",
+    "table": 4,
+    "upperFirst": false,
+    "numeric": true
+  },
   { "locale": "sr-WS", "table": 0, "upperFirst": false, "numeric": false },
   {
     "locale": "src-198-u-co-trad",
@@ -7043,6 +7277,12 @@
     "numeric": false
   },
   {
+    "locale": "xx-saaho-gaulish-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
     "locale": "xx-u-kf-kf-upper-kf-no",
     "table": 0,
     "upperFirst": false,
@@ -7080,6 +7320,12 @@
   },
   {
     "locale": "xx-u-kn-yes-kn-true-va",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "xx-xiang-alalc97",
     "table": 0,
     "upperFirst": false,
     "numeric": false
@@ -7242,6 +7488,24 @@
     "numeric": false
   },
   {
+    "locale": "zh-aaland-bokmal-posix-u-va-other",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "zh-gaulish-bokmal-u-kf-upper",
+    "table": 0,
+    "upperFirst": true,
+    "numeric": false
+  },
+  {
+    "locale": "zh-xiang-arevela-u-co-trad",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
     "locale": "zha-667-u-co-dict-va-posix",
     "table": 0,
     "upperFirst": false,
@@ -7293,6 +7557,18 @@
   },
   {
     "locale": "zho-PT-u-co-phonebk",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "zho-US-lojban-posix",
+    "table": 0,
+    "upperFirst": false,
+    "numeric": false
+  },
+  {
+    "locale": "zho-gaulish-aaland-posix",
     "table": 0,
     "upperFirst": false,
     "numeric": false

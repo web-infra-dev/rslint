@@ -522,6 +522,47 @@ var collationLocales = map[string]collationLocale{
 // other language uses the default locale and ignores its extension keys.
 const collationLanguages = " adp af afr alb als am amh ar ara arb arm as asm az aze azj be bel ben bg blo bn bo bod bos br bre bs bul bur ca cat ceb ces chi chr cls cmn cnr cs cy cym cze da dan de deu drh drw dsb dut dz dzo ee ekk el ell en eng eo epo es est et ewe fa fao fas ff fi fil fin fo fr fra fre fry fuc ful fy ga gaz geo ger gl gle glg gom gre gu guj ha hau haw hbs he heb hi hin hr hrv hsb hu hun hy hye ibo ice id ig in ind is isl it ita iw ja ji jpn ka kal kan kat kaz khk khm kir kk kl km kmr kn ko kok kor ku kur ky lao lav lb lij lin lit lkt ln lo lt ltz lv lvs mac mal mar may mk mkd ml mlt mn mo mol mon mr ms msa mt my mya nb ne nep nl nld nn nno no nob nor npi nso om or ori orm ory pa pan pbu per pes pl pol por prp prs ps pt pus ro ron ru rum rus sa san scc scr se sh si sin sk sl slk slo slv sme smn sot spa sq sqi sr srp st sv sw swa swc swe swh ta tam te tel tgl th tha tib tk tl tn tnf to ton tr tsn tuk tur ug uig uk ukr ur urd uz uzb uzn vi vie wae wel wo wol xh xho ydd yi yid yo yor zh zho zsm zu zul "
 
+// collationVariantRules are the CLDR alias rules that involve variants, for
+// a language spelling or, with an empty language, any language. They apply
+// in order until none matches.
+var collationVariantRules = []collationVariantRule{
+	{language: "aa", variants: []string{"saaho"}, replacement: "ssy", region: "", add: nil},
+	{language: "aar", variants: []string{"saaho"}, replacement: "ssy", region: "", add: nil},
+	{language: "art", variants: []string{"lojban"}, replacement: "jbo", region: "", add: nil},
+	{language: "cel", variants: []string{"gaulish"}, replacement: "xtg", region: "", add: nil},
+	{language: "arm", variants: []string{"arevmda"}, replacement: "hyw", region: "", add: nil},
+	{language: "hy", variants: []string{"arevmda"}, replacement: "hyw", region: "", add: nil},
+	{language: "hye", variants: []string{"arevmda"}, replacement: "hyw", region: "", add: nil},
+	{language: "no", variants: []string{"bokmal"}, replacement: "nb", region: "", add: nil},
+	{language: "nor", variants: []string{"bokmal"}, replacement: "nb", region: "", add: nil},
+	{language: "no", variants: []string{"nynorsk"}, replacement: "nn", region: "", add: nil},
+	{language: "nor", variants: []string{"nynorsk"}, replacement: "nn", region: "", add: nil},
+	{language: "chi", variants: []string{"guoyu"}, replacement: "zh", region: "", add: nil},
+	{language: "cmn", variants: []string{"guoyu"}, replacement: "zh", region: "", add: nil},
+	{language: "zh", variants: []string{"guoyu"}, replacement: "zh", region: "", add: nil},
+	{language: "zho", variants: []string{"guoyu"}, replacement: "zh", region: "", add: nil},
+	{language: "chi", variants: []string{"hakka"}, replacement: "hak", region: "", add: nil},
+	{language: "cmn", variants: []string{"hakka"}, replacement: "hak", region: "", add: nil},
+	{language: "zh", variants: []string{"hakka"}, replacement: "hak", region: "", add: nil},
+	{language: "zho", variants: []string{"hakka"}, replacement: "hak", region: "", add: nil},
+	{language: "chi", variants: []string{"xiang"}, replacement: "hsn", region: "", add: nil},
+	{language: "cmn", variants: []string{"xiang"}, replacement: "hsn", region: "", add: nil},
+	{language: "zh", variants: []string{"xiang"}, replacement: "hsn", region: "", add: nil},
+	{language: "zho", variants: []string{"xiang"}, replacement: "hsn", region: "", add: nil},
+	{language: "", variants: []string{"hepburn", "heploc"}, replacement: "", region: "", add: []string{"alalc97"}},
+	{language: "", variants: []string{"aaland"}, replacement: "", region: "ax", add: nil},
+	{language: "", variants: []string{"arevela"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"arevmda"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"bokmal"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"hakka"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"lojban"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"nynorsk"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"saaho"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"xiang"}, replacement: "", region: "", add: nil},
+	{language: "", variants: []string{"heploc"}, replacement: "", region: "", add: []string{"alalc97"}},
+	{language: "", variants: []string{"polytoni"}, replacement: "", region: "", add: []string{"polyton"}},
+}
+
 // collationNumericTypes lists the kn types that enable numeric collation,
 // including aliases. A key without a type has the type "true".
 var collationNumericTypes = map[string]bool{

@@ -1,3 +1,5 @@
+// cspell:ignore aaland arevela
+
 // TestJsxSortPropsExtras locks in tsgo shapes and upstream branches not fully
 // represented by the upstream migration in jsx_sort_props_upstream_test.go.
 package jsx_sort_props
@@ -49,6 +51,9 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		// An explicit va type overrides the POSIX variant.
 		{Code: `<App a B />`, Tsx: true, Options: map[string]any{"locale": "en-US-posix-u-va-other"}},
 		{Code: `<App a B />`, Tsx: true, Options: map[string]any{"locale": "en-US-posix-u-va"}},
+		// Canonicalization removes alias variants before counting variants.
+		{Code: `<App B a />`, Tsx: true, Options: map[string]any{"locale": "en-US-aaland-posix"}},
+		{Code: `<App B a />`, Tsx: true, Options: map[string]any{"locale": "en-US-arevela-posix"}},
 		// Thai ignores punctuation by default, so "a_c" compares as "ac".
 		{Code: `<App ab a_c />`, Tsx: true, Options: map[string]any{"locale": "th"}},
 	}, []rule_tester.InvalidTestCase{

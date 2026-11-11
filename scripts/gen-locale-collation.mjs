@@ -16,7 +16,7 @@
 // Each distinct order is derived into a table and checked against
 // Intl.Collator on a randomized corpus; one the table model cannot reproduce
 // falls back to the root order instead of shipping a wrong tailoring.
-// cspell:ignore Qzzz aaland arevela arevmda heploc polytoni
+// cspell:ignore Qzzz aaland alalc arevela arevmda bokmal heploc polyton polytoni saaho
 import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -378,7 +378,7 @@ function parseTag(input) {
     }
     flush();
   }
-  tag.posix = posixOf(variants, vaTypes);
+  tag.posix = posixOf(applyVariantRules(tag, variants), vaTypes);
   return tag;
 }
 
@@ -523,6 +523,76 @@ for (const a of lower) {
   for (const b of lower) {
     languages.push(a + b);
     for (const c of lower) languages.push(a + b + c);
+  }
+}
+
+// The CLDR 48 alias rules that involve variants (supplemental/aliases.json,
+// languageAlias and variantAlias, without the grandfathered i- tags that
+// Intl.Collator rejects). Canonicalization applies them before the POSIX
+// variant is counted, so they can remove, replace, or add variants, change the
+// language, or add a region.
+const cldrVariantRules = [
+  ['aa', 'saaho', 'ssy'],
+  ['art', 'lojban', 'jbo'],
+  ['cel', 'gaulish', 'xtg'],
+  ['hy', 'arevmda', 'hyw'],
+  ['no', 'bokmal', 'nb'],
+  ['no', 'nynorsk', 'nn'],
+  ['zh', 'guoyu', 'zh'],
+  ['zh', 'hakka', 'hak'],
+  ['zh', 'xiang', 'hsn'],
+  ['und', 'hepburn-heploc', 'und-alalc97'],
+  ['und', 'aaland', 'und-AX'],
+  ['und', 'arevela', 'und'],
+  ['und', 'arevmda', 'und'],
+  ['und', 'bokmal', 'und'],
+  ['und', 'hakka', 'und'],
+  ['und', 'lojban', 'und'],
+  ['und', 'nynorsk', 'und'],
+  ['und', 'saaho', 'und'],
+  ['und', 'xiang', 'und'],
+  ['und', 'heploc', 'und-alalc97'],
+  ['und', 'polytoni', 'und-polyton'],
+];
+// A rule for a language also applies to its aliases, such as "zho" for "zh".
+const canonicalLanguage = new Map(
+  languages.map((language) => [
+    language,
+    Intl.getCanonicalLocales(language)[0].split('-')[0].toLowerCase(),
+  ]),
+);
+const variantRules = cldrVariantRules.flatMap(([language, variants, to]) => {
+  const [replacement, ...rest] = to.toLowerCase().split('-');
+  const rule = {
+    variants: variants.split('-'),
+    replacement: replacement === 'und' ? '' : replacement,
+    region: rest.find((s) => s.length === 2 || /^[0-9]{3}$/.test(s)) ?? '',
+    add: rest.filter((s) => s.length > 3),
+  };
+  if (language === 'und') return [{ ...rule, language: '' }];
+  return languages
+    .filter((spelling) => canonicalLanguage.get(spelling) === language)
+    .map((spelling) => ({ ...rule, language: spelling }));
+});
+
+// applyVariantRules rewrites a tag's language, region, and variants with the
+// rules until none applies, as canonicalization does. A rule adds its region
+// only to a tag without one.
+function applyVariantRules(tag, variants) {
+  let current = variants;
+  for (;;) {
+    const rule = variantRules.find(
+      (r) =>
+        (r.language === '' || r.language === tag.language) &&
+        r.variants.every((v) => current.includes(v)),
+    );
+    if (!rule) return current;
+    current = [
+      ...current.filter((v) => !rule.variants.includes(v)),
+      ...rule.add.filter((v) => !current.includes(v)),
+    ];
+    if (rule.replacement) tag.language = rule.replacement;
+    if (rule.region && !tag.region) tag.region = rule.region;
   }
 }
 const scriptNames = new Intl.DisplayNames('en', {
@@ -848,12 +918,22 @@ function withoutCaseAndNumeric(resolved) {
 }
 
 // intlEffective is what Intl.Collator does with a tag it accepts.
+// A tag in an unsupported language resolves to the host's default locale; the
+// comparer uses root defaults instead, so only check that Intl.Collator
+// dropped the tag's keys.
+const hostOptions = new Intl.Collator().resolvedOptions();
 function intlEffective(text) {
   const options = new Intl.Collator(text).resolvedOptions();
-  const supported = Intl.Collator.supportedLocalesOf([text]).length > 0;
-  const outcome = outcomeOf(
-    supported ? withoutCaseAndNumeric(options.locale) : '',
-  );
+  if (Intl.Collator.supportedLocalesOf([text]).length === 0) {
+    if (
+      options.caseFirst !== hostOptions.caseFirst ||
+      options.numeric !== hostOptions.numeric
+    ) {
+      throw new Error(`${text}: an unsupported locale kept its extension keys`);
+    }
+    return { table: 0, upperFirst: false, numeric: false };
+  }
+  const outcome = outcomeOf(withoutCaseAndNumeric(options.locale));
   return {
     table: outcome.table,
     upperFirst: options.caseFirst === 'upper',
@@ -942,6 +1022,49 @@ for (const base of fuzzBases) {
     }
   }
 }
+// Every variant the rules mention, alone, with posix, and in pairs, under the
+// languages the rules name (and their aliases), with and without a region.
+const ruleVariants = [
+  ...new Set([
+    ...variantRules.flatMap((rule) => [...rule.variants, ...rule.add]),
+    'fonipa',
+  ]),
+];
+const variantForms = new Set();
+for (const a of ruleVariants) {
+  variantForms.add(`-${a}`).add(`-${a}-posix`).add(`-posix-${a}`);
+  for (const b of ruleVariants) {
+    if (a !== b) variantForms.add(`-${a}-${b}`).add(`-${a}-${b}-posix`);
+  }
+}
+const variantBases = [
+  ...new Set([
+    'en',
+    'en-US',
+    'sv',
+    'da',
+    'xx',
+    'sr-Latn',
+    ...variantRules.flatMap((rule) =>
+      rule.language ? [rule.language, `${rule.language}-US`] : [],
+    ),
+  ]),
+];
+for (const base of variantBases) {
+  for (const variant of variantForms) {
+    for (const extension of [
+      '',
+      '-u-va-posix',
+      '-u-va-other',
+      '-u-kn',
+      '-u-kf-upper',
+      '-u-co-trad',
+    ]) {
+      checkEffective(base + variant + extension);
+    }
+  }
+}
+
 if (fuzzMismatches.length) {
   if (process.env.FUZZ_DUMP) {
     await writeFile(
@@ -961,6 +1084,10 @@ if (fuzzMismatches.length) {
 
 // --- write -------------------------------------------------------------------
 
+const goStrings = (list) =>
+  list.length
+    ? `[]string{${list.map((v) => JSON.stringify(v)).join(', ')}}`
+    : 'nil';
 const hex = (bytes) =>
   `"${bytes.map((b) => `\\x${b.toString(16).padStart(2, '0')}`).join('')}"`;
 
@@ -1011,6 +1138,17 @@ go += `}
 // Intl.Collator has data for, including aliases such as "sh". A tag in any
 // other language uses the default locale and ignores its extension keys.
 const collationLanguages = " ${[...supportedLanguages].sort().join(' ')} "
+
+// collationVariantRules are the CLDR alias rules that involve variants, for
+// a language spelling or, with an empty language, any language. They apply
+// in order until none matches.
+var collationVariantRules = []collationVariantRule{
+${variantRules
+  .map(
+    (rule) =>
+      `\t{language: ${JSON.stringify(rule.language)}, variants: ${goStrings(rule.variants)}, replacement: ${JSON.stringify(rule.replacement)}, region: ${JSON.stringify(rule.region)}, add: ${goStrings(rule.add)}},\n`,
+  )
+  .join('')}}
 
 // collationNumericTypes lists the kn types that enable numeric collation,
 // including aliases. A key without a type has the type "true".
