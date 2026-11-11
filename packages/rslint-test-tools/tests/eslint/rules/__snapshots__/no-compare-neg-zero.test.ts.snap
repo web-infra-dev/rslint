@@ -1,0 +1,313 @@
+// Rstest Snapshot v1
+
+exports[`no-compare-neg-zero > invalid 1`] = `
+{
+  "code": "x === -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '===' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 2`] = `
+{
+  "code": "-0 === x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '===' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 3`] = `
+{
+  "code": "x == -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '==' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 4`] = `
+{
+  "code": "-0 == x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '==' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 5`] = `
+{
+  "code": "x > -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '>' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 6`] = `
+{
+  "code": "-0 > x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '>' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 7`] = `
+{
+  "code": "x >= -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '>=' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 8`] = `
+{
+  "code": "-0 >= x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '>=' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 9`] = `
+{
+  "code": "x < -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '<' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 10`] = `
+{
+  "code": "-0 < x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '<' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 11`] = `
+{
+  "code": "x <= -0",
+  "diagnostics": [
+    {
+      "message": "Do not use the '<=' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-compare-neg-zero > invalid 12`] = `
+{
+  "code": "-0 <= x",
+  "diagnostics": [
+    {
+      "message": "Do not use the '<=' operator to compare against -0.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-compare-neg-zero",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

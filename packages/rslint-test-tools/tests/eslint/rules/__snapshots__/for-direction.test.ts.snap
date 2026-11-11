@@ -1,0 +1,833 @@
+// Rstest Snapshot v1
+
+exports[`for-direction > invalid 1`] = `
+{
+  "code": "for(var i = 0; i < 10; i--){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 2`] = `
+{
+  "code": "for(var i = 0; i <= 10; i--){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 3`] = `
+{
+  "code": "for(var i = 10; i > 10; i++){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 4`] = `
+{
+  "code": "for(var i = 10; i >= 0; i++){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 5`] = `
+{
+  "code": "for(var i = 0; 10 > i; i--){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 6`] = `
+{
+  "code": "for(var i = 0; 10 >= i; i--){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 7`] = `
+{
+  "code": "for(var i = 10; 10 < i; i++){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 8`] = `
+{
+  "code": "for(var i = 10; 0 <= i; i++){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 9`] = `
+{
+  "code": "for(var i = 0; i < 10; i-=1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 10`] = `
+{
+  "code": "for(var i = 0; i <= 10; i-=1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 11`] = `
+{
+  "code": "for(var i = 10; i > 10; i+=1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 12`] = `
+{
+  "code": "for(var i = 10; i >= 0; i+=1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 13`] = `
+{
+  "code": "for(var i = 0; i < 10; i+=-1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 14`] = `
+{
+  "code": "for(var i = 0; i <= 10; i+=-1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 15`] = `
+{
+  "code": "for(var i = 10; i > 10; i-=-1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 16`] = `
+{
+  "code": "for(var i = 10; i >= 0; i-=-1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 17`] = `
+{
+  "code": "for(var i = 0n; i > l; i+=1n){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 18`] = `
+{
+  "code": "for(var i = 0n; i < l; i+=-1n){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 19`] = `
+{
+  "code": "for(var i = MIN; i <= MAX; i-=true){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 20`] = `
+{
+  "code": "for(var i = 0; i < 10; i-=+5e-7){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 21`] = `
+{
+  "code": "for(var i = 0; i < MAX; i += (2 - 3));",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 22`] = `
+{
+  "code": "var n = -2; for(var i = 0; i < 10; i += n);",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 23`] = `
+{
+  "code": "for(var i = 0; 10 > i; i-=1){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 24`] = `
+{
+  "code": "for(var i = 0; i < 10; (i--, j++)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 25`] = `
+{
+  "code": "for(var i = 0; i <= 10; (i--, j++)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 26`] = `
+{
+  "code": "for(var i = 10; i > 0; (i++, j--)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 27`] = `
+{
+  "code": "for(var i = 10; i >= 0; (i++, j--)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 28`] = `
+{
+  "code": "for(var i = 0; i < 10; (j++, i--)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 29`] = `
+{
+  "code": "for(var i = 0; i < 10; (i-=1, j++)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 30`] = `
+{
+  "code": "for(var i = 10; i > 0; (i+=1, j--)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 31`] = `
+{
+  "code": "for(var i = 0; 10 > i; (i--, j++)){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`for-direction > invalid 32`] = `
+{
+  "code": "for(var i = 10; i < 20; (j++, (i--, k++))){}",
+  "diagnostics": [
+    {
+      "message": "The update clause in this loop moves the variable in the wrong direction.",
+      "messageId": "incorrectDirection",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "for-direction",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

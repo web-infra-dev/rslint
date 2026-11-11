@@ -1,0 +1,511 @@
+// Rstest Snapshot v1
+
+exports[`require-array-sort-compare > invalid 1`] = `
+{
+  "code": "
+function f(a: Array<any>) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 2`] = `
+{
+  "code": "
+function f(a: number[]) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 3`] = `
+{
+  "code": "
+function f(a: number[]) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 4`] = `
+{
+  "code": "
+function f(a: number | number[]) {
+  if (Array.isArray(a)) a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 5`] = `
+{
+  "code": "
+function f(a: string | string[]) {
+  if (Array.isArray(a)) a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 6`] = `
+{
+  "code": "
+function f(a: number[] | string[]) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 7`] = `
+{
+  "code": "
+function f<T extends number[]>(a: T) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 8`] = `
+{
+  "code": "
+function f<T extends string[]>(a: T) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 9`] = `
+{
+  "code": "
+function f<T, U extends T[]>(a: U) {
+  a.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 10`] = `
+{
+  "code": "
+function f(a: number[]) {
+  a?.sort();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 11`] = `
+{
+  "code": "
+[1, 2, 3].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 12`] = `
+{
+  "code": "
+function getNumber() {
+  return 1;
+}
+[getNumber(), getNumber()].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 13`] = `
+{
+  "code": "
+const foo = 1;
+const bar = 2;
+const baz = 3;
+[foo, bar, baz].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 14`] = `
+{
+  "code": "
+[2, 'bar', 'baz'].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 15`] = `
+{
+  "code": "
+function getNumber() {
+  return 2;
+}
+[2, 3].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 16`] = `
+{
+  "code": "
+const one = 1;
+const two = 2;
+const three = 3;
+[one, two, three].sort();
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 17`] = `
+{
+  "code": "
+function f(a: number[]) {
+  a.toSorted();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

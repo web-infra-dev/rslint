@@ -1,0 +1,458 @@
+// Rstest Snapshot v1
+
+exports[`no-const-assign > invalid 1`] = `
+{
+  "code": "const x = 0; x = 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 2`] = `
+{
+  "code": "const {a: x} = {a: 0}; x = 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 3`] = `
+{
+  "code": "const x = 0; ({x} = {x: 1});",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 4`] = `
+{
+  "code": "const x = 0; ({a: x = 1} = {});",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 5`] = `
+{
+  "code": "const x = 0; x += 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 6`] = `
+{
+  "code": "const x = 0; ++x;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 7`] = `
+{
+  "code": "for (const i = 0; i < 10; ++i) { foo(i); }",
+  "diagnostics": [
+    {
+      "message": "'i' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 8`] = `
+{
+  "code": "const x = 0; x = 1; x = 2;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 9`] = `
+{
+  "code": "const x = 0; function foo() { x = x + 1; }",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 10`] = `
+{
+  "code": "const x = 0; function foo(a) { x = a; }",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 11`] = `
+{
+  "code": "const x = 0; while (true) { x = x + 1; }",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 12`] = `
+{
+  "code": "using x = foo(); x = 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 13`] = `
+{
+  "code": "await using x = foo(); x = 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 14`] = `
+{
+  "code": "using x = foo(); x ??= bar();",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 15`] = `
+{
+  "code": "await using x = foo(); x ||= bar();",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 16`] = `
+{
+  "code": "using x = foo(); [x, y] = bar();",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-const-assign > invalid 17`] = `
+{
+  "code": "await using x = foo(); [x = baz, y] = bar();",
+  "diagnostics": [
+    {
+      "message": "'x' is constant.",
+      "messageId": "const",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-const-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
