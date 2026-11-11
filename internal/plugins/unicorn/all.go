@@ -68,6 +68,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_error_capture_stack_trace"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_fallback_in_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_length_check"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_recursion"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
@@ -196,6 +197,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_error_capture_stack_trace.NoUselessErrorCaptureStackTraceRule,
 		no_useless_fallback_in_spread.NoUselessFallbackInSpreadRule,
 		no_useless_length_check.NoUselessLengthCheckRule,
+		no_useless_recursion.NoUselessRecursionRule,
 		no_useless_spread.NoUselessSpreadRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
