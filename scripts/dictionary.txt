@@ -588,6 +588,7 @@ SIGSEGV
 slashless
 smajobber
 somethingelse
+SOML
 sonarjs
 sourcegraph
 spinbutton
