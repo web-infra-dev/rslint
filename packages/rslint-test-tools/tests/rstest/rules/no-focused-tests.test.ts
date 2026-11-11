@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-focused-tests', {} as never, {
+ruleTester.run('no-focused-tests', {
   valid: [
     { code: 'describe()' },
     { code: 'it()' },
@@ -26,12 +27,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'describe.only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 10,
+          endLine: 1,
           endColumn: 14,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'describe()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'describe()',
+            },
           ],
         },
       ],
@@ -40,11 +47,19 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'it.only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 4,
+          endLine: 1,
           endColumn: 8,
-          messageId: 'focusedTest',
-          suggestions: [{ messageId: 'suggestRemoveFocus', output: 'it()' }],
+          suggestions: [
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'it()',
+            },
+          ],
         },
       ],
     },
@@ -52,11 +67,19 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test.only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 6,
+          endLine: 1,
           endColumn: 10,
-          messageId: 'focusedTest',
-          suggestions: [{ messageId: 'suggestRemoveFocus', output: 'test()' }],
+          suggestions: [
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test()',
+            },
+          ],
         },
       ],
     },
@@ -64,12 +87,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test.concurrent.only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 17,
+          endLine: 1,
           endColumn: 21,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'test.concurrent()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test.concurrent()',
+            },
           ],
         },
       ],
@@ -78,12 +107,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test.only.for()()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 6,
+          endLine: 1,
           endColumn: 10,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'test.for()()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test.for()()',
+            },
           ],
         },
       ],
@@ -92,12 +127,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'describe["only"]()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 10,
+          endLine: 1,
           endColumn: 16,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'describe()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'describe()',
+            },
           ],
         },
       ],
@@ -106,12 +147,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test?.only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 7,
+          endLine: 1,
           endColumn: 11,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'test?.()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test?.()',
+            },
           ],
         },
       ],
@@ -120,12 +167,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test?.["only"]()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 8,
+          endLine: 1,
           endColumn: 14,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'test?.()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test?.()',
+            },
           ],
         },
       ],
@@ -134,12 +187,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'describe.only.each()()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 10,
+          endLine: 1,
           endColumn: 14,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'describe.each()()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'describe.each()()',
+            },
           ],
         },
       ],
@@ -148,12 +207,18 @@ ruleTester.run('no-focused-tests', {} as never, {
       code: 'test.runIf(true).only()',
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 18,
+          endLine: 1,
           endColumn: 22,
-          messageId: 'focusedTest',
           suggestions: [
-            { messageId: 'suggestRemoveFocus', output: 'test.runIf(true)()' },
+            {
+              messageId: 'suggestRemoveFocus',
+              desc: 'Suggest removing focus from test',
+              output: 'test.runIf(true)()',
+            },
           ],
         },
       ],
@@ -163,15 +228,17 @@ ruleTester.run('no-focused-tests', {} as never, {
 focused('case', fn)`,
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 2,
           column: 1,
+          endLine: 2,
           endColumn: 8,
-          messageId: 'focusedTest',
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `const focused = test;
-focused('case', fn)`,
+              desc: 'Suggest removing focus from test',
+              output: "const focused = test;\nfocused('case', fn)",
             },
           ],
         },
@@ -182,15 +249,17 @@ focused('case', fn)`,
 focused.skip('case', fn)`,
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 2,
           column: 1,
+          endLine: 2,
           endColumn: 8,
-          messageId: 'focusedTest',
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `const focused = test;
-focused.skip('case', fn)`,
+              desc: 'Suggest removing focus from test',
+              output: "const focused = test;\nfocused.skip('case', fn)",
             },
           ],
         },
@@ -202,24 +271,28 @@ focused('first', fn);
 focused('second', fn)`,
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 2,
           column: 1,
+          endLine: 2,
           endColumn: 8,
-          messageId: 'focusedTest',
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `const focused = test;
-focused('first', fn);
-focused('second', fn)`,
+              desc: 'Suggest removing focus from test',
+              output:
+                "const focused = test;\nfocused('first', fn);\nfocused('second', fn)",
             },
           ],
         },
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 3,
           column: 1,
+          endLine: 3,
           endColumn: 8,
-          messageId: 'focusedTest',
         },
       ],
     },
@@ -227,14 +300,17 @@ focused('second', fn)`,
       code: `import.meta.rstest.test.only('case', fn)`,
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 1,
           column: 25,
+          endLine: 1,
           endColumn: 29,
-          messageId: 'focusedTest',
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `import.meta.rstest.test('case', fn)`,
+              desc: 'Suggest removing focus from test',
+              output: "import.meta.rstest.test('case', fn)",
             },
           ],
         },
@@ -245,15 +321,18 @@ focused('second', fn)`,
 test.only('case', fn)`,
       errors: [
         {
+          messageId: 'focusedTest',
+          message: 'Unexpected focused test',
           line: 2,
           column: 6,
+          endLine: 2,
           endColumn: 10,
-          messageId: 'focusedTest',
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `import { test } from '@rstest/playwright';
-test('case', fn)`,
+              desc: 'Suggest removing focus from test',
+              output:
+                "import { test } from '@rstest/playwright';\ntest('case', fn)",
             },
           ],
         },
@@ -264,10 +343,16 @@ test('case', fn)`,
       errors: [
         {
           messageId: 'focusedTest',
+          message: 'Unexpected focused test',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 23,
           suggestions: [
             {
               messageId: 'suggestRemoveFocus',
-              output: `test/* keep */ ()`,
+              desc: 'Suggest removing focus from test',
+              output: 'test/* keep */ ()',
             },
           ],
         },

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-restricted-rstest-methods', {} as never, {
+ruleTester.run('no-restricted-rstest-methods', {
   valid: [
     { code: `rs.fn()` },
     { code: `rs.fn()`, options: [{}] },
@@ -27,6 +28,7 @@ ruleTester.run('no-restricted-rstest-methods', {} as never, {
       errors: [
         {
           messageId: 'restrictedRstestMethod',
+          message: 'Use of `fn` is disallowed',
           line: 1,
           column: 4,
           endLine: 1,
@@ -40,6 +42,7 @@ ruleTester.run('no-restricted-rstest-methods', {} as never, {
       errors: [
         {
           messageId: 'restrictedRstestMethodWithMessage',
+          message: 'Use the shared factory instead.',
           line: 1,
           column: 4,
           endLine: 1,
@@ -53,6 +56,7 @@ ruleTester.run('no-restricted-rstest-methods', {} as never, {
       errors: [
         {
           messageId: 'restrictedRstestMethod',
+          message: 'Use of `fn` is disallowed',
           line: 1,
           column: 4,
           endLine: 1,
@@ -66,6 +70,7 @@ ruleTester.run('no-restricted-rstest-methods', {} as never, {
       errors: [
         {
           messageId: 'restrictedRstestMethod',
+          message: 'Use of `mock` is disallowed',
           line: 1,
           column: 4,
           endLine: 1,
@@ -79,6 +84,7 @@ ruleTester.run('no-restricted-rstest-methods', {} as never, {
       errors: [
         {
           messageId: 'restrictedRstestMethod',
+          message: 'Use of `mock` is disallowed',
           line: 1,
           column: 30,
           endLine: 1,

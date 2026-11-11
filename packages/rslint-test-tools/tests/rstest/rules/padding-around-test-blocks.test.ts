@@ -1,12 +1,22 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-new RuleTester().run('padding-around-test-blocks', {} as never, {
+new RuleTester(config).run('padding-around-test-blocks', {
   valid: [{ code: `setup();\n\ntest('works', run);` }],
   invalid: [
     {
       code: `setup();\ntest('works', run);`,
       output: `setup();\n\ntest('works', run);`,
-      errors: 1,
+      errors: [
+        {
+          messageId: 'missingPadding',
+          message: 'Expected blank line before this statement.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

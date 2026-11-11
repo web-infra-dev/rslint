@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-to-have-been-called-times', {} as never, {
+ruleTester.run('prefer-to-have-been-called-times', {
   valid: [
     'expect.assertions(1)',
     'expect(fn).toHaveBeenCalledTimes',
@@ -29,81 +30,152 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
   invalid: [
     {
       code: 'expect(method.mock.calls).toHaveLength(1);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
       output: 'expect(method).toHaveBeenCalledTimes(1);',
-      column: 27,
-      endColumn: 39,
     },
     {
       code: 'expect(method.mock.calls).resolves.toHaveLength(x);',
-      output: null,
-      column: 36,
-      endColumn: 48,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: "expect(fn.mock.calls).toHaveLength('1');",
-      output: null,
-      column: 23,
-      endColumn: 35,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'expect(fn.mock.calls).toHaveLength((fn.mockClear(), 1));',
-      output: null,
-      column: 23,
-      endColumn: 35,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'class Derived extends Base { static verify() { expect(super.mock.calls).toHaveLength(1); } }',
-      output: null,
-      column: 73,
-      endColumn: 85,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 73,
+          endLine: 1,
+          endColumn: 85,
+        },
+      ],
     },
     {
       code: 'expect(method["mock"].calls).toHaveLength(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
       output: 'expect(method).toHaveBeenCalledTimes(0);',
-      column: 30,
-      endColumn: 42,
     },
     {
       code: 'expect(my.method.mock.calls).not.toHaveLength(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
       output: 'expect(my.method).not.toHaveBeenCalledTimes(0);',
-      column: 34,
-      endColumn: 46,
     },
     {
       code: 'expect<unknown[]>(fn.mock.calls).toHaveLength(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
       output: 'expect(fn).toHaveBeenCalledTimes(0);',
-      column: 34,
-      endColumn: 46,
     },
     {
       code: 'expect.soft(fn.mock.calls).toHaveLength(2);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
       output: 'expect.soft(fn).toHaveBeenCalledTimes(2);',
-      column: 28,
-      endColumn: 40,
     },
     {
       code: 'expect((fn.mock).calls).toHaveLength(1);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
       output: 'expect((fn)).toHaveBeenCalledTimes(1);',
-      column: 25,
-      endColumn: 37,
     },
     {
       code: 'const assertion = expect(fn.mock.calls).toHaveLength(1);',
-      output: null,
-      column: 41,
-      endColumn: 53,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Prefer `toHaveBeenCalledTimes`',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
-  ].map(({ column, endColumn, ...testCase }) => ({
-    ...testCase,
-    errors: [
-      {
-        messageId: 'preferMatcher',
-        message: 'Prefer `toHaveBeenCalledTimes`',
-        line: 1,
-        column,
-        endLine: 1,
-        endColumn,
-      },
-    ],
-  })),
+  ],
 });

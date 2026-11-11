@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-to-be', {} as never, {
+ruleTester.run('prefer-to-be', {
   valid: [
     { code: `expect(null).toBeNull();` },
     { code: `expect(null).not.toBeNull();` },
@@ -33,57 +34,156 @@ ruleTester.run('prefer-to-be', {} as never, {
     {
       code: `expect(value).toEqual("my string");`,
       output: `expect(value).toBe("my string");`,
-      errors: [{ messageId: 'useToBe' }],
+      errors: [
+        {
+          messageId: 'useToBe',
+          message: 'Use `toBe` instead',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: `expect("a string").not.toEqual(null);`,
       output: `expect("a string").not.toBeNull();`,
-      errors: [{ messageId: 'useToBeNull', column: 24, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNull',
+          message: 'Use `toBeNull()` instead',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect("a string").not.toStrictEqual(null);`,
       output: `expect("a string").not.toBeNull();`,
-      errors: [{ messageId: 'useToBeNull', column: 24, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNull',
+          message: 'Use `toBeNull()` instead',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: `expect(NaN).toBe(NaN);`,
       output: `expect(NaN).toBeNaN();`,
-      errors: [{ messageId: 'useToBeNaN', column: 13, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNaN',
+          message: 'Use `toBeNaN()` instead',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: `expect("a string").not.toBe(NaN);`,
       output: `expect("a string").not.toBeNaN();`,
-      errors: [{ messageId: 'useToBeNaN', column: 24, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNaN',
+          message: 'Use `toBeNaN()` instead',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: `expect("a string").not.toStrictEqual(NaN);`,
       output: `expect("a string").not.toBeNaN();`,
-      errors: [{ messageId: 'useToBeNaN', column: 24, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNaN',
+          message: 'Use `toBeNaN()` instead',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: `expect(null).toBe(null);`,
       output: `expect(null).toBeNull();`,
-      errors: [{ messageId: 'useToBeNull', column: 14, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNull',
+          message: 'Use `toBeNull()` instead',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `expect(null).toEqual(null);`,
       output: `expect(null).toBeNull();`,
-      errors: [{ messageId: 'useToBeNull', column: 14, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNull',
+          message: 'Use `toBeNull()` instead',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: `expect("a string").not.toEqual(null as number);`,
       output: `expect("a string").not.toBeNull();`,
-      errors: [{ messageId: 'useToBeNull', column: 24, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeNull',
+          message: 'Use `toBeNull()` instead',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect(undefined).toBe(undefined as unknown as string as any);`,
       output: `expect(undefined).toBeUndefined();`,
-      errors: [{ messageId: 'useToBeUndefined', column: 19, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeUndefined',
+          message: 'Use `toBeUndefined()` instead',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: `expect("a string").toEqual(undefined as number);`,
       output: `expect("a string").toBeUndefined();`,
-      errors: [{ messageId: 'useToBeUndefined', column: 20, line: 1 }],
+      errors: [
+        {
+          messageId: 'useToBeUndefined',
+          message: 'Use `toBeUndefined()` instead',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
   ],
 });

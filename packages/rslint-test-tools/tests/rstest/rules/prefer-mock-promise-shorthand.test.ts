@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-mock-promise-shorthand', {} as never, {
+ruleTester.run('prefer-mock-promise-shorthand', {
   valid: [
     { code: `rs.fn().mockResolvedValue(42)` },
     { code: `rs.fn(() => Promise.resolve(42))` },
@@ -21,29 +22,73 @@ aVariable.mockImplementation(() => Promise.resolve(value));`,
     {
       code: `rs.fn().mockImplementation(() => Promise.resolve(42))`,
       output: `rs.fn().mockResolvedValue(42)`,
-      errors: [{ messageId: 'useMockShorthand', column: 9, line: 1 }],
+      errors: [
+        {
+          messageId: 'useMockShorthand',
+          message: 'Prefer mockResolvedValue',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: `rs.fn().mockReturnValue(Promise.reject(42))`,
       output: `rs.fn().mockRejectedValue(42)`,
-      errors: [{ messageId: 'useMockShorthand', column: 9, line: 1 }],
+      errors: [
+        {
+          messageId: 'useMockShorthand',
+          message: 'Prefer mockRejectedValue',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `aVariable.mockImplementationOnce(() => {
   return Promise.reject(42);
 })`,
       output: `aVariable.mockRejectedValueOnce(42)`,
-      errors: [{ messageId: 'useMockShorthand', column: 11, line: 1 }],
+      errors: [
+        {
+          messageId: 'useMockShorthand',
+          message: 'Prefer mockRejectedValueOnce',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `aVariable.mockReturnValueOnce(Promise.resolve(42, xyz))`,
-      output: null,
-      errors: [{ messageId: 'useMockShorthand', column: 11, line: 1 }],
+      errors: [
+        {
+          messageId: 'useMockShorthand',
+          message: 'Prefer mockResolvedValueOnce',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: `aVariable.mockReturnValueOnce(Promise.resolve())`,
       output: `aVariable.mockResolvedValueOnce(undefined)`,
-      errors: [{ messageId: 'useMockShorthand', column: 11, line: 1 }],
+      errors: [
+        {
+          messageId: 'useMockShorthand',
+          message: 'Prefer mockResolvedValueOnce',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
   ],
 });

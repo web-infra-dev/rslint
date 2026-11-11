@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-expect-type-of', {} as never, {
+ruleTester.run('prefer-expect-type-of', {
   valid: [
     { code: `expect("name").toBeTypeOf("string")` },
     { code: `expect("name").not.toBeTypeOf("string")` },
@@ -23,7 +24,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(12).toBeTypeOf("number")\` instead of \`expect(typeof 12).toBe("number")\``,
+          message:
+            'Use `expect(12).toBeTypeOf("number")` instead of `expect(typeof 12).toBe("number")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -37,7 +39,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect("name").toBeTypeOf("string")\` instead of \`expect(typeof "name").toBe("string")\``,
+          message:
+            'Use `expect("name").toBeTypeOf("string")` instead of `expect(typeof "name").toBe("string")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -51,7 +54,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(true).toBeTypeOf("boolean")\` instead of \`expect(typeof true).toBe("boolean")\``,
+          message:
+            'Use `expect(true).toBeTypeOf("boolean")` instead of `expect(typeof true).toBe("boolean")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -65,7 +69,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(variable).toBeTypeOf("object")\` instead of \`expect(typeof variable).toBe("object")\``,
+          message:
+            'Use `expect(variable).toBeTypeOf("object")` instead of `expect(typeof variable).toBe("object")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -79,7 +84,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(fn).toBeTypeOf("function")\` instead of \`expect(typeof fn).toBe("function")\``,
+          message:
+            'Use `expect(fn).toBeTypeOf("function")` instead of `expect(typeof fn).toBe("function")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -93,7 +99,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(sym).toBeTypeOf("symbol")\` instead of \`expect(typeof sym).toBe("symbol")\``,
+          message:
+            'Use `expect(sym).toBeTypeOf("symbol")` instead of `expect(typeof sym).toBe("symbol")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -107,7 +114,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(big).toBeTypeOf("bigint")\` instead of \`expect(typeof big).toBe("bigint")\``,
+          message:
+            'Use `expect(big).toBeTypeOf("bigint")` instead of `expect(typeof big).toBe("bigint")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -121,7 +129,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(value).toBeTypeOf("undefined")\` instead of \`expect(typeof value).toBe("undefined")\``,
+          message:
+            'Use `expect(value).toBeTypeOf("undefined")` instead of `expect(typeof value).toBe("undefined")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -135,7 +144,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(value).toBeTypeOf("string")\` instead of \`expect(typeof value).toBe("string")\``,
+          message:
+            'Use `expect(value).toBeTypeOf("string")` instead of `expect(typeof value).toBe("string")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -149,7 +159,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(value).toBeTypeOf("string")\` instead of \`expect(typeof value).toBe("string")\``,
+          message:
+            'Use `expect(value).toBeTypeOf("string")` instead of `expect(typeof value).toBe("string")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -163,7 +174,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(value).toBeTypeOf("unknown")\` instead of \`expect(typeof value).toBe("unknown")\``,
+          message:
+            'Use `expect(value).toBeTypeOf("unknown")` instead of `expect(typeof value).toBe("unknown")`',
           line: 1,
           column: 1,
           endLine: 1,
@@ -177,7 +189,8 @@ ruleTester.run('prefer-expect-type-of', {} as never, {
       errors: [
         {
           messageId: 'preferExpectTypeOf',
-          message: `Use \`expect(value).toBeTypeOf(typeName)\` instead of \`expect(typeof value).toBe(typeName)\``,
+          message:
+            'Use `expect(value).toBeTypeOf(typeName)` instead of `expect(typeof value).toBe(typeName)`',
           line: 1,
           column: 1,
           endLine: 1,

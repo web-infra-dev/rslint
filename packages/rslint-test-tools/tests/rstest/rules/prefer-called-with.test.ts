@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-called-with', {} as never, {
+ruleTester.run('prefer-called-with', {
   valid: [
     { code: 'expect(fn).toBeCalledWith();' },
     { code: 'expect(fn).toHaveBeenCalledWith();' },
@@ -27,7 +28,6 @@ ruleTester.run('prefer-called-with', {} as never, {
         {
           messageId: 'preferCalledWith',
           message: 'Prefer toBeCalledWith(/* expected args */)',
-          data: { matcherName: 'toBeCalledWith' },
           line: 1,
           column: 12,
           endLine: 1,
@@ -42,7 +42,6 @@ ruleTester.run('prefer-called-with', {} as never, {
         {
           messageId: 'preferCalledWith',
           message: 'Prefer toBeCalledWith(/* expected args */)',
-          data: { matcherName: 'toBeCalledWith' },
           line: 1,
           column: 21,
           endLine: 1,
@@ -57,7 +56,6 @@ ruleTester.run('prefer-called-with', {} as never, {
         {
           messageId: 'preferCalledWith',
           message: 'Prefer toHaveBeenCalledWith(/* expected args */)',
-          data: { matcherName: 'toHaveBeenCalledWith' },
           line: 1,
           column: 12,
           endLine: 1,
@@ -74,7 +72,6 @@ ruleTester.run('prefer-called-with', {} as never, {
           messageId: 'preferCalledWith',
           message:
             'Prefer toHaveBeenCalledExactlyOnceWith(/* expected args */)',
-          data: { matcherName: 'toHaveBeenCalledExactlyOnceWith' },
           line: 1,
           column: 40,
           endLine: 1,

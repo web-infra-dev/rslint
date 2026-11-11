@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-spy-on', {} as never, {
+ruleTester.run('prefer-spy-on', {
   valid: [
     { code: 'Date.now = () => 10' },
     { code: 'window.fetch = rs.fn' },
@@ -21,6 +22,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -34,6 +36,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -47,6 +50,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -60,6 +64,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -73,6 +78,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -86,6 +92,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -99,6 +106,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -112,6 +120,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -126,6 +135,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 1,
           column: 1,
           endLine: 1,
@@ -145,6 +155,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
       errors: [
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 2,
           column: 9,
           endLine: 2,
@@ -152,6 +163,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
         },
         {
           messageId: 'useRsSpyOn',
+          message: 'Use `rs.spyOn` instead',
           line: 3,
           column: 9,
           endLine: 3,

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('require-top-level-describe', {} as never, {
+ruleTester.run('require-top-level-describe', {
   valid: [
     {
       code: `
@@ -38,13 +39,31 @@ ruleTester.run('require-top-level-describe', {} as never, {
 
         beforeEach(() => resetCart());
       `,
-      errors: [{ messageId: 'unexpectedHook', line: 4, column: 9 }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: 'All hooks must be wrapped in a describe block',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: `
         test.concurrent('places the order', () => {});
       `,
-      errors: [{ messageId: 'unexpectedTestCase', line: 2, column: 9 }],
+      errors: [
+        {
+          messageId: 'unexpectedTestCase',
+          message: 'All test cases must be wrapped in a describe block',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: `
@@ -52,7 +71,16 @@ ruleTester.run('require-top-level-describe', {} as never, {
         describe('returns', () => {});
       `,
       options: [{ maxNumberOfTopLevelDescribes: 1 }],
-      errors: [{ messageId: 'tooManyDescribes', line: 3, column: 9 }],
+      errors: [
+        {
+          messageId: 'tooManyDescribes',
+          message: 'There should not be more than 1 describe at the top level',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 38,
+        },
+      ],
     },
   ],
 });

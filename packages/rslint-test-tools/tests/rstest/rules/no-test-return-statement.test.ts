@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-test-return-statement', {} as never, {
+ruleTester.run('no-test-return-statement', {
   valid: [
     { code: 'it("noop", function () {});' },
     { code: 'test("noop", () => {});' },
@@ -24,26 +25,62 @@ ruleTester.run('no-test-return-statement', {} as never, {
       code: `test("one", () => {
       return expect(1).toBe(1);
        });`,
-      errors: [{ messageId: 'noTestReturnStatement', column: 7, line: 2 }],
+      errors: [
+        {
+          messageId: 'noTestReturnStatement',
+          message: 'Return statements are not allowed in tests',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: `it("one", function () {
       return expect(1).toBe(1);
        });`,
-      errors: [{ messageId: 'noTestReturnStatement', column: 7, line: 2 }],
+      errors: [
+        {
+          messageId: 'noTestReturnStatement',
+          message: 'Return statements are not allowed in tests',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: `it.skip("one", function () {
       return expect(1).toBe(1);
        });`,
-      errors: [{ messageId: 'noTestReturnStatement', column: 7, line: 2 }],
+      errors: [
+        {
+          messageId: 'noTestReturnStatement',
+          message: 'Return statements are not allowed in tests',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: `it("one", myTest);
      function myTest () {
        return expect(1).toBe(1);
      }`,
-      errors: [{ messageId: 'noTestReturnStatement', column: 8, line: 3 }],
+      errors: [
+        {
+          messageId: 'noTestReturnStatement',
+          message: 'Return statements are not allowed in tests',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `
@@ -53,7 +90,16 @@ ruleTester.run('no-test-return-statement', {} as never, {
           return 1;
         });
       `,
-      errors: [{ messageId: 'noTestReturnStatement', column: 11, line: 5 }],
+      errors: [
+        {
+          messageId: 'noTestReturnStatement',
+          message: 'Return statements are not allowed in tests',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

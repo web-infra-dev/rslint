@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-called-exactly-once-with', {} as never, {
+ruleTester.run('prefer-called-exactly-once-with', {
   valid: [
     { code: `expect(fn).toHaveBeenCalledExactlyOnceWith()` },
     { code: `expect(x).toHaveBeenCalledOnce()` },
@@ -157,14 +158,34 @@ ruleTester.run('prefer-called-exactly-once-with', {} as never, {
     {
       code: `expect(x).toHaveBeenCalledOnce(); expect(x).toHaveBeenCalledWith('hoge');`,
       output: ` expect(x).toHaveBeenCalledExactlyOnceWith('hoge');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 1,
+          column: 45,
+          endLine: 1,
+          endColumn: 65,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledWith<[string, number]>('hoge', /* keep */ 123);
 expect(x).toHaveBeenCalledOnce();`,
       output: `expect(x).toHaveBeenCalledExactlyOnceWith<[string, number]>('hoge', /* keep */ 123);
 `,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 2,
+          column: 11,
+          endLine: 2,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `test('x', ({ expect }) => {
@@ -174,88 +195,216 @@ expect(x).toHaveBeenCalledOnce();`,
       output: `test('x', ({ expect }) => {
   expect(x).toHaveBeenCalledExactlyOnceWith('a');
 });`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `import { expect as check } from '@rstest/core';
 check(x).toHaveBeenCalledOnce();
 check(x).toHaveBeenCalledWith('a');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 30,
+        },
+      ],
+      output:
+        "import { expect as check } from '@rstest/core';\ncheck(x).toHaveBeenCalledExactlyOnceWith('a');",
     },
     {
       code: `import.meta.rstest.expect(x).toHaveBeenCalledOnce();
 import.meta.rstest.expect(x).toHaveBeenCalledWith('a');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 2,
+          column: 30,
+          endLine: 2,
+          endColumn: 50,
+        },
+      ],
+      output:
+        "import.meta.rstest.expect(x).toHaveBeenCalledExactlyOnceWith('a');",
     },
     {
       code: `expect(x).to.have.been.calledOnce;
 expect(x).to.have.been.calledWith('a');`,
       output: `expect(x).to.have.been.calledOnceWith('a');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead.',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: `expect(x).to.have.been.calledOnce.and.calledWith('a');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: `expect(x).to.have.been.calledOnce.and.to.be.ok;
 expect(x).to.have.been.calledWith('a');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `calledOnce` and `calledWith` on the same target; prefer `calledOnceWith` instead.',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: `expect(getMock()).toHaveBeenCalledOnce(); expect(getMock()).toHaveBeenCalledWith('a');`,
-      output: null,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 81,
+        },
+      ],
     },
     {
       code: `expect(mocks['a']).toHaveBeenCalledOnce(); expect(mocks['a']).toHaveBeenCalledWith('x');`,
       output: ` expect(mocks['a']).toHaveBeenCalledExactlyOnceWith('x');`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 1,
+          column: 63,
+          endLine: 1,
+          endColumn: 83,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledOnce();
 console.log('checkpoint');
 expect(x).toHaveBeenCalledWith('a');`,
-      output: `console.log('checkpoint');
-expect(x).toHaveBeenCalledExactlyOnceWith('a');
-`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      output:
+        "console.log('checkpoint');\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');",
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledOnce();
 var hoge = 'foo';
 expect(x).toHaveBeenCalledWith('a');`,
-      output: `var hoge = 'foo';
-expect(x).toHaveBeenCalledExactlyOnceWith('a');
-`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      output:
+        "var hoge = 'foo';\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');",
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledOnce();
 expect(y).toEqual({ ...obj });
 expect(x).toHaveBeenCalledWith('a');`,
-      output: `expect(y).toEqual({ ...obj });
-expect(x).toHaveBeenCalledExactlyOnceWith('a');
-`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      output:
+        "expect(y).toEqual({ ...obj });\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');",
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledOnce();
 expect(y).toEqual({ id: 1 });
 expect(x).toHaveBeenCalledWith('a');`,
-      output: `expect(y).toEqual({ id: 1 });
-expect(x).toHaveBeenCalledExactlyOnceWith('a');
-`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      output:
+        "expect(y).toEqual({ id: 1 });\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');",
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `expect(x).toHaveBeenCalledOnce();
 expect(y).toHaveBeenCalledWith(expect.any(String));
 expect(x).toHaveBeenCalledWith('a');`,
-      output: `expect(y).toHaveBeenCalledWith(expect.any(String));
-expect(x).toHaveBeenCalledExactlyOnceWith('a');
-`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      output:
+        "expect(y).toHaveBeenCalledWith(expect.any(String));\nexpect(x).toHaveBeenCalledExactlyOnceWith('a');",
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: `async function f() {
@@ -265,7 +414,17 @@ expect(x).toHaveBeenCalledExactlyOnceWith('a');
       output: `async function f() {
   await expect(x).resolves.toHaveBeenCalledExactlyOnceWith('a');
 }`,
-      errors: [{ messageId: 'preferCalledExactlyOnceWith' }],
+      errors: [
+        {
+          messageId: 'preferCalledExactlyOnceWith',
+          message:
+            'Using `toHaveBeenCalledOnce` and `toHaveBeenCalledWith` on the same target; prefer `toHaveBeenCalledExactlyOnceWith` instead.',
+          line: 3,
+          column: 28,
+          endLine: 3,
+          endColumn: 48,
+        },
+      ],
     },
   ],
 });

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-conditional-expect', {} as never, {
+ruleTester.run('no-conditional-expect', {
   valid: [
     {
       code: `
@@ -28,7 +29,16 @@ ruleTester.run('no-conditional-expect', {} as never, {
           if (condition) expect(value).toBe(1);
         });
       `,
-      errors: [{ messageId: 'conditionalExpect', line: 4, column: 26 }],
+      errors: [
+        {
+          messageId: 'conditionalExpect',
+          message: 'Avoid calling `expect` conditionally',
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 47,
+        },
+      ],
     },
     {
       code: `
@@ -36,7 +46,16 @@ ruleTester.run('no-conditional-expect', {} as never, {
           condition && expect(value).toBe(1);
         });
       `,
-      errors: [{ messageId: 'conditionalExpect', line: 3, column: 24 }],
+      errors: [
+        {
+          messageId: 'conditionalExpect',
+          message: 'Avoid calling `expect` conditionally',
+          line: 3,
+          column: 24,
+          endLine: 3,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: `
@@ -47,7 +66,16 @@ ruleTester.run('no-conditional-expect', {} as never, {
           });
         }
       `,
-      errors: [{ messageId: 'conditionalExpect', line: 5, column: 26 }],
+      errors: [
+        {
+          messageId: 'conditionalExpect',
+          message: 'Avoid calling `expect` conditionally',
+          line: 5,
+          column: 26,
+          endLine: 5,
+          endColumn: 47,
+        },
+      ],
     },
     {
       code: `
@@ -57,7 +85,16 @@ ruleTester.run('no-conditional-expect', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'conditionalExpect', line: 4, column: 19 }],
+      errors: [
+        {
+          messageId: 'conditionalExpect',
+          message: 'Avoid calling `expect` conditionally',
+          line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 56,
+        },
+      ],
     },
     {
       code: `
@@ -68,7 +105,16 @@ ruleTester.run('no-conditional-expect', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'conditionalExpect', line: 5, column: 19 }],
+      errors: [
+        {
+          messageId: 'conditionalExpect',
+          message: 'Avoid calling `expect` conditionally',
+          line: 5,
+          column: 19,
+          endLine: 5,
+          endColumn: 61,
+        },
+      ],
     },
   ],
 });

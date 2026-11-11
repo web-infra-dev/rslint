@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('require-to-throw-message', {} as never, {
+ruleTester.run('require-to-throw-message', {
   valid: [
     { code: "expect(() => { throw new Error('a'); }).toThrow('a');" },
     { code: "expect(() => { throw new Error('a'); }).toThrowError('a');" },

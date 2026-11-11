@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-standalone-expect', {} as never, {
+ruleTester.run('no-standalone-expect', {
   valid: [
     {
       code: "expect.any(String); expect.extend({}); expect.not.stringContaining('value');",
@@ -72,6 +73,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           message: 'Expect must be inside of a test block',
           line: 1,
           column: 1,
+          endLine: 1,
           endColumn: 18,
         },
       ],
@@ -82,7 +84,16 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(1).toBe(1);
         });
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 3, column: 11 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: `
@@ -91,13 +102,36 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(2).toBe(2);
         });
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 4, column: 11 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: 'expect.hasAssertions(); expect.assertions(1);',
       errors: [
-        { messageId: 'unexpectedExpect', line: 1, column: 1 },
-        { messageId: 'unexpectedExpect', line: 1, column: 25 },
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 45,
+        },
       ],
     },
     {
@@ -105,18 +139,45 @@ ruleTester.run('no-standalone-expect', {} as never, {
         import { describe as d, expect as check } from '@rstest/core';
         d('suite', () => check(1).toBe(1));
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 3, column: 26 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 3,
+          column: 26,
+          endLine: 3,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: 'import.meta.rstest.expect(1).toBe(1);',
-      errors: [{ messageId: 'unexpectedExpect', line: 1, column: 1 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: `
         const { expect: check } = require('@rstest/core');
         check(1).toBe(1);
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 3, column: 9 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: `
@@ -125,7 +186,16 @@ ruleTester.run('no-standalone-expect', {} as never, {
           api.expect(1).toBe(1);
         }
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 4, column: 11 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: `
@@ -133,7 +203,16 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(1).to.be.ok;
         });
       `,
-      errors: [{ messageId: 'unexpectedExpect', line: 3, column: 11 }],
+      errors: [
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `
@@ -141,8 +220,22 @@ ruleTester.run('no-standalone-expect', {} as never, {
         test('case', { timeout: expect(1).toBe(1) }, () => {});
       `,
       errors: [
-        { messageId: 'unexpectedExpect', line: 2, column: 19 },
-        { messageId: 'unexpectedExpect', line: 3, column: 33 },
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 36,
+        },
+        {
+          messageId: 'unexpectedExpect',
+          message: 'Expect must be inside of a test block',
+          line: 3,
+          column: 33,
+          endLine: 3,
+          endColumn: 50,
+        },
       ],
     },
   ],

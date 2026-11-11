@@ -1,12 +1,22 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-new RuleTester().run('padding-around-after-each-blocks', {} as never, {
+new RuleTester(config).run('padding-around-after-each-blocks', {
   valid: [{ code: 'setup();\n\nafterEach(cleanup);' }],
   invalid: [
     {
       code: 'setup();\nafterEach(cleanup);',
       output: 'setup();\n\nafterEach(cleanup);',
-      errors: 1,
+      errors: [
+        {
+          messageId: 'missingPadding',
+          message: 'Expected blank line before this statement.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

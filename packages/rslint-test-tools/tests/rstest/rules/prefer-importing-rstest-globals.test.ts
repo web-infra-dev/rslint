@@ -2,12 +2,12 @@ import path from 'node:path';
 
 import { lint } from '@rslint/core/internal';
 
-import { buildConfigForSettings } from '../../src/util/load-test-config';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config, withFixture } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-importing-rstest-globals', {} as never, {
+ruleTester.run('prefer-importing-rstest-globals', {
   valid: [
     {
       code: `import { describe, expect, it } from '@rstest/core'; describe('suite', () => it('works', () => expect(1).toBe(1)));`,
@@ -43,6 +43,8 @@ describe('user service', () => {
           message: 'Import `describe, it, expect` from `@rstest/core`.',
           line: 1,
           column: 1,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -50,48 +52,63 @@ describe('user service', () => {
       code: `rs.fn();`,
       output: `import { rs } from '@rstest/core';
 rs.fn();`,
-      errors: [{ messageId: 'preferImportingRstestGlobals' }],
+      errors: [
+        {
+          messageId: 'preferImportingRstestGlobals',
+          message: 'Import `rs` from `@rstest/core`.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
     },
     {
       code: `import { defineConfig } from 'rstack/test';
 test('works', () => {});`,
       output: `import { defineConfig, test } from 'rstack/test';
 test('works', () => {});`,
-      errors: [{ messageId: 'preferImportingRstestGlobals' }],
+      errors: [
+        {
+          messageId: 'preferImportingRstestGlobals',
+          message: 'Import `test` from `@rstest/core`.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 5,
+        },
+      ],
     },
   ],
 });
 
 describe('interaction with consistent-rstest-namespace', () => {
   const runFix = async (code: string, ruleName: string) => {
-    const file = path.resolve(import.meta.dirname, '../src/interaction.ts');
-    const configFile = path.resolve(
-      import.meta.dirname,
-      '../rslint.config.mjs',
-    );
-    const { config, configDirectory } = await buildConfigForSettings(
-      configFile,
-      undefined,
-    );
-    const result = await lint({
-      config: [
-        ...config,
-        {
-          rules: {
-            'rstest/consistent-rstest-namespace': 'error',
-            [ruleName]: 'error',
+    const result = await withFixture((root) =>
+      lint({
+        config: [
+          {
+            plugins: ['rstest'],
+            languageOptions: config.languageOptions,
+            rules: {
+              'rstest/consistent-rstest-namespace': 'error',
+              [ruleName]: 'error',
+            },
           },
-        },
-      ],
-      configDirectory,
-      workingDirectory: process.cwd(),
-      fileContents: { [file]: code },
-      fix: true,
-    });
+        ],
+        configDirectory: root,
+        workingDirectory: root,
+        fileContents: { [path.join(root, config.filename!)]: code },
+        fix: true,
+      }),
+    );
+    // Both rules must execute: consistent-rstest-namespace requires type information.
+    expect(result.ruleCount).toBe(2);
+    expect(result.diagnostics).toEqual([]);
     return Object.values(result.output ?? {})[0] ?? code;
   };
 
-  test('no-importing converges after the namespace import is removed', async () => {
+  test('no-importing converges to the preferred global namespace', async () => {
     await expect(
       runFix(
         `import { rstest } from '@rstest/core';
@@ -99,13 +116,13 @@ rstest.fn();`,
         'rstest/no-importing-rstest-globals',
       ),
     ).resolves.toBe(`
-rstest.fn();`);
+rs.fn();`);
   });
 
-  test('prefer-importing converges after inserting the used namespace', async () => {
+  test('prefer-importing converges to the preferred namespace import', async () => {
     await expect(
       runFix(`rstest.fn();`, 'rstest/prefer-importing-rstest-globals'),
-    ).resolves.toBe(`import { rstest } from '@rstest/core';
-rstest.fn();`);
+    ).resolves.toBe(`import { rs } from '@rstest/core';
+rs.fn();`);
   });
 });

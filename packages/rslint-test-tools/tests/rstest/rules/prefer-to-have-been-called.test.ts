@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-to-have-been-called', {} as never, {
+ruleTester.run('prefer-to-have-been-called', {
   valid: [
     'expect(method.mock.calls).toHaveLength;',
     'expect(method).toBeCalledTimes();',
@@ -19,69 +20,128 @@ ruleTester.run('prefer-to-have-been-called', {} as never, {
   invalid: [
     {
       code: 'expect(method).toBeCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
       output: 'expect(method).not.toHaveBeenCalled();',
-      column: 16,
-      endColumn: 31,
     },
     {
       code: 'expect(method).not.toBeCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
       output: 'expect(method).toHaveBeenCalled();',
-      column: 20,
-      endColumn: 35,
     },
     {
       code: 'expect(method).toHaveBeenCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
       output: 'expect(method).not.toHaveBeenCalled();',
-      column: 16,
-      endColumn: 37,
     },
     {
       code: 'expect(method).not.toHaveBeenCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
       output: 'expect(method).toHaveBeenCalled();',
-      column: 20,
-      endColumn: 41,
     },
     {
       code: 'expect(method).not.toHaveBeenCalledTimes(0, 1, 2);',
-      output: null,
-      column: 20,
-      endColumn: 41,
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: 'expect(method).resolves.toHaveBeenCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
       output: 'expect(method).resolves.not.toHaveBeenCalled();',
-      column: 25,
-      endColumn: 46,
     },
     {
       code: 'expect(method).rejects.not.toHaveBeenCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
       output: 'expect(method).rejects.toHaveBeenCalled();',
-      column: 28,
-      endColumn: 49,
     },
     {
       code: 'expect(method).toBeCalledTimes(0 as number);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
       output: 'expect(method).not.toHaveBeenCalled();',
-      column: 16,
-      endColumn: 31,
     },
     {
       code: 'expect(method).not.resolves.toHaveBeenCalledTimes(0);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          message: 'Use `toHaveBeenCalled`',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
       output: 'expect(method).resolves.toHaveBeenCalled();',
-      column: 29,
-      endColumn: 50,
     },
-  ].map(({ column, endColumn, ...testCase }) => ({
-    ...testCase,
-    errors: [
-      {
-        messageId: 'preferMatcher',
-        message: 'Use `toHaveBeenCalled`',
-        line: 1,
-        column,
-        endLine: 1,
-        endColumn,
-      },
-    ],
-  })),
+  ],
 });

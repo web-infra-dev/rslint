@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-identical-title', {} as never, {
+ruleTester.run('no-identical-title', {
   valid: [
     {
       code: 'test("one", () => {}); test("two", () => {});',
@@ -40,7 +41,17 @@ ruleTester.run('no-identical-title', {} as never, {
         import.meta.rstest.test("same", () => {});
         import.meta.rstest.test("same", () => {});
       `,
-      errors: [{ messageId: 'multipleTestTitle', line: 3, column: 33 }],
+      errors: [
+        {
+          messageId: 'multipleTestTitle',
+          message:
+            'Test title is used multiple times in the same describe block',
+          line: 3,
+          column: 33,
+          endLine: 3,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: `
@@ -48,21 +59,51 @@ ruleTester.run('no-identical-title', {} as never, {
         test.describe("same", () => {});
         test.describe("same", () => {});
       `,
-      errors: [{ messageId: 'multipleDescribeTitle', line: 4, column: 23 }],
+      errors: [
+        {
+          messageId: 'multipleDescribeTitle',
+          message:
+            'Describe block title is used multiple times in the same describe block',
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: `
         test("same", () => {});
         test("same", () => {});
       `,
-      errors: [{ messageId: 'multipleTestTitle', line: 3, column: 14 }],
+      errors: [
+        {
+          messageId: 'multipleTestTitle',
+          message:
+            'Test title is used multiple times in the same describe block',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `
         describe("same", () => {});
         describe.only("same", () => {});
       `,
-      errors: [{ messageId: 'multipleDescribeTitle', line: 3, column: 23 }],
+      errors: [
+        {
+          messageId: 'multipleDescribeTitle',
+          message:
+            'Describe block title is used multiple times in the same describe block',
+          line: 3,
+          column: 23,
+          endLine: 3,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: `
@@ -71,7 +112,17 @@ ruleTester.run('no-identical-title', {} as never, {
           test.only("same", () => {});
         });
       `,
-      errors: [{ messageId: 'multipleTestTitle', line: 4, column: 21 }],
+      errors: [
+        {
+          messageId: 'multipleTestTitle',
+          message:
+            'Test title is used multiple times in the same describe block',
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 27,
+        },
+      ],
     },
   ],
 });

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-import-in-mock', {} as never, {
+ruleTester.run('prefer-import-in-mock', {
   valid: [
     { code: `rs.mock(import('./sum'))` },
     { code: `rstest.doMock(import('./sum'), { spy: true })` },
@@ -29,7 +30,7 @@ ruleTester.run('prefer-import-in-mock', {} as never, {
       errors: [
         {
           messageId: 'preferImport',
-          message: `Replace './sum' with import('./sum')`,
+          message: "Replace './sum' with import('./sum')",
           line: 1,
           column: 9,
           endLine: 1,
@@ -43,7 +44,7 @@ ruleTester.run('prefer-import-in-mock', {} as never, {
       errors: [
         {
           messageId: 'preferImport',
-          message: `Replace "./sum" with import("./sum")`,
+          message: 'Replace "./sum" with import("./sum")',
           line: 1,
           column: 15,
           endLine: 1,
@@ -57,7 +58,7 @@ ruleTester.run('prefer-import-in-mock', {} as never, {
       errors: [
         {
           messageId: 'preferImport',
-          message: `Replace './sum' with import('./sum')`,
+          message: "Replace './sum' with import('./sum')",
           line: 1,
           column: 19,
           endLine: 1,
@@ -71,7 +72,7 @@ ruleTester.run('prefer-import-in-mock', {} as never, {
       errors: [
         {
           messageId: 'preferImport',
-          message: `Replace './sum' with import('./sum')`,
+          message: "Replace './sum' with import('./sum')",
           line: 2,
           column: 9,
           endLine: 2,
@@ -85,7 +86,7 @@ ruleTester.run('prefer-import-in-mock', {} as never, {
       errors: [
         {
           messageId: 'preferImport',
-          message: `Replace './sum' with import('./sum')`,
+          message: "Replace './sum' with import('./sum')",
           line: 1,
           column: 9,
           endLine: 1,
