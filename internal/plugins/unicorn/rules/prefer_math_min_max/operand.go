@@ -275,6 +275,12 @@ func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bi
 	case ast.KindFunctionDeclaration:
 		function = declaration
 	case ast.KindVariableDeclaration, ast.KindParameter:
+		// An explicit TypeScript binding type takes precedence over JSDoc,
+		// even when only the checker can resolve its return type.
+		if bindingType := declaration.Type(); bindingType != nil && !utils.IsJSDocSyntaxNode(bindingType) &&
+			!ast.IsFunctionTypeNode(ast.SkipTypeParentheses(bindingType)) {
+			return false
+		}
 		initializer := utils.ESTreeRuntimeExpression(declaration.Initializer())
 		if initializer != nil {
 			initializer = ast.SkipOuterExpressions(initializer, ast.OEKParentheses|ast.OEKSatisfies|ast.OEKNonNullAssertions)

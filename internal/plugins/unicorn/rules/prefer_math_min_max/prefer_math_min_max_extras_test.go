@@ -70,6 +70,14 @@ func TestPreferMathMinMaxExtras(t *testing.T) {
 			`Math.min(<(number)>value, limit);`),
 		minMaxCase("input.ts", `const v = (a as (number))! < b ? a : b;`, "min", 1, 11, 1, 39,
 			`const v = Math.min((a as (number))!, b);`),
+		minMaxCase("input.ts", `/** @type {() => bigint} */
+const read: { (): number } = () => 1;
+const value = read();
+value > 0 ? value : 0;`, "max", 4, 1, 4, 22,
+			`/** @type {() => bigint} */
+const read: { (): number } = () => 1;
+const value = read();
+Math.max(value, 0);`),
 		minMaxCase("input.js", "const v = (obj[`a${index}`]) < limit ? obj[`a${index}`] : limit;", "min", 1, 11, 1, 64, ""),
 
 		// Keep the diagnostic when the Math binding or repeated evaluation
@@ -156,6 +164,15 @@ type NestedAny = Any & unknown;
 function readNestedAny(): bigint & NestedAny { return 1; }
 const nestedNumeric = readNestedAny();
 nestedNumeric > 0 ? nestedNumeric : 0;
+type ReadNumber = () => number;
+/** @type {() => bigint} */
+const readAlias: ReadNumber = () => 1;
+const fromAlias = readAlias();
+fromAlias > 0 ? fromAlias : 0;
+/** @type {() => bigint} */
+const readDynamic: any = () => 1;
+const fromDynamic = readDynamic();
+fromDynamic > 0 ? fromDynamic : 0;
 declare const readBig: () => bigint;
 const big = readBig();
 big > 0 ? big : 0;
@@ -183,12 +200,23 @@ uncertain > 0 ? uncertain : 0;
 	comparisons := []string{
 		"numeric > 0 ? numeric : 0",
 		"nestedNumeric > 0 ? nestedNumeric : 0",
+		"fromAlias > 0 ? fromAlias : 0",
+		"fromDynamic > 0 ? fromDynamic : 0",
 		"value > 0 ? value : 0",
 		"read() > 0 ? read() : 0",
 		"uncertain > 0 ? uncertain : 0",
 		"String.raw`value` > 0 ? String.raw`value` : 0",
 	}
-	replacements := []string{"Math.max(numeric, 0)", "Math.max(nestedNumeric, 0)", "Math.max(value, 0)", "", "Math.max(uncertain, 0)", ""}
+	replacements := []string{
+		"Math.max(numeric, 0)",
+		"Math.max(nestedNumeric, 0)",
+		"Math.max(fromAlias, 0)",
+		"Math.max(fromDynamic, 0)",
+		"Math.max(value, 0)",
+		"",
+		"Math.max(uncertain, 0)",
+		"",
+	}
 	sourceProgram, fileName := sourceOnlyMinMaxProgram(t, "edit-demand.ts", code)
 	target := prefer_math_min_max.PreferMathMinMaxRule
 	results := make(map[rule.EditDemand][]rule.RuleDiagnostic)
