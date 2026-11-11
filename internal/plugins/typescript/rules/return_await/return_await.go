@@ -115,8 +115,10 @@ func getWhetherToAwait(affectsErrorHandling bool, option ReturnAwaitOption) whet
 }
 
 func buildRemoveAwaitFix(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
+	token := scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos())
+	end := scanner.SkipTriviaEx(sourceFile.Text(), token.End(), &scanner.SkipTriviaOptions{StopAtComments: true})
 	return []rule.RuleFix{
-		rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos())),
+		rule.RuleFixRemoveRange(token.WithEnd(end)),
 	}
 }
 

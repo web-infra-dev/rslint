@@ -30,7 +30,9 @@ export class RuleTester {
       invalid: TestCase[];
     },
   ): void {
-    const ruleName = `${this.config.plugin}/${name}`;
+    const ruleName = this.config.plugin
+      ? `${this.config.plugin}/${name}`
+      : name;
     describe(ruleName, () => {
       let root = '';
       beforeAll(async () => {

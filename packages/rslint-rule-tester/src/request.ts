@@ -23,7 +23,7 @@ export function buildLintRequest(
     workingDirectory: root,
     config: [
       {
-        plugins: [config.plugin],
+        plugins: config.plugin ? [config.plugin] : [],
         languageOptions: {
           ...languageOptions,
           ...item.languageOptions,

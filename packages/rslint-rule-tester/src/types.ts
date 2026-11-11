@@ -1,5 +1,12 @@
 import type { LanguageOptions } from '@rslint/core';
 
+/** Preserves upstream parser metadata; JSX parsing follows the filename. */
+type TestLanguageOptions = Omit<LanguageOptions, 'parserOptions'> & {
+  parserOptions?: LanguageOptions['parserOptions'] & {
+    ecmaFeatures?: { jsx?: boolean };
+  };
+};
+
 export interface ExpectedSuggestion {
   messageId: string;
   /** The rendered suggestion message. */
@@ -32,7 +39,7 @@ export interface TestCase {
   /** A function receives the absolute fixture root. */
   options?: unknown[] | ((root: string) => unknown[]);
   settings?: Record<string, unknown>;
-  languageOptions?: LanguageOptions;
+  languageOptions?: TestLanguageOptions;
   /** Required, and non-empty, for invalid cases. */
   errors: ExpectedError[];
   /** The source after applying every autofix. */
@@ -46,11 +53,11 @@ export interface ValidTestCase extends Omit<TestCase, 'errors' | 'output'> {
 }
 
 export interface RuleTesterConfig {
-  /** Plugin name, used as the rule-name prefix. */
+  /** Plugin name, used as the rule-name prefix. Empty for ESLint core rules. */
   plugin: string;
   /** Default for each case's `filename`. Defaults to `input.js`. */
   filename?: string;
   /** Files written to the fixture root before the cases run. */
   fixtureFiles?: Record<string, string>;
-  languageOptions?: LanguageOptions;
+  languageOptions?: TestLanguageOptions;
 }

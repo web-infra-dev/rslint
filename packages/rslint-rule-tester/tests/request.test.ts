@@ -29,6 +29,16 @@ describe('buildLintRequest', () => {
     });
   });
 
+  test('runs a core rule without declaring a plugin', () => {
+    const { request } = buildLintRequest({ plugin: '' }, 'no-debugger', root, {
+      code: 'debugger;',
+    });
+    expect(request.config?.[0]).toMatchObject({
+      plugins: [],
+      rules: { 'no-debugger': ['error'] },
+    });
+  });
+
   test('places the file relative to the fixture root', () => {
     const { filename } = buildLintRequest(config, 'node/x', root, {
       code: '',

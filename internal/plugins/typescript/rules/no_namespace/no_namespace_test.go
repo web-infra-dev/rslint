@@ -529,7 +529,7 @@ func TestNoNamespaceDefinitionFileOptions(t *testing.T) {
 	}
 }
 
-func TestNoNamespaceReportRangeMatchesTrimmedNode(t *testing.T) {
+func TestNoNamespaceReportRangeExcludesExport(t *testing.T) {
 	sources := []string{
 		`namespace Test {}`,
 		"\n// leading comment\nexport namespace Test {}\n",
@@ -561,9 +561,16 @@ func TestNoNamespaceReportRangeMatchesTrimmedNode(t *testing.T) {
 
 		got := diagnostics[0].Range
 		want := utils.TrimNodeTextRange(sourceFile, declaration)
+		if token, ok := utils.TokenAtOrAfter(sourceFile, want.Pos()); ok && token.Kind == ast.KindExportKeyword {
+			next, ok := utils.TokenAtOrAfter(sourceFile, token.End)
+			if !ok {
+				t.Fatal("missing namespace after export")
+			}
+			want = want.WithPos(next.Start)
+		}
 		if got.Pos() != want.Pos() || got.End() != want.End() {
 			t.Fatalf(
-				"source %q: report range [%d,%d), want trimmed node range [%d,%d)",
+				"source %q: report range [%d,%d), want namespace range [%d,%d)",
 				source,
 				got.Pos(),
 				got.End(),

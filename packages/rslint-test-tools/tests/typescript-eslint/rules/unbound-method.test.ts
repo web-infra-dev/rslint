@@ -1,26 +1,205 @@
-import type { InvalidTestCase } from '@typescript-eslint/rule-tester';
-
-import { RuleTester } from '@typescript-eslint/rule-tester';
-
-import type { MessageIds, Options } from '../../src/rules/unbound-method';
-
-
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
+// Every case from typescript-eslint v8.28.0, with messages and full ranges
+// additionally pinned from the same upstream version. The receiver-union message difference is explained inline.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/tests/rules/unbound-method.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
 const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  fixtureFiles: {
+    'tsconfig.json':
+      '{"compilerOptions":{"jsx":"preserve","target":"es2015","module":"commonjs","strict":true,"types":[],"lib":["es2015","es2017","esnext"],"experimentalDecorators":true},"include":["*.ts","*.tsx"]}',
+    'class.ts': `// used by no-throw-literal test case to validate custom error
+export class Error {}
+
+// used by unbound-method test case to test imports
+export const console = { log() {} };
+
+// used by prefer-reduce-type-parameter to test native vs userland check
+export class Reducable {
+  reduce() {}
+}
+
+// used by no-implied-eval test function imports
+export class Function {}
+`,
+  },
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
     },
   },
 });
 
-function addContainsMethodsClass(code: string): string {
-  return `
+ruleTester.run('unbound-method', {
+  valid: [
+    {
+      code: 'Promise.resolve().then(console.log);',
+      filename: 'file.ts',
+    },
+    {
+      code: "['1', '2', '3'].map(Number.parseInt);",
+      filename: 'file.ts',
+    },
+    {
+      code: '[5.2, 7.1, 3.6].map(Math.floor);',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Number;
+      ['1', '2', '3'].map(foo.parseInt);
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Math;
+      [5.2, 7.1, 3.6].map(foo.floor);
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: "['1', '2', '3'].map(Number['floor']);",
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = console.log;',
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Object.defineProperty;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Object;
+      const x = foo.defineProperty;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = String.fromCharCode;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = String;
+      const x = foo.fromCharCode;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = RegExp.prototype;',
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Symbol.keyFor;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Symbol;
+      const x = foo.keyFor;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Array.isArray;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Array;
+      const x = foo.isArray;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      class Foo extends Array {}
+      const x = Foo.isArray;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Proxy.revocable;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Proxy;
+      const x = foo.revocable;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Date.parse;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Date;
+      const x = foo.parse;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Atomics.load;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = Atomics;
+      const x = foo.load;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = Reflect.deleteProperty;',
+      filename: 'file.ts',
+    },
+    {
+      code: 'const x = JSON.stringify;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const foo = JSON;
+      const x = foo.stringify;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const o = {
+        f: function (this: void) {},
+      };
+      const f = o.f;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      const { alert } = window;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      let b = window.blur;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+      function foo() {}
+      const fooObject = { foo };
+      const { foo: bar } = fooObject;
+    `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class ContainsMethods {
   bound?: () => void;
   unbound?(): void;
@@ -37,210 +216,1684 @@ const arith = {
   }
 };
 
-${code}
-  `;
-}
-function addContainsMethodsClassInvalid(
-  code: string[],
-): InvalidTestCase<MessageIds, Options>[] {
-  return code.map(c => ({
-    code: addContainsMethodsClass(c),
-    errors: [
-      {
-        line: 18,
-        messageId: 'unboundWithoutThisAnnotation',
-      },
-    ],
-  }));
+instance.bound();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
 }
 
-ruleTester.run('unbound-method', {
-  valid: [
-    'Promise.resolve().then(console.log);',
-    "['1', '2', '3'].map(Number.parseInt);",
-    '[5.2, 7.1, 3.6].map(Math.floor);',
-    `
-      const foo = Number;
-      ['1', '2', '3'].map(foo.parseInt);
-    `,
-    `
-      const foo = Math;
-      [5.2, 7.1, 3.6].map(foo.floor);
-    `,
-    "['1', '2', '3'].map(Number['floor']);",
-    'const x = console.log;',
-    'const x = Object.defineProperty;',
-    `
-      const foo = Object;
-      const x = foo.defineProperty;
-    `,
-    'const x = String.fromCharCode;',
-    `
-      const foo = String;
-      const x = foo.fromCharCode;
-    `,
-    'const x = RegExp.prototype;',
-    'const x = Symbol.keyFor;',
-    `
-      const foo = Symbol;
-      const x = foo.keyFor;
-    `,
-    'const x = Array.isArray;',
-    `
-      const foo = Array;
-      const x = foo.isArray;
-    `,
-    `
-      class Foo extends Array {}
-      const x = Foo.isArray;
-    `,
-    'const x = Proxy.revocable;',
-    `
-      const foo = Proxy;
-      const x = foo.revocable;
-    `,
-    'const x = Date.parse;',
-    `
-      const foo = Date;
-      const x = foo.parse;
-    `,
-    'const x = Atomics.load;',
-    `
-      const foo = Atomics;
-      const x = foo.load;
-    `,
-    'const x = Reflect.deleteProperty;',
-    'const x = JSON.stringify;',
-    `
-      const foo = JSON;
-      const x = foo.stringify;
-    `,
-    `
-      const o = {
-        f: function (this: void) {},
-      };
-      const f = o.f;
-    `,
-    `
-      const { alert } = window;
-    `,
-    `
-      let b = window.blur;
-    `,
-    `
-      function foo() {}
-      const fooObject = { foo };
-      const { foo: bar } = fooObject;
-    `,
-    ...[
-      'instance.bound();',
-      'instance.unbound();',
+let instance = new ContainsMethods();
 
-      'ContainsMethods.boundStatic();',
-      'ContainsMethods.unboundStatic();',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'const bound = instance.bound;',
-      'const boundStatic = ContainsMethods;',
+instance.unbound();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'const { bound } = instance;',
-      'const { boundStatic } = ContainsMethods;',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      '(instance.bound)();',
-      '(instance.unbound)();',
+let instance = new ContainsMethods();
 
-      '(ContainsMethods.boundStatic)();',
-      '(ContainsMethods.unboundStatic)();',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'instance.bound``;',
-      'instance.unbound``;',
+ContainsMethods.boundStatic();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'if (instance.bound) { }',
-      'if (instance.unbound) { }',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'if (instance.bound !== undefined) { }',
-      'if (instance.unbound !== undefined) { }',
+let instance = new ContainsMethods();
 
-      'if (ContainsMethods.boundStatic) { }',
-      'if (ContainsMethods.unboundStatic) { }',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'if (ContainsMethods.boundStatic !== undefined) { }',
-      'if (ContainsMethods.unboundStatic !== undefined) { }',
+ContainsMethods.unboundStatic();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'if (ContainsMethods.boundStatic && instance) { }',
-      'if (ContainsMethods.unboundStatic && instance) { }',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'if (instance.bound || instance) { }',
-      'if (instance.unbound || instance) { }',
+let instance = new ContainsMethods();
 
-      'ContainsMethods.unboundStatic && 0 || ContainsMethods;',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      '(instance.bound || instance) ? 1 : 0',
-      '(instance.unbound || instance) ? 1 : 0',
+const bound = instance.bound;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'while (instance.bound) { }',
-      'while (instance.unbound) { }',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'while (instance.bound !== undefined) { }',
-      'while (instance.unbound !== undefined) { }',
+let instance = new ContainsMethods();
 
-      'while (ContainsMethods.boundStatic) { }',
-      'while (ContainsMethods.unboundStatic) { }',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'while (ContainsMethods.boundStatic !== undefined) { }',
-      'while (ContainsMethods.unboundStatic !== undefined) { }',
+const boundStatic = ContainsMethods;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'instance.bound as any;',
-      'ContainsMethods.boundStatic as any;',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'instance.bound++;',
-      '+instance.bound;',
-      '++instance.bound;',
-      'instance.bound--;',
-      '-instance.bound;',
-      '--instance.bound;',
-      'instance.bound += 1;',
-      'instance.bound -= 1;',
-      'instance.bound *= 1;',
-      'instance.bound /= 1;',
+let instance = new ContainsMethods();
 
-      'instance.bound || 0;',
-      'instance.bound && 0;',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'instance.bound ? 1 : 0;',
-      'instance.unbound ? 1 : 0;',
+const { bound } = instance;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'ContainsMethods.boundStatic++;',
-      '+ContainsMethods.boundStatic;',
-      '++ContainsMethods.boundStatic;',
-      'ContainsMethods.boundStatic--;',
-      '-ContainsMethods.boundStatic;',
-      '--ContainsMethods.boundStatic;',
-      'ContainsMethods.boundStatic += 1;',
-      'ContainsMethods.boundStatic -= 1;',
-      'ContainsMethods.boundStatic *= 1;',
-      'ContainsMethods.boundStatic /= 1;',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'ContainsMethods.boundStatic || 0;',
-      'instane.boundStatic && 0;',
+let instance = new ContainsMethods();
 
-      'ContainsMethods.boundStatic ? 1 : 0;',
-      'ContainsMethods.unboundStatic ? 1 : 0;',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      "typeof instance.bound === 'function';",
-      "typeof instance.unbound === 'function';",
+const { boundStatic } = ContainsMethods;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      "typeof ContainsMethods.boundStatic === 'function';",
-      "typeof ContainsMethods.unboundStatic === 'function';",
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      'instance.unbound = () => {};',
-      'instance.unbound = instance.unbound.bind(instance);',
-      'if (!!instance.unbound) {}',
-      'void instance.unbound',
-      'delete instance.unbound',
+let instance = new ContainsMethods();
 
-      'const { double } = arith;',
-    ].map(addContainsMethodsClass),
-    `
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(instance.bound)();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(instance.unbound)();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(ContainsMethods.boundStatic)();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(ContainsMethods.unboundStatic)();
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound\`\`;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound\`\`;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.bound) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.unbound) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.bound !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.unbound !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.boundStatic) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.unboundStatic) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.boundStatic !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.unboundStatic !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.boundStatic && instance) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (ContainsMethods.unboundStatic && instance) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.bound || instance) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (instance.unbound || instance) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic && 0 || ContainsMethods;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(instance.bound || instance) ? 1 : 0
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+(instance.unbound || instance) ? 1 : 0
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (instance.bound) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (instance.unbound) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (instance.bound !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (instance.unbound !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (ContainsMethods.boundStatic) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (ContainsMethods.unboundStatic) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (ContainsMethods.boundStatic !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+while (ContainsMethods.unboundStatic !== undefined) { }
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound as any;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic as any;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound++;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
++instance.bound;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+++instance.bound;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound--;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+-instance.bound;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+--instance.bound;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound += 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound -= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound *= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound /= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound || 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound && 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.bound ? 1 : 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound ? 1 : 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic++;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
++ContainsMethods.boundStatic;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+++ContainsMethods.boundStatic;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic--;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+-ContainsMethods.boundStatic;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+--ContainsMethods.boundStatic;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic += 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic -= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic *= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic /= 1;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic || 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instane.boundStatic && 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.boundStatic ? 1 : 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic ? 1 : 0;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+typeof instance.bound === 'function';
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+typeof instance.unbound === 'function';
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+typeof ContainsMethods.boundStatic === 'function';
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+typeof ContainsMethods.unboundStatic === 'function';
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound = () => {};
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound = instance.unbound.bind(instance);
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+if (!!instance.unbound) {}
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+void instance.unbound
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+delete instance.unbound
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const { double } = arith;
+  `,
+      filename: 'file.ts',
+    },
+    {
+      code: `
 interface RecordA {
   readonly type: 'A';
   readonly a: {};
@@ -256,20 +1909,27 @@ function test(obj: AnyRecord) {
   }
 }
     `,
-    // https://github.com/typescript-eslint/typescript-eslint/issues/496
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class CommunicationError {
   constructor() {
     const x = CommunicationError.prototype;
   }
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class CommunicationError {}
 const x = CommunicationError.prototype;
     `,
-    // optional chain
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class ContainsMethods {
   bound?: () => void;
   unbound?(): void;
@@ -291,8 +1951,10 @@ function foo(instance: ContainsMethods | null) {
   typeof instance?.unbound === 'function';
 }
     `,
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1425
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 interface OptionalMethod {
   mightBeDefined?(): void;
 }
@@ -303,8 +1965,10 @@ if (myCondition || x.mightBeDefined) {
   console.log('hello world');
 }
     `,
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1256
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class A {
   unbound(): void {
     this.unbound = undefined;
@@ -312,49 +1976,79 @@ class A {
   }
 }
     `,
-    'const { parseInt } = Number;',
-    'const { log } = console;',
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: 'const { parseInt } = Number;',
+      filename: 'file.ts',
+    },
+    {
+      code: 'const { log } = console;',
+      filename: 'file.ts',
+    },
+    {
+      code: `
 let parseInt;
 ({ parseInt } = Number);
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 let log;
 ({ log } = console);
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 const foo = {
   bar: 'bar',
 };
 const { bar } = foo;
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbnound() {}
   bar = 4;
 }
 const { bar } = new Foo();
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
 const { bound } = new Foo();
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
 function foo({ bound } = new Foo()) {}
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
 declare const bar: Foo;
 function foo({ bound }: Foo) {}
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
@@ -363,19 +2057,28 @@ class Bar {
 }
 function foo({ bound }: Foo | Bar) {}
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
 type foo = ({ bound }: Foo) => void;
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 type foo = ({ unbound }: Foo) => void;
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   bound = () => 'foo';
 }
@@ -384,20 +2087,32 @@ class Bar {
 }
 function foo({ bound }: Foo & Bar) {}
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 declare const { unbound }: Foo;
     `,
-    "declare const { unbound } = '***';",
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: "declare const { unbound } = '***';",
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 type foo = (a: (b: (c: ({ unbound }: Foo) => void) => void) => void) => void;
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -405,13 +2120,19 @@ class Bar {
   property: ({ unbound }: Foo) => void;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 function foo<T extends ({ unbound }: Foo) => void>() {}
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -419,7 +2140,10 @@ abstract class Bar {
   abstract foo({ unbound }: Foo);
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -427,13 +2151,19 @@ declare class Bar {
   foo({ unbound }: Foo);
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 declare function foo({ unbound }: Foo);
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -441,7 +2171,10 @@ interface Bar {
   foo: ({ unbound }: Foo) => void;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -449,7 +2182,10 @@ interface Bar {
   foo({ unbound }: Foo): void;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
@@ -457,16 +2193,27 @@ interface Bar {
   new ({ unbound }: Foo): Foo;
 }
     `,
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class Foo {
   unbound = function () {};
 }
 type foo = new ({ unbound }: Foo) => void;
     `,
-    'const { unbound } = { unbound: () => {} };',
-    'function foo({ unbound }: { unbound: () => void } = { unbound: () => {} }) {}',
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1866
-    `
+      filename: 'file.ts',
+    },
+    {
+      code: 'const { unbound } = { unbound: () => {} };',
+      filename: 'file.ts',
+    },
+    {
+      code: 'function foo({ unbound }: { unbound: () => void } = { unbound: () => {} }) {}',
+      filename: 'file.ts',
+    },
+    {
+      code: `
 class BaseClass {
   x: number = 42;
   logThis() {}
@@ -481,6 +2228,8 @@ class OtherClass extends BaseClass {
 const oc = new OtherClass();
 oc.superLogThis();
     `,
+      filename: 'file.ts',
+    },
   ],
   invalid: [
     {
@@ -495,10 +2244,16 @@ const console = new Console();
 
 Promise.resolve().then(console.log);
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 10,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 10,
+          column: 24,
+          endLine: 10,
+          endColumn: 35,
         },
       ],
     },
@@ -507,54 +2262,439 @@ Promise.resolve().then(console.log);
 import { console } from './class';
 const x = console.log;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 22,
         },
       ],
     },
     {
-      code: addContainsMethodsClass(`
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+
 function foo(arg: ContainsMethods | null) {
   const unbound = arg?.unbound;
   arg.unbound += 1;
   arg?.unbound as any;
 }
-      `),
+\x20\x20\x20\x20\x20\x20
+  `,
+      filename: 'file.ts',
       errors: [
         {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
           line: 20,
-          messageId: 'unboundWithoutThisAnnotation',
+          column: 19,
+          endLine: 20,
+          endColumn: 31,
         },
         {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
           line: 21,
-          messageId: 'unboundWithoutThisAnnotation',
+          column: 3,
+          endLine: 21,
+          endColumn: 14,
         },
         {
-          line: 22,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 22,
+          column: 3,
+          endLine: 22,
+          endColumn: 15,
         },
       ],
     },
-    ...addContainsMethodsClassInvalid([
-      'const unbound = instance.unbound;',
-      'const unboundStatic = ContainsMethods.unboundStatic;',
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'const { unbound } = instance;',
-      'const { unboundStatic } = ContainsMethods;',
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
 
-      '<any>instance.unbound;',
-      'instance.unbound as any;',
+let instance = new ContainsMethods();
 
-      '<any>ContainsMethods.unboundStatic;',
-      'ContainsMethods.unboundStatic as any;',
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
 
-      'instance.unbound || 0;',
-      'ContainsMethods.unboundStatic || 0;',
+const unbound = instance.unbound;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 17,
+          endLine: 18,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
 
-      'instance.unbound ? instance.unbound : null',
-    ]),
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const unboundStatic = ContainsMethods.unboundStatic;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 23,
+          endLine: 18,
+          endColumn: 52,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const { unbound } = instance;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 9,
+          endLine: 18,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const { unboundStatic } = ContainsMethods;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 9,
+          endLine: 18,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+<any>instance.unbound;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 6,
+          endLine: 18,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound as any;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 1,
+          endLine: 18,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+<any>ContainsMethods.unboundStatic;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 6,
+          endLine: 18,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic as any;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 1,
+          endLine: 18,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound || 0;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 1,
+          endLine: 18,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic || 0;
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 1,
+          endLine: 18,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: `
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound ? instance.unbound : null
+  `,
+      filename: 'file.ts',
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 18,
+          column: 20,
+          endLine: 18,
+          endColumn: 36,
+        },
+      ],
+    },
     {
       code: `
 class ContainsMethods {
@@ -567,19 +2707,24 @@ new ContainsMethods().unbound;
 
 ContainsMethods.unboundStatic;
       `,
-      errors: [
-        {
-          line: 8,
-          messageId: 'unboundWithoutThisAnnotation',
-        },
-      ],
+      filename: 'file.ts',
       options: [
         {
           ignoreStatic: true,
         },
       ],
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 30,
+        },
+      ],
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/496
     {
       code: `
 class CommunicationError {
@@ -587,20 +2732,31 @@ class CommunicationError {
 }
 const x = CommunicationError.prototype.foo;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 43,
         },
       ],
     },
     {
-      // Promise.all is not auto-bound to Promise
       code: 'const x = Promise.all;',
+      filename: 'file.ts',
       errors: [
         {
-          line: 1,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -616,10 +2772,16 @@ let x;
 x = instance.unbound; // THIS SHOULD ERROR
 instance.unbound = x; // THIS SHOULD NOT
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 9,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 9,
+          column: 5,
+          endLine: 9,
+          endColumn: 21,
         },
       ],
     },
@@ -631,10 +2793,16 @@ class Foo extends Number {
 const foo = Foo;
 ['1', '2', '3'].map(foo.parseInt);
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 21,
+          endLine: 6,
+          endColumn: 33,
         },
       ],
     },
@@ -643,10 +2811,16 @@ const foo = Foo;
 declare const foo: Number;
 const x = foo.toFixed;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 22,
         },
       ],
     },
@@ -655,10 +2829,16 @@ const x = foo.toFixed;
 declare const foo: Object;
 const x = foo.hasOwnProperty;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 29,
         },
       ],
     },
@@ -667,10 +2847,16 @@ const x = foo.hasOwnProperty;
 declare const foo: String;
 const x = foo.slice;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 20,
         },
       ],
     },
@@ -679,10 +2865,16 @@ const x = foo.slice;
 declare const foo: Date;
 const x = foo.getTime;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 22,
         },
       ],
     },
@@ -691,10 +2883,16 @@ const x = foo.getTime;
 class Foo extends Number {}
 const x = Foo.parseInt;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
     },
@@ -703,10 +2901,16 @@ const x = Foo.parseInt;
 class Foo extends String {}
 const x = Foo.fromCharCode;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -715,10 +2919,16 @@ const x = Foo.fromCharCode;
 class Foo extends Object {}
 const x = Foo.defineProperty;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 29,
         },
       ],
     },
@@ -727,10 +2937,16 @@ const x = Foo.defineProperty;
 class Foo extends Date {}
 const x = Foo.parse;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 20,
         },
       ],
     },
@@ -741,10 +2957,16 @@ class Foo {
 }
 const unbound = new Foo().unbound;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 17,
+          endLine: 5,
+          endColumn: 34,
         },
       ],
     },
@@ -755,10 +2977,16 @@ class Foo {
 }
 const { unbound } = new Foo();
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 16,
         },
       ],
     },
@@ -769,10 +2997,16 @@ class Foo {
 }
 const { unbound } = new Foo();
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 16,
         },
       ],
     },
@@ -784,10 +3018,16 @@ class Foo {
 let unbound;
 ({ unbound } = new Foo());
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 6,
+          column: 4,
+          endLine: 6,
+          endColumn: 11,
         },
       ],
     },
@@ -799,10 +3039,16 @@ class Foo {
 let unbound;
 ({ unbound } = new Foo());
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 4,
+          endLine: 6,
+          endColumn: 11,
         },
       ],
     },
@@ -813,10 +3059,16 @@ class Foo {
 }
 function foo({ unbound }: Foo = new Foo()) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 16,
+          endLine: 5,
+          endColumn: 23,
         },
       ],
     },
@@ -828,10 +3080,16 @@ class Foo {
 declare const bar: Foo;
 function foo({ unbound }: Foo = bar) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 23,
         },
       ],
     },
@@ -843,10 +3101,16 @@ class Foo {
 declare const bar: Foo;
 function foo({ unbound }: Foo = { unbound: () => {} }) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 23,
         },
       ],
     },
@@ -858,10 +3122,16 @@ class Foo {
 declare const bar: Foo;
 function foo({ unbound }: Foo = { unbound: function () {} }) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 23,
         },
       ],
     },
@@ -872,10 +3142,16 @@ class Foo {
 }
 function foo({ unbound }: Foo) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 16,
+          endLine: 5,
+          endColumn: 23,
         },
       ],
     },
@@ -887,10 +3163,16 @@ class Foo {
 function bar(cb: (arg: Foo) => void) {}
 bar(({ unbound }) => {});
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 15,
         },
       ],
     },
@@ -902,10 +3184,16 @@ class Foo {
 function bar(cb: (arg: { unbound: () => void }) => void) {}
 bar(({ unbound } = new Foo()) => {});
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 15,
         },
       ],
     },
@@ -917,10 +3205,16 @@ class Foo {
 for (const { unbound } of [new Foo(), new Foo()]) {
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 21,
         },
       ],
     },
@@ -932,10 +3226,16 @@ class Foo {
   foo({ unbound }: Foo) {}
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 16,
         },
       ],
     },
@@ -949,10 +3249,16 @@ class Bar {
 }
 function foo({ unbound }: Foo | Bar) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 8,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 8,
+          column: 16,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
     },
@@ -963,10 +3269,16 @@ class Foo {
 }
 function foo({ unbound }: { unbound: () => string } | Foo) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 16,
+          endLine: 5,
+          endColumn: 23,
         },
       ],
     },
@@ -980,10 +3292,16 @@ class Bar {
 }
 function foo({ unbound }: Foo | Bar) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 8,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 8,
+          column: 16,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
     },
@@ -994,10 +3312,16 @@ class Foo {
 }
 const foo = ({ unbound }: Foo & { foo: () => 'bar' }) => {};
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 5,
+          column: 16,
+          endLine: 5,
+          endColumn: 23,
         },
       ],
     },
@@ -1011,10 +3335,16 @@ class Bar {
 }
 const foo = ({ unbound }: (Foo & { foo: () => 'bar' }) | Bar) => {};
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 8,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 8,
+          column: 16,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
     },
@@ -1028,10 +3358,16 @@ class Bar {
 }
 const foo = ({ unbound }: Foo & Bar) => {};
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 8,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 8,
+          column: 16,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
     },
@@ -1047,19 +3383,31 @@ class Bar {
 }
 const foo = ({ unbound, ...rest }: Foo & Bar) => {};
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 10,
           messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
+          line: 10,
+          column: 16,
+          endLine: 10,
+          endColumn: 23,
         },
       ],
     },
     {
       code: 'const { unbound } = { unbound: function () {} };',
+      filename: 'file.ts',
       errors: [
         {
-          line: 1,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 16,
         },
       ],
     },
@@ -1069,10 +3417,16 @@ function foo(
   { unbound }: { unbound: () => void } = { unbound: function () {} },
 ) {}
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 12,
         },
       ],
     },
@@ -1084,10 +3438,18 @@ class Foo {
 
 const { floor } = Math.random() > 0.5 ? new Foo() : Math;
       `,
+      filename: 'file.ts',
       errors: [
         {
+          // Upstream visits Math's method first; tsgo visits Foo's function field.
+          // Keep the field diagnostic: this annotation cannot exempt such fields.
+          messageId: 'unbound',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.',
           line: 6,
-          messageId: 'unboundWithoutThisAnnotation',
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1098,10 +3460,16 @@ class CommunicationError {
 }
 const { foo } = CommunicationError.prototype;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 12,
         },
       ],
     },
@@ -1113,10 +3481,16 @@ class CommunicationError {
 let foo;
 ({ foo } = CommunicationError.prototype);
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 6,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 6,
+          column: 4,
+          endLine: 6,
+          endColumn: 7,
         },
       ],
     },
@@ -1125,23 +3499,34 @@ let foo;
 import { console } from './class';
 const { log } = console;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 3,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 12,
         },
       ],
     },
     {
       code: 'const { all } = Promise;',
+      filename: 'file.ts',
       errors: [
         {
-          line: 1,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1866
     {
       code: `
 class BaseClass {
@@ -1154,15 +3539,19 @@ class OtherClass extends BaseClass {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 15,
-          line: 8,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 8,
+          column: 15,
+          endLine: 8,
+          endColumn: 28,
         },
       ],
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1866
     {
       code: `
 class BaseClass {
@@ -1176,11 +3565,16 @@ class OtherClass extends BaseClass {
   }
 }
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 9,
-          line: 9,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 9,
+          column: 9,
+          endLine: 9,
+          endColumn: 22,
         },
       ],
     },
@@ -1193,12 +3587,16 @@ const values = {
 
 const { a, b } = values;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 9,
-          endColumn: 10,
-          line: 7,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 7,
+          column: 9,
+          endLine: 7,
+          endColumn: 10,
         },
       ],
     },
@@ -1211,12 +3609,16 @@ const values = {
 
 const { a: c } = values;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 9,
-          endColumn: 10,
-          line: 7,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 7,
+          column: 9,
+          endLine: 7,
+          endColumn: 10,
         },
       ],
     },
@@ -1229,16 +3631,19 @@ const values = {
 
 const { b, a } = values;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          column: 12,
-          endColumn: 13,
-          line: 7,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 7,
+          column: 12,
+          endLine: 7,
+          endColumn: 13,
         },
       ],
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/8636
     {
       code: `
 const objectLiteral = {
@@ -1246,10 +3651,16 @@ const objectLiteral = {
 };
 const f = objectLiteral.f;
       `,
+      filename: 'file.ts',
       errors: [
         {
-          line: 5,
           messageId: 'unboundWithoutThisAnnotation',
+          message: `Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.`,
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 26,
         },
       ],
     },

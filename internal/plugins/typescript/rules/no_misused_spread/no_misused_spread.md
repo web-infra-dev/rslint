@@ -39,6 +39,14 @@ const obj = Object.fromEntries(map);
 const chars = Array.from(new Intl.Segmenter().segment('hello'));
 ```
 
+## Differences from upstream
+
+Map-spread suggestions preserve necessary token separation: `return{ ...map }`
+becomes `return Object.fromEntries(map)`. They also preserve authored comments,
+lint directives and line endings. When comments surround the spread argument,
+the suggestion keeps parentheses and existing whitespace so line comments cannot
+change `return`, `throw` or `yield` behavior.
+
 ## Original Documentation
 
 - [typescript-eslint: no-misused-spread](https://typescript-eslint.io/rules/no-misused-spread)

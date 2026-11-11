@@ -2,10 +2,12 @@ package no_misused_spread
 
 import (
 	_ "embed"
+	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -65,10 +67,10 @@ func buildNoPromiseSpreadInObjectMessage() rule.RuleMessage {
 func buildNoStringSpreadMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id: "noStringSpread",
-		Description: "Using the spread operator on a string can mishandle special characters, as can `.split(\"\")`.\n'" +
-			"- `...` produces Unicode code points, which will decompose complex emojis into individual emojis" +
-			"- .split(\"\") produces UTF-16 code units, which breaks rich characters in many languages" +
-			"Consider using `Intl.Segmenter` for locale-aware string decomposition." +
+		Description: "Using the spread operator on a string can mishandle special characters, as can `.split(\"\")`.\n" +
+			"- `...` produces Unicode code points, which will decompose complex emojis into individual emojis\n" +
+			"- .split(\"\") produces UTF-16 code units, which breaks rich characters in many languages\n" +
+			"Consider using `Intl.Segmenter` for locale-aware string decomposition.\n" +
 			"Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
 	}
 }
@@ -168,6 +170,41 @@ func isClassDeclaration(t *checker.Type) bool {
 	})
 }
 
+// Rebuilding a sole-spread object from only its inner expression would drop
+// comments in the braces, spread trivia, or parentheses stripped from the argument.
+func mapSpreadNeedsCommentPreservation(ctx *rule.RuleContext, object, inner *ast.Node) bool {
+	objectRange := utils.TrimNodeTextRange(ctx.SourceFile, object)
+	innerRange := utils.TrimNodeTextRange(ctx.SourceFile, inner)
+	comments := ctx.Comments.All()
+	start := sort.Search(len(comments), func(i int) bool { return comments[i].End() > objectRange.Pos() })
+	for _, comment := range comments[start:] {
+		if comment.Pos() >= objectRange.End() {
+			break
+		}
+		if comment.Pos() < innerRange.Pos() || comment.End() > innerRange.End() {
+			return true
+		}
+	}
+	return false
+}
+
+func mapSpreadFixesPreservingComments(ctx *rule.RuleContext, spread, argument *ast.Node) []rule.RuleFix {
+	object := spread.Parent
+	// Keep every comment and newline in place. Parentheses replace the braces
+	// so a leading line comment cannot introduce ASI after return/throw/yield.
+	fixes := []rule.RuleFix{
+		rule.RuleFixReplaceRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, object.Pos()), "("),
+		rule.RuleFixReplaceRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, spread.Pos()), "Object.fromEntries("),
+		rule.RuleFixInsertAfter(argument, ")"),
+		rule.RuleFixReplaceRange(object.Loc.WithPos(object.End()-1), ")"),
+	}
+	if token, ok := utils.TokenAtOrAfter(ctx.SourceFile, argument.End()); ok && token.Kind == ast.KindCommaToken {
+		// A trailing object comma must not become a comma expression inside ().
+		fixes = append(fixes, rule.RuleFixRemoveRange(token.Range()))
+	}
+	return fixes
+}
+
 var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-spread",
 	Schema:           rule.NewSchema(schemaJSON),
@@ -202,32 +239,37 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			if ast.IsObjectLiteralExpression(node.Parent) {
-				properties := node.Parent.AsObjectLiteralExpression().Properties
-				if len(properties.Nodes) == 1 {
-					return []rule.RuleSuggestion{
-						{
-							Message: buildReplaceMapSpreadInObjectMessage(),
-							FixesArr: []rule.RuleFix{
-								rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Parent.Pos())),                  // {
-								rule.RuleFixReplaceRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()), "Object.fromEntries("), // ...
-								rule.RuleFixReplaceRange(properties.Loc.WithPos(argument.End()), ")"),
-								rule.RuleFixRemoveRange(node.Parent.Loc.WithPos(node.Parent.End() - 1)), // }
-							},
-						},
-					}
+			// ESTree omits parentheses. Replace the complete target instead of
+			// inserting around tsgo nodes, whose ranges include leading trivia.
+			inner := ast.SkipParentheses(argument)
+			text := utils.TrimNodeTextRange(ctx.SourceFile, inner)
+			code := ctx.SourceFile.Text()[text.Pos():text.End()]
+			if !utils.IsStrongPrecedenceNode(inner) {
+				code = "(" + code + ")"
+			}
+			target := inner
+			if ast.IsObjectLiteralExpression(node.Parent) && len(node.Parent.AsObjectLiteralExpression().Properties.Nodes) == 1 {
+				target = node.Parent
+				if mapSpreadNeedsCommentPreservation(&ctx, target, inner) {
+					return []rule.RuleSuggestion{{
+						Message:  buildReplaceMapSpreadInObjectMessage(),
+						FixesArr: mapSpreadFixesPreservingComments(&ctx, node, argument),
+					}}
 				}
 			}
-
-			return []rule.RuleSuggestion{
-				{
-					Message: buildReplaceMapSpreadInObjectMessage(),
-					FixesArr: []rule.RuleFix{
-						rule.RuleFixInsertBefore(ctx.SourceFile, argument, "Object.fromEntries("),
-						rule.RuleFixInsertAfter(argument, ")"),
-					},
-				},
+			code = "Object.fromEntries(" + code + ")"
+			if typescriptutil.IsWeakPrecedenceParent(target) {
+				code = "(" + code + ")"
 			}
+			if target == node.Parent {
+				// The replacement starts with an identifier where the object used
+				// to start with `{`, as in `return{ ...map }`.
+				code = utils.SafeReplacementText(ctx.SourceFile, target, code)
+			}
+			return []rule.RuleSuggestion{{
+				Message:  buildReplaceMapSpreadInObjectMessage(),
+				FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, target, code)},
+			}}
 		}
 
 		checkObjectSpread := func(node *ast.Node, argument *ast.Node) {

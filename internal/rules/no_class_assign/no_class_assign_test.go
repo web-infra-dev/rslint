@@ -55,7 +55,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { } A = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
@@ -63,7 +63,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { } ({A} = 0);`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 15},
+					{MessageId: "class", Line: 1, Column: 15},
 				},
 			},
 
@@ -71,7 +71,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { } ({b: A = 0} = {});`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 18},
+					{MessageId: "class", Line: 1, Column: 18},
 				},
 			},
 
@@ -79,7 +79,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { } [A] = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 14},
+					{MessageId: "class", Line: 1, Column: 14},
 				},
 			},
 
@@ -87,7 +87,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `A = 0; class A { }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 1},
+					{MessageId: "class", Line: 1, Column: 1},
 				},
 			},
 
@@ -95,7 +95,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { b() { A = 0; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 17},
+					{MessageId: "class", Line: 1, Column: 17},
 				},
 			},
 
@@ -103,7 +103,7 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `let A = class A { b() { A = 0; } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 25},
+					{MessageId: "class", Line: 1, Column: 25},
 				},
 			},
 
@@ -111,8 +111,8 @@ func TestNoClassAssignRule(t *testing.T) {
 			{
 				Code: `class A { } A = 0; A = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
-					{MessageId: "classReassignment", Line: 1, Column: 20},
+					{MessageId: "class", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 20},
 				},
 			},
 
@@ -126,11 +126,11 @@ A++;
 for (A in object) {}
 for (A of values) {}`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 2, Column: 1},
-					{MessageId: "classReassignment", Line: 3, Column: 1},
-					{MessageId: "classReassignment", Line: 4, Column: 2},
-					{MessageId: "classReassignment", Line: 5, Column: 6},
-					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 6, Column: 6},
+					{MessageId: "class", Message: "'A' is a class.", Line: 2, Column: 1},
+					{MessageId: "class", Line: 3, Column: 1},
+					{MessageId: "class", Line: 4, Column: 2},
+					{MessageId: "class", Line: 5, Column: 6},
+					{MessageId: "class", Message: "'A' is a class.", Line: 6, Column: 6},
 				},
 			},
 
@@ -138,98 +138,98 @@ for (A of values) {}`,
 			{
 				Code: `class A { } A += 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A -= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A *= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A /= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A %= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A <<= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A >>= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A >>>= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A &= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A |= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A ^= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A &&= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A ||= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A ??= 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
@@ -237,28 +237,28 @@ for (A of values) {}`,
 			{
 				Code: `class A { } A++;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } A--;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 13},
+					{MessageId: "class", Line: 1, Column: 13},
 				},
 			},
 
 			{
 				Code: `class A { } ++A;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 15},
+					{MessageId: "class", Line: 1, Column: 15},
 				},
 			},
 
 			{
 				Code: `class A { } --A;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 15},
+					{MessageId: "class", Line: 1, Column: 15},
 				},
 			},
 
@@ -266,7 +266,7 @@ for (A of values) {}`,
 			{
 				Code: `class A { b() { c(() => { A = 0; }); } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 27},
+					{MessageId: "class", Line: 1, Column: 27},
 				},
 			},
 
@@ -274,7 +274,7 @@ for (A of values) {}`,
 			{
 				Code: `class A { } (A as any) = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Line: 1, Column: 14},
+					{MessageId: "class", Line: 1, Column: 14},
 				},
 			},
 
@@ -285,7 +285,7 @@ for (A of values) {}`,
 				Code: `export default class A {}
 A = 0;`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "classReassignment", Message: "'A' is a class.", Line: 2, Column: 1},
+					{MessageId: "class", Message: "'A' is a class.", Line: 2, Column: 1},
 				},
 			},
 		},

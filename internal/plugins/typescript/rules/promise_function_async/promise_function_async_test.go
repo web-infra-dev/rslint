@@ -245,7 +245,7 @@ const nonAsyncPromiseFunctionExpressionA = function (p: Promise<void>) {
 };
       `,
 			Output: []string{`
-const nonAsyncPromiseFunctionExpressionA =  async function (p: Promise<void>) {
+const nonAsyncPromiseFunctionExpressionA = async function (p: Promise<void>) {
   return p;
 };
       `,
@@ -263,7 +263,7 @@ const nonAsyncPromiseFunctionExpressionB = function () {
 };
       `,
 			Output: []string{`
-const nonAsyncPromiseFunctionExpressionB =  async function () {
+const nonAsyncPromiseFunctionExpressionB = async function () {
   return new Promise<void>();
 };
       `,
@@ -281,7 +281,7 @@ function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
 }
       `,
 			Output: []string{`
- async function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
+async function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
   return p;
 }
       `,
@@ -299,7 +299,7 @@ function nonAsyncPromiseFunctionDeclarationB() {
 }
       `,
 			Output: []string{`
- async function nonAsyncPromiseFunctionDeclarationB() {
+async function nonAsyncPromiseFunctionDeclarationB() {
   return new Promise<void>();
 }
       `,
@@ -315,7 +315,7 @@ function nonAsyncPromiseFunctionDeclarationB() {
 const nonAsyncPromiseArrowFunctionA = (p: Promise<void>) => p;
       `,
 			Output: []string{`
-const nonAsyncPromiseArrowFunctionA =  async (p: Promise<void>) => p;
+const nonAsyncPromiseArrowFunctionA = async (p: Promise<void>) => p;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -329,7 +329,7 @@ const nonAsyncPromiseArrowFunctionA =  async (p: Promise<void>) => p;
 const nonAsyncPromiseArrowFunctionB = () => new Promise<void>();
       `,
 			Output: []string{`
-const nonAsyncPromiseArrowFunctionB =  async () => new Promise<void>();
+const nonAsyncPromiseArrowFunctionB = async () => new Promise<void>();
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -348,7 +348,7 @@ const functions = {
       `,
 			Output: []string{`
 const functions = {
-   async nonAsyncPromiseMethod() {
+  async nonAsyncPromiseMethod() {
     return Promise.resolve(1);
   },
 };
@@ -375,11 +375,11 @@ class Test {
       `,
 			Output: []string{`
 class Test {
-  public  async nonAsyncPromiseMethodA(p: Promise<void>) {
+  public async nonAsyncPromiseMethodA(p: Promise<void>) {
     return p;
   }
 
-  public static  async nonAsyncPromiseMethodB() {
+  public static async nonAsyncPromiseMethodB() {
     return new Promise<void>();
   }
 }
@@ -415,18 +415,18 @@ class Test {
 }
       `,
 			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
+const nonAsyncPromiseFunctionExpression = async function (p: Promise<void>) {
   return p;
 };
 
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
+async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
   return p;
 }
 
 const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
 
 class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
+  public async nonAsyncPromiseMethod(p: Promise<void>) {
     return p;
   }
 }
@@ -467,7 +467,7 @@ class Test {
 }
       `,
 			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
+const nonAsyncPromiseFunctionExpression = async function (p: Promise<void>) {
   return p;
 };
 
@@ -475,10 +475,10 @@ function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
   return p;
 }
 
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
+const nonAsyncPromiseArrowFunction = async (p: Promise<void>) => p;
 
 class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
+  public async nonAsyncPromiseMethod(p: Promise<void>) {
     return p;
   }
 }
@@ -523,14 +523,14 @@ const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
   return p;
 };
 
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
+async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
   return p;
 }
 
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
+const nonAsyncPromiseArrowFunction = async (p: Promise<void>) => p;
 
 class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
+  public async nonAsyncPromiseMethod(p: Promise<void>) {
     return p;
   }
 }
@@ -571,15 +571,15 @@ class Test {
 }
       `,
 			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
+const nonAsyncPromiseFunctionExpression = async function (p: Promise<void>) {
   return p;
 };
 
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
+async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
   return p;
 }
 
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
+const nonAsyncPromiseArrowFunction = async (p: Promise<void>) => p;
 
 class Test {
   public nonAsyncPromiseMethod(p: Promise<void>) {
@@ -613,7 +613,7 @@ const returnAllowedType = () => new PromiseType();
 			Output: []string{`
 class PromiseType {}
 
-const returnAllowedType =  async () => new PromiseType();
+const returnAllowedType = async () => new PromiseType();
       `,
 			},
 			Options: map[string]interface{}{"allowedPromiseNames": []interface{}{"PromiseType"}},
@@ -635,7 +635,7 @@ function foo(): Promise<string> | SPromise<boolean> {
       `,
 			Output: []string{`
 interface SPromise<T> extends Promise<T> {}
- async function foo(): Promise<string> | SPromise<boolean> {
+async function foo(): Promise<string> | SPromise<boolean> {
   return Math.random() > 0.5
     ? Promise.resolve('value')
     : Promise.resolve(false);
@@ -662,7 +662,7 @@ class Test {
 			Output: []string{`
 class Test {
   @decorator
-  public  async test() {
+  public async test() {
     return Promise.resolve(123);
   }
 }
@@ -671,7 +671,7 @@ class Test {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "missingAsync",
-					Line:      3,
+					Line:      4,
 					Column:    3,
 				},
 			},
@@ -709,7 +709,7 @@ class Test {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "missingAsync",
-					Line:      3,
+					Line:      4,
 					Column:    3,
 				},
 				{
@@ -743,16 +743,16 @@ class Foo {
       `,
 			Output: []string{`
 class Foo {
-   async catch() {
+  async catch() {
     return Promise.resolve(1);
   }
 
-  public  async default() {
+  public async default() {
     return Promise.resolve(2);
   }
 
   @decorator
-  private  async case<T>() {
+  private async case<T>() {
     return Promise.resolve(3);
   }
 }
@@ -771,7 +771,7 @@ class Foo {
 				},
 				{
 					MessageId: "missingAsync",
-					Line:      11,
+					Line:      12,
 					Column:    3,
 				},
 			},
@@ -786,7 +786,7 @@ const foo = {
       `,
 			Output: []string{`
 const foo = {
-   async catch() {
+  async catch() {
     return Promise.resolve(1);
   },
 };
@@ -807,7 +807,7 @@ function promiseInUnionWithoutExplicitReturnType(p: boolean) {
 }
       `,
 			Output: []string{`
- async function promiseInUnionWithoutExplicitReturnType(p: boolean) {
+async function promiseInUnionWithoutExplicitReturnType(p: boolean) {
   return p ? Promise.resolve(5) : 5;
 }
       `,
@@ -831,7 +831,7 @@ function overloadingThatCanReturnPromise(
 			Output: []string{`
 function overloadingThatCanReturnPromise(): Promise<number>;
 function overloadingThatCanReturnPromise(a: boolean): Promise<string>;
- async function overloadingThatCanReturnPromise(
+async function overloadingThatCanReturnPromise(
   a?: boolean,
 ): Promise<number | string> {
   return Promise.resolve(5);

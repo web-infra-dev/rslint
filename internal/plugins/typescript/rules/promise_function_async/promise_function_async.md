@@ -30,6 +30,13 @@ class Baz {
 }
 ```
 
+## Differences from upstream
+
+Autofixes preserve token separation when adding `async` after a keyword. For
+example, `return()=>Promise.resolve(1)` becomes
+`return async ()=>Promise.resolve(1)`, rather than merging `return` and `async`.
+The same safeguard applies after `throw` and `yield`, including generic arrows.
+
 ## Original Documentation
 
 - [typescript-eslint: promise-function-async](https://typescript-eslint.io/rules/promise-function-async)
