@@ -23,9 +23,9 @@ func skipOperand(ctx *rule.RuleContext, evaluator *utils.StaticStringEvaluator, 
 	// contribute a type annotation.
 	cast := ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKNonNullAssertions)
 	if ast.IsAsExpression(cast) || ast.IsTypeAssertion(cast) {
-		annotation := cast.Type()
+		annotation := ast.SkipTypeParentheses(cast.Type())
 		boxedNumber := annotation.Kind == ast.KindTypeReference &&
-			isNamedIdentifier(annotation.AsTypeReferenceNode().TypeName, "Number")
+			unicornutil.NodeMatchesPath(annotation.AsTypeReferenceNode().TypeName, "Number")
 		if annotation.Kind != ast.KindNumberKeyword && !boxedNumber {
 			return true
 		}
@@ -55,7 +55,7 @@ func skipOperand(ctx *rule.RuleContext, evaluator *utils.StaticStringEvaluator, 
 			continue
 		}
 		annotation := declaration.Type()
-		if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) && annotation.Kind != ast.KindNumberKeyword {
+		if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) && ast.SkipTypeParentheses(annotation).Kind != ast.KindNumberKeyword {
 			return true
 		}
 		initializer := utils.ESTreeRuntimeExpression(declaration.Initializer())
@@ -69,16 +69,12 @@ func skipOperand(ctx *rule.RuleContext, evaluator *utils.StaticStringEvaluator, 
 
 func isDateConstruction(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindNewExpression &&
-		isNamedIdentifier(utils.ESTreeRuntimeExpression(node.Expression()), "Date")
+		unicornutil.NodeMatchesPath(node.Expression(), "Date")
 }
 
 func nonNumberLiteral(node *ast.Node) bool {
 	return node != nil && (node.Kind == ast.KindNoSubstitutionTemplateLiteral ||
 		(utils.IsESTreeLiteralKind(node.Kind) && node.Kind != ast.KindNumericLiteral))
-}
-
-func isNamedIdentifier(node *ast.Node, name string) bool {
-	return node != nil && ast.IsIdentifier(node) && node.Text() == name
 }
 
 func isBigInt(ctx *rule.RuleContext, evaluator *utils.StaticStringEvaluator, node *ast.Node) bool {
@@ -148,7 +144,7 @@ func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.N
 		if annotation != nil {
 			return classifyBigIntAnnotation(ctx, annotation, bindings) == annotationBigInt
 		}
-		if declaration.Kind != ast.KindVariableDeclaration || !ast.IsVarConst(declaration.Parent) {
+		if declaration.Kind != ast.KindVariableDeclaration || !ast.IsVarConst(declaration) {
 			return false
 		}
 		// Break cycles and reuse the result for repeated aliases in this operand.
@@ -191,6 +187,7 @@ func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindi
 	if annotation == nil {
 		return annotationOther
 	}
+	annotation = ast.SkipTypeParentheses(annotation)
 	var parts []*ast.Node
 	switch annotation.Kind {
 	case ast.KindBigIntKeyword:
@@ -206,7 +203,7 @@ func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindi
 			return annotationBigInt
 		}
 		return annotationOther
-	case ast.KindParenthesizedType, ast.KindJSDocNullableType, ast.KindJSDocNonNullableType, ast.KindJSDocOptionalType:
+	case ast.KindJSDocNullableType, ast.KindJSDocNonNullableType, ast.KindJSDocOptionalType:
 		return classifyBigIntAnnotation(ctx, annotation.Type(), bindings)
 	case ast.KindTypeReference:
 		symbol := ctx.Refs.ResolveInFileWithMeaning(annotation.AsTypeReferenceNode().TypeName, ast.SymbolFlagsType)
@@ -260,12 +257,12 @@ func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bi
 		return false
 	}
 	callee := utils.ESTreeCallCallee(node.Expression())
-	if isNamedIdentifier(callee, "BigInt") {
+	if unicornutil.NodeMatchesPath(callee, "BigInt") {
 		return true
 	}
 	if call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 		Methods: []string{"asIntN", "asUintN"},
-	}); ok && isNamedIdentifier(utils.ESTreeRuntimeExpression(call.Object), "BigInt") {
+	}); ok && unicornutil.NodeMatchesPath(call.Object, "BigInt") {
 		return true
 	}
 	symbol := ctx.Refs.ResolveInFile(callee)
@@ -278,6 +275,12 @@ func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bi
 	case ast.KindFunctionDeclaration:
 		function = declaration
 	case ast.KindVariableDeclaration, ast.KindParameter:
+		// An explicit TypeScript binding type takes precedence over JSDoc,
+		// even when only the checker can resolve its return type.
+		if bindingType := declaration.Type(); bindingType != nil && !utils.IsJSDocSyntaxNode(bindingType) &&
+			!ast.IsFunctionTypeNode(ast.SkipTypeParentheses(bindingType)) {
+			return false
+		}
 		initializer := utils.ESTreeRuntimeExpression(declaration.Initializer())
 		if initializer != nil {
 			initializer = ast.SkipOuterExpressions(initializer, ast.OEKParentheses|ast.OEKSatisfies|ast.OEKNonNullAssertions)
@@ -285,19 +288,18 @@ func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bi
 				function = initializer
 			}
 		}
-	}
-	if function != nil && (ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync) || function.BodyData().AsteriskToken != nil) {
+	default:
 		return false
 	}
-	annotation, optional := unicornutil.ValueTypeAnnotation(*ctx, declaration)
-	if function != declaration {
-		if annotation != nil {
-			if optional || annotation.Kind != ast.KindFunctionType {
-				return false
-			}
-			annotation = annotation.Type()
-		} else if function != nil && ast.IsVariableDeclaration(declaration) {
-			annotation, _ = unicornutil.ValueTypeAnnotation(*ctx, function)
+	if function != nil && ast.GetFunctionFlags(function)&ast.FunctionFlagsAsyncGenerator != 0 {
+		return false
+	}
+	annotation := unicornutil.CallableReturnTypeAnnotation(*ctx, declaration)
+	if annotation == nil && function != nil && ast.IsVariableDeclaration(declaration) {
+		// Only infer a variable's return type from its initializer when the
+		// binding has no explicit type of its own.
+		if bindingType, _ := unicornutil.ValueTypeAnnotation(*ctx, declaration); bindingType == nil {
+			annotation = unicornutil.CallableReturnTypeAnnotation(*ctx, function)
 		}
 	}
 	return classifyBigIntAnnotation(ctx, annotation, bindings) == annotationBigInt &&

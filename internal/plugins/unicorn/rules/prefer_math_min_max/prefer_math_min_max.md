@@ -9,12 +9,6 @@ The rule skips comparisons involving known BigInt values, `new Date()` operands,
 and bindings with non-number TypeScript annotations or initializers such as
 string literals.
 
-The replacement is an editor suggestion because the two forms can differ for
-`NaN`, signed zero, and values that need coercion. For example, when `a` is
-`NaN`, `a > b ? a : b` returns `b` while `Math.max(a, b)` returns `NaN`.
-The rule keeps the diagnostic when a suggestion would discard comments or
-change how often an operand with side effects is evaluated.
-
 Examples of **incorrect** code for this rule
 
 ```javascript
@@ -29,14 +23,23 @@ Math.min(height, 50);
 Math.max(height, 50);
 ```
 
+## Fixes and suggestions
+
+The rule offers editor suggestions because the replacement can change the
+result for `NaN`, signed zero, or values that need numeric coercion. When `a`
+is `NaN`, `a > b ? a : b` returns `b` while `Math.max(a, b)` returns `NaN`.
+
+You still get a diagnostic when the replacement would remove a comment or
+change how often an operand with side effects runs.
+
 ## Options
 
 This rule has no options.
 
 ## Differences from upstream
 
-The diagnostic has no suggestion when a local variable shadows `Math` or
-`languageOptions.globals` disables it.
+Rslint reports without a suggestion when `Math` is shadowed or disabled in
+`languageOptions.globals`.
 
 ```javascript
 function cap(Math, height) {
@@ -44,22 +47,22 @@ function cap(Math, height) {
 }
 ```
 
-The diagnostic also has no suggestion when an operand uses `delete` or
-contains a class with a call in its `extends` expression, a field initializer,
-or a static block.
+Rslint also reports without a suggestion for `delete` expressions and classes
+with side effects in an `extends` expression, field initializer, or static
+block. For example, replacing this ternary could change how many times the
+property is deleted.
 
 ```javascript
 const capped = (delete cache.key, height) > 50 ? 50 : (delete cache.key, height);
 ```
 
-Rslint skips comparisons with values returned by a callback typed as
-`() => bigint` or a function with a signed BigInt literal return type such
-as `-1n`, even in files outside a TypeScript project. It also skips return
-types of `bigint & unknown`, which simplify to `bigint`. Passing these
-values to `Math.min()` or `Math.max()` throws a `TypeError`.
+When linting a file without a TypeScript project, Rslint also skips comparisons
+that use the result of a callback typed as `() => bigint` or a function whose
+return type is `bigint & unknown` or a signed BigInt literal type like `-1n`.
+Passing these values to `Math.min()` or `Math.max()` throws a `TypeError`.
 
 ```typescript
-declare const read: () => bigint;
+declare const read: (() => bigint);
 const value = read();
 value > 0 ? value : 0;
 
