@@ -103,6 +103,8 @@ func classifyCallableReturnType(annotation *ast.Node, classify func(*ast.Node) T
 	}
 	annotation = ast.SkipTypeParentheses(annotation)
 	switch annotation.Kind {
+	case ast.KindJSDocNonNullableType:
+		return classifyCallableReturnType(annotation.Type(), classify)
 	case ast.KindFunctionType:
 		return classify(annotation.Type())
 	case ast.KindTypeLiteral:
@@ -128,6 +130,10 @@ func classifyCallableReturnType(annotation *ast.Node, classify func(*ast.Node) T
 		var visit func(*ast.Node)
 		visit = func(member *ast.Node) {
 			member = ast.SkipTypeParentheses(member)
+			if member.Kind == ast.KindJSDocNonNullableType {
+				visit(member.Type())
+				return
+			}
 			if member.Kind == ast.KindIntersectionType {
 				for _, part := range member.AsIntersectionTypeNode().Types.Nodes {
 					visit(part)

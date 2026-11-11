@@ -109,7 +109,7 @@ func (c *domNodeTypeClassifier) jsDocType(tag, declaration *ast.Node) *ast.Node 
 		return nil
 	}
 	annotation := tag.TypeExpression().Type()
-	if isClosureFunctionType(annotation) {
+	if containsClosureFunctionType(annotation) {
 		if callable, _ := c.recoverClosureFunction(tag, declaration); callable != nil {
 			return callable
 		}
@@ -119,7 +119,7 @@ func (c *domNodeTypeClassifier) jsDocType(tag, declaration *ast.Node) *ast.Node 
 
 func (c *domNodeTypeClassifier) recoverClosureFunction(tag, declaration *ast.Node) (*ast.Node, *ast.Node) {
 	expression := tag.TypeExpression()
-	if expression == nil || !isClosureFunctionType(expression.Type()) {
+	if expression == nil || !containsClosureFunctionType(expression.Type()) {
 		return nil, nil
 	}
 	raw := c.ctx.SourceFile.Text()[expression.Pos():tag.End()]
@@ -127,31 +127,33 @@ func (c *domNodeTypeClassifier) recoverClosureFunction(tag, declaration *ast.Nod
 	if end == 0 {
 		return nil, nil
 	}
-	// Parse the callable as a type-literal method. A synthetic @param lets
-	// tsgo read the original parameter name and optional marker in the same pass.
+	normalized, changed := normalizeClosureFunctionTypes(raw[1 : end-1])
+	if !changed {
+		return nil, nil
+	}
+	// A synthetic @param lets tsgo read the complete type, parameter name and
+	// optional marker together after adapting Closure signatures to call signatures.
 	name := " value"
 	if ast.IsJSDocParameterTag(tag) && tag.Name() != nil && ast.IsIdentifier(tag.Name()) && tag.Name().Text() == "" {
 		name = raw[end:]
 	}
-	text := "/** @param {" + raw[:end] + "}" + name + " */ function annotated(value) {}"
+	text := "/** @param {" + normalized + "}" + name + " */ function annotated(value) {}"
 	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
 	parsed := file.Statements.Nodes[0].JSDoc(file)[0].AsJSDoc().Tags.Nodes[0]
 	expression = parsed.TypeExpression()
 	if expression == nil {
 		return nil, nil
 	}
-	method := closureFunctionMethod(expression.Type())
-	if method == nil || len(file.JSDocDiagnostics()) != 0 {
+	annotation := expression.Type()
+	if annotation == nil || len(file.JSDocDiagnostics()) != 0 {
 		return nil, nil
 	}
-	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
-	callable := factory.NewFunctionTypeNode(nil, method.ParameterList(), method.Type())
-	callable.Flags = ast.NodeFlagsJSDoc
-	callable.Parent = declaration
-	if result := callable.Type(); result != nil {
-		result.Parent = callable
-	}
-	return callable, parsed
+	annotation.Parent = declaration
+	return annotation, parsed
+}
+
+func containsClosureFunctionType(node *ast.Node) bool {
+	return node != nil && (isClosureFunctionType(node) || node.ForEachChild(containsClosureFunctionType))
 }
 
 func closureTypeEnd(raw string) int {

@@ -180,6 +180,75 @@ func TestPreferDomNodeTextContentTypeInformation(t *testing.T) {
 	)
 }
 
+func TestPreferDomNodeTextContentClosureAnnotations(t *testing.T) {
+	var valid []rule_tester.ValidTestCase
+	for _, annotation := range []string{
+		"(function(): string)",
+		"((function(): {innerText: string}))",
+		"!function(): {innerText: string}",
+		"(function(): {innerText: string}) | (function(): {innerText: number})",
+		"(function(): {innerText: string}) & !{property: true}",
+		"function(): function(): string",
+		"function(function(): string): {innerText: string}",
+		"function(this: HTMLElement, string=, ...Array<Array<function(): string>>): {innerText: string}",
+		"function(): {function(): string, note: 'function(): {'}",
+		"function(): {value: string\n function(): string}",
+		"function(): {value: function(): string\n function(): string}",
+		"function(): {value:\n function(): string}",
+		"function(): {value: function()\n new(): string}",
+	} {
+		valid = append(valid,
+			rule_tester.ValidTestCase{FileName: "case.js", Code: fmt.Sprintf("/** @type {%s} */ const make = source;\nmake.innerText;\nmake().innerText;", annotation)},
+			rule_tester.ValidTestCase{FileName: "case.js", Code: fmt.Sprintf("/** @param {%s} make */ function read(other, make) {\n  make.innerText;\n  make().innerText;\n}", annotation)},
+		)
+	}
+	valid = append(valid, rule_tester.ValidTestCase{
+		FileName: "case.js",
+		Code:     "/** @returns {(function(): function(): string)} */ function make() { return source; }\nmake().innerText;",
+	})
+
+	var invalid []rule_tester.InvalidTestCase
+	for _, annotation := range []string{
+		"?function(): {innerText: string}",
+		"(function(): {innerText: string})=",
+		"(function(): {innerText: string}) | (function(): HTMLElement)",
+		"function(function(): string): HTMLElement",
+		"function(): (function(): string) | HTMLElement",
+		"function(): {}",
+	} {
+		binding := fmt.Sprintf("/** @type {%s} */ const make = source;\nmake().innerText;", annotation)
+		parameter := fmt.Sprintf("/** @param {%s} make */ function read(make) {\n  make().innerText;\n}", annotation)
+		invalid = append(invalid,
+			rule_tester.InvalidTestCase{FileName: "case.js", Code: binding, Errors: []rule_tester.InvalidTestCaseError{
+				textContentError(2, 8, 17, strings.Replace(binding, ".innerText", ".textContent", 1)),
+			}},
+			rule_tester.InvalidTestCase{FileName: "case.js", Code: parameter, Errors: []rule_tester.InvalidTestCaseError{
+				textContentError(2, 10, 19, strings.Replace(parameter, ".innerText", ".textContent", 1)),
+			}},
+		)
+	}
+	for _, annotation := range []string{
+		"(function)",
+		"function(,): string",
+		"function(this): string",
+		"function(keyof HTMLElement): string",
+		"function(): keyof HTMLElement",
+		"(function(): {innerText: string})[]",
+	} {
+		code := fmt.Sprintf("/** @type {%s} */ const make = source;\nmake.innerText;", annotation)
+		invalid = append(invalid, rule_tester.InvalidTestCase{FileName: "case.js", Code: code, Errors: []rule_tester.InvalidTestCaseError{
+			textContentError(2, 6, 15, strings.Replace(code, ".innerText", ".textContent", 1)),
+		}})
+	}
+	optional := "/** @param {(function(): {innerText: string})} [make=identity] */ function read(make) {\n  make.innerText;\n  make().innerText;\n}"
+	invalid = append(invalid, rule_tester.InvalidTestCase{FileName: "case.js", Code: optional, Errors: []rule_tester.InvalidTestCaseError{
+		textContentError(3, 10, 19, strings.Replace(optional, "make().innerText", "make().textContent", 1)),
+	}})
+
+	testedRule := preferDomNodeTextContentWithoutTypes()
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule, valid, invalid)
+}
+
 func TestPreferDomNodeTextContentImportedTypes(t *testing.T) {
 	directory := txtarfs.MustParseFile(t, "testdata/imported_types.txtar").Materialize(t, "typed")
 	root := rule_tester.Root{Dir: tspath.NormalizePath(directory), FS: bundled.WrapFS(osvfs.FS())}
