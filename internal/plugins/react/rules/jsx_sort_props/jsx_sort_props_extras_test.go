@@ -46,6 +46,9 @@ func TestJsxSortPropsExtras(t *testing.T) {
 		{Code: `<App lj lz />`, Tsx: true, Options: map[string]any{"locale": "sr-ME"}},
 		{Code: `<App x I />`, Tsx: true, Options: map[string]any{"locale": "az-IR"}},
 		{Code: `<App b aa />`, Tsx: true, Options: map[string]any{"locale": "da-Cyrl"}},
+		// An explicit va type overrides the POSIX variant.
+		{Code: `<App a B />`, Tsx: true, Options: map[string]any{"locale": "en-US-posix-u-va-other"}},
+		{Code: `<App a B />`, Tsx: true, Options: map[string]any{"locale": "en-US-posix-u-va"}},
 		// Thai ignores punctuation by default, so "a_c" compares as "ac".
 		{Code: `<App ab a_c />`, Tsx: true, Options: map[string]any{"locale": "th"}},
 	}, []rule_tester.InvalidTestCase{

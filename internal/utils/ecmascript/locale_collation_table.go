@@ -517,6 +517,26 @@ var collationLocales = map[string]collationLocale{
 	"yor":                   {table: 22, upperFirst: false},
 }
 
+// collationLanguages lists, space-separated, the language subtags
+// Intl.Collator has data for, including aliases such as "sh". A tag in any
+// other language uses the default locale and ignores its extension keys.
+const collationLanguages = " adp af afr alb als am amh ar ara arb arm as asm az aze azj be bel ben bg blo bn bo bod bos br bre bs bul bur ca cat ceb ces chi chr cls cmn cnr cs cy cym cze da dan de deu drh drw dsb dut dz dzo ee ekk el ell en eng eo epo es est et ewe fa fao fas ff fi fil fin fo fr fra fre fry fuc ful fy ga gaz geo ger gl gle glg gom gre gu guj ha hau haw hbs he heb hi hin hr hrv hsb hu hun hy hye ibo ice id ig in ind is isl it ita iw ja ji jpn ka kal kan kat kaz khk khm kir kk kl km kmr kn ko kok kor ku kur ky lao lav lb lij lin lit lkt ln lo lt ltz lv lvs mac mal mar may mk mkd ml mlt mn mo mol mon mr ms msa mt my mya nb ne nep nl nld nn nno no nob nor npi nso om or ori orm ory pa pan pbu per pes pl pol por prp prs ps pt pus ro ron ru rum rus sa san scc scr se sh si sin sk sl slk slo slv sme smn sot spa sq sqi sr srp st sv sw swa swc swe swh ta tam te tel tgl th tha tib tk tl tn tnf to ton tr tsn tuk tur ug uig uk ukr ur urd uz uzb uzn vi vie wae wel wo wol xh xho ydd yi yid yo yor zh zho zsm zu zul "
+
+// collationNumericTypes lists the kn types that enable numeric collation,
+// including aliases. A key without a type has the type "true".
+var collationNumericTypes = map[string]bool{
+	"true": true,
+	"yes":  true,
+}
+
+// collationCaseFirstTypes maps the kf types Intl.Collator honors to whether
+// uppercase sorts first. Other types keep the locale default.
+var collationCaseFirstTypes = map[string]bool{
+	"false": false,
+	"lower": false,
+	"upper": true,
+}
+
 // Locales whose ASCII order this model cannot reproduce and that therefore use
 // the root order:
 //   - hu

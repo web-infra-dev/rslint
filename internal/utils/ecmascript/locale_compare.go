@@ -38,8 +38,9 @@ import (
 // The generated keys include language aliases and every script and region ICU
 // distinguishes. Locales with no table, or whose ASCII tailoring the tables
 // cannot express, use the root order. The Unicode extension keys Intl.Collator
-// reads (co, kf, and kn) and the POSIX variant are honored; all others are
-// ignored.
+// reads (co, kf, and kn) and the POSIX variant are honored as Intl.Collator
+// in Node.js honors them, including type aliases and repeated keys; all
+// others are ignored.
 type LocaleComparer struct {
 	table       *collationTable
 	upperFirst  bool
@@ -98,18 +99,17 @@ const (
 func NewLocaleComparer(locale string) *LocaleComparer {
 	comparer := &LocaleComparer{table: &collationTables[0]}
 	if locale != "" && locale != "auto" {
-		if tag, ok := parseLocaleTag(locale); ok {
+		// Intl.Collator resolves a language it has no data for to the default
+		// locale and drops the extension keys with it.
+		if tag, ok := parseLocaleTag(locale); ok && strings.Contains(collationLanguages, " "+tag.language+" ") {
 			if entry, found := lookupCollationLocale(tag); found {
 				comparer.table = &collationTables[entry.table]
 				comparer.upperFirst = entry.upperFirst
 			}
-			switch tag.keys["kf"] {
-			case "upper":
-				comparer.upperFirst = true
-			case "lower", "false":
-				comparer.upperFirst = false
+			if upper, found := collationCaseFirstTypes[tag.keys["kf"]]; found {
+				comparer.upperFirst = upper
 			}
-			comparer.numeric = tag.keys["kn"] == "true"
+			comparer.numeric = collationNumericTypes[tag.keys["kn"]]
 		}
 	}
 	for _, contraction := range comparer.table.contractions {
@@ -153,13 +153,15 @@ func parseLocaleTag(locale string) (localeTag, bool) {
 		tag.region = subtags[i]
 		i++
 	}
-	// Variants. Intl.Collator maps the POSIX variant to -u-va-posix; others
-	// have no collation data.
+	// Variants have no collation data, except that POSIX can select the
+	// POSIX order.
+	variants := 0
+	posixVariant := false
 	for ; i < len(subtags) && len(subtags[i]) > 1; i++ {
-		if subtags[i] == "posix" {
-			tag.posix = true
-		}
+		variants++
+		posixVariant = posixVariant || subtags[i] == "posix"
 	}
+	var vaTypes []string
 	for i < len(subtags) {
 		singleton := subtags[i]
 		i++
@@ -171,31 +173,53 @@ func parseLocaleTag(locale string) (localeTag, bool) {
 			i++
 		}
 		if singleton == "u" {
-			tag.keys = unicodeExtensionKeys(subtags[start:i])
+			tag.keys, vaTypes = unicodeExtensionKeys(subtags[start:i])
 		}
 	}
-	if tag.keys["va"] == "posix" {
-		tag.posix = true
-	}
+	tag.posix = selectsPOSIX(variants, posixVariant, vaTypes)
 	return tag, true
 }
 
-// unicodeExtensionKeys returns the keys of a -u- extension's subtags.
-func unicodeExtensionKeys(subtags []string) map[string]string {
+// selectsPOSIX reports whether a tag selects the POSIX order, which canonical
+// -u-va-posix does. Canonicalization turns a posix variant into va-posix only
+// when it is the only variant. With other variants, the first va type is
+// kept; without them, every va-posix becomes the variant and any other va
+// type overrides it.
+func selectsPOSIX(variants int, posixVariant bool, vaTypes []string) bool {
+	if len(vaTypes) == 0 {
+		return variants == 1 && posixVariant
+	}
+	if variants > 0 {
+		return vaTypes[0] == "posix"
+	}
+	for _, vaType := range vaTypes {
+		if vaType != "posix" {
+			return false
+		}
+	}
+	return true
+}
+
+// unicodeExtensionKeys returns the keys of a -u- extension's subtags, and
+// every type of the va key in order.
+func unicodeExtensionKeys(subtags []string) (map[string]string, []string) {
 	keys := map[string]string{}
+	var vaTypes []string
 	key := ""
 	var types []string
 	flush := func() {
 		if key == "" {
 			return
 		}
-		if _, seen := keys[key]; seen {
-			return
+		value := "true"
+		if len(types) > 0 {
+			value = strings.Join(types, "-")
 		}
-		if len(types) == 0 {
-			keys[key] = "true"
-		} else {
-			keys[key] = strings.Join(types, "-")
+		if key == "va" {
+			vaTypes = append(vaTypes, value)
+		}
+		if _, seen := keys[key]; !seen {
+			keys[key] = value
 		}
 	}
 	for _, subtag := range subtags {
@@ -207,7 +231,7 @@ func unicodeExtensionKeys(subtags []string) map[string]string {
 		}
 	}
 	flush()
-	return keys
+	return keys, vaTypes
 }
 
 // lookupCollationLocale finds the table for tag: it tries the requested

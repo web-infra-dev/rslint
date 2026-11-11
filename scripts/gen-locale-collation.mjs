@@ -349,9 +349,10 @@ function parseTag(input) {
   ) {
     tag.region = subtags[i++];
   }
-  for (; i < subtags.length && subtags[i].length > 1; i++) {
-    if (subtags[i] === 'posix') tag.posix = true;
-  }
+  const variants = [];
+  for (; i < subtags.length && subtags[i].length > 1; i++)
+    variants.push(subtags[i]);
+  const vaTypes = [];
   while (i < subtags.length) {
     const singleton = subtags[i++];
     if (singleton === 'x') break;
@@ -361,8 +362,10 @@ function parseTag(input) {
     let key = '';
     let types = [];
     const flush = () => {
-      if (key && !(key in tag.keys))
-        tag.keys[key] = types.length ? types.join('-') : 'true';
+      if (!key) return;
+      const type = types.length ? types.join('-') : 'true';
+      if (key === 'va') vaTypes.push(type);
+      if (!(key in tag.keys)) tag.keys[key] = type;
     };
     for (const subtag of subtags.slice(start, i)) {
       if (subtag.length === 2) {
@@ -375,8 +378,22 @@ function parseTag(input) {
     }
     flush();
   }
-  if (tag.keys.va === 'posix') tag.posix = true;
+  tag.posix = posixOf(variants, vaTypes);
   return tag;
+}
+
+// posixOf reports whether a tag selects the POSIX order, which canonical
+// -u-va-posix does. Canonicalization turns a posix variant into va-posix only
+// when it is the only variant. With other variants, the first va type is
+// kept; without them, every va-posix becomes the variant and any other va
+// type overrides it.
+function posixOf(variants, vaTypes) {
+  if (vaTypes.length) {
+    return variants.length
+      ? vaTypes[0] === 'posix'
+      : vaTypes.every((type) => type === 'posix');
+  }
+  return variants.length === 1 && variants[0] === 'posix';
 }
 
 function extensionSuffixes(co, posix) {
@@ -561,7 +578,6 @@ for (const language of known) {
     tags.push({ text: `${language}-${region}`, level: 1 });
 }
 tags.sort((a, b) => a.level - b.level);
-const enumeratedCount = tags.length;
 
 const extensions = [
   ...collations.map((co) => ({ co, posix: false })),
@@ -739,6 +755,210 @@ for (const tag of [
   checkTag(tag);
 }
 
+// --- extension keys ------------------------------------------------------------
+
+// The kf and kn types Intl.Collator honors, derived rather than read from the
+// spec, since aliases such as kn-yes count too. Any other type leaves the
+// locale default. A type has three to eight characters; a two-character
+// subtag such as the "no" in kn-no starts another key.
+const typeVocabulary = new Set([
+  'true',
+  'false',
+  'yes',
+  'no',
+  'upper',
+  'lower',
+  'on',
+  'off',
+  'none',
+  'foo',
+  'posix',
+  ...collations,
+]);
+{
+  const random = mulberry32(0x7e5);
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  for (let n = 0; n < 300; n++) {
+    let type = '';
+    for (let i = 3 + Math.floor(random() * 6); i > 0; i--)
+      type += chars[Math.floor(random() * chars.length)];
+    typeVocabulary.add(type);
+  }
+}
+const numericTypes = new Set();
+const caseFirstTypes = new Map();
+for (const type of typeVocabulary) {
+  if (type.length < 3 || !isValidTag(`en-u-kn-${type}`)) continue;
+  if (new Intl.Collator(`en-u-kn-${type}`).resolvedOptions().numeric)
+    numericTypes.add(type);
+  if (
+    new Intl.Collator(`en-u-kf-${type}`).resolvedOptions().caseFirst === 'upper'
+  )
+    caseFirstTypes.set(type, true);
+  else if (
+    new Intl.Collator(`da-u-kf-${type}`).resolvedOptions().caseFirst !== 'upper'
+  )
+    caseFirstTypes.set(type, false);
+}
+
+// Languages Intl.Collator has data for. A tag in any other language resolves
+// to the default locale, and ResolveLocale then drops its extension keys too.
+const supportedLanguages = new Set(
+  languages.filter(
+    (language) => Intl.Collator.supportedLocalesOf([language]).length > 0,
+  ),
+);
+for (const tag of tags) {
+  if ((tag.resolved !== '') !== supportedLanguages.has(tag.parsed.language)) {
+    throw new Error(`${tag.text}: support differs from its language`);
+  }
+}
+
+// effective mirrors NewLocaleComparer: the table, case order, and numeric
+// collation a tag selects.
+function effective(text) {
+  const parsed = parseTag(text);
+  if (!parsed || !supportedLanguages.has(parsed.language)) {
+    return { table: 0, upperFirst: false, numeric: false };
+  }
+  const entry = lookup(parsed);
+  const kf = caseFirstTypes.get(parsed.keys.kf);
+  return {
+    table: entry.table,
+    upperFirst: kf ?? entry.upperFirst,
+    numeric: numericTypes.has(parsed.keys.kn),
+  };
+}
+
+// withoutCaseAndNumeric drops kf and kn from a canonical resolved locale, so
+// the remainder names the collation data.
+function withoutCaseAndNumeric(resolved) {
+  const [base, extension] = resolved.split('-u-');
+  if (extension === undefined) return resolved;
+  if (resolved.includes('-t-') || resolved.includes('-x-')) {
+    throw new Error(`unexpected extension in resolved locale ${resolved}`);
+  }
+  const kept = [];
+  let skip = false;
+  for (const subtag of extension.split('-')) {
+    if (subtag.length === 2) skip = subtag === 'kf' || subtag === 'kn';
+    if (!skip) kept.push(subtag);
+  }
+  return kept.length ? `${base}-u-${kept.join('-')}` : base;
+}
+
+// intlEffective is what Intl.Collator does with a tag it accepts.
+function intlEffective(text) {
+  const options = new Intl.Collator(text).resolvedOptions();
+  const supported = Intl.Collator.supportedLocalesOf([text]).length > 0;
+  const outcome = outcomeOf(
+    supported ? withoutCaseAndNumeric(options.locale) : '',
+  );
+  return {
+    table: outcome.table,
+    upperFirst: options.caseFirst === 'upper',
+    numeric: options.numeric,
+  };
+}
+
+const sameEffective = (a, b) =>
+  a.table === b.table &&
+  a.upperFirst === b.upperFirst &&
+  a.numeric === b.numeric;
+
+// Every combination of the features that change the result, within a bound:
+// bases that cover default case order, collation types, POSIX, aliases, and
+// unknown or unmodeled locales; variants around posix; and every sequence of
+// up to three kf, kn, co, and va keys, including repeats, aliases, empty
+// types, multi-subtag types, and unsupported types. Random noise then adds
+// what must not matter: attributes, other extensions, private use, and case.
+const fuzzBases = [
+  'en',
+  'en-US',
+  'en-Latn-US',
+  'da',
+  'es-MX',
+  'sh',
+  'sr-Latn-ME',
+  'hu',
+  'th',
+  'xx',
+  'fr-CA',
+];
+const fuzzVariants = [
+  '',
+  '-posix',
+  '-fonipa',
+  '-posix-fonipa',
+  '-fonipa-posix',
+  '-1901-posix',
+];
+const fuzzKeys = [
+  ...['', '-true', '-false', '-yes', '-no', '-foo'].map((type) => `kn${type}`),
+  ...['', '-upper', '-lower', '-false', '-yes', '-no', '-true', '-foo'].map(
+    (type) => `kf${type}`,
+  ),
+  ...['', '-trad', '-emoji', '-foo', '-trad-foo'].map((type) => `co${type}`),
+  ...['', '-posix', '-other', '-posix-foo', '-true'].map((type) => `va${type}`),
+];
+const fuzzExtensions = [''];
+for (const a of fuzzKeys) {
+  fuzzExtensions.push(`-u-${a}`);
+  for (const b of fuzzKeys) {
+    fuzzExtensions.push(`-u-${a}-${b}`);
+    for (const c of fuzzKeys) fuzzExtensions.push(`-u-${a}-${b}-${c}`);
+  }
+}
+const fuzzMismatches = [];
+const fuzzSample = [];
+const fuzzRandom = mulberry32(0xf022);
+const noise = (text) => {
+  let out = text;
+  const roll = fuzzRandom();
+  if (roll < 0.25) out = out.replace('-u-', '-u-attr-');
+  else if (roll < 0.5) out = out.replace('-u-', '-t-de-u-');
+  else if (roll < 0.75) out += '-x-kn-va-posix';
+  else out = out.replace('-u-', '-a-bcd-u-');
+  return [...out]
+    .map((c) => (fuzzRandom() < 0.3 ? c.toUpperCase() : c))
+    .join('');
+};
+let fuzzChecked = 0;
+const checkEffective = (text) => {
+  if (!isValidTag(text)) return;
+  fuzzChecked++;
+  const expected = intlEffective(text);
+  const got = effective(text);
+  if (!sameEffective(got, expected))
+    fuzzMismatches.push({ text, got, expected });
+  if (fuzzRandom() < 0.0005) fuzzSample.push(text);
+};
+for (const base of fuzzBases) {
+  for (const variant of fuzzVariants) {
+    for (const extension of fuzzExtensions) {
+      const text = base + variant + extension;
+      checkEffective(text);
+      if (extension && fuzzRandom() < 0.05) checkEffective(noise(text));
+    }
+  }
+}
+if (fuzzMismatches.length) {
+  if (process.env.FUZZ_DUMP) {
+    await writeFile(
+      process.env.FUZZ_DUMP,
+      fuzzMismatches.map((m) => JSON.stringify(m)).join('\n'),
+    );
+  }
+  for (const { text, got, expected } of fuzzMismatches.slice(0, 40)) {
+    console.error(
+      `${text}: resolver ${JSON.stringify(got)}, Intl.Collator ${JSON.stringify(expected)}`,
+    );
+  }
+  throw new Error(
+    `${fuzzMismatches.length} tags resolve differently from Intl.Collator`,
+  );
+}
+
 // --- write -------------------------------------------------------------------
 
 const hex = (bytes) =>
@@ -786,6 +1006,27 @@ for (const [key, { table, upperFirst }] of [...entries].sort(([a], [b]) =>
   go += `\t${JSON.stringify(key)}: {table: ${table}, upperFirst: ${upperFirst}},\n`;
 }
 go += `}
+
+// collationLanguages lists, space-separated, the language subtags
+// Intl.Collator has data for, including aliases such as "sh". A tag in any
+// other language uses the default locale and ignores its extension keys.
+const collationLanguages = " ${[...supportedLanguages].sort().join(' ')} "
+
+// collationNumericTypes lists the kn types that enable numeric collation,
+// including aliases. A key without a type has the type "true".
+var collationNumericTypes = map[string]bool{
+${[...numericTypes]
+  .sort()
+  .map((type) => `\t${JSON.stringify(type)}: true,\n`)
+  .join('')}}
+
+// collationCaseFirstTypes maps the kf types Intl.Collator honors to whether
+// uppercase sorts first. Other types keep the locale default.
+var collationCaseFirstTypes = map[string]bool{
+${[...caseFirstTypes]
+  .sort(([a], [b]) => (a < b ? -1 : 1))
+  .map(([type, upper]) => `\t${JSON.stringify(type)}: ${upper},\n`)
+  .join('')}}
 `;
 const skippedLocales = [
   ...new Set(skipped.map((s) => s.split(' (')[0])),
@@ -829,8 +1070,7 @@ for (const [index, table] of tables.entries()) {
 // enumeration with random extensions.
 const resolution = new Map();
 const addResolution = (text) => {
-  if (!resolution.has(text))
-    resolution.set(text, outcomeOf(resolvedLocale(text)));
+  if (!resolution.has(text)) resolution.set(text, intlEffective(text));
 };
 for (const tag of [...tags, ...special]) {
   if (entries.has(keyOf(tag.parsed, tag.wildcard))) addResolution(tag.text);
@@ -846,6 +1086,8 @@ for (let n = 0; n < 1500; n++) {
   );
 }
 
+for (const text of fuzzSample) addResolution(text);
+
 const goldenFile = resolve(outDir, 'testdata/locale_collation_golden.json');
 await writeFile(
   goldenFile,
@@ -859,8 +1101,8 @@ await writeFile(
   resolutionFile,
   `[\n${[...resolution]
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([locale, { table, upperFirst }]) =>
-      JSON.stringify({ locale, table, upperFirst }),
+    .map(([locale, { table, upperFirst, numeric }]) =>
+      JSON.stringify({ locale, table, upperFirst, numeric }),
     )
     .join(',\n')}\n]\n`,
 );
@@ -870,6 +1112,6 @@ execFileSync('pnpm', ['exec', 'rs', 'fmt', goldenFile, resolutionFile], {
 });
 
 console.log(
-  `tables: ${tables.length}, entries: ${entries.size}, enumerated tags: ${tags.length}, resolved locales: ${resolvedSet.length}`,
+  `tables: ${tables.length}, entries: ${entries.size}, enumerated tags: ${tags.length}, resolved locales: ${resolvedSet.length}, languages: ${supportedLanguages.size}, extension tags checked: ${fuzzChecked}`,
 );
 if (skipped.length) console.log(`skipped:\n  ${skipped.join('\n  ')}`);

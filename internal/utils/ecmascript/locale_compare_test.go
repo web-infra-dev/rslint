@@ -58,6 +58,14 @@ func TestLocaleComparer(t *testing.T) {
 		{name: "emoji collation replaces tailoring", locale: "cs-u-co-emoji", input: []string{"i", "ch"}, want: []string{"ch", "i"}},
 		{name: "POSIX variant", locale: "en-US-posix", input: []string{"a", "_", "B"}, want: []string{"B", "_", "a"}},
 		{name: "POSIX extension", locale: "en-US-u-va-posix", input: []string{"a", "_", "B"}, want: []string{"B", "_", "a"}},
+		{name: "explicit va overrides the POSIX variant", locale: "en-US-posix-u-va-other", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "valueless va overrides the POSIX variant", locale: "en-US-posix-u-va", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "later va overrides a leading va-posix", locale: "en-US-u-va-posix-va-other", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "first va wins with another variant", locale: "en-US-fonipa-u-va-posix-va-other", input: []string{"a", "B"}, want: []string{"B", "a"}},
+		{name: "POSIX variant needs to be the only variant", locale: "en-US-posix-fonipa", input: []string{"B", "a"}, want: []string{"a", "B"}},
+		{name: "numeric type alias", locale: "en-u-kn-yes", input: []string{"a10", "a9"}, want: []string{"a9", "a10"}},
+		{name: "repeated key keeps the first type", locale: "en-u-kn-false-kn-true", input: []string{"a9", "a10"}, want: []string{"a10", "a9"}},
+		{name: "unsupported language ignores extension keys", locale: "xx-u-kn", input: []string{"a9", "a10"}, want: []string{"a10", "a9"}},
 		{name: "POSIX needs the US region", locale: "en-GB-posix", input: []string{"B", "_", "a"}, want: []string{"_", "a", "B"}},
 		{name: "POSIX numbers precede punctuation", locale: "en-US-u-va-posix-kn", input: []string{"!", "a10", "a9"}, want: []string{"!", "a9", "a10"}},
 		{name: "case-insensitive tag", locale: "SR-latn", input: []string{"lj", "lz"}, want: []string{"lz", "lj"}},
@@ -159,6 +167,7 @@ func TestLocaleComparerResolvesLikeICU(t *testing.T) {
 		Locale     string `json:"locale"`
 		Table      int    `json:"table"`
 		UpperFirst bool   `json:"upperFirst"`
+		Numeric    bool   `json:"numeric"`
 	}
 	if err := json.Unmarshal(data, &resolution); err != nil {
 		t.Fatal(err)
@@ -174,9 +183,9 @@ func TestLocaleComparerResolvesLikeICU(t *testing.T) {
 				table = i
 			}
 		}
-		if table != entry.Table || comparer.upperFirst != entry.UpperFirst {
-			t.Errorf("%s: got table %d (upper first %t), ICU %s uses table %d (upper first %t)",
-				entry.Locale, table, comparer.upperFirst, collationICUVersion, entry.Table, entry.UpperFirst)
+		if table != entry.Table || comparer.upperFirst != entry.UpperFirst || comparer.numeric != entry.Numeric {
+			t.Errorf("%s: got table %d (upper first %t, numeric %t), ICU %s uses table %d (upper first %t, numeric %t)",
+				entry.Locale, table, comparer.upperFirst, comparer.numeric, collationICUVersion, entry.Table, entry.UpperFirst, entry.Numeric)
 		}
 	}
 }
