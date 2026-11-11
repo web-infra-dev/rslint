@@ -109,7 +109,7 @@ func (c *domNodeTypeClassifier) jsDocType(tag, declaration *ast.Node) *ast.Node 
 		return nil
 	}
 	annotation := tag.TypeExpression().Type()
-	if containsClosureFunctionType(annotation) {
+	if containsClosureCallableType(annotation) {
 		if callable, _ := c.recoverClosureFunction(tag, declaration); callable != nil {
 			return callable
 		}
@@ -119,7 +119,7 @@ func (c *domNodeTypeClassifier) jsDocType(tag, declaration *ast.Node) *ast.Node 
 
 func (c *domNodeTypeClassifier) recoverClosureFunction(tag, declaration *ast.Node) (*ast.Node, *ast.Node) {
 	expression := tag.TypeExpression()
-	if expression == nil || !containsClosureFunctionType(expression.Type()) {
+	if expression == nil || !containsClosureCallableType(expression.Type()) {
 		return nil, nil
 	}
 	raw := c.ctx.SourceFile.Text()[expression.Pos():tag.End()]
@@ -150,10 +150,6 @@ func (c *domNodeTypeClassifier) recoverClosureFunction(tag, declaration *ast.Nod
 	}
 	annotation.Parent = declaration
 	return annotation, parsed
-}
-
-func containsClosureFunctionType(node *ast.Node) bool {
-	return node != nil && (isClosureFunctionType(node) || node.ForEachChild(containsClosureFunctionType))
 }
 
 func closureTypeEnd(raw string) int {

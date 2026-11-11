@@ -74,11 +74,11 @@ func normalizeClosureFunctionTypes(raw string) (string, bool) {
 		}
 		if scope.nextParameter && token.kind != scope.closingToken {
 			scope.nextParameter = false
-			switch {
-			case token.kind == ast.KindDotDotDotToken:
+			switch token.kind {
+			case ast.KindDotDotDotToken:
 				out.WriteString("...argument:")
 				continue
-			case token.kind == ast.KindThisKeyword:
+			case ast.KindThisKeyword:
 				if next != ast.KindColonToken {
 					return "", false
 				}
