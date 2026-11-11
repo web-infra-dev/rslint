@@ -88,8 +88,7 @@ func hasNonIndexedJSDocType(ctx rule.RuleContext, input *ast.Node) bool {
 			return false
 		}
 		if annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration); annotation != nil {
-			class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, jsdocInputTypes)
-			return class == unicornutil.TypeNonTarget || class == unicornutil.TypeNullish
+			return isNonIndexedJSDocAnnotation(ctx, annotation)
 		}
 		if !ast.IsVariableDeclaration(declaration) || !ast.IsVarConst(declaration) {
 			return false
@@ -97,7 +96,50 @@ func hasNonIndexedJSDocType(ctx rule.RuleContext, input *ast.Node) bool {
 		seen[symbol] = true
 		input = ast.SkipParentheses(declaration.Initializer())
 	}
-	return false
+	return input != nil && ast.IsCallExpression(input) &&
+		isNonIndexedJSDocAnnotation(ctx, localCallReturnAnnotation(ctx, input))
+}
+
+func isNonIndexedJSDocAnnotation(ctx rule.RuleContext, annotation *ast.Node) bool {
+	if annotation == nil {
+		return false
+	}
+	class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, jsdocInputTypes)
+	return class == unicornutil.TypeNonTarget || class == unicornutil.TypeNullish
+}
+
+func localCallReturnAnnotation(ctx rule.RuleContext, call *ast.Node) *ast.Node {
+	callee := utils.ESTreeCallCallee(call.Expression())
+	if !isIdentifier(callee) || ast.IsOptionalChain(call) {
+		return nil
+	}
+	symbol := ctx.Refs.ResolveInFile(callee)
+	if symbol == nil || len(symbol.Declarations) != 1 || slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference) {
+		return nil
+	}
+	declaration := symbol.Declarations[0]
+	var function *ast.Node
+	switch declaration.Kind {
+	case ast.KindFunctionDeclaration:
+		function = declaration
+	case ast.KindVariableDeclaration, ast.KindParameter:
+		initializer := utils.ESTreeRuntimeExpression(declaration.Initializer())
+		if initializer != nil && ast.IsFunctionExpressionOrArrowFunction(initializer) {
+			function = initializer
+		}
+	default:
+		return nil
+	}
+	if function != nil && (ast.GetFunctionFlags(function)&ast.FunctionFlagsAsyncGenerator != 0 || len(function.TypeParameters()) != 0) {
+		return nil
+	}
+	annotation := unicornutil.CallableReturnTypeAnnotation(ctx, declaration)
+	if annotation == nil && function != nil && ast.IsVariableDeclaration(declaration) {
+		if binding, _ := unicornutil.ValueTypeAnnotation(ctx, declaration); binding == nil {
+			return unicornutil.CallableReturnTypeAnnotation(ctx, function)
+		}
+	}
+	return annotation
 }
 
 type loopBounds struct {

@@ -23,6 +23,10 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 	const suggestion = `for (const [name, score] of Iterator.zip([names, scores]))`
 	const argumentHeader = `for (let index = 0; index < Math.min(names.length, arguments.length); index++)`
 	const annotatedArrays = "/**\n * @param {string[]} names\n * @param {Uint8Array} scores\n */\nfunction pair(names, scores) {\n  "
+	const arrayFactory = "/** @returns {string[]} */\nfunction getNames() { return [\"x\"]; }\nconst names = getNames();\n"
+	const reassignedFactory = "/** @returns {string} */\nfunction getNames() { return \"x\"; }\ngetNames = () => [\"x\"];\nconst names = getNames();\n"
+	const optionalFactoryCall = "/** @returns {string} */\nfunction getNames() { return \"x\"; }\nconst names = getNames?.();\n"
+	const asyncFactory = "/** @returns {string} */\nasync function getNames() { return \"x\"; }\nconst names = getNames();\n"
 	valid := []rule_tester.ValidTestCase{
 		// Only a plain let index and direct length comparisons qualify.
 		{FileName: "input.js", Code: `for (let index = 0; index < ` + minimum + `; )` + loopBody},
@@ -46,6 +50,12 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 		{FileName: "input.js", Code: "/** @param {{ length: number, [index: number]: string }} names */\nfunction pair(names, scores) { " + loopHeader + loopBody + " }"},
 		{FileName: "input.js", Code: "/** @param {?String} [input] */\nfunction pair(input, scores) { const names = (input); " + loopHeader + loopBody + " }"},
 		{FileName: "input.js", Code: "/** @type {string} */\nlet names = input;\n" + loopHeader + loopBody},
+		// The return annotation of a local call also describes the input.
+		{FileName: "input.js", Code: "/** @returns {string} */\nfunction getNames() { return \"🐣\"; }\nconst names = getNames();\n" + loopHeader + loopBody},
+		{FileName: "input.js", Code: "/** @returns {{length: number, [index: number]: string}} */\nfunction getNames() { return {0: \"x\", length: 1}; }\nconst names = getNames();\n" + loopHeader + loopBody},
+		{FileName: "input.js", Code: "/** @type {function(): string} */\nconst getNames = makeNames;\nconst names = getNames();\n" + loopHeader + loopBody},
+		{FileName: "input.js", Code: "/** @param {function(): string} getNames */\nfunction pair(getNames, scores) { const names = getNames(); " + loopHeader + loopBody + " }"},
+		{FileName: "input.js", Code: "const getNames = /** @returns {string} */ () => \"x\";\nconst values = getNames();\nconst names = values;\n" + loopHeader + loopBody},
 		// Reference roles within the body.
 		{FileName: "input.js", Code: loopHeader + ` { [...names[index]] = scores[index]; }`},
 		{FileName: "input.ts", Code: loopHeader + ` { type Index = typeof index; save(names[index], scores[index]); }`},
@@ -102,6 +112,11 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 		// JSDoc-annotated arrays and typed arrays still qualify.
 		expectZip("input.js", annotatedArrays+loopHeader+loopBody+"\n}",
 			annotatedArrays+suggestion+" { save(name, score); }\n}", 6, 3, 6, 78),
+		expectZip("input.js", arrayFactory+loopHeader+loopBody, arrayFactory+suggestion+` { save(name, score); }`, 4, 1, 4, 76),
+		// Preserve the unknown classification when the return annotation does not describe the call.
+		expectZip("input.js", reassignedFactory+loopHeader+loopBody, reassignedFactory+suggestion+` { save(name, score); }`, 5, 1, 5, 76),
+		expectZip("input.js", optionalFactoryCall+loopHeader+loopBody, optionalFactoryCall+suggestion+` { save(name, score); }`, 4, 1, 4, 76),
+		expectZip("input.js", asyncFactory+loopHeader+loopBody, asyncFactory+suggestion+` { save(name, score); }`, 4, 1, 4, 76),
 		// Direct eval can read bindings even without a static reference.
 		expectZip("input.js", loopHeader+` { save(eval("index"), names[index], scores[index]); }`, "", 1, 1, 1, 76),
 		expectZip("input.js", loopHeader+` { save(() => (eval)("index"), names[index], scores[index]); }`, "", 1, 1, 1, 76),

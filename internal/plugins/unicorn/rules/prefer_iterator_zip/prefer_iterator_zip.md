@@ -13,8 +13,9 @@ used only by the condition.
 
 Each input must be a distinct identifier. Within the body, the rule allows
 only element reads at the loop index. Arrays and typed arrays qualify. The rule
-skips known strings and plain objects, including those typed through JSDoc, and
-assumes that unknown inputs are arrays or typed arrays.
+skips known strings and plain objects, including those identified by JSDoc on
+an input or a local factory's return type. It assumes that unknown inputs are
+arrays or typed arrays.
 
 Examples of **incorrect** code for this rule
 
