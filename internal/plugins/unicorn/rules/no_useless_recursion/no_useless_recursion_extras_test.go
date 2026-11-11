@@ -10,6 +10,15 @@ import (
 )
 
 func TestNoUselessRecursionExtras(t *testing.T) {
+	script := rule.LanguageOptions{SourceType: "script"}
+	namedExpression := recursiveReturn(`with ({ walk: () => 1 }) {
+  const saved = function walk() {
+    walk = () => 1;
+    return walk();
+  };
+}`, "case.js", 4, 12, 16)
+	namedExpression.LanguageOptions = script
+
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_recursion.NoUselessRecursionRule,
 		[]rule_tester.ValidTestCase{
 			// These returns do not have a plain call with an identifier callee.
@@ -25,11 +34,35 @@ func TestNoUselessRecursionExtras(t *testing.T) {
 const generator = async function* walk() { return walk(); };
 const shadowed = function walk(walk) { return walk(); };`, FileName: "case.js"},
 			{Code: `function walk() { { function walk() {} return walk(); } }`, FileName: "case.js"},
+			{Code: `function walk() {
+  walk = () => 1;
+  return walk();
+}`, FileName: "case.js"},
+			// Calling a saved reference can run the original body after the binding changes.
+			{Code: `export default function walk(): number {
+  return walk();
+}
+const saved = walk;
+({ replacement: walk } = handlers);
+saved();`, FileName: "case.ts"},
+			{
+				Code: `function walk() { return walk(); }
+const saved = walk;
+var { walk } = handlers;
+saved();`,
+				FileName:        "case.js",
+				LanguageOptions: script,
+			},
+			{
+				Code:            `function walk() { with ({ walk: () => 1 }) { return walk(); } }`,
+				FileName:        "case.js",
+				LanguageOptions: script,
+			},
 			// The implicit arguments binding shadows the function name in script code.
 			{
 				Code:            `function arguments() { return arguments(); }`,
 				FileName:        "case.js",
-				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				LanguageOptions: script,
 			},
 			// Returns in methods, accessors, constructors, and arrows belong to those functions.
 			{Code: `function walk() {
@@ -77,6 +110,13 @@ function visit<visit>(value: visit): unknown {
 }`, FileName: "case.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// The inner name is immutable and in scope before the surrounding with.
+			namedExpression,
+			recursiveReturn(`function walk() {
+  { let walk; walk = () => 1; }
+  walk.count++;
+  return walk();
+}`, "case.js", 4, 10, 14),
 			recursiveReturn(`function walk() { return (((walk))()); }`, "case.js", 1, 29, 33),
 			recursiveReturn(`function walk() { return /** @type {number} */ ((/** @type {() => number} */ (walk))()); }`, "case.js", 1, 79, 83),
 			recursiveReturn(`function walk() { return /** @satisfies {number} */ ((/** @satisfies {() => number} */ (walk))()); }`, "case.js", 1, 89, 93),

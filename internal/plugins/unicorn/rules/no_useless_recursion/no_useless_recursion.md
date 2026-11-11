@@ -47,6 +47,30 @@ function foo(bar) {
 
 This rule has no options or automatic fixes.
 
+## Differences from upstream
+
+Rslint skips calls to a function declaration's name when that name is
+reassigned in the same file. A saved reference can still call the original
+function after a later reassignment.
+
+```javascript
+function walk() {
+  walk = () => 1;
+  return walk();
+}
+```
+
+In scripts, Rslint skips a call when a `with` statement can supply the same name
+from an object.
+
+```javascript
+function walk() {
+  with ({ walk: () => 1 }) {
+    return walk();
+  }
+}
+```
+
 ## Original documentation
 
 - [Upstream documentation](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-useless-recursion.md)
