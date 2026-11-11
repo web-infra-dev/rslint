@@ -27,7 +27,7 @@ export interface TestCase {
   /** Reason for skipping this case. */
   skip?: string;
   code: string;
-  /** Path relative to the fixture root. Defaults to `input.js`. */
+  /** Path relative to the fixture root. Defaults to the tester's `filename`. */
   filename?: string;
   /** A function receives the absolute fixture root. */
   options?: unknown[] | ((root: string) => unknown[]);
@@ -48,6 +48,8 @@ export interface ValidTestCase extends Omit<TestCase, 'errors' | 'output'> {
 export interface RuleTesterConfig {
   /** Plugin name, used as the rule-name prefix. */
   plugin: string;
+  /** Default for each case's `filename`. Defaults to `input.js`. */
+  filename?: string;
   /** Files written to the fixture root before the cases run. */
   fixtureFiles?: Record<string, string>;
   languageOptions?: LanguageOptions;

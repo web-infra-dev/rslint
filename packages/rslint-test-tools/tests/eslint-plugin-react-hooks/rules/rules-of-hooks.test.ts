@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('rules-of-hooks', {} as never, {
+ruleTester.run('rules-of-hooks', {
   valid: [
     {
       code: `
@@ -170,7 +171,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.`,
+          messageId: '',
+          message:
+            'React Hook "useConditionalHook" is called conditionally. React Hooks must be called in the exact same order in every component render.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 31,
         },
       ],
     },
@@ -179,7 +186,26 @@ ruleTester.run('rules-of-hooks', {} as never, {
         Hook.useState();
         Hook.useHook();
       `,
-      errors: 2,
+      errors: [
+        {
+          messageId: '',
+          message:
+            'React Hook "Hook.useState" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 22,
+        },
+        {
+          messageId: '',
+          message:
+            'React Hook "Hook.useHook" cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: `
@@ -191,7 +217,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "This.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.`,
+          messageId: '',
+          message:
+            'React Hook "This.useHook" cannot be called in a class component. React Hooks must be called in a React function component or a custom React Hook function.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 25,
         },
       ],
     },
@@ -205,7 +237,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.`,
+          messageId: '',
+          message:
+            'React Hook "useHookInsideLoop" may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 30,
         },
       ],
     },
@@ -218,7 +256,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?`,
+          messageId: '',
+          message:
+            'React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 19,
         },
       ],
     },
@@ -230,7 +274,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "useState" cannot be called in an async function.`,
+          messageId: '',
+          message:
+            'React Hook "useState" cannot be called in an async function.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 19,
         },
       ],
     },
@@ -247,7 +297,12 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "use" cannot be called in a try/catch block.`,
+          messageId: '',
+          message: 'React Hook "use" cannot be called in a try/catch block.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 16,
         },
       ],
     },
@@ -262,8 +317,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             '`onClick` is a function created with React Hook "useEffectEvent", and can only be called from Effects and Effect Events in the same component. It cannot be assigned to a variable or passed down.',
+          line: 6,
+          column: 34,
+          endLine: 6,
+          endColumn: 41,
         },
       ],
     },
@@ -277,7 +337,13 @@ ruleTester.run('rules-of-hooks', {} as never, {
       `,
       errors: [
         {
-          message: `React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.`,
+          messageId: '',
+          message:
+            'React Hook "useEffectEvent" can only be called at the top level of your component. It cannot be passed down.',
+          line: 3,
+          column: 34,
+          endLine: 5,
+          endColumn: 13,
         },
       ],
     },

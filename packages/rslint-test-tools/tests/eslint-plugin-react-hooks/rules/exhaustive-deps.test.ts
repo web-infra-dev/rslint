@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('exhaustive-deps', {} as never, {
+ruleTester.run('exhaustive-deps', {
   valid: [
     // Upstream: rule options take precedence over shared settings.
     {
@@ -155,8 +156,26 @@ ruleTester.run('exhaustive-deps', {} as never, {
       },
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useCustomEffect has a missing dependency: 'props.foo'. Either include it or remove the dependency array.",
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [props.foo]',
+              output: `
+        function MyComponent(props) {
+          useCustomEffect(() => {
+            console.log(props.foo);
+          }, [props.foo]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -172,8 +191,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       options: [{ requireExplicitEffectDeps: true }],
       errors: [
         {
+          messageId: '',
           message:
             'React Hook useEffect always requires dependencies. Please add a dependency array or an explicit `undefined`',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 20,
         },
       ],
     },
@@ -186,8 +210,24 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a missing dependency: 'id'. Either include it or remove the dependency array.",
+          line: 3,
+          column: 49,
+          endLine: 3,
+          endColumn: 51,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [id]',
+              output: `
+        function MyComponent({ id }) {
+          useEffect(() => { console.log(id); }, [id]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -200,8 +240,24 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a missing dependency: 'props.id'. Either include it or remove the dependency array.",
+          line: 3,
+          column: 55,
+          endLine: 3,
+          endColumn: 57,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [props.id]',
+              output: `
+        function MyComponent(props) {
+          useEffect(() => { console.log(props.id); }, [props.id]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -214,8 +270,24 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useCallback has an unnecessary dependency: 'b'. Either exclude it or remove the dependency array.",
+          line: 3,
+          column: 32,
+          endLine: 3,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [a]',
+              output: `
+        function MyComponent({ a, b }) {
+          useCallback(() => a, [a]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -228,8 +300,24 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useCallback has a duplicate dependency: 'a'. Either omit it or remove the dependency array.",
+          line: 3,
+          column: 32,
+          endLine: 3,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [a]',
+              output: `
+        function MyComponent({ a }) {
+          useCallback(() => a, [a]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -242,8 +330,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             'React Hook useMemo does nothing when called with only one argument. Did you forget to pass an array of dependencies?',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 18,
         },
       ],
     },
@@ -256,8 +349,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a spread element in its dependency array. This means we can't statically verify whether you've passed the correct dependencies.",
+          line: 3,
+          column: 32,
+          endLine: 3,
+          endColumn: 39,
         },
       ],
     },
@@ -270,8 +368,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect was passed a dependency list that is not an array literal. This means we can't statically verify whether you've passed the correct dependencies.",
+          line: 3,
+          column: 31,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
     },
@@ -284,8 +387,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "The 'foo' literal is not a valid dependency because it never changes. You can safely remove it.",
+          line: 3,
+          column: 32,
+          endLine: 3,
+          endColumn: 37,
         },
       ],
     },
@@ -301,8 +409,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "The ref value 'ref.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'ref.current' to a variable inside the effect, and use that variable in the cleanup function.",
+          line: 5,
+          column: 44,
+          endLine: 5,
+          endColumn: 51,
         },
       ],
     },
@@ -316,8 +429,25 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             'Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onClick` from the list.',
+          line: 4,
+          column: 44,
+          endLine: 4,
+          endColumn: 51,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Remove the dependency `onClick`',
+              output: `
+        function MyComponent({ theme }) {
+          const onClick = useEffectEvent(() => { console.log(theme); });
+          useEffect(() => { onClick(); }, []);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -332,8 +462,26 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a missing dependency: 'props.x'. Either include it or remove the dependency array.",
+          line: 4,
+          column: 63,
+          endLine: 4,
+          endColumn: 65,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [props.x]',
+              output: `
+        const C = observer((props) => {
+          const [s, setS] = useState(0);
+          useEffect(() => { console.log(props.x); setS(1); }, [props.x]);
+          return null;
+        });
+      `,
+            },
+          ],
         },
       ],
     },
@@ -349,8 +497,27 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a missing dependency: 'fetchTree'. Either include it or remove the dependency array.",
+          line: 5,
+          column: 45,
+          endLine: 5,
+          endColumn: 47,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [fetchTree]',
+              output: `
+        function useShorthand({ apId }) {
+          const [t, setT] = useState([]);
+          const fetchTree = () => { setT([{ apId }]); };
+          useEffect(() => { fetchTree(); }, [fetchTree]);
+          return t;
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -367,8 +534,28 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useEffect has a missing dependency: 'query'. Either include it or remove the dependency array.",
+          line: 6,
+          column: 41,
+          endLine: 6,
+          endColumn: 43,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [query]',
+              output: `
+        function useCallsLocal({ apId }) {
+          const [t, setT] = useState([]);
+          const transform = (x) => [x];
+          const query = () => { setT(transform(apId)); };
+          useEffect(() => { query(); }, [query]);
+          return t;
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -388,8 +575,31 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "React Hook useMemo has a missing dependency: 'findLabel'. Either include it or remove the dependency array.",
+          line: 10,
+          column: 53,
+          endLine: 10,
+          endColumn: 63,
+          suggestions: [
+            {
+              messageId: '',
+              desc: 'Update the dependencies array to be: [findLabel, tree, id]',
+              output: `
+        function useRecursive({ tree, id }) {
+          const findLabel = (data, target) => {
+            for (const node of data) {
+              if (node.id === target) return node.label;
+              if (node.children) { const r = findLabel(node.children, target); if (r) return r; }
+            }
+            return '';
+          };
+          return useMemo(() => findLabel(tree, id), [findLabel, tree, id]);
+        }
+      `,
+            },
+          ],
         },
       ],
     },
@@ -409,8 +619,13 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       errors: [
         {
+          messageId: '',
           message:
             "The ref value 'handleRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'handleRef.current' to a variable inside the effect, and use that variable in the cleanup function.",
+          line: 8,
+          column: 25,
+          endLine: 8,
+          endColumn: 32,
         },
       ],
     },

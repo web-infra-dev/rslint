@@ -10,7 +10,10 @@ export function buildLintRequest(
   item: ValidTestCase | TestCase,
 ): { request: LintOptions; filename: string } {
   const { languageOptions } = config;
-  const filename = path.join(root, item.filename ?? 'input.js');
+  const filename = path.join(
+    root,
+    item.filename ?? config.filename ?? 'input.js',
+  );
   const options =
     typeof item.options === 'function'
       ? item.options(root)
