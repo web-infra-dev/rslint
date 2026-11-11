@@ -95,6 +95,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_number_constants"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_global_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_identifier_import_export_specifiers"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_iterator_zip"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_math_min_max"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_math_trunc"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_modern_math_apis"
@@ -224,6 +225,7 @@ func GetAllRules() []rule.Rule {
 		prefer_global_number_constants.PreferGlobalNumberConstantsRule,
 		prefer_global_this.PreferGlobalThisRule,
 		prefer_identifier_import_export_specifiers.PreferIdentifierImportExportSpecifiersRule,
+		prefer_iterator_zip.PreferIteratorZipRule,
 		prefer_math_min_max.PreferMathMinMaxRule,
 		prefer_math_trunc.PreferMathTruncRule,
 		prefer_modern_math_apis.PreferModernMathApisRule,
