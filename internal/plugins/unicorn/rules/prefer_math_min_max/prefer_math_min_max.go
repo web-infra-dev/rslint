@@ -2,6 +2,7 @@ package prefer_math_min_max
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -39,13 +40,14 @@ var PreferMathMinMaxRule = rule.Rule{
 					return
 				}
 
+				span := node.Loc.WithPos(scanner.GetTokenPosOfNode(node, ctx.SourceFile, false))
 				data := map[string]string{"method": method}
-				ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
+				ctx.ReportRangeWithDeferredSuggestions(span, rule.RuleMessage{
 					Id:          messageID,
 					Description: "Prefer `Math." + method + "()` to simplify ternary expressions.",
 					Data:        data,
 				}, func() []rule.RuleSuggestion {
-					fixes := mathCallFixes(&ctx, evaluator, node, left, right, method)
+					fixes := mathCallFixes(&ctx, evaluator, node, span, left, right, method)
 					if len(fixes) == 0 {
 						return nil
 					}
@@ -76,10 +78,11 @@ func mathMethod(file *ast.SourceFile, comparison *ast.BinaryExpression, conditio
 
 	// Upstream compares source spelling after unwrapping casts. Keep distinct
 	// spellings such as obj.key and obj["key"] distinct.
-	left := utils.TrimmedNodeText(file, unwrapOperand(comparison.Left))
-	right := utils.TrimmedNodeText(file, unwrapOperand(comparison.Right))
-	consequent := utils.TrimmedNodeText(file, unwrapOperand(conditional.WhenTrue))
-	alternate := utils.TrimmedNodeText(file, unwrapOperand(conditional.WhenFalse))
+	source := file.Text()
+	left := scanner.GetTextOfNodeFromSourceText(source, unwrapOperand(comparison.Left), false)
+	right := scanner.GetTextOfNodeFromSourceText(source, unwrapOperand(comparison.Right), false)
+	consequent := scanner.GetTextOfNodeFromSourceText(source, unwrapOperand(conditional.WhenTrue), false)
+	alternate := scanner.GetTextOfNodeFromSourceText(source, unwrapOperand(conditional.WhenFalse), false)
 	if left == consequent && right == alternate {
 		// When all four expressions match, upstream prefers min.
 		if left == right {

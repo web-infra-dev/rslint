@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -22,9 +23,11 @@ func TestPreferMathMinMaxExtras(t *testing.T) {
 		{FileName: "input.js", Code: `value && limit ? value : limit;`},
 		{FileName: "input.ts", Code: `((value > limit) as boolean) ? value : limit;`},
 		{FileName: "input.js", Code: `obj["key"] < limit ? obj.key : limit;`},
+		{FileName: "input.js", Code: `amount > 0 ? \u0061mount : 0;`},
 		{FileName: "input.js", Code: `(obj?.key) < limit ? obj.key : limit;`},
 		{FileName: "input.ts", Code: `(source satisfies number) > 0 ? source : 0;`},
 		{FileName: "input.ts", Code: `function cap(n: Number) { return (n as Number) > 0 ? n : 0; }`},
+		{FileName: "input.ts", Code: `function cap(value: (string)) { return value > 'a' ? value : 'a'; }`},
 		{FileName: "input.ts", Code: `const { value }: { value: number } = source; value < 0 ? value : 0;`},
 		{FileName: "input.js", Code: `function pick({ value = "zero" }) { return value > 0 ? value : 0; }`},
 		{FileName: "input.js", Code: `const limit = /foo/; limit > value ? limit : value;`},
@@ -57,6 +60,16 @@ func TestPreferMathMinMaxExtras(t *testing.T) {
 			`for (const item of (Math.max(+a, b))) use(item);`),
 		minMaxCase("input.ts", `const v = (x < y ? x : y)satisfies number;`, "min", 1, 12, 1, 25,
 			`const v = (Math.min(x, y)) satisfies number;`),
+		minMaxCase("input.ts", `function cap(value: ((number)), limit: number) { return value > limit ? value : limit; }`, "max", 1, 57, 1, 86,
+			`function cap(value: ((number)), limit: number) { return Math.max(value, limit); }`),
+		minMaxCase("input.ts", `declare const value: (number); value > 0 ? 0 : value;`, "min", 1, 32, 1, 53,
+			`declare const value: (number); Math.min(value, 0);`),
+		minMaxCase("input.ts", `(value as (Number)) > limit ? value : limit;`, "max", 1, 1, 1, 44,
+			`Math.max(value as (Number), limit);`),
+		minMaxCase("input.ts", `(<(number)>value) < limit ? value : limit;`, "min", 1, 1, 1, 42,
+			`Math.min(<(number)>value, limit);`),
+		minMaxCase("input.ts", `const v = (a as (number))! < b ? a : b;`, "min", 1, 11, 1, 39,
+			`const v = Math.min((a as (number))!, b);`),
 		minMaxCase("input.js", "const v = (obj[`a${index}`]) < limit ? obj[`a${index}`] : limit;", "min", 1, 11, 1, 64, ""),
 
 		// Keep the diagnostic when the Math binding or repeated evaluation
@@ -68,6 +81,49 @@ func TestPreferMathMinMaxExtras(t *testing.T) {
 		minMaxCase("input.js", `(class { value = read() }) > 0 ? 0 : (class { value = read() });`, "min", 1, 1, 1, 64, ""),
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &prefer_math_min_max.PreferMathMinMaxRule, valid, invalid)
+}
+
+func TestPreferMathMinMaxSourceOnlyJSDoc(t *testing.T) {
+	const code = `/** @type {function(): bigint} */
+const readBig = source;
+const first = readBig();
+first > 0 ? first : 0;
+
+/** @param {function(): bigint} read */
+function cap(read) {
+  const value = read();
+  return value > 0 ? value : 0;
+}
+
+const zero = 0; /** @returns {bigint} */ function readInline() { return 1n; }
+const inline = readInline();
+inline > zero ? inline : zero;
+
+/** @type {function(): bigint} */
+let readMutable = source;
+readMutable = () => 1;
+const last = readMutable();
+last > 0 ? last : 0;`
+	sourceProgram, fileName := sourceOnlyMinMaxProgram(t, "jsdoc.js", code)
+	target := prefer_math_min_max.PreferMathMinMaxRule
+	var diagnostics []rule.RuleDiagnostic
+	testutil.LintProgram(t, testutil.LintProgramOptions{
+		Program: sourceProgram, Files: []string{fileName},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			return []rule.ConfiguredRule{{
+				Name: target.Name, Severity: rule.SeverityError,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners { return target.Run(ctx, nil) },
+			}}
+		},
+		OnDiagnostic: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+	})
+	if len(diagnostics) != 1 {
+		t.Fatalf("got %d diagnostics, want one for the reassigned callback", len(diagnostics))
+	}
+	diagnostic := diagnostics[0]
+	if text := code[diagnostic.Range.Pos():diagnostic.Range.End()]; text != "last > 0 ? last : 0" {
+		t.Fatalf("reported %q, want the comparison using the reassigned callback", text)
+	}
 }
 
 func TestPreferMathMinMaxEditDemand(t *testing.T) {
@@ -103,6 +159,10 @@ nestedNumeric > 0 ? nestedNumeric : 0;
 declare const readBig: () => bigint;
 const big = readBig();
 big > 0 ? big : 0;
+function cap(read: (() => bigint)) {
+  const wrapped = read();
+  return wrapped > 0 ? wrapped : 0;
+}
 declare function readSigned(): -1n;
 const signed = readSigned();
 signed > 0 ? signed : 0;
@@ -129,16 +189,7 @@ uncertain > 0 ? uncertain : 0;
 		"String.raw`value` > 0 ? String.raw`value` : 0",
 	}
 	replacements := []string{"Math.max(numeric, 0)", "Math.max(nestedNumeric, 0)", "Math.max(value, 0)", "", "Math.max(uncertain, 0)", ""}
-	root := fixtures.GetRootDir()
-	fileName := tspath.ResolvePath(root.Dir, "edit-demand.ts")
-	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
-	sourceProgram, err := program.NewFromRoots(program.RootOptions{
-		RootFileNames: []string{fileName}, Host: utils.CreateCompilerHost(root.Dir, fs),
-		CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	sourceProgram, fileName := sourceOnlyMinMaxProgram(t, "edit-demand.ts", code)
 	target := prefer_math_min_max.PreferMathMinMaxRule
 	results := make(map[rule.EditDemand][]rule.RuleDiagnostic)
 	for _, demand := range []rule.EditDemand{rule.EditDemandAll, rule.EditDemandNone, rule.EditDemandAutofix, rule.EditDemandSuggestion} {
@@ -192,4 +243,19 @@ uncertain > 0 ? uncertain : 0;
 			t.Errorf("suggestion for %q produced %q, want %q", comparisons[i], output, want)
 		}
 	}
+}
+
+func sourceOnlyMinMaxProgram(t *testing.T, name, code string) (*program.Program, string) {
+	t.Helper()
+	root := fixtures.GetRootDir()
+	fileName := tspath.ResolvePath(root.Dir, name)
+	fs := utils.NewOverlayVFS(root.FS, map[string]string{fileName: code})
+	sourceProgram, err := program.NewFromRoots(program.RootOptions{
+		RootFileNames: []string{fileName}, Host: utils.CreateCompilerHost(root.Dir, fs),
+		CompilerOptions: program.SourceOnlyCompilerOptions(), SingleThreaded: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sourceProgram, fileName
 }
