@@ -37,9 +37,7 @@ suggestion.
 
 ## Options
 
-This rule has no options. Enable it explicitly with
-`'unicorn/no-misrefactored-assignment': 'error'` in a config that enables the
-`unicorn` plugin.
+This rule has no options.
 
 ## Differences from upstream
 

@@ -119,7 +119,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-magic-array-flat-depth': 'error',
     // 'unicorn/no-manually-wrapped-comments': 'off', // not implemented
     // 'unicorn/no-mismatched-map-key': 'error', // not implemented
-    // 'unicorn/no-misrefactored-assignment': 'error',
+    // 'unicorn/no-misrefactored-assignment': 'error', // not implemented
     // 'unicorn/no-missing-local-resource': 'off', // not implemented
     // 'unicorn/no-multiple-promise-resolver-calls': 'error', // not implemented
     // 'unicorn/no-named-default': 'error', // not implemented
