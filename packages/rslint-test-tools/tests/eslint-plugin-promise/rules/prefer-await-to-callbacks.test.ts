@@ -1,11 +1,11 @@
 // Upstream: https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/__tests__/prefer-await-to-callbacks.js
 // Documentation: https://github.com/eslint-community/eslint-plugin-promise/blob/v7.3.0/docs/rules/prefer-await-to-callbacks.md
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
-const message = 'Avoid callbacks. Prefer Async/Await.';
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-await-to-callbacks', {} as never, {
+ruleTester.run('prefer-await-to-callbacks', {
   valid: [
     // Upstream tests.
     {
@@ -43,36 +43,225 @@ ruleTester.run('prefer-await-to-callbacks', {} as never, {
   ],
   invalid: [
     // Upstream tests.
-    { code: 'heart(function(err) {})', errors: [{ message }] },
-    { code: 'heart(err => {})', errors: [{ message }] },
-    { code: 'heart("ball", function(err) {})', errors: [{ message }] },
-    { code: 'function getData(id, callback) {}', errors: [{ message }] },
-    { code: 'const getData = (cb) => {}', errors: [{ message }] },
-    { code: 'var x = function (x, cb) {}', errors: [{ message }] },
-    { code: 'cb()', errors: [{ message }] },
-    { code: 'callback()', errors: [{ message }] },
-    { code: 'heart(error => {})', errors: [{ message }] },
+    {
+      code: 'heart(function(err) {})',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: 'heart(err => {})',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: 'heart("ball", function(err) {})',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: 'function getData(id, callback) {}',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: 'const getData = (cb) => {}',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: 'var x = function (x, cb) {}',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: 'cb()',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: 'callback()',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: 'heart(error => {})',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: 'async.map(files, fs.stat, function(err, results) { if (err) throw err; });',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 73,
+        },
+      ],
     },
     {
       code: '_.map(files, fs.stat, function(err, results) { if (err) throw err; });',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 69,
+        },
+      ],
     },
     {
       code: 'map(files, fs.stat, function(err, results) { if (err) throw err; });',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 67,
+        },
+      ],
     },
     {
       code: 'map(function(err, results) { if (err) throw err; });',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
-    { code: 'customMap(errors, (err) => err.message)', errors: [{ message }] },
+    {
+      code: 'customMap(errors, (err) => err.message)',
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
+    },
     // Upstream documentation (the yield example is wrapped in a generator).
     {
       code: 'cb()\ncallback()\ndoSomething(arg, (err) => {})\nfunction doSomethingElse(cb) {}',
-      errors: [{ message }, { message }, { message }, { message }],
+      errors: [
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 11,
+        },
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 29,
+        },
+        {
+          messageId: 'error',
+          message: 'Avoid callbacks. Prefer Async/Await.',
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 28,
+        },
+      ],
     },
   ],
 });

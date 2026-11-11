@@ -1,11 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const catchMessage = 'Expected catch() or return';
-const doneMessage = 'Expected done() or return';
-
-ruleTester.run('catch-or-return', {} as never, {
+ruleTester.run('catch-or-return', {
   valid: [
     // ESLint upstream — catch
     { code: 'frank().then(go).catch(doIt)' },
@@ -151,158 +149,521 @@ ruleTester.run('catch-or-return', {} as never, {
     // catch failures
     {
       code: 'function callPromise(promise, cb) { promise.then(cb) }',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 37,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'fetch("http://www.yahoo.com").then(console.log.bind(console))',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
     {
       code: 'a.then(function() { return "x"; }).then(function(y) { throw y; })',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
-    { code: 'Promise.resolve(frank)', errors: [{ message: catchMessage }] },
-    { code: 'Promise.all([])', errors: [{ message: catchMessage }] },
-    { code: 'Promise.allSettled([])', errors: [{ message: catchMessage }] },
-    { code: 'Promise.any([])', errors: [{ message: catchMessage }] },
-    { code: 'Promise.race([])', errors: [{ message: catchMessage }] },
+    {
+      code: 'Promise.resolve(frank)',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: 'Promise.all([])',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: 'Promise.allSettled([])',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: 'Promise.any([])',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: 'Promise.race([])',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
     {
       code: 'frank().then(to).catch(fn).then(foo)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
-    { code: 'frank().finally(fn)', errors: [{ message: catchMessage }] },
+    {
+      code: 'frank().finally(fn)',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
     {
       code: 'frank().then(to).finally(fn)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: 'frank().then(go).catch(doIt).finally(fn)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().then().then().catch(doIt).finally(fn)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().catch(function() { /* why bother */ }).finally(fn)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 75,
+        },
+      ],
     },
 
     // return failures
     {
       code: 'function a() { frank().then(go) }',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: 'function a() { frank().then(go).then().then().then() }',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'function a() { frank().then(go).then()}',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: 'function a() { frank.then(go).then(to) }',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
 
     // allowFinally=true failures
     {
       code: 'frank().then(go).catch(doIt).finally(fn).then(foo)',
       options: [{ allowFinally: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: 'frank().then(go).catch(doIt).finally(fn).foobar(foo)',
       options: [{ allowFinally: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
 
     // terminationMethod=done failures
     {
       code: 'frank().then(go)',
       options: [{ terminationMethod: 'done' }],
-      errors: [{ message: doneMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected done() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: 'frank().catch(go)',
       options: [{ terminationMethod: 'done' }],
-      errors: [{ message: doneMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected done() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
 
     // assume somePromise.ANYTHING() is a new promise
     {
       code: 'frank().catch(go).someOtherMethod()',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // .then(null, fn) without allowThen
     {
       code: 'frank().then(a).then(b).then(null, c)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: 'frank().then(a).then(b).then().then().then(null, doIt)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'frank().then(a).then(b).then(null, function() { /* why bother */ })',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 68,
+        },
+      ],
     },
 
     // .then(fn, fn) without allowThen
-    { code: 'frank().then(a, b)', errors: [{ message: catchMessage }] },
+    {
+      code: 'frank().then(a, b)',
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
     {
       code: 'frank().then(go).then(zam, doIt)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: 'frank().then(a).then(b).then(c, d)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().then().then().then(wham, doIt)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().then(function() {}, function() { /* why bother */ })',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 77,
+        },
+      ],
     },
     {
       code: 'frank.then(go).then(to).then(pewPew, jail)',
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
 
     // .then(fn, fn) with allowThenStrict (non-null first arg still invalid)
     {
       code: 'frank().then(a, b)',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then(zam, doIt)',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: 'frank().then(a).then(b).then(c, d)',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().then().then().then(wham, doIt)',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'frank().then(go).then().then(function() {}, function() { /* why bother */ })',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 77,
+        },
+      ],
     },
     {
       code: 'frank.then(go).then(to).then(pewPew, jail)',
       options: [{ allowThenStrict: true }],
-      errors: [{ message: catchMessage }],
+      errors: [
+        {
+          messageId: 'terminationMethod',
+          message: 'Expected catch() or return',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
   ],
 });

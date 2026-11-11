@@ -1,10 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const errorMessage = 'Avoid using promises inside of callbacks.';
-
-ruleTester.run('no-promise-in-callback', {} as never, {
+ruleTester.run('no-promise-in-callback', {
   valid: [
     { code: 'go(function() { return Promise.resolve(4) })' },
     { code: 'go(function() { return a.then(b) })' },
@@ -54,69 +53,204 @@ ruleTester.run('no-promise-in-callback', {} as never, {
   invalid: [
     {
       code: 'a(function(err) { doThing().then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: 'a(function(error, zup, supa) { doThing().then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
     {
       code: 'a(function(error) { doThing().then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
 
     // arrow function
     {
       code: 'a((error) => { doThing().then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: 'a((error) => doThing().then(a))',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: 'a((err, data) => { doThing().then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: 'a((err, data) => doThing().then(a))',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
 
     // function declarations and similar
     {
       code: 'function x(err) { Promise.all() }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: 'function x(err) { Promise.allSettled() }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'function x(err) { Promise.any() }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: 'let x = (err) => doThingWith(err).then(a)',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: 'a(function(err) { return doThing()?.then(a) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: 'a(function(err) { return Promise?.resolve(err) })',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // object/class methods with an err/error first param are callbacks too
     {
       code: 'const o = { onError(err) { Promise.resolve(err) } }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: 'class X { onError(error) { audit().catch(log) } }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidPromiseInCallback',
+          message: 'Avoid using promises inside of callbacks.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
   ],
 });
