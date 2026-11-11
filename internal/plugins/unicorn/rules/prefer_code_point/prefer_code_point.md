@@ -23,7 +23,7 @@ const first = String.fromCodePoint(0x1f984);
 The rule offers a suggestion that renames `charCodeAt` to `codePointAt` only when the result is not consumed as a number. In string hashing or digit parsing such as `string.charCodeAt(index) - 48`, swapping in `codePointAt` would change the computed value: a code point outside the BMP occupies two code units, and iterating by `string.length` would still visit the trailing surrogate separately. The diagnostic is still reported there, but the fix is left for manual review.
 
 ```javascript
-// Reported without a suggestion: a correct code-point hash must iterate by code point.
+// Iterate by code point when computing a code-point hash.
 let hash = 0;
 for (const character of string) {
 	hash = (((hash * 31) | 0) + character.codePointAt(0)) | 0;
