@@ -1,8 +1,6 @@
 package rule
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	"strings"
@@ -33,29 +31,6 @@ type DisableDirectiveUsage struct {
 	Line   int     `json:"line"`
 	Column int     `json:"column"`
 	RuleID *string `json:"ruleId"`
-}
-
-func (usage *DisableDirectiveUsage) UnmarshalJSON(data []byte) error {
-	var wire struct {
-		Line   *int            `json:"line"`
-		Column *int            `json:"column"`
-		RuleID json.RawMessage `json:"ruleId"`
-	}
-	if err := json.Unmarshal(data, &wire); err != nil {
-		return err
-	}
-	if wire.Line == nil || wire.Column == nil || *wire.Line < 0 || *wire.Column < 0 || len(wire.RuleID) == 0 {
-		return errors.New("disable directive usage requires a nonnegative line, column, and a declared ruleId")
-	}
-	var name *string
-	if err := json.Unmarshal(wire.RuleID, &name); err != nil {
-		return err
-	}
-	if name != nil && *name == "" {
-		return errors.New("disable directive usage ruleId must be nonempty or null")
-	}
-	*usage = DisableDirectiveUsage{Line: *wire.Line, Column: *wire.Column, RuleID: name}
-	return nil
 }
 
 type directiveUsageKey struct {

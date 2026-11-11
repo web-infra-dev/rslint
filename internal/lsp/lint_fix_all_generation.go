@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
+	"github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -97,21 +98,7 @@ func acquireSpeculativeGeneration(
 			readText,
 		)
 		generation.Native.DirectiveRuleExists = func(_ string, name string) bool {
-			if snapshot.ruleCatalog == nil {
-				return true
-			}
-			if _, ok := snapshot.ruleCatalog.Lookup(name); !ok {
-				return false
-			}
-			namespace := rule.Namespace(name)
-			if namespace == "" {
-				return true
-			}
-			if snapshot.resolvedConfig.MergedConfig == nil {
-				return false
-			}
-			_, ok := snapshot.resolvedConfig.MergedConfig.Plugins[namespace]
-			return ok
+			return lint.DirectiveRuleExists(snapshot.ruleCatalog, snapshot.resolvedConfig.MergedConfig, name)
 		}
 		generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity {
 			return snapshot.resolvedConfig.MergedConfig.UnusedDirectiveSeverity()

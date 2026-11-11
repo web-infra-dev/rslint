@@ -134,10 +134,6 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 		if kind == directiveNone {
 			continue
 		}
-		// Only line-flavored directives can be carried by line comments.
-		if comment.Kind == ast.KindSingleLineCommentTrivia && (kind == directiveBlock || kind == directiveEnable) {
-			continue
-		}
 
 		if dm.directiveTracking == nil && (kind == directiveBlock || kind == directiveEnable) {
 			dm.blockDirectives = append(dm.blockDirectives, suppressionBlock{pos: comment.Pos(), rules: rules, disabled: kind == directiveBlock})

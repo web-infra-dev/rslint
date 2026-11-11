@@ -303,17 +303,30 @@ func (resolver *Resolver) UnusedDirectiveSeverityForSourcePath(sourcePath string
 // DirectiveRuleExists checks availability, not enabled severity. Configured-off
 // rules can still have unused directives; unavailable names must not be deleted.
 func (resolver *Resolver) DirectiveRuleExists(sourcePath, name string) bool {
-	if _, ok := resolver.catalog.Lookup(name); !ok {
+	var merged *config.MergedConfig
+	if _, resolved, ok := resolver.ResolveSourcePath(sourcePath); ok {
+		merged = resolved.MergedConfig
+	}
+	return DirectiveRuleExists(resolver.catalog, merged, name)
+}
+
+// DirectiveRuleExists checks whether a directive names an available rule,
+// independently of its configured severity. A missing catalog preserves entries
+// when availability is unknown, as in editor generations without a catalog.
+func DirectiveRuleExists(catalog *rule.Catalog, merged *config.MergedConfig, name string) bool {
+	if catalog == nil {
+		return true
+	}
+	if _, ok := catalog.Lookup(name); !ok {
 		return false
 	}
 	namespace := rule.Namespace(name)
 	if namespace == "" {
 		return true
 	}
-	_, resolved, ok := resolver.ResolveSourcePath(sourcePath)
-	if !ok || resolved.MergedConfig == nil {
+	if merged == nil {
 		return false
 	}
-	_, declared := resolved.MergedConfig.Plugins[namespace]
+	_, declared := merged.Plugins[namespace]
 	return declared
 }

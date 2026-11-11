@@ -698,3 +698,34 @@ func configuredRuleNameSet(configuredRules []rule.ConfiguredRule) map[string]boo
 	}
 	return names
 }
+
+func TestDirectiveRuleExists(t *testing.T) {
+	catalog := rule.NewCatalog(
+		rule.Rule{Name: "no-debugger"},
+		rule.Rule{Name: "plugin/example"},
+		rule.Rule{Name: "@scope/plugin/example"},
+	)
+	merged := &config.MergedConfig{Plugins: map[string]struct{}{"plugin": {}, "@scope/plugin": {}}}
+	for _, tc := range []struct {
+		name     string
+		catalog  *rule.Catalog
+		merged   *config.MergedConfig
+		ruleName string
+		want     bool
+	}{
+		{"unknown availability preserves entries", nil, nil, "unknown", true},
+		{"unknown rule", catalog, merged, "unknown", false},
+		{"core without config", catalog, nil, "no-debugger", true},
+		{"declared plugin", catalog, merged, "plugin/example", true},
+		{"declared scoped plugin", catalog, merged, "@scope/plugin/example", true},
+		{"plugin without config", catalog, nil, "plugin/example", false},
+		{"undeclared plugin", catalog, &config.MergedConfig{}, "plugin/example", false},
+		{"unknown rule in declared plugin", catalog, merged, "plugin/missing", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := DirectiveRuleExists(tc.catalog, tc.merged, tc.ruleName); got != tc.want {
+				t.Fatalf("DirectiveRuleExists(%q) = %v, want %v", tc.ruleName, got, tc.want)
+			}
+		})
+	}
+}

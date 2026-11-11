@@ -614,33 +614,51 @@ func TestDisableManagerBlockAndLineCombined(t *testing.T) {
 	}
 }
 
-func TestDisableManagerIgnoresBlockDirectivesInLineComments(t *testing.T) {
+func TestDisableManagerBlockDirectivesInLineComments(t *testing.T) {
 	for _, prefix := range []string{"eslint", "rslint"} {
-		for _, tc := range []struct {
-			name, source string
-			report       bool
-			disabled     bool
-		}{
-			{"specific disable", "// eslint-disable a\nx();", true, false},
-			{"wildcard disable", "// eslint-disable\nx();", true, false},
-			{"specific enable", "/* eslint-disable a */\n// eslint-enable a\nx();", true, true},
-			{"wildcard enable", "/* eslint-disable */\n// eslint-enable\nx();", true, true},
-			{"unused disable", "// eslint-disable a\nx();", false, false},
-			{"unmatched enable", "// eslint-enable a\nx();", false, false},
-		} {
-			t.Run(prefix+"/"+tc.name, func(t *testing.T) {
-				source := strings.ReplaceAll(tc.source, "eslint-", prefix+"-")
-				sf := parseCommentStoreSource(t, source)
-				manager := NewDisableManager(sf, NewCommentStore(sf))
-				if tc.report {
-					if got := manager.IsRuleDisabled("a", strings.Index(source, "x();")); got != tc.disabled {
-						t.Fatalf("disabled = %v, want %v", got, tc.disabled)
+		for _, tracking := range []bool{false, true} {
+			for _, tc := range []struct {
+				name, source     string
+				report, disabled bool
+				unused           int
+			}{
+				{"specific disable", "// eslint-disable a\nx();", true, true, 0},
+				{"wildcard disable", "// eslint-disable\nx();", true, true, 0},
+				{"specific enable", "/* eslint-disable a */\n// eslint-enable a\nx();", true, false, 1},
+				{"wildcard enable", "/* eslint-disable */\n// eslint-enable\nx();", true, false, 1},
+				{"unused disable", "// eslint-disable a\nx();", false, false, 1},
+				{"unmatched enable", "// eslint-enable a\nx();", false, false, 1},
+			} {
+				t.Run(fmt.Sprintf("%s/tracking=%v/%s", prefix, tracking, tc.name), func(t *testing.T) {
+					source := strings.ReplaceAll(tc.source, "eslint-", prefix+"-")
+					sf := parseCommentStoreSource(t, source)
+					manager := NewSuppressionManager(sf, NewCommentStore(sf))
+					if tracking {
+						manager = NewDisableManager(sf, NewCommentStore(sf))
 					}
-				}
-				if diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil); len(diagnostics) != 0 {
-					t.Fatalf("unexpected unused diagnostics or fixes: %+v", diagnostics)
-				}
-			})
+					if tc.report {
+						if got := manager.IsRuleDisabled("a", strings.Index(source, "x();")); got != tc.disabled {
+							t.Fatalf("disabled = %v, want %v", got, tc.disabled)
+						}
+					}
+					if !tracking {
+						return
+					}
+					diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil)
+					if len(diagnostics) != tc.unused {
+						t.Fatalf("unused diagnostics = %d, want %d: %+v", len(diagnostics), tc.unused, diagnostics)
+					}
+					for _, diagnostic := range diagnostics {
+						if diagnostic.FixesPtr == nil || len(*diagnostic.FixesPtr) != 1 {
+							t.Fatalf("expected one removal fix: %+v", diagnostic)
+						}
+						fix := (*diagnostic.FixesPtr)[0]
+						if fix.Range.Pos() != 0 || fix.Range.End() != strings.IndexByte(source, '\n') || fix.Text != " " {
+							t.Fatalf("unexpected comment removal: %+v", fix)
+						}
+					}
+				})
+			}
 		}
 	}
 }
@@ -871,25 +889,6 @@ func TestUnusedDirectiveUsageRejectsUnknownEntriesAtomically(t *testing.T) {
 		diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil)
 		if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "'a' or 'b'") {
 			t.Fatalf("invalid summary partially marked usage: %+v", diagnostics)
-		}
-	}
-}
-
-func TestUnusedDirectiveUsageDecode(t *testing.T) {
-	for _, input := range []string{
-		`{}`, `{"line":0,"column":0}`, `{"line":null,"column":0,"ruleId":null}`,
-		`{"line":0,"column":-1,"ruleId":null}`, `{"line":0,"column":0,"ruleId":""}`,
-		`{"line":0,"column":0,"ruleId":1}`, `null`,
-	} {
-		var usage DisableDirectiveUsage
-		if err := json.Unmarshal([]byte(input), &usage); err == nil {
-			t.Fatalf("accepted malformed usage %s", input)
-		}
-	}
-	for _, input := range []string{`{"line":0,"column":0,"ruleId":null}`, `{"line":1,"column":3,"ruleId":"a"}`} {
-		var usage DisableDirectiveUsage
-		if err := json.Unmarshal([]byte(input), &usage); err != nil {
-			t.Fatal(err)
 		}
 	}
 }
