@@ -38,6 +38,7 @@ replace (
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/fatih/color v1.19.0
+	github.com/jinzhu/inflection v1.0.0
 	github.com/microsoft/TypeScript/tsc/shim/api/encoder v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/ast v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/binder v0.0.0
