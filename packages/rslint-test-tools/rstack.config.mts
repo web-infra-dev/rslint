@@ -920,6 +920,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-array-index-of.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-last-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-some.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-at.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-bigint-literals.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-blob-reading-methods.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-block-statement-over-iife.test.ts',

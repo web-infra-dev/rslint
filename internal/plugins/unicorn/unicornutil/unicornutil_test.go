@@ -250,6 +250,7 @@ func TestNodeMatchesPathNestedBoundaries(t *testing.T) {
 		want       bool
 	}{
 		{text: "utils.deep.flat", path: "utils.deep.flat", want: true},
+		{text: "utils.deep.flat", path: "utils..deep.flat"},
 		{text: "(utils.deep).flat", path: "utils.deep.flat", want: true},
 		{text: "utils?.deep.flat", path: "utils.deep.flat"},
 		{text: "utils.deep?.flat", path: "utils.deep.flat"},
@@ -267,6 +268,7 @@ func TestNodeMatchesPathNestedBoundaries(t *testing.T) {
 		{text: "super", path: "super.deep"},
 		{text: "import.meta", path: "import.meta", want: true},
 		{text: "import.meta", path: "import"},
+		{text: "import.meta.last", path: "import.meta.last", want: true},
 	}
 	for _, test := range tests {
 		sourceFile := parseTestSource(test.text + ";")
