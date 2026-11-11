@@ -662,6 +662,7 @@ tttodo
 txtar
 txtarfs
 typeparam
+typeservice
 typescriptutil
 Über
 über

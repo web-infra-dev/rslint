@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "composite": false,
+    "types": ["node"],
+    "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-core-plugin-api-dts.tsbuildinfo"
+  },
+  "files": ["src/eslint-plugin/index.ts", "src/eslint-plugin/types.ts"],
+  "include": []
+}

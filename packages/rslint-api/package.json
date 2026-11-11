@@ -4,6 +4,14 @@
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@typescript/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./*": "./*"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/web-infra-dev/rslint"
@@ -21,6 +29,7 @@
     "@typescript/native-preview": "catalog:"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "exports": null
   }
 }

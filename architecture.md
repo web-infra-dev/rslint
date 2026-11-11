@@ -133,7 +133,7 @@ The directory map below folds the high-level module relationships into the packa
 | `packages/rslint/`                   | Main npm package with JavaScript API and CLI wrapper                                                                           | Spawns `cmd/rslint --api` in JavaScript runtime environments and uses `internal/api` message shapes                                                                                                                                                                                                                                                                                                                                                             |
 | `packages/rslint/src/languages/js/`  | JavaScript/TypeScript ESTree operations for JS plugins                                                                         | Owns ESTree types, frame decoding/schema, positions, visitor keys, token reconstruction, JSX token decoding, built-in globals and scope analysis. It imports no plugin host, RuleContext, SourceCode, configuration loader, native binding or IPC implementation.                                                                                                                                                                                               |
 | `packages/rslint/src/eslint-plugin/` | ESLint plugin SDK, rule execution and worker coordination                                                                      | Adapts final language data to SourceCode and RuleContext, diagnostics, directives and listeners. Host, protocol and WorkerPool coordinate requests without decoding ASTs. It depends on `languages/js`; language modules never depend on it.                                                                                                                                                                                                                    |
-| `packages/rslint-api/`               | Frontend-facing encoded source file / AST decoding helpers                                                                     | Used mainly by website Playground to decode AST/source data returned from the Go API                                                                                                                                                                                                                                                                                                                                                                            |
+| `packages/rslint-api/`               | Shared compiler AST and syntax reader                                                                                          | Decodes Go-encoded source trees for the Playground and core type services                                                                                                                                                                                                                                                                                                                                                                                       |
 | `packages/rslint-rule-tester/`       | Shared rule tester for plugin integration tests                                                                                | Runs rule cases through `@rslint/core` and asserts their diagnostics and fixes                                                                                                                                                                                                                                                                                                                                                                                  |
 | `packages/rslint-test-tools/`        | Testing utilities and cross-ecosystem rule tests                                                                               | Supports package-side and integration-style tests around the linter and rule ecosystem                                                                                                                                                                                                                                                                                                                                                                          |
 | `packages/rslint-wasm/`              | Browser/WASM package for running `rslint --api` in a worker                                                                    | Starts the browser worker, hosts the wasm runtime, and bridges website Playground requests through `internal/api` and `internal/api/server` to `internal/linter` and `internal/inspector`                                                                                                                                                                                                                                                                       |
@@ -1820,6 +1820,95 @@ expose ordinary arrays containing those same mutable objects; after exposure,
 queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
+
+The independent `internal/typeservice` foundation accepts an already bound
+Program and explicitly eligible sources. `BindTarget` authorizes one canonical
+source identity and session generation; dependency declarations remain valid
+semantic operands. One anchored checker supplies stable type, symbol and
+signature handles. Queries resolve source indices before acquiring the checker,
+copy typed facts during a short exclusive lease, then resolve declaration
+indices and encode packets after releasing it. The session retains its Program
+directly until close, outside the Program's weak derived cache.
+
+The reusable ESTree `Builder.Project` owns syntax encoding and exact numeric
+forward origins and preferred reverse aliases from the original compiler AST.
+Flattened comma prefixes use compact reverse-only metadata referencing one
+canonical sequence, without serialized prefix lists. The file client snapshots
+that sequence's original membership once and creates an ordinary writable alias
+array only when a caller requests the reverse mapping. Native compiler nodes and
+proxies resolve on map lookup through the pinned binary syntax reader.
+
+`TypeServiceClient` belongs to one worker and Program generation. Each eligible
+lint task obtains a `file(binding)` handle and closes it in `finally`; file
+completion releases ESTree maps while preserving generation-scoped native,
+type, symbol and signature identities while a plugin can observe them. Weak
+interning releases unreachable wrappers and their keys. Closing the owner invalidates all those
+objects and releases its transports and caches. `FileTypeServiceClient` is a
+convenience owner for a standalone invocation.
+
+An injected synchronous transport uses a finite request/fact protocol and
+offset-addressed binary records. Property/name arguments and packet strings
+preserve UTF-16 code units. Scalar answers include shallow facts for their
+direct handles and symbols, without recursively exporting member or type graphs.
+Reference targets, type parameters, alias arguments and operands of derived
+types are handles on those facts. Index signatures and type predicates come from
+the checker on demand.
+Scope and export lists carry symbol names and handles so name searches can
+defer declaration facts. Type and signature formatting use the checker printer
+with TypeScript's defaults. Passing `MultilineObjectLiterals` raises an
+unsupported-operation error because the Go printer uses different line breaks.
+Workers and brokers retain each supplemental fact under its canonical key,
+rather than duplicating it under every node query. Fields decode on demand;
+wrappers retain requested immutable values and translated flags, never packet
+readers. A byte-bounded packet LRU is checked before shared storage and the
+bridge. Query keys use descriptor file ordinals while retaining every semantic
+argument. `QueryBatch` resolves node identities before one short checker lease
+and encodes its answers afterward.
+
+An optional profile groups observed node operations by native syntax shape and
+effective rule/options identity. Subsequent files may prefetch matching checker
+facts in batches of at most 256 queries, with bounded profile and request counts.
+This executes real checker queries and never predicts answers or replays rules;
+any unprepared or evicted query follows the same synchronous miss path. An
+optional preparation failure leaves demanded queries authoritative; cancellation,
+generation invalidation and malformed packets still fail the task.
+
+Compiler node proxies hold canonical file/index identities. Source metadata and
+`getSourceFile()` need no syntax transfer; a finite `nodeRecord` supplies
+requested declaration ancestors and names, with a separate byte-bounded summary
+cache. Relative and case aliases use metadata-only canonicalization through the
+Program; they do not request source syntax. Other structural properties load the
+exact immutable source through a separate callback outside checker leases.
+Copied source buffers have their own byte-bounded generation LRU. Full syntax
+and compact summaries use the same proxies and enum/heritage adapters, preserving
+identity through hydration. File origin maps continue to reference the exact
+compiler nodes and preferred reverse aliases.
+Node-local values written by TypeScript helpers stay on the JavaScript proxy,
+so helper caches remain observable without modifying the compiler tree.
+
+A broker may publish immutable packets into `SharedTypeCacheOwner`, a portable
+JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. When an
+entry count is omitted, the index uses at most one quarter of the byte budget;
+it has no separate half-capacity insertion cutoff. Bounded probe walks preserve
+existing hits at capacity and fall back to binary replies when insertion cannot
+proceed. Independent workers decode their own requested values. Live wrappers
+and their requested arrays have generation validity, rather than a claimed global heap
+bound. Plugins retaining syntax methods or decoded values can retain their
+independently owned graphs after close; semantic access rejects. Shared storage
+is reclaimed when its owner/readers/descriptors are unreachable. This cache
+retains no native attachment lease or research Go-mapped V8 store.
+
+The optional parser-services factory is available to the direct rule runner;
+production CLI, API, LSP and WorkerPool requests do not supply it yet. Entrypoint
+admission, scheduling, generation transfer and editor integration remain follow-up
+work. Meta-property keywords are scalar compiler fields, so their synthetic
+ESTree identifiers have no compiler node origin and reject semantic queries.
+The `@rslint/api` workspace package owns the binary syntax reader, decoder and
+enums from the same pinned compiler source as Go. Rslib selects its
+`@typescript/source` entry for runtime bundling. Core's workspace type check
+covers the worker with the same strict settings as the rest of core and
+resolves the public declarations from the API's own build. Public plugin
+declarations are bundled from the public entries.
 
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
