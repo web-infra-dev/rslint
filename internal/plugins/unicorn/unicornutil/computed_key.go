@@ -1,4 +1,4 @@
-package prefer_modern_math_apis
+package unicornutil
 
 import (
 	"math"
@@ -12,13 +12,22 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Keep ordinary keys on the shared evaluator. Lower the missing pure calls on
-// a temporary tree so nested calls still use its coercion and indexing rules.
-func staticKeyText(node *ast.Node) (string, bool) {
+// ComputedKeyEvaluator folds computed keys without resolving bindings. The zero
+// value is ready to use. Keep one evaluator per file or comparison.
+type ComputedKeyEvaluator struct {
+	evaluator *utils.StaticStringEvaluator
+}
+
+// Eval keeps ordinary keys on the shared evaluator. It lowers supported pure
+// calls on a temporary tree so nested calls reuse its coercion and indexing rules.
+func (keys *ComputedKeyEvaluator) Eval(node *ast.Node) (string, bool) {
 	if node == nil || ast.IsIdentifier(node) {
 		return "", false
 	}
-	evaluator := utils.NewStaticStringEvaluatorWithoutScope()
+	if keys.evaluator == nil {
+		keys.evaluator = utils.NewStaticStringEvaluatorWithoutScope()
+	}
+	evaluator := keys.evaluator
 	if text, ok := evaluator.EvalToString(node); ok {
 		return text, true
 	}
@@ -180,7 +189,7 @@ func (f literalMethodFolder) foldArrayCall(receiver *ast.Node, method string, ar
 }
 
 func literalElements(node *ast.Node) ([]*ast.Node, bool) {
-	node = ast.SkipOuterExpressions(node, numberWrappers)
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
 	if !ast.IsArrayLiteralExpression(node) {
 		return nil, false
 	}
