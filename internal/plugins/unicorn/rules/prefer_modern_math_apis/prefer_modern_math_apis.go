@@ -120,6 +120,7 @@ func checkSqrt(ctx rule.RuleContext, node *ast.Node) {
 	if !ok {
 		return
 	}
+	var keys unicornutil.ComputedKeyEvaluator
 	var additions, squares []*ast.Node
 	var collect func(*ast.Node) bool
 	collect = func(expression *ast.Node) bool {
@@ -135,7 +136,7 @@ func checkSqrt(ctx rule.RuleContext, node *ast.Node) {
 		case ast.KindAsteriskToken:
 			// This comparator includes static strings and erased TypeScript
 			// wrappers, as upstream's isSameReference does in v79.
-			if !unicornutil.IsSameComparisonOperandWithKeyEvaluator(binary.Left, binary.Right, staticKeyText) {
+			if !unicornutil.IsSameComparisonOperandWithKeyEvaluator(binary.Left, binary.Right, keys.Eval) {
 				return false
 			}
 		case ast.KindAsteriskAsteriskToken:
