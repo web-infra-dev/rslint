@@ -60,6 +60,30 @@ function walk() {
 }
 ```
 
+In scripts, writing a known property of `globalThis` can also replace a
+top-level function with that name.
+
+```javascript
+function walk() {
+  globalThis.walk = () => 1;
+  return walk();
+}
+```
+
+In non-strict scripts, a function declared in a block can make a different
+function available under the same name outside the block. Rslint skips calls
+that could use that function.
+
+```javascript
+function walk(n) {
+  if (true) {
+    function walk() { return 1; }
+  }
+  if (n) return walk(n - 1);
+  return 0;
+}
+```
+
 In scripts, Rslint skips a call when a `with` statement can supply the same name
 from an object.
 

@@ -162,3 +162,101 @@ function walk(value: number): number { return walk(value); }`, "case.ts", 2, 47,
 		},
 	)
 }
+
+func TestNoUselessRecursionBindingExtras(t *testing.T) {
+	script := rule.LanguageOptions{SourceType: "script"}
+	scriptRecursion := func(code string, line, column int) rule_tester.InvalidTestCase {
+		test := recursiveReturn(code, "case.js", line, column, column+4)
+		test.LanguageOptions = script
+		return test
+	}
+	const globalWrite = `function walk() {
+  globalThis.walk = () => 1;
+  return walk();
+}`
+	const blockFunction = `function walk(n) {
+  if (true) { function walk() { return 1; } }
+  if (n) return walk(n - 1);
+  return 0;
+}`
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_recursion.NoUselessRecursionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `function outer(walk) {
+  function walk(walk) { return walk(); }
+}`, FileName: "case.js"},
+			// Unlike a parameter-default write, this updates the body binding.
+			{Code: `function outer(walk = () => 0) {
+  function walk() { return walk(); }
+  walk = () => 1;
+}`, FileName: "case.js"},
+			{Code: globalWrite, FileName: "case.js", LanguageOptions: script},
+			{Code: `function walk() {
+  (globalThis)["wa" + "lk"] = () => 1;
+  return walk();
+}`, FileName: "case.js", LanguageOptions: script},
+			{Code: blockFunction, FileName: "case.js", LanguageOptions: script},
+			{Code: `function walk(n) {
+  if (n) return walk(n - 1);
+  return 0;
+}
+const saved = walk;
+{ function walk() { return 1; } }
+saved(1);`, FileName: "case.js", LanguageOptions: script},
+			{Code: `const saved = function walk(n) {
+  { function walk() { return 1; } }
+  if (n) return walk(n - 1);
+  return 0;
+};`, FileName: "case.js", LanguageOptions: script},
+			{Code: `function walk(n) {
+  try { throw 0; } catch (walk) { { function walk() { return 1; } } }
+  if (n) return walk(n - 1);
+  return 0;
+}`, FileName: "case.js", LanguageOptions: script},
+		},
+		[]rule_tester.InvalidTestCase{
+			recursiveReturn(`function outer(walk) {
+  function walk() {
+    return walk();
+  }
+}`, "case.js", 3, 12, 16),
+			recursiveReturn(`function outer({ walk }: { walk: () => number } = { walk: () => 0 }, change = (walk = () => 1)) {
+  function walk(): number {
+    return walk();
+  }
+}`, "case.ts", 3, 12, 16),
+			recursiveReturn(globalWrite, "case.js", 3, 10, 14),
+			scriptRecursion(`function walk(globalThis) {
+  globalThis.walk = () => 1;
+  return walk();
+}`, 3, 10),
+			scriptRecursion(`{
+  function walk() {
+    globalThis.walk = () => 1;
+    return walk();
+  }
+}`, 4, 12),
+			recursiveReturn(blockFunction, "case.js", 3, 17, 21),
+			scriptRecursion(`"use strict";`+"\n"+blockFunction, 4, 17),
+			// Lexical declarations can prevent the block function from escaping.
+			scriptRecursion(`function walk(n) {
+  { let walk; { function walk() { return 1; } } }
+  if (n) return walk(n - 1);
+  return 0;
+}`, 3, 17),
+			scriptRecursion(`function walk(n) {
+  try { throw { walk: 0 }; } catch ({ walk }) { { function walk() { return 1; } } }
+  if (n) return walk(n - 1);
+  return 0;
+}`, 3, 17),
+			// An assignment to the local copy does not change the global function.
+			scriptRecursion(`function walk() {
+  return walk();
+}
+function other() {
+  { function walk() { return 1; } }
+  walk = () => 2;
+}`, 2, 10),
+		},
+	)
+}

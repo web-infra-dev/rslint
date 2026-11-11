@@ -6,8 +6,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/scope"
-	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
 
 var recursionMessage = rule.RuleMessage{
@@ -19,23 +17,22 @@ var NoUselessRecursionRule = rule.Rule{
 	Name:   "unicorn/no-useless-recursion",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		var reassigned map[*ast.Node]struct{}
-		isReassigned := func(function *ast.Node) bool {
-			if reassigned == nil {
-				reassigned = reassignedFunctions(ctx)
+		var bindings *functionBindings
+		getBindings := func() *functionBindings {
+			if bindings == nil {
+				bindings = analyzeFunctionBindings(ctx)
 			}
-			_, ok := reassigned[function]
-			return ok
+			return bindings
 		}
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
-				checkReturn(ctx, node, isReassigned)
+				checkReturn(ctx, node, getBindings)
 			},
 		}
 	},
 }
 
-func checkReturn(ctx rule.RuleContext, node *ast.Node, isReassigned func(*ast.Node) bool) {
+func checkReturn(ctx rule.RuleContext, node *ast.Node, getBindings func() *functionBindings) {
 	expression := utils.ESTreeRuntimeExpression(node.AsReturnStatement().Expression)
 	if expression == nil || expression.Kind != ast.KindCallExpression || ast.IsOptionalChain(expression) {
 		return
@@ -56,41 +53,18 @@ func checkReturn(ctx rule.RuleContext, node *ast.Node, isReassigned func(*ast.No
 	// Upstream's scope lookup also stops at a same-named type declaration.
 	symbol := ctx.Refs.ResolveInFileWithMeaning(callee,
 		ast.SymbolFlagsValue|ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
-	if symbol == nil || !slices.Contains(symbol.Declarations, function) || hasTryWithOrActiveUsing(node, function) {
+	if symbol == nil || (!slices.Contains(symbol.Declarations, function) && !reusesEnclosingParameter(function, symbol)) ||
+		hasTryWithOrActiveUsing(node, function) {
 		return
 	}
-	// A named function expression has a private, immutable name.
-	if function.Kind == ast.KindFunctionDeclaration && isReassigned(function) {
+
+	// An expression's private name can be shadowed by a legacy block function in its body.
+	if (function.Kind == ast.KindFunctionDeclaration || ctx.LanguageOptions.EffectiveSourceType() != "module") &&
+		getBindings().mayBeReplaced(function) {
 		return
 	}
 
 	ctx.ReportNode(callee, recursionMessage)
-}
-
-func reassignedFunctions(ctx rule.RuleContext) map[*ast.Node]struct{} {
-	// The JavaScript scope graph groups var redeclarations with function names.
-	manager := scopeanalysis.References(ctx, nil)
-	reassigned := make(map[*ast.Node]struct{})
-	for _, reference := range manager.References {
-		if reference.IsValueReference() && utils.IsWriteReference(reference.Identifier) {
-			for _, binding := range reference.Declarations {
-				if binding.Kind == scope.DefFunctionName {
-					reassigned[binding.DefNode] = struct{}{}
-				}
-			}
-		}
-	}
-	for _, lexicalScope := range manager.Scopes {
-		for _, binding := range lexicalScope.Vars {
-			if binding.Kind == scope.DefFunctionName &&
-				slices.ContainsFunc(lexicalScope.Declarations(binding.Name), func(declaration *scope.Variable) bool {
-					return declaration.Kind == scope.DefVariable && utils.IsVariableWriteReference(declaration.ID)
-				}) {
-				reassigned[binding.DefNode] = struct{}{}
-			}
-		}
-	}
-	return reassigned
 }
 
 func hasTryWithOrActiveUsing(node, function *ast.Node) bool {
