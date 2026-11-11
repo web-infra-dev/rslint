@@ -1,12 +1,11 @@
 package prefer_iterator_zip
 
-// cspell:words gertd
+// cspell:words jinzhu
 
 import (
 	"strings"
-	"sync"
 
-	"github.com/gertd/go-pluralize"
+	"github.com/jinzhu/inflection"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -15,13 +14,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
 )
-
-var inflection = sync.OnceValue(func() *pluralize.Client {
-	client := pluralize.NewClient()
-	// The JavaScript inflector treats species as uncountable.
-	client.AddUncountableRule("species")
-	return client
-})
 
 func buildSuggestion(ctx rule.RuleContext, header core.TextRange, loop *ast.Node, bounds loopBounds, reads []inputReads) []rule.RuleSuggestion {
 	if bounds.mathObject != nil && (!ctx.Globals.Access("Math").IsDeclared() || !ctx.Refs.IsGlobalReference(bounds.mathObject)) {
@@ -59,8 +51,8 @@ func buildSuggestion(ctx rule.RuleContext, header core.TextRange, loop *ast.Node
 	inputs := make([]string, 0, len(reads))
 	names := make([]string, 0, len(reads))
 	for _, input := range reads {
-		// The Go port differs from pluralize on some inflections, such as cookies.
-		name := inflection().Singular(input.name)
+		// This inflector uses cookie for cookies.
+		name := inflection.Singular(input.name)
 		if name == "" || name == input.name {
 			name = "element"
 		}
