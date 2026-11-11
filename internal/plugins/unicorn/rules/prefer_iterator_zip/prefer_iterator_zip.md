@@ -13,8 +13,8 @@ used only by the condition.
 
 Each input must be a distinct identifier. Within the body, the rule allows
 only element reads at the loop index. Arrays and typed arrays qualify. The rule
-skips known strings and plain objects and assumes that unknown inputs are arrays
-or typed arrays.
+skips known strings and plain objects, including those typed through JSDoc, and
+assumes that unknown inputs are arrays or typed arrays.
 
 Examples of **incorrect** code for this rule
 
@@ -61,6 +61,9 @@ function pair(Iterator, names, scores) {
 Rslint also withholds the suggestion when `languageOptions.globals` disables
 `Iterator` or the loop's `Math`, or when the loop or its element reads are
 inside a `with` statement.
+
+Rslint reports the loop without a suggestion when a direct `eval()` can observe
+the loop index or a cached length that the suggestion would remove.
 
 Rslint ignores a bound such as `Math.min(index.length, names.length)` when
 `index` is the loop counter. The counter starts at `0` and is a number.

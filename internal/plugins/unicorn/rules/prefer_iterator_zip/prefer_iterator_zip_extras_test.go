@@ -22,6 +22,7 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 	const minimum = `Math.min(names.length, scores.length)`
 	const suggestion = `for (const [name, score] of Iterator.zip([names, scores]))`
 	const argumentHeader = `for (let index = 0; index < Math.min(names.length, arguments.length); index++)`
+	const annotatedArrays = "/**\n * @param {string[]} names\n * @param {Uint8Array} scores\n */\nfunction pair(names, scores) {\n  "
 	valid := []rule_tester.ValidTestCase{
 		// Only a plain let index and direct length comparisons qualify.
 		{FileName: "input.js", Code: `for (let index = 0; index < ` + minimum + `; )` + loopBody},
@@ -40,6 +41,11 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 		{FileName: "input.js", Code: `const length = ` + minimum + `; label: ` + cached + loopBody},
 		{FileName: "input.js", Code: `const other = ` + minimum + `; ` + cached + loopBody},
 		{FileName: "input.js", Code: `const length = Math.max(names.length, scores.length); ` + cached + loopBody},
+		// JSDoc can identify inputs whose indexing differs from iteration.
+		{FileName: "input.js", Code: "/** @param {string} names */\nfunction pair(names, scores) { " + loopHeader + loopBody + " }"},
+		{FileName: "input.js", Code: "/** @param {{ length: number, [index: number]: string }} names */\nfunction pair(names, scores) { " + loopHeader + loopBody + " }"},
+		{FileName: "input.js", Code: "/** @param {?String} [input] */\nfunction pair(input, scores) { const names = (input); " + loopHeader + loopBody + " }"},
+		{FileName: "input.js", Code: "/** @type {string} */\nlet names = input;\n" + loopHeader + loopBody},
 		// Reference roles within the body.
 		{FileName: "input.js", Code: loopHeader + ` { [...names[index]] = scores[index]; }`},
 		{FileName: "input.ts", Code: loopHeader + ` { type Index = typeof index; save(names[index], scores[index]); }`},
@@ -93,6 +99,17 @@ func TestPreferIteratorZipExtras(t *testing.T) {
 			suggestion+` { save(name, score); }`, 1, 1, 1, 85),
 		expectZip("input.js", loopHeader+` { const Iterator = 0; save(Iterator, names[index], scores[index]); }`,
 			suggestion+` { const Iterator = 0; save(Iterator, name, score); }`, 1, 1, 1, 76),
+		// JSDoc-annotated arrays and typed arrays still qualify.
+		expectZip("input.js", annotatedArrays+loopHeader+loopBody+"\n}",
+			annotatedArrays+suggestion+" { save(name, score); }\n}", 6, 3, 6, 78),
+		// Direct eval can read bindings even without a static reference.
+		expectZip("input.js", loopHeader+` { save(eval("index"), names[index], scores[index]); }`, "", 1, 1, 1, 76),
+		expectZip("input.js", loopHeader+` { save(() => (eval)("index"), names[index], scores[index]); }`, "", 1, 1, 1, 76),
+		expectZip("input.js", `for (let index = 0, length = `+minimum+`; index < length; index++) { save(eval("length"), names[index], scores[index]); }`, "", 1, 1, 1, 93),
+		expectZip("input.js", "const length = "+minimum+";\n"+cached+loopBody+` save(eval("length"));`, "", 2, 1, 2, 45),
+		expectZip("input.js", "switch (kind) { case 0:\n  const length = "+minimum+";\n  "+cached+loopBody+"\ncase 1: save(eval('length'));\n}", "", 3, 3, 3, 47),
+		expectZip("input.js", loopHeader+` { save(eval?.("index"), (0, eval)("index"), names[index], scores[index]); }`,
+			suggestion+` { save(eval?.("index"), (0, eval)("index"), name, score); }`, 1, 1, 1, 76),
 	}
 	disabledIterator := expectZip("input.js", loopHeader+loopBody, "", 1, 1, 1, 76)
 	disabledIterator.Globals = map[string]any{"Iterator": "off"}

@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
@@ -27,7 +28,7 @@ func buildSuggestion(ctx rule.RuleContext, header core.TextRange, loop *ast.Node
 		return nil
 	}
 	comments := ctx.Comments.All()
-	if utils.HasCommentInSpan(comments, header.Pos(), header.End()) {
+	if utils.HasCommentInSpan(comments, header.Pos(), header.End()) || hasEvalWithLoopBindings(ctx, loop, bounds.cachedStatement) {
 		return nil
 	}
 	var fixes []rule.RuleFix
@@ -81,6 +82,24 @@ func buildSuggestion(ctx rule.RuleContext, header core.TextRange, loop *ast.Node
 		Message:  rule.RuleMessage{Id: ruleName + "/suggestion", Description: "Use `Iterator.zip(…)`."},
 		FixesArr: fixes,
 	}}
+}
+
+type directEvalScopeKey struct{ block *ast.Node }
+
+func hasEvalWithLoopBindings(ctx rule.RuleContext, loop, cachedStatement *ast.Node) bool {
+	if cachedStatement == nil {
+		return hasDirectEval(loop.AsForStatement().Statement)
+	}
+	// A preceding cached bound is also visible elsewhere in its block.
+	block := cachedStatement.Parent
+	if ast.IsCaseClause(block) || ast.IsDefaultClause(block) {
+		block = block.Parent
+	}
+	return rule.CachedByFile(ctx, directEvalScopeKey{block}, func() bool { return hasDirectEval(block) })
+}
+
+func hasDirectEval(node *ast.Node) bool {
+	return unicornutil.IsDirectEvalCall(node) || node.ForEachChild(hasDirectEval)
 }
 
 type scopeChildrenKey struct{}

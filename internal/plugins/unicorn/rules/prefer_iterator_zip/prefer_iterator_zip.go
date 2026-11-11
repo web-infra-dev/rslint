@@ -45,7 +45,7 @@ func checkLoop(ctx rule.RuleContext, node *ast.Node) {
 	}
 	for _, input := range bounds.inputs {
 		// In JavaScript, classify from the source even when a checker is available.
-		if unicornutil.IsKnownNonIndexedCollectionWithOptions(ctx, input, unicornutil.ArrayReceiverOptions{}) {
+		if hasNonIndexedJSDocType(ctx, input) || unicornutil.IsKnownNonIndexedCollectionWithOptions(ctx, input, unicornutil.ArrayReceiverOptions{}) {
 			return
 		}
 	}
@@ -65,6 +65,39 @@ func checkLoop(ctx rule.RuleContext, node *ast.Node) {
 	}, func() []rule.RuleSuggestion {
 		return buildSuggestion(ctx, header, node, bounds, reads)
 	})
+}
+
+var jsdocInputTypes = unicornutil.TypeClassifierOptions{
+	TargetTypeNames:          utils.NewSetFromItems("Array", "ReadonlyArray"),
+	NonTargetTypeNames:       utils.NewSetFromItems("String"),
+	AllowNullishInMixedUnion: true,
+}
+
+func hasNonIndexedJSDocType(ctx rule.RuleContext, input *ast.Node) bool {
+	if !ast.IsInJSFile(input) {
+		return false
+	}
+	seen := make(map[*ast.Symbol]bool)
+	for isIdentifier(input) {
+		symbol := ctx.Refs.ResolveInFile(input)
+		if symbol == nil || len(symbol.Declarations) != 1 || seen[symbol] {
+			return false
+		}
+		declaration := symbol.Declarations[0]
+		if !ast.IsParameterDeclaration(declaration) && !ast.IsVariableDeclaration(declaration) {
+			return false
+		}
+		if annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration); annotation != nil {
+			class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, jsdocInputTypes)
+			return class == unicornutil.TypeNonTarget || class == unicornutil.TypeNullish
+		}
+		if !ast.IsVariableDeclaration(declaration) || !ast.IsVarConst(declaration) {
+			return false
+		}
+		seen[symbol] = true
+		input = ast.SkipParentheses(declaration.Initializer())
+	}
+	return false
 }
 
 type loopBounds struct {
