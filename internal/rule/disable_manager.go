@@ -209,12 +209,6 @@ func matchDirective(commentContent string) (directiveKind, []string) {
 		} else {
 			continue
 		}
-		if rest != "" {
-			first, _ := utf8.DecodeRuneInString(rest)
-			if !ecmascript.IsWhiteSpaceOrLineTerminator(first) {
-				continue
-			}
-		}
 		return kind, parseRuleNames(rest)
 	}
 	return directiveNone, nil

@@ -163,6 +163,73 @@ describe('ecma-language-plugin: diagnostic positions clamped to source text leng
 // ── P1 #10 — getDisableDirectives sees rslint-* prefix ────────────
 
 describe('sourceCode.getDisableDirectives: rslint-* prefix recognition', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    test(`${prefix}: both APIs expose named and blanket line disable/enable commands`, () => {
+      let inspected = false;
+      const loaded = makeReportingPlugin((ctx) => {
+        const nodes = ctx.sourceCode.getInlineConfigNodes();
+        const result = ctx.sourceCode.getDisableDirectives();
+        expect(nodes).toHaveLength(4);
+        expect(result.problems).toEqual([]);
+        expect(
+          result.directives.map(({ type, value, justification }) => ({
+            type,
+            value,
+            justification,
+          })),
+        ).toEqual([
+          { type: 'disable', value: 'stub/probe', justification: 'reason' },
+          { type: 'enable', value: 'stub/probe', justification: '' },
+          { type: 'disable', value: '', justification: '' },
+          { type: 'enable', value: '', justification: '' },
+        ]);
+        expect(result.directives.map(({ node }) => node)).toEqual(nodes);
+        inspected = true;
+      });
+      const source = [
+        `// ${prefix}-disable stub/probe -- reason`,
+        `// ${prefix}-enable stub/probe`,
+        `// ${prefix}-disable`,
+        `// ${prefix}-enable`,
+        '// global ignored',
+        `// ${prefix}-disable-foo`,
+        'export {};',
+      ].join('\n');
+      const result = lintFile(defaultRequest(source), loaded);
+      expect(result.parseError).toBeUndefined();
+      expect(result.ruleErrors).toBeUndefined();
+      expect(inspected).toBe(true);
+    });
+  }
+
+  test('Unicorn reports blanket line disables like block disables', async () => {
+    const { default: unicorn } = await import('eslint-plugin-unicorn');
+    const name = 'unicorn/no-abusive-eslint-disable';
+    const loaded: LoadedPlugins = {
+      plugins: [],
+      rules: new Map([[name, unicorn.rules['no-abusive-eslint-disable']]]),
+    };
+    for (const prefix of ['eslint', 'rslint']) {
+      for (const comment of [
+        `// ${prefix}-disable`,
+        `/* ${prefix}-disable */`,
+      ]) {
+        const result = lintFile(
+          {
+            ...defaultRequest(`export {};\n${comment}\n`),
+            rules: { [name]: { options: [] } },
+          },
+          loaded,
+        );
+        expect(result.parseError).toBeUndefined();
+        expect(result.ruleErrors).toBeUndefined();
+        expect(result.diagnostics.map(({ messageId }) => messageId)).toEqual([
+          'no-abusive-eslint-disable',
+        ]);
+      }
+    }
+  });
+
   test('returns rslint-disable + rslint-disable-line + rslint-disable-next-line + rslint-enable alongside eslint-*', () => {
     interface DirShape {
       type: 'disable' | 'enable' | 'disable-next-line' | 'disable-line';

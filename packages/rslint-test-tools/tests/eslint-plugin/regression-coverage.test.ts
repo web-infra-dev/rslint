@@ -1572,9 +1572,9 @@ describe('WorkerPool init treats any rejection as fatal (no undefined sentinel)'
   });
 });
 
-// Block directives require block comments; workers filter before transport.
-describe('plugin host filters disable directives', () => {
-  test('line comments cannot carry block disable directives', () => {
+// Rslint accepts block disable/enable commands in line comments in both engines.
+describe('line-comment eslint-disable / eslint-enable directives', () => {
+  test('`// eslint-disable` suppresses diagnostics on later lines', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1604,10 +1604,10 @@ describe('plugin host filters disable directives', () => {
       loaded,
     );
     expect(result.parseError).toBeUndefined();
-    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics).toHaveLength(0);
   });
 
-  test('line comments cannot end block suppression', () => {
+  test('`// eslint-enable` ends a block-disable region', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1640,10 +1640,10 @@ describe('plugin host filters disable directives', () => {
       loaded,
     );
     expect(result.parseError).toBeUndefined();
-    expect(result.diagnostics).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
   });
 
-  test('block disable comments suppress plugin diagnostics', () => {
+  test('`/* eslint-disable … */` block comment STILL suppresses (control)', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([

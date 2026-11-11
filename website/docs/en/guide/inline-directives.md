@@ -91,6 +91,9 @@ when a block directive already suppressed the diagnostic. Rules skipped by
 execution policy exempt their entries and wildcard directives from unused
 reporting. Failed or incomplete file execution produces no unused reports.
 
-Both prefixes have identical behavior. Rslint also retains its support for
-block disable/enable commands in `//` comments; ESLint requires `/* */` for
-those commands. Malformed keywords such as `eslint-disabled` are not directives.
+Both prefixes have identical behavior. Native and JavaScript plugin rules accept
+block disable/enable commands in `//` comments; ESLint requires `/* */` for those
+commands. The plugin SourceCode APIs expose these line comments as directives too.
+Native rules also retain permissive keyword parsing, including rule names
+immediately following `eslint-disable` without whitespace. JavaScript plugin
+rules recognize only complete directive keywords.

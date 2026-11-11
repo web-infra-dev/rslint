@@ -171,17 +171,17 @@ func TestMatchDirective(t *testing.T) {
 		{"mixed case Eslint-Enable not recognized", "Eslint-Enable no-console", directiveNone, nil},
 
 		// ---- no space between prefix and rule name ------------------------
-		{"rslint-disable no space before rule", "rslint-disable" + "no-console", directiveNone, nil}, // cspell:disable-line
-		{"eslint-disable no space before rule", "eslint-disable" + "no-console", directiveNone, nil}, // cspell:disable-line
+		{"rslint-disable no space before rule", "rslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
+		{"eslint-disable no space before rule", "eslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
 
 		// ---- typos / near-miss prefixes -----------------------------------
-		{"rslint-disabled (extra d)", "rslint-disabled no-console", directiveNone, nil},
-		{"eslint-disabled (extra d)", "eslint-disabled no-console", directiveNone, nil},
+		{"rslint-disabled (extra d)", "rslint-disabled no-console", directiveBlock, []string{"d no-console"}},
+		{"eslint-disabled (extra d)", "eslint-disabled no-console", directiveBlock, []string{"d no-console"}},
 
 		// ---- enable-line / enable-next-line (not valid ESLint directives) --
-		{"rslint-enable-line treated as enable rule -line", "rslint-enable-line", directiveNone, nil},
-		{"rslint-enable-next-line treated as enable rule -next-line", "rslint-enable-next-line", directiveNone, nil},
-		{"eslint-enable-line treated as enable rule -line", "eslint-enable-line", directiveNone, nil},
+		{"rslint-enable-line treated as enable rule -line", "rslint-enable-line", directiveEnable, []string{"-line"}},
+		{"rslint-enable-next-line treated as enable rule -next-line", "rslint-enable-next-line", directiveEnable, []string{"-next-line"}},
+		{"eslint-enable-line treated as enable rule -line", "eslint-enable-line", directiveEnable, []string{"-line"}},
 
 		// ---- whitespace variants ------------------------------------------
 		{"tab between prefix and rule", "rslint-disable\tno-console", directiveBlock, []string{"no-console"}},

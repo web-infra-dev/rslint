@@ -1426,30 +1426,17 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
         }
         return false;
       };
-      // Line-comment gate. ESLint v10
-      // (`lib/languages/js/source-code/source-code.js`, getInlineConfigNodes)
-      // ends its filter with:
-      //
-      //   comment.type !== "Line" || /^eslint-disable-(next-)?line$/u.test(label)
-      //
-      // i.e. a Line comment qualifies ONLY when its directive is
-      // `eslint-disable-line` / `eslint-disable-next-line`. A
-      // `// eslint-disable foo` (Line, but a BLOCK-only directive) is a
-      // mistake ESLint never treats as an inline-config node. Pre-fix
-      // rslint had no Line gate here, so it returned that bad Line node
-      // while `getDisableDirectives` (which re-applies the same gate)
-      // dropped it — the two surfaces disagreed about the same comment.
-      // We classify the label with the SAME `parseDirective` +
-      // `disable-line` regex `getDisableDirectives` uses below, so the
-      // two surfaces are now defined by one rule. `rslint-*` is accepted
-      // alongside `eslint-*` because the runner treats them as
-      // equivalent directive prefixes everywhere else.
+      // Rslint extends ESLint by accepting block disable/enable commands
+      // in line comments, matching native and plugin suppression. Other
+      // inline configuration commands still require block comments.
       const lineCommentSupported = (c: Comment): boolean => {
         if (c.type !== 'Line') return true;
         const parsed = directiveParser.parseDirective(c.value);
         return (
           parsed != null &&
-          /^(?:eslint|rslint)-disable-(?:next-)?line$/u.test(parsed.label)
+          /^(?:eslint|rslint)-(?:disable(?:-(?:next-)?line)?|enable)$/u.test(
+            parsed.label,
+          )
         );
       };
       return comments.filter(
@@ -1497,14 +1484,6 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
         const parsed = directiveParser.parseDirective(comment.value);
         if (!parsed) continue;
         const { label, value, justification } = parsed;
-
-        // Line comments are valid carriers only for line-flavored
-        // directives. Block comments accept any label. Accept both
-        // `eslint-*` and `rslint-*` prefixes (same rationale as the
-        // suffix-classification block below).
-        const lineCommentSupported =
-          /^(?:eslint|rslint)-disable-(?:next-)?line$/u.test(label);
-        if (comment.type === 'Line' && !lineCommentSupported) continue;
 
         // `*-disable-line` is a SINGLE-LINE directive by spec — ESLint
         // reports a problem on multi-line block comments carrying that
