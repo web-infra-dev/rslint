@@ -644,21 +644,23 @@ describe('eslint-disable comment directives', () => {
 
 describe('unused disable directives', () => {
   for (const prefix of ['eslint', 'rslint']) {
-    for (const { name, source, rules } of [
+    for (const { name, source, rules, fixed } of [
       {
-        name: 'line disable does not suppress diagnostics',
+        name: 'line disable suppresses native and plugin diagnostics',
         source: `// ${prefix}-disable no-debugger, custom/check\ndebugger;\n`,
-        rules: ['custom/check', 'no-debugger'],
+        rules: [],
       },
       {
-        name: 'line enable does not end block suppression',
+        name: 'line enable ends block suppression',
         source: `/* ${prefix}-disable no-debugger, custom/check */\n// ${prefix}-enable no-debugger, custom/check\ndebugger;\n`,
-        rules: [],
+        rules: ['', 'custom/check', 'no-debugger'],
+        fixed: ' \n \ndebugger;\n',
       },
       {
-        name: 'unused line disable is preserved',
+        name: 'unused line disable is reported and removed',
         source: `// ${prefix}-disable no-debugger, custom/check\nconst x = 1;\n`,
-        rules: [],
+        rules: [''],
+        fixed: ' \nconst x = 1;\n',
       },
     ]) {
       test(`${prefix}: ${name}`, async () => {
@@ -680,7 +682,12 @@ describe('unused disable directives', () => {
               [...args, '--format', 'jsonline', 'test.ts'],
               tempDir,
             );
-            expect(result.exitCode).toBe(rules.length ? 1 : 0);
+            const expectedRules = args.length
+              ? rules.filter((rule) => rule !== '')
+              : rules;
+            expect(result.exitCode).toBe(
+              expectedRules.some((rule) => rule !== '') ? 1 : 0,
+            );
             const reportedRules = result.stdout
               .split('\n')
               .filter(Boolean)
@@ -688,10 +695,10 @@ describe('unused disable directives', () => {
                 (line) => (JSON.parse(line) as { ruleName: string }).ruleName,
               )
               .sort();
-            expect(reportedRules).toEqual(rules);
+            expect(reportedRules).toEqual(expectedRules);
             expect(
               await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8'),
-            ).toBe(source);
+            ).toBe(args.length ? (fixed ?? source) : source);
           }
         } finally {
           await cleanupTempDir(tempDir);

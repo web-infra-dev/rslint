@@ -99,7 +99,6 @@ export function applyDisableDirectives(options: Options): {
       default:
         continue;
     }
-    if (block && comment.type !== 'Block') continue;
     const names = parseRuleNames(parsed.value);
     for (const ruleId of names.length ? names : [null]) {
       const usage =

@@ -492,6 +492,41 @@ test('suppression normalizes exceptional positions in both collection modes', ()
   }
 });
 
+test('line comments support block disable and enable in both collection modes', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const names of ['', ' stub/probe']) {
+      for (const enabled of [false, true]) {
+        const source =
+          `// ${prefix}-disable${names}\n` +
+          (enabled ? `// ${prefix}-enable${names}\n` : '') +
+          'x();';
+        const loaded = makeReportingPlugin((ctx) => {
+          ctx.report({
+            loc: { line: enabled ? 3 : 2, column: 0 },
+            message: 'probe',
+          });
+        });
+        for (const collectDirectiveUsage of [false, true]) {
+          const result = lintFile(
+            { ...defaultRequest(source), collectDirectiveUsage },
+            loaded,
+          );
+          expect(result.parseError).toBeUndefined();
+          expect(result.diagnostics).toHaveLength(enabled ? 1 : 0);
+          expect(result.usedDisableDirectives).toEqual(
+            collectDirectiveUsage
+              ? {
+                  rules: enabled ? [] : [names ? 'stub/probe' : null],
+                  entries: enabled ? [] : [[0, 0, 0]],
+                }
+              : undefined,
+          );
+        }
+      }
+    }
+  }
+});
+
 test('usage summary distinguishes partial, wildcard and repeated directives', () => {
   for (const prefix of ['eslint', 'rslint']) {
     for (const source of [
