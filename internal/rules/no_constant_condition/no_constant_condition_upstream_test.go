@@ -208,8 +208,7 @@ func TestNoConstantConditionRule(t *testing.T) {
 			{Code: `if (Boolean(...args)) {}`},
 			{Code: `if (foo.Boolean(1)) {}`},
 			{Code: `function foo(Boolean) { if (Boolean(1)) {} }`},
-			// TODO: This test is failing - TypeScript symbol resolution issue with const declarations
-			// {Code: `const Boolean = () => {}; if (Boolean(1)) {}`},
+			{Code: `const Boolean = () => {}; if (Boolean(1)) {}`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{

@@ -75,6 +75,7 @@ const ecosystemTests = {
     // eslint
     './tests/eslint/rules/no-class-assign.test.ts',
     './tests/eslint/rules/no-debugger.test.ts',
+    './tests/eslint/rules/no-constant-condition.test.ts',
     './tests/eslint/rules/no-template-curly-in-string.test.ts',
     './tests/eslint/heritage-members.test.ts',
     './tests/eslint/rules/accessor-pairs.test.ts',
