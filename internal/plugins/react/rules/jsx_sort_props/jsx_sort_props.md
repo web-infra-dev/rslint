@@ -143,10 +143,12 @@ You can instead provide a non-empty subset of the reserved prop list.
 `"auto"` (the default) uses rslint's default collation for locale-aware
 comparisons when `ignoreCase` is enabled. Provide a locale name to use
 locale-aware ordering even without `ignoreCase`. Unicode collation extensions
-used by `Intl.Collator` (`co`, `kf`, and `kn`) are accepted; unsupported
-collations use the locale's default ordering. Nordic locales order ASCII prop
-names like Node 24, including the `aa` contraction and locale-specific case
-order.
+used by `Intl.Collator` (`co`, `kf`, and `kn`) and the POSIX variant are
+accepted; unsupported collations use the locale's default ordering. The
+collation is selected the way `Intl.Collator` selects it, including language
+aliases and region or script fallbacks. ASCII prop names are ordered like
+Node.js's ICU, including locale contractions such as Czech and Slovak `ch` or
+Danish `aa`, and locale-specific case order.
 
 ```json
 { "react/jsx-sort-props": ["error", { "locale": "de" }] }
@@ -161,8 +163,15 @@ order.
 - With `locale: "auto"`, rslint uses a deterministic default collation instead
   of the host environment's locale. Set an explicit locale such as `"de"` when
   locale-specific ordering is required.
-- With an explicit `locale`, rslint can order some Unicode or mixed-case prop
-  names differently from ESLint.
+- Prop names outside printable ASCII use a simplified, deterministic
+  collation: an accented letter sorts with its base letter, but locale
+  rules for non-ASCII letters are not applied. For example, with
+  `locale: "sv"`, rslint accepts `<App ä z />` while ESLint expects
+  `<App z ä />`.
+- Hungarian uses the default order even for ASCII prop names, because its
+  doubled digraphs such as `ccs` (two `cs` letters) are not modeled. For
+  example, with `locale: "hu"`, rslint accepts `<App cs cz />` while ESLint
+  expects `<App cz cs />`.
 - With a malformed `locale`, rslint continues linting with its default order;
   ESLint stops with a `RangeError`.
 - If sorting a comment-attached block would reverse duplicate props, rslint
