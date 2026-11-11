@@ -1,6 +1,7 @@
 package unicornutil
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -23,18 +24,24 @@ func ClassifyTypeAnnotation(ctx rule.RuleContext, node *ast.Node, options TypeCl
 }
 
 type typeAnnotationWalk struct {
-	visiting  map[annotationReference]bool
-	completed map[annotationReference]TypeClass
+	visiting      map[annotationReference]bool
+	completed     map[annotationReference]TypeClass
+	bindings      map[*ast.Symbol]TypeClass
+	instantiation string
 }
 
 // Type aliases and typeof queries can resolve to the same merged symbol.
 type annotationReference struct {
-	symbol *ast.Symbol
-	value  bool
+	symbol    *ast.Symbol
+	value     bool
+	arguments string
 }
 
 func (walk *typeAnnotationWalk) classifyReference(ref annotationReference, classify func() TypeClass) TypeClass {
-	if walk.visiting[ref] {
+	// Recursive aliases remain cyclic when their arguments change.
+	active := ref
+	active.arguments = ""
+	if walk.visiting[active] {
 		// Propagate cycles so an enclosing intersection cannot cache a
 		// classification based only on its non-cyclic members.
 		return typeCyclic
@@ -42,9 +49,9 @@ func (walk *typeAnnotationWalk) classifyReference(ref annotationReference, class
 	if completed, ok := walk.completed[ref]; ok {
 		return completed
 	}
-	walk.visiting[ref] = true
+	walk.visiting[active] = true
 	class := classify()
-	delete(walk.visiting, ref)
+	delete(walk.visiting, active)
 	walk.completed[ref] = class
 	return class
 }
@@ -154,8 +161,57 @@ func classifyTypeReference(
 		}
 		return known
 	}
-	return walk.classifyReference(annotationReference{symbol: symbol}, func() TypeClass {
+	if bound, ok := walk.bindings[symbol]; ok {
+		return bound
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration != nil && declaration.Kind == ast.KindTypeAliasDeclaration && len(declaration.TypeParameters()) != 0 {
+			return classifyGenericTypeAlias(ctx, declaration, typeArguments, walk, options)
+		}
+	}
+	ref := annotationReference{symbol: symbol}
+	if symbol.Flags&ast.SymbolFlagsTypeParameter != 0 {
+		// A nested function type's constraint can depend on alias arguments.
+		ref.arguments = walk.instantiation
+	}
+	return walk.classifyReference(ref, func() TypeClass {
 		return classifyTypeDeclaration(ctx, symbol, name, walk, options)
+	})
+}
+
+func classifyGenericTypeAlias(ctx rule.RuleContext, declaration *ast.Node, typeArguments []*ast.Node, walk *typeAnnotationWalk, options TypeClassifierOptions) TypeClass {
+	symbol := declaration.Symbol()
+	if walk.visiting[annotationReference{symbol: symbol}] {
+		return typeCyclic
+	}
+	// Evaluate supplied arguments in the caller's bindings. The classification
+	// of each argument identifies this instantiation in the completed cache.
+	arguments := make([]byte, len(typeArguments))
+	for i, argument := range typeArguments {
+		arguments[i] = byte(classifyTypeAnnotation(ctx, argument, walk, options))
+	}
+	ref := annotationReference{symbol: symbol, arguments: string(arguments)}
+	return walk.classifyReference(ref, func() TypeClass {
+		previous, previousInstantiation := walk.bindings, walk.instantiation
+		walk.bindings = maps.Clone(previous)
+		walk.instantiation = ref.arguments
+		if walk.bindings == nil {
+			walk.bindings = make(map[*ast.Symbol]TypeClass)
+		}
+		defer func() {
+			walk.bindings = previous
+			walk.instantiation = previousInstantiation
+		}()
+		for i, parameter := range declaration.TypeParameters() {
+			class := TypeUnknown
+			if i < len(arguments) {
+				class = TypeClass(arguments[i])
+			} else if fallback := parameter.AsTypeParameterDeclaration().DefaultType; fallback != nil {
+				class = classifyTypeAnnotation(ctx, fallback, walk, options)
+			}
+			walk.bindings[parameter.Symbol()] = class
+		}
+		return classifyTypeAnnotation(ctx, declaration.AsTypeAliasDeclaration().Type, walk, options)
 	})
 }
 
@@ -211,7 +267,8 @@ func classifyTypeQuery(ctx rule.RuleContext, node *ast.Node, walk *typeAnnotatio
 	if declaration.Kind != ast.KindVariableDeclaration && declaration.Kind != ast.KindParameter {
 		return TypeUnknown
 	}
-	return walk.classifyReference(annotationReference{symbol: symbol, value: true}, func() TypeClass {
+	ref := annotationReference{symbol: symbol, value: true, arguments: walk.instantiation}
+	return walk.classifyReference(ref, func() TypeClass {
 		annotation, _ := ValueTypeAnnotation(ctx, declaration)
 		return classifyTypeAnnotation(ctx, annotation, walk, options)
 	})

@@ -48,6 +48,13 @@ func TestPreferAtExtras(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			{
+				// A recursive default must terminate without type services.
+				Code:     "type Cycle<T = Cycle> = NodeList & T; function f(a: Cycle) {\n  return a[a.length - 1];\n}",
+				FileName: "file.ts",
+				Output:   []string{"type Cycle<T = Cycle> = NodeList & T; function f(a: Cycle) {\n  return a.at(-1);\n}"},
+				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
+			},
+			{
 				Code: "/** @param {function(): NodeList} other */\nfunction f(read) { return _.last(read()); }", FileName: "file.js",
 				Output: []string{"/** @param {function(): NodeList} other */\nfunction f(read) { return read().at(-1); }"},
 				Errors: []rule_tester.InvalidTestCaseError{upstreamError("get-last-function", 2, 27, 2, 33, "_.last")},
@@ -212,6 +219,12 @@ func TestPreferAtTypeIntersections(t *testing.T) {
 		{Code: "declare const value: unknown; function f(a: NodeList & typeof value) { return a[a.length - 1]; }", FileName: "file.ts"},
 		{Code: "function f<T extends any>(a: NodeList & T) { return a[a.length - 1]; }", FileName: "file.ts"},
 		{Code: "type Nodes = NodeList & { children: Nodes }; function f(a: Nodes) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type WithDOM<T> = NodeList & T; function f(a: WithDOM<unknown>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type WithDOM<T = unknown> = NodeList & T; function f(a: WithDOM) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type WithDOM<T, U = T> = NodeList & U; function f(a: WithDOM<unknown>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type WithDOM<T> = NodeList & T; function f(a: WithDOM<WithDOM<unknown>>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type Choose<T, U> = T; function f(a: Choose<NodeList, any> | Choose<NodeList, unknown>) { return a[a.length - 1]; }", FileName: "file.ts"},
+		{Code: "type WithDOM<T, U> = NodeList & T; type Swap<A, B> = WithDOM<B, A>; function f(a: Swap<any, unknown>) { return a[a.length - 1]; }", FileName: "file.ts"},
 	}
 	var invalid []rule_tester.InvalidTestCase
 	for _, declaration := range []string{
@@ -222,6 +235,15 @@ func TestPreferAtTypeIntersections(t *testing.T) {
 		"interface Value { tag: string }; declare const Value: any; function f(a: NodeList & Value & typeof Value)",
 		"type Alias = any; function f(a: NodeList & (unknown | Alias))",
 		"type Cycle = Cycle | Cycle; function f(a: Cycle)",
+		"type WithDOM<T> = NodeList & T; function f(a: WithDOM<any>)",
+		"type WithDOM<T = any> = NodeList & T; function f(a: WithDOM)",
+		"type WithDOM<T, U = T> = NodeList & U; function f(a: WithDOM<any>)",
+		"type Identity<T> = T; type WithDOM<T> = NodeList & Identity<T>; function f(a: WithDOM<any>)",
+		"type WithDOM<T> = NodeList & T; function f(a: WithDOM<unknown> | WithDOM<any>)",
+		"type WithDOM<T> = NodeList & T; function f(a: WithDOM<any> | WithDOM<unknown>)",
+		"type Result<T> = ReturnType<(<U extends T>() => U)>; function f(a: Result<NodeList> | Result<string[]>)",
+		"type Result<T> = ReturnType<(value: T) => typeof value>; function f(a: Result<NodeList> | Result<string[]>)",
+		"type Cycle<T> = Cycle<T[]>; function f(a: Cycle<any>)",
 	} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{
 			Code:     declaration + " {\n  return a[a.length - 1];\n}",
@@ -251,12 +273,6 @@ func TestPreferAtResolvedIntersections(t *testing.T) {
 				Output:   []string{"import type { Erased } from './types'; function f(a: NodeList & Erased) {\n  return a.at(-1);\n}"},
 				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
 			},
-			{
-				Code:     "type WithDOM<T> = NodeList & T; function f(a: WithDOM<any>) {\n  return a[a.length - 1];\n}",
-				FileName: "file.ts",
-				Output:   []string{"type WithDOM<T> = NodeList & T; function f(a: WithDOM<any>) {\n  return a.at(-1);\n}"},
-				Errors:   []rule_tester.InvalidTestCaseError{upstreamError("negative-index", 2, 12, 2, 24)},
-			},
 		})
 }
 
@@ -280,10 +296,12 @@ func TestPreferAtSharedTypeAliases(t *testing.T) {
 	const depth = 32
 	var source strings.Builder
 	source.WriteString("type T0 = NodeList;\n")
+	source.WriteString("type G0<T> = NodeList & T;\n")
 	for i := 1; i <= depth; i++ {
 		fmt.Fprintf(&source, "type T%d = T%d | T%d;\n", i, i-1, i-1)
+		fmt.Fprintf(&source, "type G%d<T> = G%d<T> | G%d<T>;\n", i, i-1, i-1)
 	}
-	fmt.Fprintf(&source, "function f(a: T%d) { return a[a.length - 1] ?? _.last(a); }", depth)
+	fmt.Fprintf(&source, "function f(a: T%d, b: G%d<unknown>) { return a[a.length - 1] ?? _.last(b); }", depth, depth)
 	testRule := PreferAtRule
 	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		ctx.TypeChecker = nil
