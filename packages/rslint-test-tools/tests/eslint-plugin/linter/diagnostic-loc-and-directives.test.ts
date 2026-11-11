@@ -205,9 +205,11 @@ describe('sourceCode.getDisableDirectives: rslint-* prefix recognition', () => {
   test('Unicorn reports blanket line disables like block disables', async () => {
     const { default: unicorn } = await import('eslint-plugin-unicorn');
     const name = 'unicorn/no-abusive-eslint-disable';
+    const rule = unicorn.rules?.['no-abusive-eslint-disable'];
+    if (!rule) throw new Error(`Missing test rule: ${name}`);
     const loaded: LoadedPlugins = {
       plugins: [],
-      rules: new Map([[name, unicorn.rules['no-abusive-eslint-disable']]]),
+      rules: new Map([[name, rule]]),
     };
     for (const prefix of ['eslint', 'rslint']) {
       for (const comment of [
