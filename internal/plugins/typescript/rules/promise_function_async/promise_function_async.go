@@ -155,8 +155,11 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 				insertAt = utils.FindFunctionKeywordPos(ctx.SourceFile, node)
 			} else if ast.IsMethodDeclaration(node) {
 				insertAt = utils.TrimNodeTextRange(ctx.SourceFile, node.Name()).Pos()
-				if previous, ok := utils.TokenBeforePosition(ctx.SourceFile, insertAt); ok {
-					// Match SourceCode.isSpaceBetween: comments alone do not
+			}
+			if previous, ok := utils.TokenBeforePosition(ctx.SourceFile, insertAt); ok {
+				needsSpace := previous.End == insertAt && !utils.CanTokenTextsBeAdjacent(previous.Text, text)
+				if ast.IsMethodDeclaration(node) {
+					// Retain upstream's method formatting. Comments alone do not
 					// count as whitespace, but gaps around them do.
 					end := previous.End
 					comments := ctx.Comments.All()
@@ -164,9 +167,10 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 					for ; i < len(comments) && comments[i].Pos() == end && comments[i].End() <= insertAt; i++ {
 						end = comments[i].End()
 					}
-					if end == insertAt {
-						text = " " + text
-					}
+					needsSpace = end == insertAt
+				}
+				if needsSpace {
+					text = " " + text
 				}
 			}
 			insertion := node.Loc.WithPos(insertAt).WithEnd(insertAt)

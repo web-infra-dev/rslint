@@ -2,9 +2,11 @@ package no_misused_spread
 
 import (
 	_ "embed"
+	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -168,6 +170,41 @@ func isClassDeclaration(t *checker.Type) bool {
 	})
 }
 
+// Rebuilding a sole-spread object from only its inner expression would drop
+// comments in the braces, spread trivia, or parentheses stripped from the argument.
+func mapSpreadNeedsCommentPreservation(ctx *rule.RuleContext, object, inner *ast.Node) bool {
+	objectRange := utils.TrimNodeTextRange(ctx.SourceFile, object)
+	innerRange := utils.TrimNodeTextRange(ctx.SourceFile, inner)
+	comments := ctx.Comments.All()
+	start := sort.Search(len(comments), func(i int) bool { return comments[i].End() > objectRange.Pos() })
+	for _, comment := range comments[start:] {
+		if comment.Pos() >= objectRange.End() {
+			break
+		}
+		if comment.Pos() < innerRange.Pos() || comment.End() > innerRange.End() {
+			return true
+		}
+	}
+	return false
+}
+
+func mapSpreadFixesPreservingComments(ctx *rule.RuleContext, spread, argument *ast.Node) []rule.RuleFix {
+	object := spread.Parent
+	// Keep every comment and newline in place. Parentheses replace the braces
+	// so a leading line comment cannot introduce ASI after return/throw/yield.
+	fixes := []rule.RuleFix{
+		rule.RuleFixReplaceRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, object.Pos()), "("),
+		rule.RuleFixReplaceRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, spread.Pos()), "Object.fromEntries("),
+		rule.RuleFixInsertAfter(argument, ")"),
+		rule.RuleFixReplaceRange(object.Loc.WithPos(object.End()-1), ")"),
+	}
+	if token, ok := utils.TokenAtOrAfter(ctx.SourceFile, argument.End()); ok && token.Kind == ast.KindCommaToken {
+		// A trailing object comma must not become a comma expression inside ().
+		fixes = append(fixes, rule.RuleFixRemoveRange(token.Range()))
+	}
+	return fixes
+}
+
 var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-spread",
 	Schema:           rule.NewSchema(schemaJSON),
@@ -213,10 +250,21 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 			target := inner
 			if ast.IsObjectLiteralExpression(node.Parent) && len(node.Parent.AsObjectLiteralExpression().Properties.Nodes) == 1 {
 				target = node.Parent
+				if mapSpreadNeedsCommentPreservation(&ctx, target, inner) {
+					return []rule.RuleSuggestion{{
+						Message:  buildReplaceMapSpreadInObjectMessage(),
+						FixesArr: mapSpreadFixesPreservingComments(&ctx, node, argument),
+					}}
+				}
 			}
 			code = "Object.fromEntries(" + code + ")"
 			if typescriptutil.IsWeakPrecedenceParent(target) {
 				code = "(" + code + ")"
+			}
+			if target == node.Parent {
+				// The replacement starts with an identifier where the object used
+				// to start with `{`, as in `return{ ...map }`.
+				code = utils.SafeReplacementText(ctx.SourceFile, target, code)
 			}
 			return []rule.RuleSuggestion{{
 				Message:  buildReplaceMapSpreadInObjectMessage(),
