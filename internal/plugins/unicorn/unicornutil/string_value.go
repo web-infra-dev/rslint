@@ -255,7 +255,7 @@ func isStringValue(ctx rule.RuleContext, node *ast.Node, evaluator *utils.Static
 					return true
 				}
 			}
-			if method == "join" && classifyArrayReceiver(ctx, object, indexedCollectionTargets, keyedCollectionNames) == arrayClassTarget {
+			if method == "join" && classifyArrayReceiver(ctx, object, indexedCollectionTargets, knownNonIndexedCollectionNames) == arrayClassTarget {
 				return true
 			}
 			if isStringBuiltinValue(ctx, object, "Date", state.visiting) {

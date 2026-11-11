@@ -15,10 +15,16 @@ import (
 // ValueTypeAnnotation reads authored annotations through tsgo's AST, retaining
 // JSDoc unknown types and optional parameter metadata so static folding cannot
 // bypass them.
-func ValueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotation *ast.Node, optional bool) {
+func ValueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*ast.Node, bool) {
+	return valueTypeAnnotation(ctx, declaration, false)
+}
+
+func valueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node, recoverJSDoc bool) (annotation *ast.Node, optional bool) {
 	annotation = ast.GetTypeAnnotationNode(declaration)
 	optional = ast.HasQuestionToken(declaration)
-	if annotation != nil && (declaration.Kind != ast.KindParameter || !utils.IsJSDocSyntaxNode(annotation)) {
+	jsdocAnnotation := utils.IsJSDocSyntaxNode(annotation)
+	recoverJSDoc = recoverJSDoc && (annotation == nil || jsdocAnnotation && containsClosureCallableType(annotation))
+	if annotation != nil && !recoverJSDoc && (declaration.Kind != ast.KindParameter || !jsdocAnnotation) {
 		return annotation, optional
 	}
 	host := declaration
@@ -26,9 +32,20 @@ func ValueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotatio
 		host = declaration.Parent
 	}
 	for host != nil {
-		for _, doc := range host.JSDoc(ctx.SourceFile) {
+		var docs []*ast.Node
+		var source string
+		if recoverJSDoc {
+			docs, source = callableJSDoc(ctx, host)
+		} else {
+			docs = host.JSDoc(ctx.SourceFile)
+		}
+		for _, doc := range docs {
 			if tags := doc.AsJSDoc().Tags; tags != nil {
 				for _, tag := range tags.Nodes {
+					originalTag := tag
+					if source != "" && tag.TypeExpression() != nil {
+						tag = adaptClosureCallableTag(tag, source, declaration)
+					}
 					var expression *ast.Node
 					switch tag.Kind {
 					case ast.KindJSDocParameterTag:
@@ -47,7 +64,7 @@ func ValueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (annotatio
 						}
 					}
 					if expression != nil {
-						if annotation == nil {
+						if annotation == nil || tag != originalTag {
 							annotation = expression.Type()
 						}
 						return annotation, optional
@@ -273,6 +290,8 @@ func collectJSDocCallableReturns(node *ast.Node, returns *[]*ast.Node, inInterse
 	}
 	node = ast.SkipTypeParentheses(node)
 	switch node.Kind {
+	case ast.KindJSDocNonNullableType:
+		return collectJSDocCallableReturns(node.Type(), returns, inIntersection)
 	case ast.KindFunctionType:
 		if result := node.Type(); result != nil {
 			*returns = append(*returns, result)
@@ -337,17 +356,24 @@ func parseCallableJSDoc(comment string, scope *ast.Node) []*ast.Node {
 
 func adaptClosureCallableTag(tag *ast.Node, source string, scope *ast.Node) *ast.Node {
 	expression := tag.TypeExpression()
-	text := source[expression.Pos():tag.End()]
-	if !strings.Contains(text, "function") || !containsClosureCallableType(expression.Type()) {
+	raw := source[expression.Pos():tag.End()]
+	if !strings.Contains(raw, "function") || !containsClosureCallableType(expression.Type()) {
 		return tag
 	}
-	if rewritten, ok := rewriteClosureCallables(text); ok {
-		comment := "/** " + source[tag.Pos():expression.Pos()] + rewritten + " */"
-		for _, doc := range parseCallableJSDoc(comment, scope) {
-			if tags := doc.AsJSDoc().Tags; tags != nil && len(tags.Nodes) != 0 {
-				if parsed := tags.Nodes[0]; parsed.Kind == tag.Kind && parsed.TypeExpression() != nil {
-					return parsed
-				}
+	end := closureTypeEnd(raw)
+	if end == 0 {
+		return tag
+	}
+	// Call signatures preserve the grouping of Closure callables under ? and !.
+	normalized, changed := normalizeClosureFunctionTypes(raw[1 : end-1])
+	if !changed {
+		return tag
+	}
+	comment := "/** " + source[tag.Pos():expression.Pos()] + "{" + normalized + raw[end-1:] + " */"
+	for _, doc := range parseCallableJSDoc(comment, scope) {
+		if tags := doc.AsJSDoc().Tags; tags != nil && len(tags.Nodes) != 0 {
+			if parsed := tags.Nodes[0]; parsed.Kind == tag.Kind && parsed.TypeExpression() != nil {
+				return parsed
 			}
 		}
 	}
@@ -365,59 +391,4 @@ func containsClosureCallableType(node *ast.Node) bool {
 		}
 	}
 	return node.ForEachChild(containsClosureCallableType)
-}
-
-// tsgo stops at Closure's `function` keyword in a type. Adapt callable
-// members to arrow syntax and let tsgo parse the enclosing type and tag.
-func rewriteClosureCallables(text string) (string, bool) {
-	tokens := scanner.NewScanner()
-	tokens.SetText(text)
-	tokens.SetSkipJSDocLeadingAsterisks(true)
-	if tokens.Scan() != ast.KindOpenBraceToken {
-		return "", false
-	}
-	var result strings.Builder
-	depth, written := 1, 0
-	for kind := tokens.Scan(); kind != ast.KindEndOfFile; kind = tokens.Scan() {
-		switch kind {
-		case ast.KindOpenBraceToken:
-			depth++
-		case ast.KindCloseBraceToken:
-			depth--
-			if depth == 0 {
-				if written == 0 {
-					return "", false
-				}
-				result.WriteString(text[written:])
-				return result.String(), true
-			}
-		case ast.KindFunctionKeyword:
-			// A function-named method inside a record is ordinary type syntax.
-			if depth != 1 {
-				continue
-			}
-			start, state := tokens.TokenStart(), tokens.Mark()
-			if tokens.Scan() != ast.KindOpenParenToken {
-				tokens.Rewind(state)
-				continue
-			}
-			for parentheses := 1; parentheses > 0; {
-				switch tokens.Scan() {
-				case ast.KindOpenParenToken:
-					parentheses++
-				case ast.KindCloseParenToken:
-					parentheses--
-				case ast.KindEndOfFile:
-					return "", false
-				}
-			}
-			if tokens.Scan() != ast.KindColonToken {
-				return "", false
-			}
-			result.WriteString(text[written:start])
-			result.WriteString("() =>")
-			written = tokens.TokenEnd()
-		}
-	}
-	return "", false
 }

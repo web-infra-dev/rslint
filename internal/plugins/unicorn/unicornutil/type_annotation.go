@@ -85,10 +85,7 @@ func classifyTypeAnnotation(
 	case ast.KindJSDocNonNullableType:
 		return classifyTypeAnnotation(ctx, node.Type(), walk, options)
 	case ast.KindJSDocNullableType, ast.KindJSDocOptionalType:
-		if options.AllowNullishInMixedUnion {
-			return classifyTypeAnnotation(ctx, node.Type(), walk, options)
-		}
-		return TypeUnknown
+		return includeNullishSourceType(classifyTypeAnnotation(ctx, node.Type(), walk, options), options)
 	case ast.KindNullKeyword, ast.KindUndefinedKeyword:
 		if options.AllowNullishInMixedUnion {
 			return TypeNullish
@@ -357,6 +354,13 @@ func classifyClassReference(ctx rule.RuleContext, node *ast.Node, visited map[*a
 		return classifyClassReference(ctx, base.AsExpressionWithTypeArguments().Expression, visited, options)
 	}
 	return TypeNonTarget
+}
+
+func includeNullishSourceType(class TypeClass, options TypeClassifierOptions) TypeClass {
+	if options.AllowNullishInMixedUnion {
+		return class
+	}
+	return combineSourceTypeUnion([]TypeClass{class, TypeNonTarget}, options)
 }
 
 func combineSourceTypeUnion(classes []TypeClass, options TypeClassifierOptions) TypeClass {

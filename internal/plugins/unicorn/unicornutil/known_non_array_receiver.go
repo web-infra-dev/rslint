@@ -101,7 +101,7 @@ func ShouldSkipKnownNonArrayReceiver(ctx rule.RuleContext, node *ast.Node) bool 
 	}
 	if isSourceOnlyFile(ctx) {
 		return classifySourceOnlyArrayReceiver(
-			ctx, node, indexedCollectionTargets, keyedCollectionNames,
+			ctx, node, indexedCollectionTargets, knownNonIndexedCollectionNames,
 		) == arrayClassNonTarget
 	}
 	return IsKnownNonIndexedCollection(ctx, node)

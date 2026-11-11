@@ -67,22 +67,18 @@ func ShouldAddParenthesesToMemberExpressionObject(
 // ShouldAddParenthesesToMemberExpressionObjectAt also accounts for the source
 // position an expression will occupy, including statement and arrow-body starts.
 func ShouldAddParenthesesToMemberExpressionObjectAt(source *ast.SourceFile, node, replacement *ast.Node) bool {
-	first, _ := utils.TokenAtOrAfter(source, utils.TrimNodeTextRange(source, node).Pos())
-	next, _ := utils.TokenAtOrAfter(source, first.End)
-	startsWithObject := first.Kind == ast.KindOpenBraceToken
-	startsWithDeclaration := first.Kind == ast.KindFunctionKeyword || first.Kind == ast.KindClassKeyword ||
-		(first.Text == "async" && next.Kind == ast.KindFunctionKeyword)
-	startsWithLetBracket := first.Text == "let" && next.Kind == ast.KindOpenBracketToken
-	if startsWithObject || startsWithDeclaration || startsWithLetBracket {
+	prefix := declarationLikePrefix(source, node)
+	if prefix != ast.KindUnknown {
 		for current := replacement; current.Parent != nil; current = current.Parent {
 			parent := current.Parent
 			if ast.IsParenthesizedExpression(parent) {
 				break
 			}
 			if parent.Kind == ast.KindExpressionStatement ||
-				(parent.Kind == ast.KindArrowFunction && parent.Body() == current && startsWithObject) ||
-				(parent.Kind == ast.KindForStatement && parent.Initializer() == current && startsWithLetBracket) ||
-				(parent.Kind == ast.KindExportAssignment && !parent.AsExportAssignment().IsExportEquals && parent.Expression() == current && startsWithDeclaration) {
+				(parent.Kind == ast.KindArrowFunction && parent.Body() == current && prefix == ast.KindOpenBraceToken) ||
+				(parent.Kind == ast.KindForStatement && parent.Initializer() == current && prefix == ast.KindLetKeyword) ||
+				(parent.Kind == ast.KindExportAssignment && !parent.AsExportAssignment().IsExportEquals && parent.Expression() == current &&
+					(prefix == ast.KindFunctionKeyword || prefix == ast.KindClassKeyword)) {
 				return true
 			}
 			if utils.TrimNodeTextRange(source, parent).Pos() != utils.TrimNodeTextRange(source, current).Pos() {
@@ -100,4 +96,29 @@ func ShouldAddParenthesesToMemberExpressionObjectAt(source *ast.SourceFile, node
 	default:
 		return ShouldAddParenthesesToMemberExpressionObject(source, node)
 	}
+}
+
+// StartsWithDeclarationLikeToken reports whether the raw expression text
+// needs parentheses to start a standalone expression statement.
+func StartsWithDeclarationLikeToken(source *ast.SourceFile, node *ast.Node) bool {
+	return declarationLikePrefix(source, node) != ast.KindUnknown
+}
+
+func declarationLikePrefix(source *ast.SourceFile, node *ast.Node) ast.Kind {
+	first, _ := utils.TokenAtOrAfter(source, utils.TrimNodeTextRange(source, node).Pos())
+	switch first.Kind {
+	case ast.KindOpenBraceToken, ast.KindClassKeyword, ast.KindFunctionKeyword:
+		return first.Kind
+	}
+	switch first.Text {
+	case "async":
+		if next, _ := utils.TokenAtOrAfter(source, first.End); next.Kind == ast.KindFunctionKeyword {
+			return ast.KindFunctionKeyword
+		}
+	case "let":
+		if next, _ := utils.TokenAtOrAfter(source, first.End); next.Kind == ast.KindOpenBracketToken {
+			return ast.KindLetKeyword
+		}
+	}
+	return ast.KindUnknown
 }
