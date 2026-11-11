@@ -276,3 +276,54 @@ func TestNoRelativePackagesResolverDefaults(t *testing.T) {
 		})
 	}
 }
+
+// Suggestion eligibility depends on whether Node resolver options are present,
+// even for options such as basedir that do not affect lookup. Environments that
+// share a Program must not reuse each other's resolver configuration.
+func TestNoRelativePackagesResolverOptionsShareProgram(t *testing.T) {
+	root := safetyRoot(t, "C01", true, false)
+	file := tspath.ResolvePath(root.Dir, "packages/a/source.cjs")
+	empty := map[string]any{"import/resolver": map[string]any{"node": map[string]any{}}}
+	configured := map[string]any{"import/resolver": map[string]any{"node": map[string]any{"basedir": root.Dir}}}
+	for _, emptyFirst := range []bool{true, false} {
+		name := "configured first"
+		if emptyFirst {
+			name = "empty first"
+		}
+		t.Run(name, func(t *testing.T) {
+			p, err := program.NewFromRoots(program.RootOptions{Host: utils.CreateCompilerHost(root.Dir, root.FS), CompilerOptions: program.SourceOnlyCompilerOptions(), RootFileNames: []string{file}, SingleThreaded: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := &target.NoRelativePackagesRule
+			options := rule_tester.ResolveTestCaseOptions(t, r, map[string]any{"commonjs": true})
+			suggested := func(settings map[string]any) bool {
+				t.Helper()
+				var diagnostics []rule.RuleDiagnostic
+				environment := &rule.RuleEnvironment{Settings: settings}
+				ctx := rule.RuleContext{SourceFile: p.GetSourceFile(file), Settings: settings}.WithProgram(p).
+					WithFileCache(rule.NewFileCacheWithEnvironment(root.Dir, environment)).
+					WithDiagnosticConsumer(r.Name, rule.SeverityError, rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }})
+				listeners := r.Run(ctx, options)
+				node := ctx.SourceFile.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].AsVariableDeclaration().Initializer
+				listeners[node.Kind](node)
+				if len(diagnostics) != 1 {
+					t.Fatalf("%d diagnostics", len(diagnostics))
+				}
+				return diagnostics[0].Suggestions != nil && len(*diagnostics[0].Suggestions) != 0
+			}
+			var emptySuggested, configuredSuggested bool
+			if emptyFirst {
+				emptySuggested, configuredSuggested = suggested(empty), suggested(configured)
+			} else {
+				configuredSuggested, emptySuggested = suggested(configured), suggested(empty)
+			}
+			if !emptySuggested {
+				t.Error("empty Node options lost the suggestion")
+			}
+			if configuredSuggested {
+				t.Error("configured Node options gained a suggestion")
+			}
+		})
+	}
+}

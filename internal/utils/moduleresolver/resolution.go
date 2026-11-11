@@ -95,6 +95,10 @@ func Resolve(p *program.Program, name, containingFile string, options Options) R
 	if err != nil {
 		return Result{}
 	}
+	return resolveWithOptions(p, name, containingFile, options, string(encoded))
+}
+
+func resolveWithOptions(p *program.Program, name, containingFile string, options Options, optionsKey string) Result {
 	cacheFile := containingFile
 	// Recursive aliases and package entry fields can expose the original file
 	// in cycle diagnostics. Only the non-recursive path is directory-invariant.
@@ -102,16 +106,8 @@ func Resolve(p *program.Program, name, containingFile string, options Options) R
 		len(options.AliasFields) == 0 && len(options.MainFields) == 0 {
 		cacheFile = tspath.GetDirectoryPath(containingFile)
 	}
-	result := program.Cached(p, resolutionKey{name, cacheFile, string(encoded)}, func() Result {
-		if options.Extensions == nil {
-			options.Extensions = DefaultExtensions()
-		}
-		if options.Modules == nil {
-			options.Modules = []string{"node_modules"}
-		}
-		if options.Conditions == nil {
-			options.Conditions = []string{"node", "require", "import"}
-		}
+	result := program.Cached(p, resolutionKey{name, cacheFile, optionsKey}, func() Result {
+		options = defaultOptions(options)
 		resolver := nodeResolver{program: p, fileName: containingFile, options: options}
 		return resolver.resolve(name)
 	})
