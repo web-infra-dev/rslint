@@ -72,6 +72,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_zero_fractions"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/number_literal_case"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/numeric_separators_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_add_event_listener_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
@@ -198,6 +199,7 @@ func GetAllRules() []rule.Rule {
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
 		no_zero_fractions.NoZeroFractionsRule,
 		number_literal_case.NumberLiteralCaseRule,
+		numeric_separators_style.NumericSeparatorsStyleRule,
 		prefer_add_event_listener_options.PreferAddEventListenerOptionsRule,
 		prefer_array_flat.PreferArrayFlatRule,
 		prefer_array_flat_map.PreferArrayFlatMapRule,
