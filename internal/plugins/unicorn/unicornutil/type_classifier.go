@@ -23,6 +23,25 @@ const (
 	typeCyclic
 )
 
+func combineTypeClassUnion(classes []TypeClass) TypeClass {
+	if len(classes) == 0 {
+		return TypeNonTarget
+	}
+	allTarget := true
+	allNonTarget := true
+	for _, class := range classes {
+		allTarget = allTarget && class == TypeTarget
+		allNonTarget = allNonTarget && class == TypeNonTarget
+	}
+	if allTarget {
+		return TypeTarget
+	}
+	if allNonTarget {
+		return TypeNonTarget
+	}
+	return TypeUnknown
+}
+
 // TypeClassifierOptions configures the shared recursive portion of Unicorn's
 // createTypeCheckers helper. Syntactic target/non-target recognition remains
 // with each rule because those shapes are domain-specific.

@@ -1,8 +1,6 @@
 package unicornutil
 
 import (
-	"slices"
-
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -326,56 +324,6 @@ func isStringBuiltinValue(ctx rule.RuleContext, node *ast.Node, name string, vis
 		isStringBuiltinValue(ctx, declaration.AsVariableDeclaration().Initializer, name, visiting)
 }
 
-func classifyStringCallReturnType(ctx rule.RuleContext, annotation *ast.Node) TypeClass {
-	if annotation == nil {
-		return TypeUnknown
-	}
-	annotation = ast.SkipTypeParentheses(annotation)
-	switch annotation.Kind {
-	case ast.KindFunctionType:
-		return classifyStringValueType(ctx, annotation.Type())
-	case ast.KindTypeLiteral:
-		var classes []TypeClass
-		for _, member := range annotation.AsTypeLiteralNode().Members.Nodes {
-			if member.Kind == ast.KindCallSignature {
-				classes = append(classes, classifyStringValueType(ctx, member.Type()))
-			}
-		}
-		if len(classes) > 0 {
-			return combineStringUnion(classes)
-		}
-	case ast.KindUnionType:
-		var classes []TypeClass
-		for _, member := range annotation.AsUnionTypeNode().Types.Nodes {
-			classes = append(classes, classifyStringCallReturnType(ctx, member))
-		}
-		if len(classes) > 0 {
-			return combineStringUnion(classes)
-		}
-	case ast.KindIntersectionType:
-		var classes []TypeClass
-		var visit func(*ast.Node)
-		visit = func(member *ast.Node) {
-			member = ast.SkipTypeParentheses(member)
-			if member.Kind == ast.KindIntersectionType {
-				for _, part := range member.AsIntersectionTypeNode().Types.Nodes {
-					visit(part)
-				}
-				return
-			}
-			if member.Kind == ast.KindTypeLiteral && !slices.ContainsFunc(member.AsTypeLiteralNode().Members.Nodes, func(part *ast.Node) bool { return part.Kind == ast.KindCallSignature }) {
-				return
-			}
-			classes = append(classes, classifyStringCallReturnType(ctx, member))
-		}
-		visit(annotation)
-		if len(classes) > 0 {
-			return combineStringUnion(classes)
-		}
-	}
-	return TypeUnknown
-}
-
 func isStringValueType(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyStringValueType(ctx, node) == TypeTarget
 }
@@ -415,35 +363,11 @@ func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class
 	}
 	defer func() { cache[symbol] = class }()
 	declaration := symbol.Declarations[0]
-	if declaration.Kind != ast.KindFunctionDeclaration && declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
+	function, ok := unmodifiedFunctionValue(ctx, symbol)
+	if !ok {
 		return TypeUnknown
 	}
-	for _, reference := range ctx.Refs.References(symbol) {
-		if reference != declaration.Name() && utils.IsWriteReference(reference) {
-			return TypeUnknown
-		}
-	}
-	var function *ast.Node
-	switch declaration.Kind {
-	case ast.KindFunctionDeclaration:
-		function = declaration
-	case ast.KindVariableDeclaration:
-		initializer := utils.ESTreeRuntimeExpression(declaration.AsVariableDeclaration().Initializer)
-		for initializer != nil && (initializer.Kind == ast.KindSatisfiesExpression || initializer.Kind == ast.KindNonNullExpression) {
-			initializer = utils.ESTreeRuntimeExpression(initializer.Expression())
-		}
-		if initializer != nil && (initializer.Kind == ast.KindFunctionExpression || initializer.Kind == ast.KindArrowFunction) {
-			function = initializer
-		}
-	}
 	if function != nil {
-		if ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync) || len(function.TypeParameters()) > 0 {
-			return TypeUnknown
-		}
-		if (function.Kind == ast.KindFunctionDeclaration && function.AsFunctionDeclaration().AsteriskToken != nil) ||
-			(function.Kind == ast.KindFunctionExpression && function.AsFunctionExpression().AsteriskToken != nil) {
-			return TypeUnknown
-		}
 		if annotation, _ := ValueTypeAnnotation(ctx, function); annotation != nil {
 			return classifyStringValueType(ctx, annotation)
 		}
@@ -460,5 +384,7 @@ func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class
 			return TypeUnknown
 		}
 	}
-	return classifyStringCallReturnType(ctx, annotation)
+	return classifyCallableReturnType(annotation, func(returnType *ast.Node) TypeClass {
+		return classifyStringValueType(ctx, returnType)
+	})
 }
