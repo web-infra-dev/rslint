@@ -61,31 +61,44 @@ var ConsistentReturnRule = rule.Rule{
 	Name:   "consistent-return",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, rawOptions []any) rule.RuleListeners {
-		opts := parseOptions(rawOptions)
-
-		// Every diagnostic depends on the code path a `return` belongs to, so
-		// the returns are collected first and judged once the file is walked.
-		// Collecting them also bounds the cost of the reachability question:
-		// only a code path that returns a value ever needs a graph.
-		var returns []*ast.Node
-		listeners := rule.RuleListeners{
-			ast.KindReturnStatement: func(node *ast.Node) {
-				returns = append(returns, node)
-			},
-		}
-
-		statements := ctx.SourceFile.Statements
-		if statements == nil || len(statements.Nodes) == 0 {
-			return listeners
-		}
-		lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
-		listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
-			if node == lastTopLevelNode {
-				report(&ctx, returns, opts)
-			}
-		}
-		return listeners
+		return NewListeners(ctx, rawOptions, ReturnChecks{})
 	},
+}
+
+// ReturnChecks supplies the TypeScript extension's return classification while
+// retaining the core rule's code paths, diagnostics, and implicit-return checks.
+// Nil callbacks preserve the core rule's syntax-only behavior.
+type ReturnChecks struct {
+	SkipReturn  func(root, statement *ast.Node) bool
+	IsUndefined func(expression *ast.Node) bool
+}
+
+// NewListeners creates the shared consistent-return traversal. Type-aware rules
+// may ignore a bare return or classify a precisely undefined expression as an
+// unspecified value without mutating the AST used by other rules.
+func NewListeners(ctx rule.RuleContext, rawOptions []any, checks ReturnChecks) rule.RuleListeners {
+	opts := parseOptions(rawOptions)
+
+	// Every diagnostic depends on the code path a `return` belongs to, so
+	// collect the returns first and judge them once the file is walked.
+	var returns []*ast.Node
+	listeners := rule.RuleListeners{
+		ast.KindReturnStatement: func(node *ast.Node) {
+			returns = append(returns, node)
+		},
+	}
+
+	statements := ctx.SourceFile.Statements
+	if statements == nil || len(statements.Nodes) == 0 {
+		return listeners
+	}
+	lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
+	listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
+		if node == lastTopLevelNode {
+			report(&ctx, returns, opts, checks)
+		}
+	}
+	return listeners
 }
 
 // diagnostic is one pending report. ESLint emits the per-`return` reports while
@@ -106,7 +119,7 @@ type codePathInfo struct {
 	build          func(string) rule.RuleMessage
 }
 
-func report(ctx *rule.RuleContext, returns []*ast.Node, opts options) {
+func report(ctx *rule.RuleContext, returns []*ast.Node, opts options, checks ReturnChecks) {
 	infos := make(map[*ast.Node]*codePathInfo)
 	var rootOrder []*ast.Node
 	var diagnostics []diagnostic
@@ -119,6 +132,9 @@ func report(ctx *rule.RuleContext, returns []*ast.Node, opts options) {
 		if root == nil || !isCheckedRoot(root) {
 			continue
 		}
+		if checks.SkipReturn != nil && checks.SkipReturn(root, node) {
+			continue
+		}
 		info := infos[root]
 		if info == nil {
 			info = &codePathInfo{}
@@ -126,7 +142,7 @@ func report(ctx *rule.RuleContext, returns []*ast.Node, opts options) {
 			rootOrder = append(rootOrder, root)
 		}
 
-		hasReturnValue := returnsValue(node, opts)
+		hasReturnValue := returnsValue(node, opts, checks)
 		if !info.seenReturn {
 			info.seenReturn = true
 			info.hasReturnValue = hasReturnValue
@@ -185,13 +201,16 @@ func isCheckedRoot(node *ast.Node) bool {
 // returnsValue reports whether a `return` statement hands back a value. Under
 // `treatUndefinedAsUnspecified` the identifier `undefined` and any `void`
 // expression are read as handing back nothing.
-func returnsValue(node *ast.Node, opts options) bool {
+func returnsValue(node *ast.Node, opts options, checks ReturnChecks) bool {
 	expression := node.AsReturnStatement().Expression
 	if expression == nil {
 		return false
 	}
 	if !opts.treatUndefinedAsUnspecified {
 		return true
+	}
+	if checks.IsUndefined != nil && checks.IsUndefined(expression) {
+		return false
 	}
 	// ESTree has no parenthesis node, so `return (undefined)` reads the same as
 	// `return undefined` upstream.

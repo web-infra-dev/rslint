@@ -1,16 +1,18 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
-import { AST_NODE_TYPES } from '@typescript-eslint/utils';
+// Every upstream case from typescript-eslint v8.67.0, preserving inputs,
+// options, message IDs and complete ranges. Messages expand upstream templates.
+// This rule has no autofixes or suggestions; the shared tester asserts their absence.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/tests/rules/consistent-return.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootDir = getFixturesRootDir();
 const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json':
+      '{"compilerOptions":{"jsx":"preserve","target":"es2015","module":"commonjs","strict":true,"types":[],"lib":["es2015","es2017","esnext"],"experimentalDecorators":true},"include":["file.ts"]}',
+  },
   languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
+    parserOptions: { project: './tsconfig.json' },
   },
 });
 
@@ -18,159 +20,159 @@ ruleTester.run('consistent-return', {
   valid: [
     // base rule
     `
-      function foo() {
-        return;
-      }
+function foo() {
+  return;
+}
     `,
     `
-      const foo = (flag: boolean) => {
-        if (flag) return true;
-        return false;
-      };
+const foo = (flag: boolean) => {
+  if (flag) return true;
+  return false;
+};
     `,
     `
-      class A {
-        foo() {
-          if (a) return true;
-          return false;
-        }
-      }
+class A {
+  foo() {
+    if (a) return true;
+    return false;
+  }
+}
     `,
     {
       code: `
-        const foo = (flag: boolean) => {
-          if (flag) return;
-          else return undefined;
-        };
+const foo = (flag: boolean) => {
+  if (flag) return;
+  else return undefined;
+};
       `,
       options: [{ treatUndefinedAsUnspecified: true }],
     },
     // void
     `
-      declare function bar(): void;
-      function foo(flag: boolean): void {
-        if (flag) {
-          return bar();
-        }
-        return;
-      }
+declare function bar(): void;
+function foo(flag: boolean): void {
+  if (flag) {
+    return bar();
+  }
+  return;
+}
     `,
     `
-      declare function bar(): void;
-      const foo = (flag: boolean): void => {
-        if (flag) {
-          return;
-        }
-        return bar();
-      };
+declare function bar(): void;
+const foo = (flag: boolean): void => {
+  if (flag) {
+    return;
+  }
+  return bar();
+};
     `,
     `
-      function foo(flag?: boolean): number | void {
-        if (flag) {
-          return 42;
-        }
-        return;
-      }
+function foo(flag?: boolean): number | void {
+  if (flag) {
+    return 42;
+  }
+  return;
+}
     `,
     `
-      function foo(): boolean;
-      function foo(flag: boolean): void;
-      function foo(flag?: boolean): boolean | void {
-        if (flag) {
-          return;
-        }
-        return true;
-      }
+function foo(): boolean;
+function foo(flag: boolean): void;
+function foo(flag?: boolean): boolean | void {
+  if (flag) {
+    return;
+  }
+  return true;
+}
     `,
     `
-      class Foo {
-        baz(): void {}
-        bar(flag: boolean): void {
-          if (flag) return baz();
-          return;
-        }
-      }
+class Foo {
+  baz(): void {}
+  bar(flag: boolean): void {
+    if (flag) return baz();
+    return;
+  }
+}
     `,
     `
-      declare function bar(): void;
-      function foo(flag: boolean): void {
-        function fn(): string {
-          return '1';
-        }
-        if (flag) {
-          return bar();
-        }
-        return;
-      }
+declare function bar(): void;
+function foo(flag: boolean): void {
+  function fn(): string {
+    return '1';
+  }
+  if (flag) {
+    return bar();
+  }
+  return;
+}
     `,
     `
-      class Foo {
-        foo(flag: boolean): void {
-          const bar = (): void => {
-            if (flag) return;
-            return this.foo();
-          };
-          if (flag) {
-            return this.bar();
-          }
-          return;
-        }
-      }
+class Foo {
+  foo(flag: boolean): void {
+    const bar = (): void => {
+      if (flag) return;
+      return this.foo();
+    };
+    if (flag) {
+      return this.bar();
+    }
+    return;
+  }
+}
     `,
     // async
     `
-      declare function bar(): void;
-      async function foo(flag?: boolean): Promise<void> {
-        if (flag) {
-          return bar();
-        }
-        return;
-      }
+declare function bar(): void;
+async function foo(flag?: boolean): Promise<void> {
+  if (flag) {
+    return bar();
+  }
+  return;
+}
     `,
     `
-      declare function bar(): Promise<void>;
-      async function foo(flag?: boolean): Promise<ReturnType<typeof bar>> {
-        if (flag) {
-          return bar();
-        }
-        return;
-      }
+declare function bar(): Promise<void>;
+async function foo(flag?: boolean): Promise<ReturnType<typeof bar>> {
+  if (flag) {
+    return bar();
+  }
+  return;
+}
     `,
     `
-      async function foo(flag?: boolean): Promise<Promise<void | undefined>> {
-        if (flag) {
-          return undefined;
-        }
-        return;
-      }
+async function foo(flag?: boolean): Promise<Promise<void | undefined>> {
+  if (flag) {
+    return undefined;
+  }
+  return;
+}
     `,
     `
-      type PromiseVoidNumber = Promise<void | number>;
-      async function foo(flag?: boolean): PromiseVoidNumber {
-        if (flag) {
-          return 42;
-        }
-        return;
-      }
+type PromiseVoidNumber = Promise<void | number>;
+async function foo(flag?: boolean): PromiseVoidNumber {
+  if (flag) {
+    return 42;
+  }
+  return;
+}
     `,
     `
-      class Foo {
-        baz(): void {}
-        async bar(flag: boolean): Promise<void> {
-          if (flag) return baz();
-          return;
-        }
-      }
+class Foo {
+  baz(): void {}
+  async bar(flag: boolean): Promise<void> {
+    if (flag) return baz();
+    return;
+  }
+}
     `,
     {
       code: `
-        declare const undef: undefined;
-        function foo(flag: boolean) {
-          if (flag) {
-            return undef;
-          }
-          return 'foo';
-        }
+declare const undef: undefined;
+function foo(flag: boolean) {
+  if (flag) {
+    return undef;
+  }
+  return 'foo';
+}
       `,
       options: [
         {
@@ -180,12 +182,12 @@ ruleTester.run('consistent-return', {
     },
     {
       code: `
-        function foo(flag: boolean): undefined {
-          if (flag) {
-            return undefined;
-          }
-          return;
-        }
+function foo(flag: boolean): undefined {
+  if (flag) {
+    return undefined;
+  }
+  return;
+}
       `,
       options: [
         {
@@ -195,13 +197,13 @@ ruleTester.run('consistent-return', {
     },
     {
       code: `
-        declare const undef: undefined;
-        function foo(flag: boolean): undefined {
-          if (flag) {
-            return undef;
-          }
-          return;
-        }
+declare const undef: undefined;
+function foo(flag: boolean): undefined {
+  if (flag) {
+    return undef;
+  }
+  return;
+}
       `,
       options: [
         {
@@ -213,211 +215,200 @@ ruleTester.run('consistent-return', {
   invalid: [
     {
       code: `
-        function foo(flag: boolean): any {
-          if (flag) return true;
-          else return;
-        }
+function foo(flag: boolean): any {
+  if (flag) return true;
+  else return;
+}
       `,
       errors: [
         {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
+          column: 8,
+          message: "Function 'foo' expected a return value.",
+          endColumn: 15,
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        function bar(): undefined {}
-        function foo(flag: boolean): undefined {
-          if (flag) return bar();
-          return;
-        }
+function bar(): undefined {}
+function foo(flag: boolean): undefined {
+  if (flag) return bar();
+  return;
+}
       `,
       errors: [
         {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 18,
+          column: 3,
+          message: "Function 'foo' expected a return value.",
+          endColumn: 10,
           endLine: 5,
           line: 5,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        declare function foo(): void;
-        function bar(flag: boolean): undefined {
-          function baz(): undefined {
-            if (flag) return;
-            return undefined;
-          }
-          if (flag) return baz();
-          return;
-        }
+declare function foo(): void;
+function bar(flag: boolean): undefined {
+  function baz(): undefined {
+    if (flag) return;
+    return undefined;
+  }
+  if (flag) return baz();
+  return;
+}
       `,
       errors: [
         {
-          column: 13,
-          data: { name: "Function 'baz'" },
-          endColumn: 30,
+          column: 5,
+          message: "Function 'baz' expected no return value.",
+          endColumn: 22,
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
         {
-          column: 11,
-          data: { name: "Function 'bar'" },
-          endColumn: 18,
+          column: 3,
+          message: "Function 'bar' expected a return value.",
+          endColumn: 10,
           endLine: 9,
           line: 9,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        function foo(flag: boolean): Promise<void> {
-          if (flag) return Promise.resolve(void 0);
-          else return;
-        }
+function foo(flag: boolean): Promise<void> {
+  if (flag) return Promise.resolve(void 0);
+  else return;
+}
       `,
       errors: [
         {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
+          column: 8,
+          message: "Function 'foo' expected a return value.",
+          endColumn: 15,
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        async function foo(flag: boolean): Promise<string> {
-          if (flag) return;
-          else return 'value';
-        }
+async function foo(flag: boolean): Promise<string> {
+  if (flag) return;
+  else return 'value';
+}
       `,
       errors: [
         {
-          column: 16,
-          data: { name: "Async function 'foo'" },
-          endColumn: 31,
-          endLine: 4,
-          line: 4,
-          messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
-        },
-      ],
-    },
-    {
-      code: `
-        async function foo(flag: boolean): Promise<string | undefined> {
-          if (flag) return 'value';
-          else return;
-        }
-      `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Async function 'foo'" },
+          column: 8,
+          message: "Async function 'foo' expected no return value.",
           endColumn: 23,
           endLine: 4,
           line: 4,
+          messageId: 'unexpectedReturnValue',
+        },
+      ],
+    },
+    {
+      code: `
+async function foo(flag: boolean): Promise<string | undefined> {
+  if (flag) return 'value';
+  else return;
+}
+      `,
+      errors: [
+        {
+          column: 8,
+          message: "Async function 'foo' expected a return value.",
+          endColumn: 15,
+          endLine: 4,
+          line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        async function foo(flag: boolean) {
-          if (flag) return;
-          return 1;
-        }
+async function foo(flag: boolean) {
+  if (flag) return;
+  return 1;
+}
       `,
       errors: [
         {
-          column: 11,
-          data: { name: "Async function 'foo'" },
-          endColumn: 20,
+          column: 3,
+          message: "Async function 'foo' expected no return value.",
+          endColumn: 12,
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        function foo(flag: boolean): Promise<string | undefined> {
-          if (flag) return;
-          else return 'value';
-        }
+function foo(flag: boolean): Promise<string | undefined> {
+  if (flag) return;
+  else return 'value';
+}
       `,
       errors: [
         {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 31,
+          column: 8,
+          message: "Function 'foo' expected no return value.",
+          endColumn: 23,
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        declare function bar(): Promise<void>;
-        function foo(flag?: boolean): Promise<void> {
-          if (flag) {
-            return bar();
-          }
-          return;
-        }
+declare function bar(): Promise<void>;
+function foo(flag?: boolean): Promise<void> {
+  if (flag) {
+    return bar();
+  }
+  return;
+}
       `,
       errors: [
         {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 18,
+          column: 3,
+          message: "Function 'foo' expected a return value.",
+          endColumn: 10,
           endLine: 7,
           line: 7,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
     {
       code: `
-        function foo(flag: boolean): undefined | boolean {
-          if (flag) {
-            return undefined;
-          }
-          return true;
-        }
+function foo(flag: boolean): undefined | boolean {
+  if (flag) {
+    return undefined;
+  }
+  return true;
+}
       `,
       errors: [
         {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
+          column: 3,
+          message: "Function 'foo' expected no return value.",
+          endColumn: 15,
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
       options: [
@@ -428,23 +419,22 @@ ruleTester.run('consistent-return', {
     },
     {
       code: `
-        declare const undefOrNum: undefined | number;
-        function foo(flag: boolean) {
-          if (flag) {
-            return;
-          }
-          return undefOrNum;
-        }
+declare const undefOrNum: undefined | number;
+function foo(flag: boolean) {
+  if (flag) {
+    return;
+  }
+  return undefOrNum;
+}
       `,
       errors: [
         {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 29,
+          column: 3,
+          message: "Function 'foo' expected no return value.",
+          endColumn: 21,
           endLine: 7,
           line: 7,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
       options: [
