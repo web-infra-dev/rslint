@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const expectedError = (element: string) => ({
-  message: `Do not use <${element}> elements as they can create visual accessibility issues and are deprecated.`,
-});
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const blinkComponentSettings = {
   'jsx-a11y': {
@@ -12,7 +9,7 @@ const blinkComponentSettings = {
   },
 };
 
-new RuleTester().run('no-distracting-elements', null as never, {
+new RuleTester(config).run('no-distracting-elements', {
   valid: [
     // ---- Upstream valid ----
     { code: '<div />;' },
@@ -157,46 +154,206 @@ new RuleTester().run('no-distracting-elements', null as never, {
   ],
   invalid: [
     // ---- Upstream invalid ----
-    { code: '<marquee />', errors: [expectedError('marquee')] },
-    { code: '<marquee {...props} />', errors: [expectedError('marquee')] },
+    {
+      code: '<marquee />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
+    {
+      code: '<marquee {...props} />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
     {
       code: '<marquee lang={undefined} />',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
-    { code: '<blink />', errors: [expectedError('blink')] },
-    { code: '<blink {...props} />', errors: [expectedError('blink')] },
-    { code: '<blink foo={undefined} />', errors: [expectedError('blink')] },
+    {
+      code: '<blink />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<blink {...props} />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<blink foo={undefined} />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
     {
       code: '<Blink />',
       settings: blinkComponentSettings,
-      errors: [expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
 
     // ---- Paired form: report on the OPENING element only ----
     {
       code: '<marquee>scrolling</marquee>',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
-    { code: '<marquee></marquee>', errors: [expectedError('marquee')] },
+    {
+      code: '<marquee></marquee>',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
 
     // ---- Same-kind nesting: outer + inner each report ----
     {
       code: '<marquee><marquee /></marquee>',
-      errors: [expectedError('marquee'), expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
 
     // ---- Boolean / spread / various attribute forms ----
-    { code: '<marquee draggable />', errors: [expectedError('marquee')] },
+    {
+      code: '<marquee draggable />',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     {
       code: '<marquee className="x" id={n} />',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
 
     // ---- Custom `elements` list ----
     {
       code: '<blink />',
       options: [{ elements: ['blink'] }],
-      errors: [expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
 
     // ---- Components map with a matching entry ----
@@ -205,7 +362,17 @@ new RuleTester().run('no-distracting-elements', null as never, {
       settings: {
         'jsx-a11y': { components: { CustomMarquee: 'marquee' } },
       },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
 
     // ---- Polymorphic prop without an allow-list — every truthy `as` value
@@ -213,7 +380,17 @@ new RuleTester().run('no-distracting-elements', null as never, {
     {
       code: '<Foo as="marquee" />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     // Polymorphic with allow-list that DOES include the rawType.
     {
@@ -224,72 +401,263 @@ new RuleTester().run('no-distracting-elements', null as never, {
           polymorphicAllowList: ['Foo'],
         },
       },
-      errors: [expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
 
     // ---- Listener boundary: each violation reports independently ----
-    { code: '<div><marquee /></div>', errors: [expectedError('marquee')] },
+    {
+      code: '<div><marquee /></div>',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
     {
       code: '<marquee><blink /></marquee>',
-      errors: [expectedError('marquee'), expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
 
     // ---- Real-world component patterns ----
     {
       code: 'function Banner() { return <marquee>News</marquee>; }',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'const x = items.map(item => <blink key={item.id}>{item.text}</blink>)',
-      errors: [expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: 'const x = cond ? <marquee /> : <div />',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: 'class C { render() { return <div><marquee /><blink /></div>; } }',
-      errors: [expectedError('marquee'), expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 45,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
 
     // ---- Deep nesting (3 levels) ----
     {
       code: '<marquee><marquee><marquee /></marquee></marquee>',
       errors: [
-        expectedError('marquee'),
-        expectedError('marquee'),
-        expectedError('marquee'),
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 19,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 30,
+        },
       ],
     },
 
     // ---- JsxFragment wrapper ----
-    { code: '<><marquee /></>', errors: [expectedError('marquee')] },
+    {
+      code: '<><marquee /></>',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
 
     // ---- JSX inside expression containers (children, attribute, &&) ----
-    { code: '<div>{<marquee />}</div>', errors: [expectedError('marquee')] },
+    {
+      code: '<div>{<marquee />}</div>',
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: '<div>{cond && <marquee />}</div>',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<div content={<marquee />} />',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<Provider value={data}>{<marquee />}</Provider>',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- Components map: map-to-distracting / map-to-self ----
     {
       code: '<Foo />',
       settings: { 'jsx-a11y': { components: { Foo: 'marquee' } } },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<marquee />',
       settings: { 'jsx-a11y': { components: { marquee: 'marquee' } } },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
 
     // ---- Polymorphic + components combination ----
@@ -303,7 +671,17 @@ new RuleTester().run('no-distracting-elements', null as never, {
           components: { Foo: 'div' },
         },
       },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
 
     // Polymorphic + components CHAIN: Foo → Bar (polymorphic) → marquee
@@ -317,45 +695,144 @@ new RuleTester().run('no-distracting-elements', null as never, {
           components: { Bar: 'marquee' },
         },
       },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
 
     // ---- Polymorphic prop value forms ----
     {
       code: '<Foo as={"marquee"} />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<Foo as={`marquee`} />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
 
     // ---- Real-world patterns (extended) ----
     {
       code: 'const Banner = withTheme(() => <marquee />);',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: 'const x = items.filter(x => x).map(x => <marquee key={x.id} />)',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
       code: 'const items = [<marquee key="1" />, <blink key="2" />];',
-      errors: [expectedError('marquee'), expectedError('blink')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 35,
+        },
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <blink> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 37,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'wrap(<marquee />);',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: 'const x = { content: <marquee /> };',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: 'const Marquee = React.forwardRef((props, ref) => <marquee ref={ref} {...props} />);',
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 50,
+          endLine: 1,
+          endColumn: 82,
+        },
+      ],
     },
 
     // ---- Defensive type handling (invalid side) ----
@@ -368,7 +845,17 @@ new RuleTester().run('no-distracting-elements', null as never, {
           polymorphicAllowList: [123 as unknown as string, 'Foo'],
         },
       },
-      errors: [expectedError('marquee')],
+      errors: [
+        {
+          messageId: 'distractingElement',
+          message:
+            'Do not use <marquee> elements as they can create visual accessibility issues and are deprecated.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
   ],
 });

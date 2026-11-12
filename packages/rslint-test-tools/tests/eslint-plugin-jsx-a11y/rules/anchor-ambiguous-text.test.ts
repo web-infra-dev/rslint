@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const linkComponentSettings = {
   'jsx-a11y': {
@@ -16,20 +17,7 @@ const imageComponentSettings = {
   },
 };
 
-const DEFAULT_AMBIGUOUS_WORDS = [
-  'click here',
-  'here',
-  'link',
-  'a link',
-  'learn more',
-];
-
-const expectedMessage = (words: string[]) =>
-  `Ambiguous text within anchor. Screen reader users rely on link text for context; the words "${words.join('", "')}" are ambiguous and do not provide enough context.`;
-
-const defaultErrorMessage = expectedMessage(DEFAULT_AMBIGUOUS_WORDS);
-
-new RuleTester().run('anchor-ambiguous-text', null as never, {
+new RuleTester(config).run('anchor-ambiguous-text', {
   valid: [
     { code: '<a>documentation</a>;' },
     { code: '<a>${here}</a>;' },
@@ -61,81 +49,400 @@ new RuleTester().run('anchor-ambiguous-text', null as never, {
     },
   ],
   invalid: [
-    { code: '<a>here</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>HERE</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>click here</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more</a>;', errors: [{ message: defaultErrorMessage }] },
+    {
+      code: '<a>here</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>HERE</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>click here</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
     {
       code: '<a>learn      more</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
-    { code: '<a>learn more.</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more?</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more,</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more!</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more;</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>learn more:</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>link</a>;', errors: [{ message: defaultErrorMessage }] },
-    { code: '<a>a link</a>;', errors: [{ message: defaultErrorMessage }] },
+    {
+      code: '<a>learn more.</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more?</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more,</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more!</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more;</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>learn more:</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>link</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
+    {
+      code: '<a>a link</a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
     {
       code: '<a aria-label="click here">something</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
-    { code: '<a> a link </a>;', errors: [{ message: defaultErrorMessage }] },
+    {
+      code: '<a> a link </a>;',
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
+    },
     {
       code: '<a>a<i></i> link</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><i></i>a link</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><span>click</span> here</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><span> click </span> here</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><span aria-hidden>more text</span>learn more</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><span aria-hidden="true">more text</span>learn more</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><img alt="click here"/></a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a alt="tutorial on using eslint-plugin-jsx-a11y">click here</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<a><span alt="tutorial on using eslint-plugin-jsx-a11y">click here</span></a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a><CustomElement>click</CustomElement> here</a>;',
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<Link>here</Link>',
       settings: linkComponentSettings,
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: '<a><Image alt="click here" /></a>',
       settings: imageComponentSettings,
-      errors: [{ message: defaultErrorMessage }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "click here", "here", "link", "a link", "learn more" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a>a disallowed word</a>',
       options: [{ words: ['a disallowed word'] }],
-      errors: [{ message: expectedMessage(['a disallowed word']) }],
+      errors: [
+        {
+          messageId: 'anchorAmbiguousText',
+          message:
+            'Ambiguous text within anchor. Screen reader users rely on link text for context; the words "a disallowed word" are ambiguous and do not provide enough context.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
   ],
 });

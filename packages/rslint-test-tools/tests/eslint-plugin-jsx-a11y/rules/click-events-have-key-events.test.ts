@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const errorMessage =
-  'Visible, non-interactive elements with click handlers must have at least one keyboard listener.';
-const expectedError = { message: errorMessage };
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const footerComponentSettings = {
   'jsx-a11y': {
@@ -25,7 +22,7 @@ const polymorphicAllowListSettings = {
   },
 };
 
-new RuleTester().run('click-events-have-key-events', null as never, {
+new RuleTester(config).run('click-events-have-key-events', {
   valid: [
     // ============================================================
     // Upstream valid suite (mirrors __tests__/src/rules/click-events-have-key-events-test.js)
@@ -134,55 +131,320 @@ new RuleTester().run('click-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onClick={() => void 0} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div onClick={() => void 0} role={undefined} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: '<div onClick={() => void 0} {...props} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
-    { code: '<section onClick={() => void 0} />;', errors: [expectedError] },
-    { code: '<main onClick={() => void 0} />;', errors: [expectedError] },
-    { code: '<article onClick={() => void 0} />;', errors: [expectedError] },
-    { code: '<header onClick={() => void 0} />;', errors: [expectedError] },
-    { code: '<footer onClick={() => void 0} />;', errors: [expectedError] },
+    {
+      code: '<section onClick={() => void 0} />;',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: '<main onClick={() => void 0} />;',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
+    {
+      code: '<article onClick={() => void 0} />;',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: '<header onClick={() => void 0} />;',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<footer onClick={() => void 0} />;',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
     {
       code: '<div onClick={() => void 0} aria-hidden={false} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
-    { code: '<a onClick={() => void 0} />', errors: [expectedError] },
+    {
+      code: '<a onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
     {
       code: '<a tabIndex="0" onClick={() => void 0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: '<Footer onClick={doFoo} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
       settings: footerComponentSettings,
     },
 
     // ============================================================
     // Non-interactive element survey
     // ============================================================
-    { code: '<span onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<aside onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<nav onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<p onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<h1 onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<h6 onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<ul onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<ol onClick={() => void 0} />', errors: [expectedError] },
-    { code: '<li onClick={() => void 0} />', errors: [expectedError] },
+    {
+      code: '<span onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
+    {
+      code: '<aside onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: '<nav onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: '<p onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<h1 onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<h6 onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<ul onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<ol onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<li onClick={() => void 0} />',
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
 
     // ============================================================
     // Listener boundary — nested element reports independently
     // ============================================================
     {
       code: '<button onClick={() => void 0}><div onClick={() => void 0} /></button>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
 
     // ============================================================
@@ -191,11 +453,31 @@ new RuleTester().run('click-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onClick={() => void 0} {...{onKeyDown: foo}} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: '<div {...props} onClick={() => void 0} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // ============================================================
@@ -204,7 +486,17 @@ new RuleTester().run('click-events-have-key-events', null as never, {
     {
       code: '<Foo as="div" onClick={() => void 0} />;',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
 
     // ============================================================
@@ -212,11 +504,40 @@ new RuleTester().run('click-events-have-key-events', null as never, {
     // ============================================================
     {
       code: 'function ClickCard() { return <div onClick={handler}>Title</div>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'function App() { return (<><div onClick={() => void 0}>A</div><button onClick={() => void 0}>B</button><section onClick={() => void 0}>C</section></>); }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'clickEventsHaveKeyEvents',
+          message:
+            'Visible, non-interactive elements with click handlers must have at least one keyboard listener.',
+          line: 1,
+          column: 104,
+          endLine: 1,
+          endColumn: 136,
+        },
+      ],
     },
   ],
 });

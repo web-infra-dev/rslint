@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // Mirrors aria-query's `dom.keys()` in order. Used to drive procedural test
 // generation that mirrors upstream's
@@ -154,9 +155,6 @@ const reservedSet = new Set([
   'track',
 ]);
 
-const errorMessage = (invalidProp: string) =>
-  `This element does not support ARIA roles, states and properties. Try removing the prop '${invalidProp}'.`;
-
 const roleValidityTests = allDomElements.map((el) => ({
   code: `<${el} ${reservedSet.has(el) ? '' : 'role'} />`,
 }));
@@ -167,26 +165,7 @@ const ariaValidityTests = allDomElements
   }))
   .concat({ code: '<fake aria-hidden />' });
 
-const invalidRoleValidityTests = allDomElements
-  .filter((el) => reservedSet.has(el))
-  .map((el) => ({
-    code: `<${el} role {...props} />`,
-    errors: [{ message: errorMessage('role') }],
-  }))
-  .concat({
-    code: '<Meta aria-hidden />',
-    errors: [{ message: errorMessage('aria-hidden') }],
-    settings: { 'jsx-a11y': { components: { Meta: 'meta' } } },
-  } as never);
-
-const invalidAriaValidityTests = allDomElements
-  .filter((el) => reservedSet.has(el))
-  .map((el) => ({
-    code: `<${el} aria-hidden aria-role="none" {...props} />`,
-    errors: [{ message: errorMessage('aria-hidden') }],
-  }));
-
-new RuleTester().run('aria-unsupported-elements', null as never, {
+new RuleTester(config).run('aria-unsupported-elements', {
   valid: [
     ...roleValidityTests,
     ...ariaValidityTests,
@@ -252,130 +231,836 @@ new RuleTester().run('aria-unsupported-elements', null as never, {
     { code: '<base key="x" />' },
   ],
   invalid: [
-    ...invalidRoleValidityTests,
-    ...invalidAriaValidityTests,
-    // Case-insensitive matching.
+    {
+      code: '<base role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<col role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<colgroup role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<head role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<html role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<link role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<meta role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<noembed role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: '<noscript role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<param role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<picture role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: '<script role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<source role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<style role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<title role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<track role {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<Meta aria-hidden />',
+      settings: {
+        'jsx-a11y': {
+          components: {
+            Meta: 'meta',
+          },
+        },
+      },
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<base aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '<col aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
+    },
+    {
+      code: '<colgroup aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: '<head aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '<html aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '<link aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '<meta aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '<noembed aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
+    },
+    {
+      code: '<noscript aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: '<param aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
+    },
+    {
+      code: '<picture aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
+    },
+    {
+      code: '<script aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      code: '<source aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      code: '<style aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
+    },
+    {
+      code: '<title aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
+    },
+    {
+      code: '<track aria-hidden aria-role="none" {...props} />',
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
+    },
     {
       code: '<base ROLE />',
-      errors: [{ message: errorMessage('role') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: '<base ARIA-HIDDEN />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
-    // Multiple invalid attributes on the same element.
     {
       code: '<base role aria-hidden aria-label="x" />',
       errors: [
-        { message: errorMessage('role') },
-        { message: errorMessage('aria-hidden') },
-        { message: errorMessage('aria-label') },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
       ],
     },
-    // Paired opening/closing form.
     {
       code: '<style aria-hidden></style>',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
-    // polymorphicPropName resolves to a reserved element.
     {
       code: '<Box as="base" aria-hidden />',
-      settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [{ message: errorMessage('aria-hidden') }],
+      settings: {
+        'jsx-a11y': {
+          polymorphicPropName: 'as',
+        },
+      },
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: '<Foo as="meta" role="none" />',
-      settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [{ message: errorMessage('role') }],
+      settings: {
+        'jsx-a11y': {
+          polymorphicPropName: 'as',
+        },
+      },
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
-    // Components map points at a reserved element.
     {
       code: '<Foo aria-hidden />',
-      settings: { 'jsx-a11y': { components: { Foo: 'meta' } } },
-      errors: [{ message: errorMessage('aria-hidden') }],
+      settings: {
+        'jsx-a11y': {
+          components: {
+            Foo: 'meta',
+          },
+        },
+      },
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
-    // Reserved nested in non-reserved.
     {
       code: '<div><base aria-hidden /></div>',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
-    // Reserved nested in reserved — both fire independently.
     {
       code: '<head role="x"><base aria-hidden /></head>',
       errors: [
-        { message: errorMessage('role') },
-        { message: errorMessage('aria-hidden') },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
     },
-    // Mixed valid + invalid attributes on a reserved element.
     {
       code: '<base href="x" target="_blank" aria-hidden />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
-    // Spread interleaved with named attributes.
     {
       code: '<base {...a} role {...b} aria-hidden {...c} />',
       errors: [
-        { message: errorMessage('role') },
-        { message: errorMessage('aria-hidden') },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
       ],
     },
-    // Boolean form of `role`.
     {
       code: '<base role />',
-      errors: [{ message: errorMessage('role') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'role'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
-    // Inside a JSX fragment / conditional expression.
     {
       code: '<>{cond && <title aria-hidden>x</title>}</>',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
-    // Boolean form of an aria-* attribute.
     {
       code: '<base aria-label />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
-    // Reserved tag with children.
     {
       code: '<base aria-hidden>x</base>',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
-    // Self-closing without space.
     {
       code: '<base aria-hidden/>',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
-    // Array.map iteration — JSX inside expression body.
     {
       code: 'function L({xs}) { return xs.map(x => <base aria-hidden key={x} />); }',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 67,
+        },
+      ],
     },
-    // Class component render method.
     {
       code: 'class C { render() { return <link aria-hidden />; } }',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
-    // Conditional render via && inside parent JSX.
     {
       code: 'function F() { return <div>{cond && <meta aria-hidden />}</div>; }',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 37,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
-    // TS type assertion on attribute value.
     {
       code: '<base aria-hidden={true as boolean} />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
-    // `as const` assertion.
     {
       code: '<base aria-label={"x" as const} />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-label'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
-    // JSX inside generic function.
     {
       code: 'function f<T>(x: T) { return <base aria-hidden />; }',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
-    // polymorphicAllowList allows the substitution.
     {
       code: '<Box as="meta" aria-hidden />',
       settings: {
@@ -384,7 +1069,17 @@ new RuleTester().run('aria-unsupported-elements', null as never, {
           polymorphicAllowList: ['Box'],
         },
       },
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'unsupported',
+          message:
+            "This element does not support ARIA roles, states and properties. Try removing the prop 'aria-hidden'.",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
   ],
 });

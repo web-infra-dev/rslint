@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // (role, requiredProps) — mirrors aria-query's per-role `requiredProps`
 // keys for every non-abstract role with at least one required prop.
@@ -19,9 +20,6 @@ const roleRequiredProps: Record<string, string[]> = {
   switch: ['aria-checked'],
   treeitem: ['aria-selected'],
 };
-
-const errorMessage = (role: string, required: string[]) =>
-  `Elements with the ARIA role "${role}" must have the following attributes defined: ${required.join(',')}`;
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -165,7 +163,7 @@ const validRoles = [
   'graphics-symbol',
 ];
 
-new RuleTester().run('role-has-required-aria-props', null as never, {
+new RuleTester(config).run('role-has-required-aria-props', {
   valid: [
     // Upstream test file — order preserved.
     { code: '<Bar baz />' },
@@ -200,40 +198,102 @@ new RuleTester().run('role-has-required-aria-props', null as never, {
     // SLIDER.
     {
       code: '<div role="slider" />',
-      errors: [{ message: errorMessage('slider', roleRequiredProps.slider) }],
+      errors: [
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<div role="slider" aria-valuemax />',
-      errors: [{ message: errorMessage('slider', roleRequiredProps.slider) }],
+      errors: [
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<div role="slider" aria-valuemax aria-valuemin />',
-      errors: [{ message: errorMessage('slider', roleRequiredProps.slider) }],
+      errors: [
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "slider" must have the following attributes defined: aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
 
     // CHECKBOX.
     {
       code: '<div role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', roleRequiredProps.checkbox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<div role="checkbox" checked />',
       errors: [
-        { message: errorMessage('checkbox', roleRequiredProps.checkbox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<div role="checkbox" aria-chcked />',
       errors: [
-        { message: errorMessage('checkbox', roleRequiredProps.checkbox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<span role="checkbox" aria-labelledby="foo" tabindex="0"></span>',
       errors: [
-        { message: errorMessage('checkbox', roleRequiredProps.checkbox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "checkbox" must have the following attributes defined: aria-checked',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
 
@@ -241,19 +301,43 @@ new RuleTester().run('role-has-required-aria-props', null as never, {
     {
       code: '<div role="combobox" />',
       errors: [
-        { message: errorMessage('combobox', roleRequiredProps.combobox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<div role="combobox" expanded />',
       errors: [
-        { message: errorMessage('combobox', roleRequiredProps.combobox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<div role="combobox" aria-expandd />',
       errors: [
-        { message: errorMessage('combobox', roleRequiredProps.combobox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
 
@@ -261,42 +345,102 @@ new RuleTester().run('role-has-required-aria-props', null as never, {
     {
       code: '<div role="scrollbar" />',
       errors: [
-        { message: errorMessage('scrollbar', roleRequiredProps.scrollbar) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<div role="scrollbar" aria-valuemax />',
       errors: [
-        { message: errorMessage('scrollbar', roleRequiredProps.scrollbar) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<div role="scrollbar" aria-valuemax aria-valuemin />',
       errors: [
-        { message: errorMessage('scrollbar', roleRequiredProps.scrollbar) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<div role="scrollbar" aria-valuemax aria-valuenow />',
       errors: [
-        { message: errorMessage('scrollbar', roleRequiredProps.scrollbar) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<div role="scrollbar" aria-valuemin aria-valuenow />',
       errors: [
-        { message: errorMessage('scrollbar', roleRequiredProps.scrollbar) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "scrollbar" must have the following attributes defined: aria-controls,aria-valuenow',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
 
     // HEADING / OPTION.
     {
       code: '<div role="heading" />',
-      errors: [{ message: errorMessage('heading', roleRequiredProps.heading) }],
+      errors: [
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "heading" must have the following attributes defined: aria-level',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<div role="option" />',
-      errors: [{ message: errorMessage('option', roleRequiredProps.option) }],
+      errors: [
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "option" must have the following attributes defined: aria-selected',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
 
     // Custom element + components map.
@@ -304,8 +448,43 @@ new RuleTester().run('role-has-required-aria-props', null as never, {
       code: '<MyComponent role="combobox" />',
       settings: componentsSettings,
       errors: [
-        { message: errorMessage('combobox', roleRequiredProps.combobox) },
+        {
+          messageId: 'role-has-required-aria-props',
+          message:
+            'Elements with the ARIA role "combobox" must have the following attributes defined: aria-controls,aria-expanded',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 29,
+        },
       ],
     },
   ],
+});
+
+// Additional upstream v6.10.2 inputs. Matrix rows freeze the expected
+// classification and configuration; ranges follow the authored source templates.
+// No rule implementation or lint output is consulted when generating cases.
+
+new RuleTester(config).run('role-has-required-aria-props', {
+  valid: [
+    ...(
+      [
+        [
+          14,
+          'command composite input landmark range roletype section sectionhead select structure widget window',
+        ],
+      ] as const
+    ).flatMap(([firstCase, values]) =>
+      values.split(' ').map((role, index) => {
+        const openingElement = `<div role="${role}"  />`;
+        const code = openingElement;
+        return {
+          name: `upstream v6.10.2 role-has-required-aria-props valid ${firstCase + index}`,
+          code,
+        };
+      }),
+    ),
+  ],
+  invalid: [],
 });

@@ -1,7 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const errorMessage = (role: string, tag: string): string =>
-  `Use ${tag} instead of the "${role}" role to ensure accessibility across all devices.`;
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const polymorphicSettings = {
   'jsx-a11y': {
@@ -18,7 +16,7 @@ const componentsSettings = {
   },
 };
 
-new RuleTester().run('prefer-tag-over-role', null as never, {
+new RuleTester(config).run('prefer-tag-over-role', {
   valid: [
     // ============================================================
     // Upstream valid set (mirrors __tests__/.../prefer-tag-over-role-test.js).
@@ -108,23 +106,42 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: '<div role="button checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
     },
     {
       code: '<div role="heading" />',
       errors: [
         {
-          message: errorMessage(
-            'heading',
-            '<h1>, <h2>, <h3>, <h4>, <h5>, or <h6>',
-          ),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <h1>, <h2>, <h3>, <h4>, <h5>, or <h6> instead of the "heading" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
@@ -132,7 +149,13 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<div role="link" />',
       errors: [
         {
-          message: errorMessage('link', '<a href=...>, or <area href=...>'),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <a href=...>, or <area href=...> instead of the "link" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
         },
       ],
     },
@@ -140,25 +163,57 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<div role="rowgroup" />',
       errors: [
         {
-          message: errorMessage('rowgroup', '<tbody>, <tfoot>, or <thead>'),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <tbody>, <tfoot>, or <thead> instead of the "rowgroup" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
     {
       code: '<span role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
     {
       code: '<other role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: '<div role="banner" />',
-      errors: [{ message: errorMessage('banner', '<header>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <header> instead of the "banner" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
 
     // ============================================================
@@ -167,19 +222,43 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role={"checkbox"} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: '<div role={`checkbox`} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: '<div role={"check" + "box"} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
     },
 
@@ -189,7 +268,15 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div ROLE="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
 
@@ -199,7 +286,15 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div {...{role:"checkbox"}} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
     },
 
@@ -209,7 +304,15 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role="checkbox"></div>',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
 
@@ -221,7 +324,15 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<Box as="div" role="checkbox" />',
       settings: polymorphicSettings,
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
       ],
     },
     {
@@ -229,7 +340,13 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       settings: componentsSettings,
       errors: [
         {
-          message: errorMessage('img', '<img alt=...>, or <img alt=...>'),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <img alt=...>, or <img alt=...> instead of the "img" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -241,14 +358,28 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<MyComponent role="link" />',
       errors: [
         {
-          message: errorMessage('link', '<a href=...>, or <area href=...>'),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <a href=...>, or <area href=...> instead of the "link" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
     },
     {
       code: '<svg:foo role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
 
@@ -258,13 +389,29 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role="alert button checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
       ],
     },
     {
       code: '<div role=" checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
 
@@ -273,19 +420,59 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     // ============================================================
     {
       code: '<div role="article" />',
-      errors: [{ message: errorMessage('article', '<article>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <article> instead of the "article" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div role="navigation" />',
-      errors: [{ message: errorMessage('navigation', '<nav>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <nav> instead of the "navigation" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<div role="separator" />',
-      errors: [{ message: errorMessage('separator', '<hr>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <hr> instead of the "separator" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: '<div role="paragraph" />',
-      errors: [{ message: errorMessage('paragraph', '<p>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <p> instead of the "paragraph" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
 
     // ============================================================
@@ -295,16 +482,29 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<div role="textbox" />',
       errors: [
         {
-          message: errorMessage(
-            'textbox',
-            '<input type=...>, <input list=...>, <input list=...>, <input list=...>, <input list=...>, or <textarea>',
-          ),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type=...>, <input list=...>, <input list=...>, <input list=...>, <input list=...>, or <textarea> instead of the "textbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
     {
       code: '<div role="searchbox" />',
-      errors: [{ message: errorMessage('searchbox', '<input list=...>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input list=...> instead of the "searchbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
 
     // ============================================================
@@ -314,7 +514,13 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<button role="link" />',
       errors: [
         {
-          message: errorMessage('link', '<a href=...>, or <area href=...>'),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <a href=...>, or <area href=...> instead of the "link" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
@@ -322,10 +528,13 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
       code: '<a role="button" />',
       errors: [
         {
-          message: errorMessage(
-            'button',
-            '<input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button>',
-          ),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="button">, <input type="image">, <input type="reset">, <input type="submit">, or <button> instead of the "button" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
         },
       ],
     },
@@ -337,13 +546,29 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role="&#99;heckbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     {
       code: '<div role="button&#32;checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
       ],
     },
 
@@ -355,13 +580,29 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role={checkbox} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: '<div role={"" || checkbox} />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
       ],
     },
 
@@ -372,7 +613,15 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div role="checkbox" role="banner" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
       ],
     },
 
@@ -382,13 +631,29 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: '<div {...{role:"checkbox"}} role="link" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
       ],
     },
     {
       code: '<div {...props} role="checkbox" />',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
       ],
     },
 
@@ -398,24 +663,43 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     {
       code: 'function Card() { return <div role="checkbox" />; }',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 49,
+        },
       ],
     },
     {
       code: 'const Card = () => <div role="heading" />;',
       errors: [
         {
-          message: errorMessage(
-            'heading',
-            '<h1>, <h2>, <h3>, <h4>, <h5>, or <h6>',
-          ),
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <h1>, <h2>, <h3>, <h4>, <h5>, or <h6> instead of the "heading" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 42,
         },
       ],
     },
     {
       code: 'const Card = React.memo(() => <span role="checkbox" />);',
       errors: [
-        { message: errorMessage('checkbox', '<input type="checkbox">') },
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <input type="checkbox"> instead of the "checkbox" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 55,
+        },
       ],
     },
 
@@ -424,7 +708,17 @@ new RuleTester().run('prefer-tag-over-role', null as never, {
     // ============================================================
     {
       code: '<div role="presentation banner" />',
-      errors: [{ message: errorMessage('banner', '<header>') }],
+      errors: [
+        {
+          messageId: 'preferTagOverRole',
+          message:
+            'Use <header> instead of the "banner" role to ensure accessibility across all devices.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
   ],
 });

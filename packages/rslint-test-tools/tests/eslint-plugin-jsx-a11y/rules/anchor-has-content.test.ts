@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const linkSettings = {
   'jsx-a11y': {
@@ -8,10 +9,7 @@ const linkSettings = {
   },
 };
 
-const errorMessage =
-  'Anchors must have content and the content must be accessible by a screen reader.';
-
-new RuleTester().run('anchor-has-content', null as never, {
+new RuleTester(config).run('anchor-has-content', {
   valid: [
     { code: '<div />;' },
     { code: '<a>Foo</a>' },
@@ -29,20 +27,60 @@ new RuleTester().run('anchor-has-content', null as never, {
   invalid: [
     {
       code: '<a />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'anchorHasContent',
+          message:
+            'Anchors must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 6,
+        },
+      ],
     },
     {
       code: '<a><Bar aria-hidden /></a>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'anchorHasContent',
+          message:
+            'Anchors must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<a>{undefined}</a>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'anchorHasContent',
+          message:
+            'Anchors must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 4,
+        },
+      ],
     },
     {
       code: '<Link />',
       settings: linkSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'anchorHasContent',
+          message:
+            'Anchors must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
     },
   ],
 });

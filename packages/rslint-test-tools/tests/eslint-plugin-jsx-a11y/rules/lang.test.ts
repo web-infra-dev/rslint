@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -9,9 +10,7 @@ const componentsSettings = {
   },
 };
 
-const errorMessage = 'lang attribute must have a valid value.';
-
-new RuleTester().run('lang', null as never, {
+new RuleTester(config).run('lang', {
   valid: [
     { code: '<div />;' },
     { code: '<div foo="bar" />;' },
@@ -31,25 +30,70 @@ new RuleTester().run('lang', null as never, {
   invalid: [
     {
       code: '<html lang="foo" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidLangValue',
+          message: 'lang attribute must have a valid value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: '<html lang="zz-LL" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidLangValue',
+          message: 'lang attribute must have a valid value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<html lang={undefined} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidLangValue',
+          message: 'lang attribute must have a valid value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<Foo lang={undefined} />',
       settings: componentsSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidLangValue',
+          message: 'lang attribute must have a valid value.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Box as="html" lang="foo" />',
       settings: componentsSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidLangValue',
+          message: 'lang attribute must have a valid value.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
   ],
 });

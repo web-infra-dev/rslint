@@ -1,6 +1,6 @@
 # no-autofocus
 
-Enforce that the `autoFocus` prop is not used on JSX elements.
+Enforce that the `autoFocus` prop is not enabled on JSX elements.
 Programmatically moving focus on render is disorienting for sighted users
 (the viewport jumps to an unexpected location) and disruptive for
 assistive-technology users (screen-reader and keyboard navigation are
@@ -68,6 +68,21 @@ Examples of **incorrect** code with `{ "ignoreNonDOM": true }`:
 ```jsx
 <input autoFocus />
 ```
+
+## Differences from upstream
+
+Unlike `eslint-plugin-jsx-a11y` v6.10.2, Rslint allows `autoFocus` values
+that its static evaluator resolves to the boolean `false` or the string
+`"false"`. For example, `<input autoFocus={false} />` is accepted by Rslint
+but reported by upstream, which checks only whether the prop is present.
+This is intentional: Rslint allows an explicitly disabled value instead of
+requiring the prop to be removed. The diagnostic therefore says the prop
+should not be "enabled", rather than upstream's "used".
+
+This is not a general truthiness check: `autoFocus={undefined}`,
+`autoFocus={null}` and `autoFocus={0}` are still reported. Values that the
+static evaluator cannot resolve to either accepted value are also reported.
+To satisfy both tools, remove the `autoFocus` prop when it is disabled.
 
 ## Original Documentation
 

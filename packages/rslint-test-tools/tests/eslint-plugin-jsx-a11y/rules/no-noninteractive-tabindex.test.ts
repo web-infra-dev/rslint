@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const errorMessage =
-  '`tabIndex` should only be declared on interactive elements.';
-const expectedError = { message: errorMessage };
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -39,7 +36,7 @@ const allowExpressionValuesFalseOptions = [{ allowExpressionValues: false }];
 const tagsExemptDivOptions = [{ tags: ['div'] }];
 const rolesExemptTabpanelOptions = [{ roles: ['tabpanel'] }];
 
-new RuleTester().run('no-noninteractive-tabindex', null as never, {
+new RuleTester(config).run('no-noninteractive-tabindex', {
   valid: [
     // ============================================================
     // Upstream alwaysValid (run under both :strict and :recommended)
@@ -376,45 +373,228 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // to `0 >= 0` = true → REPORT. Aligned via GetTabIndexEx's nullLike
     // arm. Locks against the lossy pre-Ex behavior that silently skipped.
     // ============================================================
-    { code: '<div tabIndex={-1 satisfies number} />', errors: [expectedError] },
-    { code: '<div tabIndex={5 satisfies number} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={-1 satisfies number} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5 satisfies number} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
     {
       code: 'async function f() { return <div tabIndex={await p} />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: 'function* g() { yield <div tabIndex={yield 0} />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
 
     // ============================================================
     // BigInt — Number(BigInt) coerces. 0n → 0 → REPORT; 1n → 1 → REPORT.
     // ============================================================
-    { code: '<div tabIndex={0n} />', errors: [expectedError] },
-    { code: '<div tabIndex={1n} />', errors: [expectedError] },
-    { code: '<div tabIndex={2n} />', errors: [expectedError] },
-    { code: '<div tabIndex={5n} />', errors: [expectedError] },
-    { code: '<div tabIndex={true ? 1n : 0n} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0n} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1n} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={2n} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5n} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={true ? 1n : 0n} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
 
     // ============================================================
     // Empty JsxExpression `tabIndex={}` — JSXEmptyExpression → null →
     // `null >= 0` true → REPORT.
     // ============================================================
-    { code: '<div tabIndex={} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
 
     // ============================================================
     // Upstream neverValid
     // ============================================================
-    { code: '<div tabIndex="0" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="0" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: '<div role="article" tabIndex="0" />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
-    { code: '<article tabIndex="0" />', errors: [expectedError] },
-    { code: '<article tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<article tabIndex="0" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<article tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     {
       code: '<Article tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
       settings: componentsSettings,
     },
 
@@ -423,21 +603,61 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: '<div role="tabpanel" tabIndex="0" />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: '<div role={ROLE_BUTTON} onClick={() => {}} tabIndex="0" />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 44,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
     },
     {
       code: '<div role={BUTTON} onClick={() => {}} tabIndex="0" />',
       options: allowExpressionValuesFalseOptions,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<div role={isButton ? "button" : "link"} onClick={() => {}} tabIndex="0" />',
       options: allowExpressionValuesFalseOptions,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 73,
+        },
+      ],
     },
 
     // ============================================================
@@ -445,190 +665,1474 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: '<article tabIndex={0}><span tabIndex={0} /></article>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: '<article tabIndex={0}><section tabIndex={0}><span tabIndex={0} /></section></article>',
-      errors: [expectedError, expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 44,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 51,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
       code: '<button tabIndex={0}><span tabIndex={0} /></button>',
-      errors: [expectedError], // outer interactive, inner reports
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ], // outer interactive, inner reports
     },
     {
       code: '<><div tabIndex={0} /><span tabIndex={0} /></>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
 
     // ============================================================
     // Non-interactive element survey
     // ============================================================
-    { code: '<div tabIndex={0} />', errors: [expectedError] },
-    { code: '<span tabIndex={0} />', errors: [expectedError] },
-    { code: '<section tabIndex={0} />', errors: [expectedError] },
-    { code: '<header tabIndex={0} />', errors: [expectedError] },
-    { code: '<footer tabIndex={0} />', errors: [expectedError] },
-    { code: '<main tabIndex={0} />', errors: [expectedError] },
-    { code: '<aside tabIndex={0} />', errors: [expectedError] },
-    { code: '<nav tabIndex={0} />', errors: [expectedError] },
-    { code: '<p tabIndex={0} />', errors: [expectedError] },
-    { code: '<h1 tabIndex={0} />', errors: [expectedError] },
-    { code: '<h6 tabIndex={0} />', errors: [expectedError] },
-    { code: '<ul tabIndex={0} />', errors: [expectedError] },
-    { code: '<ol tabIndex={0} />', errors: [expectedError] },
-    { code: '<li tabIndex={0} />', errors: [expectedError] },
-    { code: '<table tabIndex={0} />', errors: [expectedError] },
-    { code: '<dl tabIndex={0} />', errors: [expectedError] },
-    { code: '<details tabIndex={0} />', errors: [expectedError] },
-    { code: '<dialog tabIndex={0} />', errors: [expectedError] },
-    { code: '<fieldset tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<span tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<section tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<header tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<footer tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<main tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<aside tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<nav tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<p tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<h1 tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<h6 tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<ul tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<ol tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<li tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<table tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<dl tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<details tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<dialog tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<fieldset tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
     // `<a />` (no href) is non-interactive.
-    { code: '<a tabIndex={0} />', errors: [expectedError] },
-    { code: '<area tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<a tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<area tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
 
     // ============================================================
     // Non-interactive role values
     // ============================================================
-    { code: '<div role="article" tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role="document" tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role="img" tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role="region" tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role="article" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: '<div role="document" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<div role="img" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<div role="region" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
     {
       code: '<div role="tabpanel" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     // Note: `<div role="progressbar" tabIndex={0} />` is VALID per
     // upstream — progressbar is widget-class in aria-query → interactive →
     // rule skips. Moved to valid section.
-    { code: '<div role="alert" tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role="banner" tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role="alert" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: '<div role="banner" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
     {
       code: '<div role="navigation" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<div role="presentation" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
-    { code: '<div role="none" tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role="none" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
     // First-token rule: `article button` — first wins → non-interactive.
     {
       code: '<div role="article button" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: '<div role="madeUpRole" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
-    { code: '<div role="" tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role="   " tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role="" tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<div role="   " tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
 
     // ============================================================
     // Non-literal role + allowExpressionValues=false
     // ============================================================
-    { code: '<div role={SOME_ROLE} tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role={SOME_ROLE} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
     {
       code: '<div role={SOME_ROLE} tabIndex={0} />',
       options: allowExpressionValuesFalseOptions,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     // `role={undefined}` is special-cased — does NOT count as non-literal.
     {
       code: '<div role={undefined} tabIndex={0} />',
       options: allowExpressionValuesTrueOptions,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     // `role={null}` → JSXExpressionContainer with NullKeyword → not undefined,
     // not JSXText → IsNonLiteralProperty=true → exempt under
     // allowExpressionValues=true. Without the option, IsInteractiveRole
     // returns false → reports.
-    { code: '<div role={null} tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role={null} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
     // Non-string literal role values.
-    { code: '<div role={0} tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role={true} tabIndex={0} />', errors: [expectedError] },
-    { code: '<div role={false} tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div role={0} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<div role={true} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<div role={false} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
 
     // ============================================================
     // tabIndex value variants ≥ 0 — full numeric/string survey
     // ============================================================
-    { code: '<div tabIndex={1} />', errors: [expectedError] },
-    { code: '<div tabIndex={5} />', errors: [expectedError] },
-    { code: '<div tabIndex={2147483647} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={2147483647} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
     // Hex / Octal / Binary integer literals.
-    { code: '<div tabIndex={0x10} />', errors: [expectedError] },
-    { code: '<div tabIndex={0o10} />', errors: [expectedError] },
-    { code: '<div tabIndex={0b10} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0x10} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0o10} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0b10} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
     // Hex / oct / bin STRING forms: upstream Number("0x10") = 16 → reports.
-    { code: '<div tabIndex="0x10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0X10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0o10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0b10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0xff" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="0x10" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0X10" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0o10" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0b10" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0xff" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
     // Step-2 fallback exercises the same hex/oct/bin dispatch.
     {
       code: '<div tabIndex={true ? "0x10" : "-1"} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     // `Infinity` identifier — `Infinity >= 0` is true → reports.
-    { code: '<div tabIndex={Infinity} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={Infinity} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
     // ArrayLiteralExpression — Array.prototype.join + ToNumber.
-    { code: '<div tabIndex={[]} />', errors: [expectedError] }, // "" → 0
-    { code: '<div tabIndex={[5]} />', errors: [expectedError] }, // "5" → 5
-    { code: '<div tabIndex={[0]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[null]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[Infinity]} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={[]} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    }, // "" → 0
+    {
+      code: '<div tabIndex={[5]} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    }, // "5" → 5
+    {
+      code: '<div tabIndex={[0]} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[null]} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[Infinity]} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
     // Unary `+`/`-` on string operand → ToNumber.
-    { code: '<div tabIndex={+"5"} />', errors: [expectedError] },
-    { code: '<div tabIndex={-"-5"} />', errors: [expectedError] },
-    { code: '<div tabIndex={+"0x10"} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={+"5"} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={-"-5"} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+"0x10"} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
     // Numeric separator (ES2021).
-    { code: '<div tabIndex={1_000} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1_000} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     // Scientific notation that lands on integer.
-    { code: '<div tabIndex={1e2} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1e2} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
     // Negative zero — `-0 >= 0` is true in JS.
-    { code: '<div tabIndex={-0} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={-0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
     // String forms.
-    { code: '<div tabIndex="5" />', errors: [expectedError] },
-    { code: '<div tabIndex="100" />', errors: [expectedError] },
-    { code: '<div tabIndex=" 0 " />', errors: [expectedError] },
-    { code: '<div tabIndex={" 0 "} />', errors: [expectedError] },
-    { code: '<div tabIndex="+0" />', errors: [expectedError] },
-    { code: '<div tabIndex="+1" />', errors: [expectedError] },
-    { code: '<div tabIndex="-0" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="5" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="100" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex=" 0 " />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={" 0 "} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="+0" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="+1" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="-0" />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
     // Numeric expressions (step-2 fallback).
-    { code: '<div tabIndex={1+1} />', errors: [expectedError] },
-    { code: '<div tabIndex={2-1} />', errors: [expectedError] },
-    { code: '<div tabIndex={2*0} />', errors: [expectedError] },
-    { code: '<div tabIndex={5%3} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1+1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={2-1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={2*0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5%3} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
     // String concatenation → ToNumber → 0 → reports.
-    { code: '<div tabIndex={"0" + "0"} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={"0" + "0"} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
     // Unary plus / minus on numeric literals.
-    { code: '<div tabIndex={+0} />', errors: [expectedError] },
-    { code: '<div tabIndex={+5} />', errors: [expectedError] },
-    { code: '<div tabIndex={-(-1)} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={+0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+5} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={-(-1)} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     // NoSubstitutionTemplateLiteral.
-    { code: '<div tabIndex={`0`} />', errors: [expectedError] },
-    { code: '<div tabIndex={`5`} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={`0`} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={`5`} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
     // Parenthesized number literal.
-    { code: '<div tabIndex={(0)} />', errors: [expectedError] },
-    { code: '<div tabIndex={((0))} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={(0)} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={((0))} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     // TS wrappers around numeric / string literals.
-    { code: '<div tabIndex={0 as number} />', errors: [expectedError] },
-    { code: '<div tabIndex={(0) as number} />', errors: [expectedError] },
-    { code: '<div tabIndex={0 as any} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0 as number} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={(0) as number} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0 as any} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
     // Note: `<div tabIndex={(0)!} />` is VALID (stringified to "0!" → NaN
     // → undefined → skip). Lock-in in the valid section.
     // Conditional / Logical / Nullish resolving to non-negative.
-    { code: '<div tabIndex={cond ? 0 : -1} />', errors: [expectedError] },
-    { code: '<div tabIndex={true ? 0 : 1} />', errors: [expectedError] },
-    { code: '<div tabIndex={true ? "0" : "-1"} />', errors: [expectedError] },
-    { code: '<div tabIndex={true && 0} />', errors: [expectedError] },
-    { code: '<div tabIndex={false || 1} />', errors: [expectedError] },
-    { code: '<div tabIndex={null ?? 0} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={cond ? 0 : -1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={true ? 0 : 1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={true ? "0" : "-1"} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={true && 0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={false || 1} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={null ?? 0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
     // Boolean-ternary (very rare; step-2 boolean coercion → 0/1, both ≥0).
     {
       code: '<div tabIndex={true ? true : false} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ============================================================
@@ -637,17 +2141,47 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     {
       code: '<div tabIndex={0} />',
       options: [{ tags: ['span'] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: '<div role="article" tabIndex={0} />',
       options: rolesExemptTabpanelOptions,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: '<div role="article" tabIndex={0} />',
       options: [{ roles: [] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
 
     // ============================================================
@@ -655,7 +2189,17 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: '<div tabIndex={0} tabIndex={5} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
 
     // ============================================================
@@ -664,17 +2208,47 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     {
       code: '<Box as="div" tabIndex={0} />',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<Box as="article" tabIndex={0} />',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<Box as="article" tabIndex={0} />',
       settings: polymorphicAllowListSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
 
     // ============================================================
@@ -687,7 +2261,17 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
           components: { MyArticle: 'article' },
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<MyDiv tabIndex={0} />',
@@ -696,7 +2280,17 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
           components: { MyDiv: 'div' },
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
 
     // ============================================================
@@ -704,31 +2298,110 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: 'function Outer() { return <div tabIndex={0}>focusable but not interactive</div>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
     },
     {
       code: 'const items = arr.map(item => <li key={item.id} tabIndex={0}>{item.name}</li>);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 49,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: 'function Foo({cond}) { return cond ? <article tabIndex={0} /> : null; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 47,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
     },
     {
       code: 'const Pane = React.forwardRef((props, ref) => <div ref={ref} tabIndex={0} {...props} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 62,
+          endLine: 1,
+          endColumn: 74,
+        },
+      ],
     },
     {
       code: 'function A() { return <div tabIndex={0} />; }\nfunction B() { return <article tabIndex={0} />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 40,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 2,
+          column: 32,
+          endLine: 2,
+          endColumn: 44,
+        },
+      ],
     },
     {
       code: 'const Enhanced = withTracking(({ value }) => <div data-value={value} tabIndex={0} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 70,
+          endLine: 1,
+          endColumn: 82,
+        },
+      ],
     },
     {
       code: 'const Pane = React.memo(({ id }) => <section id={id} tabIndex={0} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 54,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
 
     // ============================================================
@@ -736,15 +2409,45 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: 'function FakeButton({ onClick, children }) { return <div onClick={onClick} tabIndex={0}>{children}</div>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 76,
+          endLine: 1,
+          endColumn: 88,
+        },
+      ],
     },
     {
       code: 'function Dropdown({ items }) { return <ul tabIndex={0}>{items.map(x => <li key={x}>{x}</li>)}</ul>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'function ClickCard() { return <article tabIndex={0} onClick={handler}>Title</article>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 40,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
 
     // ============================================================
@@ -752,19 +2455,68 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: 'function* render() { yield <div tabIndex={0} />; yield <article tabIndex={0} />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 65,
+          endLine: 1,
+          endColumn: 77,
+        },
+      ],
     },
     {
       code: 'async function render() { return <div tabIndex={0} />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: 'const x = (() => <article tabIndex={0} />)();',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: 'class Form extends React.Component { render() { return <div tabIndex={0}>ready</div>; } }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 73,
+        },
+      ],
     },
 
     // ============================================================
@@ -772,11 +2524,31 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: 'const x = <>{cond && <div tabIndex={0} />}</>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: 'const x = <React.Fragment><div tabIndex={0} /></React.Fragment>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
     },
 
     // ============================================================
@@ -784,18 +2556,64 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     // ============================================================
     {
       code: '<div /* a */ tabIndex={0} /* b */ />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
-    { code: '<div tabIndex={/* truthy */ 0} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={/* truthy */ 0} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
 
     // ============================================================
     // Spread literal — role / tabIndex flowing through
     // ============================================================
     {
       code: '<div {...{role: "article", tabIndex: 0}} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
-    { code: '<div {...{tabIndex: 0}} />', errors: [expectedError] },
+    {
+      code: '<div {...{tabIndex: 0}} />',
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
 
     // ============================================================
     // Multi-element file with mixed interactive / non-interactive
@@ -803,9 +2621,211 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     {
       code: 'function App() { return (<><div tabIndex={0}>A</div><button tabIndex={0}>B</button><article tabIndex={0}>C</article><input tabIndex={0} /><section tabIndex={0}>D</section></>); }',
       errors: [
-        expectedError, // div
-        expectedError, // article
-        expectedError, // section (button & input are interactive)
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 93,
+          endLine: 1,
+          endColumn: 105,
+        },
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 148,
+          endLine: 1,
+          endColumn: 160,
+        },
+      ],
+    },
+  ],
+});
+
+// Additional upstream v6.10.2 inputs. Matrix rows freeze the expected
+// classification and configuration; ranges follow the authored source templates.
+// No rule implementation or lint output is consulted when generating cases.
+const upstreamOptions0 = [
+  { tags: [], roles: ['tabpanel'], allowExpressionValues: true },
+];
+const upstreamOptions1 = [
+  { allowExpressionValues: true, tags: [], roles: ['tabpanel'] },
+];
+const upstreamSettings0 = {
+  'jsx-a11y': { components: { Article: 'article', MyButton: 'button' } },
+};
+
+new RuleTester(config).run('no-noninteractive-tabindex', {
+  valid: [
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 0',
+      code: '<MyButton tabIndex={0} />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 1',
+      code: '<button />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 2',
+      code: '<button tabIndex="0" />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 3',
+      code: '<button tabIndex={0} />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 4',
+      code: '<div />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 5',
+      code: '<div tabIndex="-1" />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 6',
+      code: '<div role="button" tabIndex="0" />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 7',
+      code: '<div role="article" tabIndex="-1" />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 8',
+      code: '<article tabIndex="-1" />',
+      options: upstreamOptions0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 9',
+      code: '<Article tabIndex="-1" />',
+      options: upstreamOptions0,
+      settings: upstreamSettings0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 10',
+      code: '<MyButton tabIndex={0} />',
+      options: upstreamOptions0,
+      settings: upstreamSettings0,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 13',
+      code: '<div role={BUTTON} onClick={() => {}} tabIndex="0" />;',
+      options: upstreamOptions1,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 14',
+      code: '<div role={isButton ? "button" : "link"} onClick={() => {}} tabIndex="0" />;',
+      options: upstreamOptions1,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 15',
+      code: '<div role={isButton ? "button" : LINK} onClick={() => {}} tabIndex="0" />;',
+      options: upstreamOptions1,
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended valid 16',
+      code: '<div role={isButton ? BUTTON : LINK} onClick={() => {}} tabIndex="0"/>;',
+      options: upstreamOptions1,
+    },
+  ],
+  invalid: [
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended invalid 0',
+      code: '<div tabIndex="0" />',
+      options: upstreamOptions0,
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended invalid 1',
+      code: '<div role="article" tabIndex="0" />',
+      options: upstreamOptions0,
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended invalid 2',
+      code: '<article tabIndex="0" />',
+      options: upstreamOptions0,
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended invalid 3',
+      code: '<article tabIndex={0} />',
+      options: upstreamOptions0,
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      name: 'upstream v6.10.2 no-noninteractive-tabindex:recommended invalid 4',
+      code: '<Article tabIndex={0} />',
+      options: upstreamOptions0,
+      settings: upstreamSettings0,
+      errors: [
+        {
+          messageId: 'noNoninteractiveTabindex',
+          message:
+            '`tabIndex` should only be declared on interactive elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
   ],

@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -18,7 +19,7 @@ const arrayOpts = [
   },
 ];
 
-new RuleTester().run('alt-text', null as never, {
+new RuleTester(config).run('alt-text', {
   valid: [
     // ---- DEFAULT ELEMENT 'img' TESTS ----
     { code: '<img alt="foo" />;' },
@@ -144,8 +145,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img />;',
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
         },
       ],
     },
@@ -153,8 +159,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img alt />;',
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for img. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
@@ -162,8 +173,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img alt={undefined} />;',
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for img. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -171,8 +187,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img src="xyz" />',
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
         },
       ],
     },
@@ -180,8 +201,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img role />',
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
         },
       ],
     },
@@ -189,8 +215,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img {...this.props} />',
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'img elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -198,8 +229,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img alt={false || false} />',
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for img. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
     },
@@ -207,8 +243,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img alt={undefined} role="presentation" />;',
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for img. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
         },
       ],
     },
@@ -216,8 +257,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img alt role="presentation" />;',
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for img. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
         },
       ],
     },
@@ -225,8 +271,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img role="presentation" />;',
       errors: [
         {
+          messageId: 'preferAlt',
           message:
             'Prefer alt="" over a presentational role. First rule of aria is to not use aria if it can be achieved via native HTML.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
     },
@@ -234,8 +285,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img role="none" />;',
       errors: [
         {
+          messageId: 'preferAlt',
           message:
             'Prefer alt="" over a presentational role. First rule of aria is to not use aria if it can be achieved via native HTML.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
         },
       ],
     },
@@ -243,8 +299,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img aria-label={undefined} />',
       errors: [
         {
+          messageId: 'ariaLabelValue',
           message:
             'The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
         },
       ],
     },
@@ -252,8 +313,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img aria-labelledby={undefined} />',
       errors: [
         {
+          messageId: 'ariaLabelledByValue',
           message:
             'The aria-labelledby attribute must have a value. The alt attribute is preferred over aria-labelledby for images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
         },
       ],
     },
@@ -261,8 +327,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img aria-label="" />',
       errors: [
         {
+          messageId: 'ariaLabelValue',
           message:
             'The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -270,8 +341,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<img aria-labelledby="" />',
       errors: [
         {
+          messageId: 'ariaLabelledByValue',
           message:
             'The aria-labelledby attribute must have a value. The alt attribute is preferred over aria-labelledby for images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
     },
@@ -280,8 +356,13 @@ new RuleTester().run('alt-text', null as never, {
       settings: componentsSettings,
       errors: [
         {
+          messageId: 'ariaLabelValue',
           message:
             'The aria-label attribute must have a value. The alt attribute is preferred over aria-label for images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
         },
       ],
     },
@@ -291,8 +372,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 11,
         },
       ],
     },
@@ -300,8 +386,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object><div aria-hidden /></object>',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -309,8 +400,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object title={undefined} />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
     },
@@ -318,8 +414,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object aria-label="" />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -327,8 +428,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object aria-labelledby="" />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
         },
       ],
     },
@@ -336,8 +442,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object aria-label={undefined} />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
         },
       ],
     },
@@ -345,8 +456,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<object aria-labelledby={undefined} />',
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
         },
       ],
     },
@@ -356,8 +472,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -365,8 +486,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area alt />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
         },
       ],
     },
@@ -374,8 +500,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area alt={undefined} />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -383,8 +514,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area src="xyz" />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -392,8 +528,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area {...this.props} />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -401,8 +542,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area aria-label="" />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
@@ -410,8 +556,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area aria-label={undefined} />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
         },
       ],
     },
@@ -419,8 +570,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area aria-labelledby="" />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
     },
@@ -428,8 +584,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<area aria-labelledby={undefined} />',
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
         },
       ],
     },
@@ -439,8 +600,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
@@ -448,8 +614,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" alt />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
     },
@@ -457,8 +628,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" alt={undefined} />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
         },
       ],
     },
@@ -466,8 +642,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image">Foo</input>',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
         },
       ],
     },
@@ -475,8 +656,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" {...this.props} />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
         },
       ],
     },
@@ -484,8 +670,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" aria-label="" />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
         },
       ],
     },
@@ -493,8 +684,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" aria-label={undefined} />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 46,
         },
       ],
     },
@@ -502,8 +698,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" aria-labelledby="" />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
         },
       ],
     },
@@ -511,8 +712,13 @@ new RuleTester().run('alt-text', null as never, {
       code: '<input type="image" aria-labelledby={undefined} />',
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
         },
       ],
     },
@@ -523,8 +729,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
     },
@@ -533,8 +744,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for Thumbnail. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
         },
       ],
     },
@@ -543,8 +759,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for Thumbnail. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
         },
       ],
     },
@@ -553,8 +774,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -563,8 +789,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Thumbnail elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
         },
       ],
     },
@@ -573,8 +804,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
         },
       ],
     },
@@ -583,8 +819,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for Image. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
     },
@@ -593,8 +834,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'altValue',
           message:
             'Invalid alt value for Image. Use alt="" for presentational images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
         },
       ],
     },
@@ -603,8 +849,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
         },
       ],
     },
@@ -613,8 +864,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'missingProp',
           message:
             'Image elements must have an alt prop, either with meaningful text, or an empty string for decorative images.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
         },
       ],
     },
@@ -623,8 +879,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 11,
         },
       ],
     },
@@ -633,8 +894,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -643,8 +909,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'object',
           message:
             'Embedded <object> elements must have alternative text by providing inner text, aria-label or aria-labelledby props.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
     },
@@ -653,8 +924,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -663,8 +939,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
         },
       ],
     },
@@ -673,8 +954,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -683,8 +969,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -693,8 +984,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'area',
           message:
             'Each area of an image map must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -703,8 +999,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 15,
         },
       ],
     },
@@ -713,8 +1014,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -723,8 +1029,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
         },
       ],
     },
@@ -733,8 +1044,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
         },
       ],
     },
@@ -743,8 +1059,13 @@ new RuleTester().run('alt-text', null as never, {
       options: arrayOpts,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
         },
       ],
     },
@@ -753,8 +1074,13 @@ new RuleTester().run('alt-text', null as never, {
       settings: componentsSettings,
       errors: [
         {
+          messageId: 'inputImage',
           message:
             '<input> elements with type="image" must have a text alternative through the `alt`, `aria-label`, or `aria-labelledby` prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },

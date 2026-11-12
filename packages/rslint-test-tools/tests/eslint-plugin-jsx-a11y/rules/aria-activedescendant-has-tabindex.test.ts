@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const errorMessage =
-  'An element that manages focus with `aria-activedescendant` must have a tabindex';
-const expectedError = { message: errorMessage };
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsCustomDiv = {
   'jsx-a11y': {
@@ -18,7 +15,7 @@ const polymorphicSettings = {
   },
 };
 
-new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
+new RuleTester(config).run('aria-activedescendant-has-tabindex', {
   valid: [
     // ============================================================
     // Upstream-suite valid cases
@@ -205,11 +202,31 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={x} tabIndex={0!} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={(0)!} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
 
     // ============================================================
@@ -217,22 +234,65 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={someID} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: '<CustomComponent aria-activedescendant={someID} />;',
       settings: componentsCustomDiv,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
 
     // ============================================================
     // gate-1: boolean attribute form / explicit-undefined value still
     // count as "defined" via jsx-ast-utils' getProp
     // ============================================================
-    { code: '<div aria-activedescendant />;', errors: [expectedError] },
+    {
+      code: '<div aria-activedescendant />;',
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
     {
       code: '<div aria-activedescendant={undefined} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // ============================================================
@@ -240,11 +300,31 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div Aria-ActiveDescendant={x} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: '<div ARIA-ACTIVEDESCENDANT={x} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
 
     // ============================================================
@@ -252,11 +332,31 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={x}></div>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x}>text</div>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
 
     // ============================================================
@@ -264,32 +364,95 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<input aria-activedescendant={x} tabIndex={-2} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<button aria-activedescendant={x} tabIndex={-5} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
 
     // ============================================================
     // a without href is NOT interactive
     // ============================================================
-    { code: '<a aria-activedescendant={x} />;', errors: [expectedError] },
+    {
+      code: '<a aria-activedescendant={x} />;',
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
 
     // ============================================================
     // gate-4 boundary: tabIndex < -1
     // ============================================================
     {
       code: '<div aria-activedescendant={x} tabIndex={-2} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={-100} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex="-2" />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
 
     // ============================================================
@@ -297,15 +460,45 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={x} tabIndex="abc" />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={NaN} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={undefined} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
 
     // ============================================================
@@ -314,7 +507,17 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     {
       code: '<Box as="div" aria-activedescendant={x} />;',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
 
     // ============================================================
@@ -322,11 +525,40 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<span><div aria-activedescendant={x} /></span>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x}><span aria-activedescendant={x} /></div>;',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
 
     // ============================================================
@@ -334,11 +566,31 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={x} tabIndex={(-2 as number)} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={(-2)!} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
 
     // ============================================================
@@ -346,7 +598,35 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<><div aria-activedescendant={x} /><span aria-activedescendant={y} /><p aria-activedescendant={z} /></>;',
-      errors: [expectedError, expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 36,
+        },
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 70,
+        },
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 70,
+          endLine: 1,
+          endColumn: 101,
+        },
+      ],
     },
 
     // ============================================================
@@ -354,15 +634,45 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: 'const Item = () => <li aria-activedescendant={x} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: 'function R() { return <div aria-activedescendant={x} />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
     },
     {
       code: 'class C extends React.Component { render() { return <div aria-activedescendant={x} />; } }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 53,
+          endLine: 1,
+          endColumn: 86,
+        },
+      ],
     },
 
     // ============================================================
@@ -370,55 +680,185 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<div aria-activedescendant={x} tabIndex={cond ? -2 : -3} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={false ? 0 : -2} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={x || 0} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={x ?? 0} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={1 - 5} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={[-2]} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={[5,6]} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={true} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={false} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={null} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={-Infinity} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={`${0}`} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div aria-activedescendant={x} tabIndex={`${cond}`} />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
 
     // ============================================================
@@ -426,15 +866,45 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: '<ul aria-activedescendant={x}><li>x</li></ul>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<section aria-activedescendant={x} tabIndex={-2}>content</section>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: 'function L() { return items.map(i => <li aria-activedescendant={i.id}>x</li>); }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 38,
+          endLine: 1,
+          endColumn: 71,
+        },
+      ],
     },
 
     // ============================================================
@@ -442,7 +912,26 @@ new RuleTester().run('aria-activedescendant-has-tabindex', null as never, {
     // ============================================================
     {
       code: 'function App() { return (<ul aria-activedescendant={a}><li aria-activedescendant={b}>x</li></ul>); }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'tabIndexRequired',
+          message:
+            'An element that manages focus with `aria-activedescendant` must have a tabindex',
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 86,
+        },
+      ],
     },
   ],
 });

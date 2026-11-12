@@ -7,7 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-// expectedError mirrors upstream's expected error shape — every invalid case
+// expectedError uses Rslint's intentional enabled wording — every invalid case
 // emits the same single message. Centralized so a future text tweak lives in
 // one place. Shared with no_autofocus_extras_test.go.
 var expectedError = rule_tester.InvalidTestCaseError{
@@ -38,14 +38,12 @@ var componentsSettings = map[string]interface{}{
 	},
 }
 
-// TestNoAutofocusUpstream covers the full valid/invalid suite migrated 1:1
-// from upstream eslint-plugin-jsx-a11y's
-// `__tests__/src/rules/no-autofocus-test.js`. Order and grouping mirror the
-// upstream file so a future audit can grep across both side-by-side.
-//
-// rslint-specific lock-ins (TS wrappers, spread literals, listener boundary
-// repeats, position assertions, the upstream getPropValue branches that
-// upstream never tests directly) live in no_autofocus_extras_test.go.
+// TestNoAutofocusUpstream preserves the inputs from eslint-plugin-jsx-a11y
+// v6.10.2's __tests__/src/rules/no-autofocus-test.js, with intentional changes:
+// false and "false" move from invalid to valid, and the message says enabled
+// instead of used. Upstream checks only the attribute name; Rslint also evaluates
+// its value. See Differences from upstream in no_autofocus.md.
+// Additional evaluator and AST coverage lives in no_autofocus_extras_test.go.
 func TestNoAutofocusUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoAutofocusRule, []rule_tester.ValidTestCase{
 		// ---- Upstream valid ----
@@ -56,10 +54,10 @@ func TestNoAutofocusUpstream(t *testing.T) {
 		{Code: `<input autofocus="true" />;`, Tsx: true},
 		// Component without the autoFocus prop — nothing to inspect.
 		{Code: `<Foo bar />`, Tsx: true},
-		// Explicit boolean false → !== false fails → no report.
+		// Intentional difference: upstream reports this explicit false value.
 		{Code: `<div autoFocus={false} />`, Tsx: true},
-		// String "false" coerces to boolean false via jsxAstUtilsLiteralCoerce
-		// → !== false fails → no report.
+		// Intentional difference: the evaluator resolves "false" to false;
+		// upstream reports it without reading its value.
 		{Code: `<div autoFocus="false" />`, Tsx: true},
 		// ignoreNonDOM: true — `Foo` is not in the dom set, so the rule skips
 		// even though autoFocus is truthy.
@@ -80,9 +78,7 @@ func TestNoAutofocusUpstream(t *testing.T) {
 		{Code: `<div autoFocus />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		// Explicit boolean true.
 		{Code: `<div autoFocus={true} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
-		// `undefined` !== false AND !== "false" → reports. Locks in upstream's
-		// "anything other than literal false" semantic — even an explicit
-		// undefined trips the rule.
+		// undefined is not an accepted disabled value; both rules report it.
 		{Code: `<div autoFocus={undefined} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		// String "true" → coerces to boolean true via jsxAstUtilsLiteralCoerce
 		// → !== false → reports.
