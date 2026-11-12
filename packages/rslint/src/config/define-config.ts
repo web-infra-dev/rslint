@@ -15,6 +15,7 @@ export type RuleSeverity = 'off' | 'warn' | 'error' | 0 | 1 | 2;
  */
 const NATIVE_PLUGINS = [
   '@typescript-eslint',
+  'effector',
   'import',
   'jest',
   'jsx-a11y',
@@ -33,6 +34,7 @@ const NATIVE_PLUGINS = [
 // onto the bundled prefix, and the gate — which keys off the un-normalized
 // `<prefix>/<rule>` — would then silently drop the community rules.
 const NATIVE_PLUGIN_DECL_ALIASES = [
+  'eslint-plugin-effector',
   'eslint-plugin-import',
   'eslint-plugin-jest',
   'eslint-plugin-jsx-a11y',
@@ -236,6 +238,7 @@ export interface RslintConfigEntry {
    *   for autocomplete; arbitrary strings are still accepted. Each built-in
    *   maps to the ESLint plugin it ports rules from:
    *   `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`,
+   *   `'effector'` → `eslint-plugin-effector`,
    *   `'import'` → `eslint-plugin-import`, `'jest'` → `eslint-plugin-jest`,
    *   `'jsx-a11y'` → `eslint-plugin-jsx-a11y`, `'node'` → `eslint-plugin-n`,
    *   `'promise'` → `eslint-plugin-promise`,

@@ -148,6 +148,12 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     ],
   },
   {
+    prefix: 'effector',
+    group: 'eslint-plugin-effector',
+    importName: '',
+    presets: [],
+  },
+  {
     prefix: 'jest',
     group: 'eslint-plugin-jest',
     importName: 'jestPlugin',
