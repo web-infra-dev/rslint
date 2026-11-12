@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('consistent-test-filename', {} as never, {
+ruleTester.run('consistent-test-filename', {
   valid: [
     { code: 'export {}', filename: '1.test.ts' },
     {
@@ -18,7 +19,7 @@ ruleTester.run('consistent-test-filename', {} as never, {
       errors: [
         {
           messageId: 'consistentTestFilename',
-          message: String.raw`Use test file name pattern .*\.test\.(c|m)?[tj]sx?$`,
+          message: 'Use test file name pattern .*\\.test\\.(c|m)?[tj]sx?$',
           line: 1,
           column: 1,
           endLine: 1,
@@ -38,7 +39,7 @@ ruleTester.run('consistent-test-filename', {} as never, {
       errors: [
         {
           messageId: 'consistentTestFilename',
-          message: String.raw`Use test file name pattern .*\.spec\.ts$`,
+          message: 'Use test file name pattern .*\\.spec\\.ts$',
           line: 1,
           column: 1,
           endLine: 1,

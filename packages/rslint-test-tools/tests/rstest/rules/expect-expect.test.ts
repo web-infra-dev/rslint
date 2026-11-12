@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('expect-expect', {} as never, {
+ruleTester.run('expect-expect', {
   valid: [
     {
       code: `
@@ -26,7 +27,16 @@ ruleTester.run('expect-expect', {} as never, {
           doSomething();
         });
       `,
-      errors: [{ messageId: 'noAssertions', line: 3, column: 9 }],
+      errors: [
+        {
+          messageId: 'noAssertions',
+          message: 'Test has no assertions',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 13,
+        },
+      ],
     },
   ],
 });

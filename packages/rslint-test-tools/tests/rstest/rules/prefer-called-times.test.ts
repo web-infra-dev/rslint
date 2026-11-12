@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-called-times', {} as never, {
+ruleTester.run('prefer-called-times', {
   valid: [
     { code: `expect(fn).toBeCalledTimes(1);` },
     { code: `expect(fn).toHaveBeenCalledTimes(1);` },

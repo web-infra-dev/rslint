@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-conditional-tests', {} as never, {
+ruleTester.run('no-conditional-tests', {
   valid: [
     { code: 'test("shows error", () => {});' },
     { code: 'it("foo", function () {})' },
@@ -37,7 +38,16 @@ ruleTester.run('no-conditional-tests', {} as never, {
      })
     }
    })`,
-      errors: [{ messageId: 'noConditionalTests', line: 3, column: 6 }],
+      errors: [
+        {
+          messageId: 'noConditionalTests',
+          message: 'Avoid using if conditions in a test',
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: `
@@ -48,7 +58,16 @@ ruleTester.run('no-conditional-tests', {} as never, {
       })
      }
    })`,
-      errors: [{ messageId: 'noConditionalTests', line: 4, column: 6 }],
+      errors: [
+        {
+          messageId: 'noConditionalTests',
+          message: 'Avoid using if conditions in a test',
+          line: 4,
+          column: 6,
+          endLine: 4,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: `describe("errors", () => {
@@ -58,7 +77,16 @@ ruleTester.run('no-conditional-tests', {} as never, {
     });
     }
    });`,
-      errors: [{ messageId: 'noConditionalTests', line: 3, column: 6 }],
+      errors: [
+        {
+          messageId: 'noConditionalTests',
+          message: 'Avoid using if conditions in a test',
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 10,
+        },
+      ],
     },
   ],
 });

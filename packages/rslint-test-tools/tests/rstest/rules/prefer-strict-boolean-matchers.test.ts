@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-strict-boolean-matchers', {} as never, {
+ruleTester.run('prefer-strict-boolean-matchers', {
   valid: [
     { code: `[].push(true)` },
     { code: `[].push(false)` },

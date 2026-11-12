@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-importing-rstest-globals', {} as never, {
+ruleTester.run('no-importing-rstest-globals', {
   valid: [
     { code: `import { defineConfig } from '@rstest/core';` },
     { code: `import type { Mock } from '@rstest/core';` },
@@ -17,8 +18,24 @@ ruleTester.run('no-importing-rstest-globals', {} as never, {
       code: `import { describe, it } from '@rstest/core';`,
       output: '',
       errors: [
-        { messageId: 'noImportingRstestGlobals', line: 1, column: 10 },
-        { messageId: 'noImportingRstestGlobals', line: 1, column: 20 },
+        {
+          messageId: 'noImportingRstestGlobals',
+          message:
+            'Do not import `describe` from `@rstest/core`; it is available as a global.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'noImportingRstestGlobals',
+          message:
+            'Do not import `it` from `@rstest/core`; it is available as a global.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
@@ -31,6 +48,8 @@ ruleTester.run('no-importing-rstest-globals', {} as never, {
             'Do not import `expect` from `rstack/test`; it is available as a global.',
           line: 1,
           column: 24,
+          endLine: 1,
+          endColumn: 30,
         },
       ],
     },
@@ -40,15 +59,28 @@ ruleTester.run('no-importing-rstest-globals', {} as never, {
       errors: [
         {
           messageId: 'noRequiringRstestGlobals',
+          message:
+            'Do not require `describe` from `@rstest/core`; it is available as a global.',
           line: 1,
           column: 9,
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
     {
       code: `import { it as test } from '@rstest/core'; test('works', () => {});`,
-      output: null,
-      errors: [{ messageId: 'noImportingRstestGlobals' }],
+      errors: [
+        {
+          messageId: 'noImportingRstestGlobals',
+          message:
+            'Do not import `it` from `@rstest/core`; it is available as a global.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

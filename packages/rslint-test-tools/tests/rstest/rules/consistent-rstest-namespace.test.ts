@@ -1,23 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const namespaceError = (
-  preferred: string,
-  disallowed: string,
-  line: number,
-  column: number,
-  endColumn: number,
-) => ({
-  messageId: 'consistentNamespace',
-  message: `Prefer using \`${preferred}\` instead of \`${disallowed}\``,
-  line,
-  column,
-  endLine: line,
-  endColumn,
-});
-
-ruleTester.run('consistent-rstest-namespace', {} as never, {
+ruleTester.run('consistent-rstest-namespace', {
   valid: [
     {
       code: `import { rs } from '@rstest/core';
@@ -73,30 +59,87 @@ rstest.clearAllMocks();`,
 rs.mock('./service');
 rs.clearAllMocks();`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 2, 1, 7),
-        namespaceError('rs', 'rstest', 3, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 7,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
     },
     {
       code: `import { expect, rs, rstest } from '@rstest/core';`,
       output: `import { expect, rs } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 22, 28)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: `import { rstest, rs, expect } from '@rstest/core';`,
       output: `import { rs, expect } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 10, 16)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `import { rstest, /* the namespace */ rs } from '@rstest/core';`,
       output: `import { /* the namespace */ rs } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 10, 16)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `import { rstest /* remove with namespace */, rs } from '@rstest/core';`,
       output: `import { rs } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 10, 16)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `import { rs } from '@rstest/core';
@@ -105,28 +148,74 @@ rs.mock('./service');`,
 rstest.mock('./service');`,
       options: [{ fn: 'rstest' }],
       errors: [
-        namespaceError('rstest', 'rs', 1, 10, 12),
-        namespaceError('rstest', 'rs', 2, 1, 3),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rstest` instead of `rs`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 12,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rstest` instead of `rs`',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 3,
+        },
       ],
     },
     {
       code: `rstest.useFakeTimers();`,
       output: `rs.useFakeTimers();`,
       options: [{ fn: 'rs' }],
-      errors: [namespaceError('rs', 'rstest', 1, 1, 7)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: `rstest?.mock('./service', () => ({ pay: rstest.fn() }));`,
       output: `rs?.mock('./service', () => ({ pay: rs.fn() }));`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 1, 7),
-        namespaceError('rs', 'rstest', 1, 41, 47),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 47,
+        },
       ],
     },
     {
       code: `rstest.mocked(pay).mockReturnValue(true);`,
       output: `rs.mocked(pay).mockReturnValue(true);`,
-      errors: [namespaceError('rs', 'rstest', 1, 1, 7)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: `import { rstest } from '@rstest/core';
@@ -134,16 +223,44 @@ rstest!.mock('./service');`,
       output: `import { rs } from '@rstest/core';
 rs!.mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 2, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 7,
+        },
       ],
     },
     {
       code: `import { rstest } from '@rstest/core';
 (rstest as typeof rstest).mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 2, 2, 8),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 8,
+        },
       ],
     },
     {
@@ -152,8 +269,22 @@ rstest.fn\`service\`;`,
       output: `import { rs } from '@rstest/core';
 rs.fn\`service\`;`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 2, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 7,
+        },
       ],
     },
     {
@@ -161,8 +292,22 @@ rs.fn\`service\`;`,
 const { fn } = rstest;
 rstest.mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 3, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
     },
     {
@@ -170,47 +315,129 @@ rstest.mock('./service');`,
 export { rstest };
 rstest.mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 3, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
     },
     {
       code: `const { rstest } = require('@rstest/core');
 rstest.mock('./service');`,
-      errors: [namespaceError('rs', 'rstest', 2, 1, 7)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: `import { rs } from '@rstest/core';
 import { rstest } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 2, 10, 16)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `import { expect as check, rs, rstest } from '@rstest/core';`,
       output: `import { expect as check, rs } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 31, 37)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: `import { rs, rstest /* remove with namespace */, expect } from '@rstest/core';`,
       output: `import { rs, expect } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `import { rs, rstest /* remove with namespace */ } from '@rstest/core';`,
       output: `import { rs } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `import { rs, rstest, /* the assertion */ expect } from '@rstest/core';`,
       output: `import { rs, /* the assertion */ expect } from '@rstest/core';`,
-      errors: [namespaceError('rs', 'rstest', 1, 14, 20)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `import { rstest } from '@rstest/core';
 const rs = { mock(path: string) {} };
 rstest.mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 3, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
     },
     {
@@ -220,8 +447,22 @@ function run() {
   rstest.mock('./service');
 }`,
       errors: [
-        namespaceError('rs', 'rstest', 1, 10, 16),
-        namespaceError('rs', 'rstest', 4, 3, 9),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
     },
     {
@@ -229,15 +470,38 @@ function run() {
   const rs = { mock(path: string) {} };
   rstest.mock('./service');
 }`,
-      errors: [namespaceError('rs', 'rstest', 3, 3, 9)],
+      errors: [
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 9,
+        },
+      ],
     },
     {
       code: `import { rs } from './helpers';
 import { rstest } from '@rstest/core';
 rstest.mock('./service');`,
       errors: [
-        namespaceError('rs', 'rstest', 2, 10, 16),
-        namespaceError('rs', 'rstest', 3, 1, 7),
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 16,
+        },
+        {
+          messageId: 'consistentNamespace',
+          message: 'Prefer using `rs` instead of `rstest`',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
     },
   ],

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-unneeded-async-expect-function', {} as never, {
+ruleTester.run('no-unneeded-async-expect-function', {
   valid: [
     'expect.hasAssertions()',
     `it('pass', async () => {
@@ -76,10 +77,11 @@ it('pass', async () => {
     await doSomethingAsync();
   }).rejects.toThrow();
 })`,
-      output: null,
       errors: [
         {
           messageId: 'noAsyncWrapperForExpectedPromise',
+          message:
+            'Avoid wrapping asynchronous expectations in an unnecessary async function.',
           line: 2,
           column: 16,
           endLine: 4,
@@ -87,9 +89,9 @@ it('pass', async () => {
           suggestions: [
             {
               messageId: 'suggestRemoveAsyncWrapper',
-              output: `it('is reported', async () => {
-  await expect(doSomethingAsync()).rejects.toThrow();
-})`,
+              desc: 'Pass the awaited call to `expect()` directly',
+              output:
+                "it('is reported', async () => {\n  await expect(doSomethingAsync()).rejects.toThrow();\n})",
             },
           ],
         },
@@ -99,10 +101,11 @@ it('pass', async () => {
       code: `it('is reported', async () => {
   await expect(async () => await doSomethingAsync()).rejects.toThrow();
 })`,
-      output: null,
       errors: [
         {
           messageId: 'noAsyncWrapperForExpectedPromise',
+          message:
+            'Avoid wrapping asynchronous expectations in an unnecessary async function.',
           line: 2,
           column: 16,
           endLine: 2,
@@ -110,9 +113,9 @@ it('pass', async () => {
           suggestions: [
             {
               messageId: 'suggestRemoveAsyncWrapper',
-              output: `it('is reported', async () => {
-  await expect(doSomethingAsync()).rejects.toThrow();
-})`,
+              desc: 'Pass the awaited call to `expect()` directly',
+              output:
+                "it('is reported', async () => {\n  await expect(doSomethingAsync()).rejects.toThrow();\n})",
             },
           ],
         },
@@ -124,10 +127,11 @@ it('pass', async () => {
     await doSomethingAsync(1, 2);
   }).rejects.toThrow();
 })`,
-      output: null,
       errors: [
         {
           messageId: 'noAsyncWrapperForExpectedPromise',
+          message:
+            'Avoid wrapping asynchronous expectations in an unnecessary async function.',
           line: 2,
           column: 16,
           endLine: 4,
@@ -135,9 +139,9 @@ it('pass', async () => {
           suggestions: [
             {
               messageId: 'suggestRemoveAsyncWrapper',
-              output: `it('is reported', async () => {
-  await expect(doSomethingAsync(1, 2)).rejects.toThrow();
-})`,
+              desc: 'Pass the awaited call to `expect()` directly',
+              output:
+                "it('is reported', async () => {\n  await expect(doSomethingAsync(1, 2)).rejects.toThrow();\n})",
             },
           ],
         },
@@ -149,10 +153,11 @@ it('pass', async () => {
     await Promise.all([doSomethingAsync(1, 2), doSomethingAsync()]);
   }).rejects.toThrow();
 })`,
-      output: null,
       errors: [
         {
           messageId: 'noAsyncWrapperForExpectedPromise',
+          message:
+            'Avoid wrapping asynchronous expectations in an unnecessary async function.',
           line: 2,
           column: 16,
           endLine: 4,
@@ -160,9 +165,9 @@ it('pass', async () => {
           suggestions: [
             {
               messageId: 'suggestRemoveAsyncWrapper',
-              output: `it('is reported for Promise.all', async () => {
-  await expect(Promise.all([doSomethingAsync(1, 2), doSomethingAsync()])).rejects.toThrow();
-})`,
+              desc: 'Pass the awaited call to `expect()` directly',
+              output:
+                "it('is reported for Promise.all', async () => {\n  await expect(Promise.all([doSomethingAsync(1, 2), doSomethingAsync()])).rejects.toThrow();\n})",
             },
           ],
         },
@@ -175,10 +180,11 @@ it('pass', async () => {
     await a();
   }).rejects.toThrow();
 })`,
-      output: null,
       errors: [
         {
           messageId: 'noAsyncWrapperForExpectedPromise',
+          message:
+            'Avoid wrapping asynchronous expectations in an unnecessary async function.',
           line: 3,
           column: 16,
           endLine: 5,
@@ -186,10 +192,9 @@ it('pass', async () => {
           suggestions: [
             {
               messageId: 'suggestRemoveAsyncWrapper',
-              output: `it('is reported for a local async binding', async () => {
-  const a = async () => { await doSomethingAsync() };
-  await expect(a()).rejects.toThrow();
-})`,
+              desc: 'Pass the awaited call to `expect()` directly',
+              output:
+                "it('is reported for a local async binding', async () => {\n  const a = async () => { await doSomethingAsync() };\n  await expect(a()).rejects.toThrow();\n})",
             },
           ],
         },

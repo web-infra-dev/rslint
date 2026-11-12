@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-unnecessary-assertion', {} as never, {
+ruleTester.run('no-unnecessary-assertion', {
   valid: [
     { code: 'declare const value: string | null; expect(value).toBeNull();' },
     {
@@ -27,7 +28,12 @@ ruleTester.run('no-unnecessary-assertion', {} as never, {
       code: "expect('ready').toBeNull();",
       errors: [
         {
+          messageId: 'unnecessaryAssertion',
           message: 'Unnecessary assertion, subject cannot be null',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
     },
@@ -35,7 +41,12 @@ ruleTester.run('no-unnecessary-assertion', {} as never, {
       code: "expect.soft('ready').to.not.be.undefined;",
       errors: [
         {
+          messageId: 'unnecessaryAssertion',
           message: 'Unnecessary assertion, subject cannot be undefined',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
         },
       ],
     },
@@ -43,7 +54,12 @@ ruleTester.run('no-unnecessary-assertion', {} as never, {
       code: "import { expect as check } from '@rstest/core'; check('ready').to.be.NaN;",
       errors: [
         {
+          messageId: 'unnecessaryAssertion',
           message: 'Unnecessary assertion, subject cannot be a number',
+          line: 1,
+          column: 49,
+          endLine: 1,
+          endColumn: 73,
         },
       ],
     },
@@ -51,7 +67,12 @@ ruleTester.run('no-unnecessary-assertion', {} as never, {
       code: "expect.poll(async (): Promise<string> => 'ready').toBeNull();",
       errors: [
         {
+          messageId: 'unnecessaryAssertion',
           message: 'Unnecessary assertion, subject cannot be null',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 61,
         },
       ],
     },

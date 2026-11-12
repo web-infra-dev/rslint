@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-to-be-truthy', {} as never, {
+ruleTester.run('prefer-to-be-truthy', {
   valid: [
     { code: `[].push(true)` },
     { code: `expect("something");` },

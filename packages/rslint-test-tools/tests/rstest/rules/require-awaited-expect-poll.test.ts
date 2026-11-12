@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('require-awaited-expect-poll', {} as never, {
+ruleTester.run('require-awaited-expect-poll', {
   valid: [
     {
       code: `

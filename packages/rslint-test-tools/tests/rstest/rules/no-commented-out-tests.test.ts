@@ -1,13 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const invalid = (code: string) => ({
-  code,
-  errors: [{ message: 'Do not comment out tests' }],
-});
-
-ruleTester.run('no-commented-out-tests', {} as never, {
+ruleTester.run('no-commented-out-tests', {
   valid: [
     // Active Rstest calls are not comments.
     { code: 'test("foo", () => {})' },
@@ -71,109 +67,963 @@ ruleTester.run('no-commented-out-tests', {} as never, {
   ],
   invalid: [
     // Direct test and suite calls.
-    invalid('// test("foo", () => {})'),
-    invalid('// it("foo", () => {})'),
-    invalid('// describe("foo", () => {})'),
+    {
+      code: '// test("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '// it("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '// describe("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
 
     // Every Rstest test modifier.
-    invalid('// test.only("foo", () => {})'),
-    invalid('// test.skip("foo", () => {})'),
-    invalid('// test.todo("foo")'),
-    invalid('// test.fails("foo", () => {})'),
-    invalid('// test.concurrent("foo", () => {})'),
-    invalid('// test.sequential("foo", () => {})'),
-    invalid('// test.runIf(condition)("foo", () => {})'),
-    invalid('// test.skipIf(condition)("foo", () => {})'),
+    {
+      code: '// test.only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '// test.skip("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '// test.todo("foo")',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '// test.fails("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: '// test.concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
+    },
+    {
+      code: '// test.sequential("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
+    },
+    {
+      code: '// test.runIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
+    },
+    {
+      code: '// test.skipIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
+    },
 
     // Every Rstest suite modifier.
-    invalid('// describe.only("foo", () => {})'),
-    invalid('// describe.skip("foo", () => {})'),
-    invalid('// describe.todo("foo")'),
-    invalid('// describe.concurrent("foo", () => {})'),
-    invalid('// describe.sequential("foo", () => {})'),
-    invalid('// describe.runIf(condition)("foo", () => {})'),
-    invalid('// describe.skipIf(condition)("foo", () => {})'),
+    {
+      code: '// describe.only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '// describe.skip("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '// describe.todo("foo")',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '// describe.concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: '// describe.sequential("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: '// describe.runIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
+    },
+    {
+      code: '// describe.skipIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
+      ],
+    },
 
     // Getter and conditional modifiers can be chained.
-    invalid('// it.only.fails("foo", () => {})'),
-    invalid('// test.skip.concurrent("foo", () => {})'),
-    invalid('// test.concurrent.only("foo", () => {})'),
-    invalid('// test.concurrent.runIf(condition)("foo", () => {})'),
-    invalid('// describe.only.concurrent("foo", () => {})'),
-    invalid('// describe.concurrent.only("foo", () => {})'),
-    invalid('// describe.concurrent.skipIf(condition)("foo", () => {})'),
-    invalid('// describe.skipIf(condition).concurrent("foo", () => {})'),
+    {
+      code: '// it.only.fails("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '// test.skip.concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
+    },
+    {
+      code: '// test.concurrent.only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
+    },
+    {
+      code: '// test.concurrent.runIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: '// describe.only.concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
+    },
+    {
+      code: '// describe.concurrent.only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
+    },
+    {
+      code: '// describe.concurrent.skipIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 58,
+        },
+      ],
+    },
+    {
+      code: '// describe.skipIf(condition).concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 58,
+        },
+      ],
+    },
 
     // Array-based parameterized tests and suites.
-    invalid('// test.each(rows)("foo", ({ value }) => {})'),
-    invalid('// test.for(rows)("foo", ({ value }) => {})'),
-    invalid('// it.each(rows)("foo", ({ value }) => {})'),
-    invalid('// it.for(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.each(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.for(rows)("foo", ({ value }) => {})'),
-    invalid('// it.only.each(rows)("foo", ({ value }) => {})'),
-    invalid('// it.concurrent.for(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.only.each(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.skip.for(rows)("foo", ({ value }) => {})'),
+    {
+      code: '// test.each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
+    },
+    {
+      code: '// test.for(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
+    },
+    {
+      code: '// it.each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
+    },
+    {
+      code: '// it.for(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
+    },
+    {
+      code: '// describe.each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '// describe.for(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
+    },
+    {
+      code: '// it.only.each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
+    },
+    {
+      code: '// it.concurrent.for(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: '// describe.only.each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
+    },
+    {
+      code: '// describe.skip.for(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
 
     // Explicit type arguments are supported by each and for.
-    invalid('// test.each<Row>(rows)("foo", ({ value }) => {})'),
-    invalid('// test.for<Row>(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.each<Row>(rows)("foo", ({ value }) => {})'),
-    invalid('// describe.for<Row>(rows)("foo", ({ value }) => {})'),
-    invalid(
-      '// test.for<{ value: Map<string, number> }>(rows)("foo", ({ value }) => {})',
-    ),
+    {
+      code: '// test.each<Row>(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
+    },
+    {
+      code: '// test.for<Row>(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: '// describe.each<Row>(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
+    },
+    {
+      code: '// describe.for<Row>(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: '// test.for<{ value: Map<string, number> }>(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 76,
+        },
+      ],
+    },
 
     // Tagged-template parameterized tests and suites.
-    invalid('// test.each`value | expected`("foo", ({ value }) => {})'),
-    invalid('// test.for`value | expected`("foo", ({ value }) => {})'),
-    invalid('// it.each`value | expected`("foo", ({ value }) => {})'),
-    invalid('// it.for`value | expected`("foo", ({ value }) => {})'),
-    invalid('// describe.each`value | expected`("foo", ({ value }) => {})'),
-    invalid('// describe.for`value | expected`("foo", ({ value }) => {})'),
-    invalid('// test.for<Row>`value | expected`("foo", ({ value }) => {})'),
-    invalid(
-      '// describe.each<Row>`value | expected`("foo", ({ value }) => {})',
-    ),
-    invalid(
-      '// it.concurrent.for<Row>`value | expected`("foo", ({ value }) => {})',
-    ),
+    {
+      code: '// test.each`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
+    },
+    {
+      code: '// test.for`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
+    },
+    {
+      code: '// it.each`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
+    },
+    {
+      code: '// it.for`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
+    },
+    {
+      code: '// describe.each`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
+    },
+    {
+      code: '// describe.for`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
+    },
+    {
+      code: '// test.for<Row>`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
+    },
+    {
+      code: '// describe.each<Row>`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
+    },
+    {
+      code: '// it.concurrent.for<Row>`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 70,
+        },
+      ],
+    },
 
     // Property and bracket access can be chained.
-    invalid('// describe["skip"]("foo", () => {})'),
-    invalid('// test["only"]["concurrent"]("foo", () => {})'),
-    invalid('// describe["only"].each(rows)("foo", ({ value }) => {})'),
-    invalid('// test["for"]`value | expected`("foo", ({ value }) => {})'),
+    {
+      code: '// describe["skip"]("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      code: '// test["only"]["concurrent"]("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
+      ],
+    },
+    {
+      code: '// describe["only"].each(rows)("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
+    },
+    {
+      code: '// test["for"]`value | expected`("foo", ({ value }) => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
+    },
 
     // Block comments may contain multiline calls and chains.
-    invalid('/*\n  describe("foo", () => {})\n*/'),
-    invalid('/*\n  describe\n    .only\n    .concurrent("foo", () => {})\n*/'),
-    invalid(
-      '/*\n  test.for<Row>`\n    value\n    ${1}\n  `("$value", ({ value }) => {})\n*/',
-    ),
+    {
+      code: '/*\n  describe("foo", () => {})\n*/',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 3,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: '/*\n  describe\n    .only\n    .concurrent("foo", () => {})\n*/',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 5,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: '/*\n  test.for<Row>`\n    value\n    ${1}\n  `("$value", ({ value }) => {})\n*/',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 6,
+          endColumn: 3,
+        },
+      ],
+    },
 
     // Conditional and extended APIs must eventually register a test.
-    invalid('// test.runIf(condition).only("foo", () => {})'),
-    invalid('// describe.only.skipIf(condition)("foo", () => {})'),
-    invalid('// test.extend(fixtures)("foo", () => {})'),
-    invalid('// it.extend<Fixtures>(fixtures).only("foo", () => {})'),
-    invalid('// test.extend(a).extend(b)("foo", () => {})'),
-    invalid('// test.extend(fixtures).each(rows)("foo", () => {})'),
+    {
+      code: '// test.runIf(condition).only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
+      ],
+    },
+    {
+      code: '// describe.only.skipIf(condition)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
+    },
+    {
+      code: '// test.extend(fixtures)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
+    },
+    {
+      code: '// it.extend<Fixtures>(fixtures).only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
+    },
+    {
+      code: '// test.extend(a).extend(b)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
+    },
+    {
+      code: '// test.extend(fixtures).each(rows)("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
 
     // Transparent syntax and static property access.
-    invalid('// ((test))("foo", () => {})'),
-    invalid('// test?.("foo", () => {})'),
-    invalid('// test?.only("foo", () => {})'),
-    invalid('// test[`only`]("foo", () => {})'),
+    {
+      code: '// ((test))("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '// test?.("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '// test?.only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: '// test[`only`]("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
 
     // Consecutive line comments are parsed as one logical code block.
-    invalid('// test\n//   .only\n//   .concurrent("foo", () => {})'),
-    invalid(
-      '// test.each<Row>`\n// value | expected\n// ${1} | ${2}\n// `("foo", () => {})',
-    ),
-    invalid('// test.extend({\n//   value: 1,\n// }).only("foo", () => {})'),
-    invalid('/* test("renders", () => <div />) */'),
-    invalid('// test("first", () => {}); cleanup()'),
+    {
+      code: '// test\n//   .only\n//   .concurrent("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '// test.each<Row>`\n// value | expected\n// ${1} | ${2}\n// `("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '// test.extend({\n//   value: 1,\n// }).only("foo", () => {})',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '/* test("renders", () => <div />) */',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      code: '// test("first", () => {}); cleanup()',
+      errors: [
+        {
+          messageId: 'commentedTests',
+          message: 'Do not comment out tests',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
+    },
   ],
 });

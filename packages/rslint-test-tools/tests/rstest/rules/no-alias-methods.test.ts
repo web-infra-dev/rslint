@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-alias-methods', {} as never, {
+ruleTester.run('no-alias-methods', {
   valid: [
     { code: `expect(a).toHaveBeenCalled()` },
     { code: `expect(a).toHaveBeenCalledTimes()` },
@@ -41,6 +42,8 @@ ruleTester.run('no-alias-methods', {} as never, {
       errors: [
         {
           messageId: 'replaceAlias',
+          message:
+            'Replace toBeCalledTimes() with its canonical name of toHaveBeenCalledTimes()',
           line: 1,
           column: 11,
           endLine: 1,
@@ -54,6 +57,8 @@ ruleTester.run('no-alias-methods', {} as never, {
       errors: [
         {
           messageId: 'replaceAlias',
+          message:
+            'Replace toThrowError() with its canonical name of toThrow()',
           line: 1,
           column: 15,
           endLine: 1,

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('valid-expect-in-promise', {} as never, {
+ruleTester.run('valid-expect-in-promise', {
   valid: [
     {
       code: `test('case', async ({ expect }) => {
@@ -163,14 +164,34 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       code: `test('case', () => {
         list.push(load().then(value => assert.equal(value, 1)));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 65,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
         const pending = [load().then(value => assert.equal(value, 1))];
         await pending;
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 26,
+          endLine: 2,
+          endColumn: 70,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
@@ -178,7 +199,17 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         pending = pending && fallback;
         await pending;
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 13,
+          endLine: 2,
+          endColumn: 67,
+        },
+      ],
     },
     {
       code: `function leaf(value) {
@@ -194,8 +225,24 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         promise.then(shared);
       });`,
       errors: [
-        { messageId: 'expectInFloatingPromise' },
-        { messageId: 'expectInFloatingPromise' },
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 8,
+          column: 9,
+          endLine: 8,
+          endColumn: 30,
+        },
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 11,
+          column: 9,
+          endLine: 11,
+          endColumn: 30,
+        },
       ],
     },
     {
@@ -207,6 +254,10 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
           messageId: 'expectInFloatingPromise',
           message:
             'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 61,
         },
       ],
     },
@@ -214,60 +265,150 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
       code: `test.for([{ value: 1 }])('case', (row, context) => {
         load().then(value => context.expect(value).toBe(row.value));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 69,
+        },
+      ],
     },
     {
       code: `test.each([{ value: 1 }])('case', row => {
         load().then(value => expect(value).toBe(row.value));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: `test('case', { timeout: 1000 }, ({ expect }) => {
         load().then(value => expect(value).toBe(1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: `import { assert, test } from '@rstest/core';
       test('case', () => {
         load().then(value => assert.equal(value, 1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: `const { assert, test } = require('@rstest/core');
       test('case', () => {
         load().then(value => assert(value));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: `import * as rstest from '@rstest/core';
       rstest.test('case', () => {
         load().then(value => rstest.assert.equal(value, 1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: `import.meta.rstest.test('case', () => {
         load().then(value => import.meta.rstest.assert.equal(value, 1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 73,
+        },
+      ],
     },
     {
       code: `const api = import.meta.rstest;
       api.test('case', () => {
         load().then(value => api.assert.equal(value, 1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 58,
+        },
+      ],
     },
     {
       code: `import { expect, test } from '@rstest/playwright';
       test('case', async ({ page }) => {
         page.goto('url').then(() => expect(page).toBeDefined());
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 65,
+        },
+      ],
     },
     {
       code: `test('case', () => {
@@ -275,7 +416,17 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
           .then(value => expect(value).to.be.ok)
           .then(value => assert.equal(value, 1));
       });`,
-      errors: 1,
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 9,
+          endLine: 4,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
@@ -284,7 +435,17 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
           throw new Error('caught');
         } catch {}
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 69,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
@@ -295,14 +456,34 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
           return;
         }
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 69,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
         let pending;
         pending ||= load().then(value => assert.equal(value, 1));
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 65,
+        },
+      ],
     },
     {
       code: `test('case', async () => {
@@ -310,7 +491,17 @@ ruleTester.run('valid-expect-in-promise', {} as never, {
         pending &&= fallback;
         await pending;
       });`,
-      errors: [{ messageId: 'expectInFloatingPromise' }],
+      errors: [
+        {
+          messageId: 'expectInFloatingPromise',
+          message:
+            'This promise should either be returned or awaited to ensure the assertions in its chain are called',
+          line: 2,
+          column: 13,
+          endLine: 2,
+          endColumn: 66,
+        },
+      ],
     },
   ],
 });
