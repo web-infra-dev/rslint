@@ -1,10 +1,9 @@
-package no_chained_comparison
+package unicornutil
 
 import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -127,13 +126,18 @@ func typeReferenceDeclaration(ctx rule.RuleContext, node *ast.Node) *ast.Node {
 	return nil
 }
 
+type callableWritesCacheKey struct{}
+
 func callableHasWrites(ctx rule.RuleContext, symbol *ast.Symbol) bool {
-	for _, reference := range ctx.Refs.References(symbol) {
-		if utils.IsWriteReference(reference) {
-			return true
-		}
+	writes := rule.CachedByFile(ctx, callableWritesCacheKey{}, func() map[*ast.Symbol]bool {
+		return make(map[*ast.Symbol]bool)
+	})
+	if hasWrites, cached := writes[symbol]; cached {
+		return hasWrites
 	}
-	return false
+	hasWrites := slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference)
+	writes[symbol] = hasWrites
+	return hasWrites
 }
 
 // A JSDoc callback annotation cannot make an async/generator initializer return
@@ -156,7 +160,42 @@ func overridesJSDocCallable(declaration *ast.Node) bool {
 	return declaration.Kind == ast.KindParameter && raw != nil && (raw.Kind == ast.KindAsExpression || raw.Kind == ast.KindTypeAssertionExpression)
 }
 
-func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticStringEvaluator, visiting map[*ast.Node]bool, completed map[*ast.Node]bool) bool {
+// IsFunctionType reports whether an authored callable type returns booleans.
+func (a *BooleanAnalyzer) IsFunctionType(annotation *ast.Node) bool {
+	return booleanCallableAnnotation(*a.ctx, annotation, make(map[*ast.Node]bool))
+}
+
+// IsFunction reports whether a synchronous function returns a primitive boolean.
+// result is its concise body or the expression of its only return statement.
+func (a *BooleanAnalyzer) IsFunction(function, result *ast.Node) bool {
+	if isAsyncOrGenerator(function) {
+		return false
+	}
+	if annotation := CallableReturnTypeAnnotation(*a.ctx, function); annotation != nil {
+		if booleanAnnotation(*a.ctx, annotation, make(map[*ast.Node]bool)) {
+			return true
+		}
+		if utils.IsJSDocSyntaxNode(annotation) {
+			return false
+		}
+	}
+	return a.IsExpression(result)
+}
+
+// SingleReturnExpression returns the concise body or the value of the only
+// statement when it is a return. Multi-statement bodies need flow analysis.
+func SingleReturnExpression(function *ast.Node) *ast.Node {
+	body := function.Body()
+	if body == nil || !ast.IsBlock(body) {
+		return body
+	}
+	if statements := body.Statements(); len(statements) == 1 && ast.IsReturnStatement(statements[0]) {
+		return statements[0].Expression()
+	}
+	return nil
+}
+
+func (a *BooleanAnalyzer) booleanCall(node *ast.Node, visiting map[*ast.Node]bool) bool {
 	if ast.IsOptionalChain(node) {
 		return false
 	}
@@ -164,24 +203,25 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 	if callee == nil {
 		return false
 	}
+	if a.isBuiltinBooleanFunction(callee) {
+		return true
+	}
+	ctx := *a.ctx
 	if ast.IsAccessExpression(callee) {
 		receiver := utils.ESTreeRuntimeExpression(callee.Expression())
-		name, known := memberName(callee, evaluator)
+		name, known := a.memberName(callee)
 		if !known {
 			return false
 		}
-		if ast.IsIdentifier(receiver) && unicornutil.IsGlobalReference(ctx, receiver) && slices.Contains(booleanStaticMethods[receiver.Text()], name) {
-			return true
-		}
 		switch name {
 		case "endsWith", "includes", "isWellFormed", "startsWith":
-			if unicornutil.IsString(ctx, receiver, evaluator) {
+			if IsString(ctx, receiver, a.StaticEvaluator()) {
 				return true
 			}
 		}
 		switch name {
 		case "every", "includes", "some":
-			if unicornutil.IsIndexedCollection(ctx, receiver) {
+			if IsIndexedCollection(ctx, receiver) {
 				return true
 			}
 		case "test":
@@ -197,16 +237,21 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 		}
 		return false
 	}
-	if !ast.IsIdentifier(callee) {
+	return a.isLocalBooleanFunction(callee, visiting)
+}
+
+// IsFunctionReference recognizes a local boolean-returning function or a known
+// global predicate. It does not infer a comparator from its contextual type.
+func (a *BooleanAnalyzer) IsFunctionReference(node *ast.Node) bool {
+	return node != nil && (a.isBuiltinBooleanFunction(node) || a.isLocalBooleanFunction(node, make(map[*ast.Node]bool)))
+}
+
+func (a *BooleanAnalyzer) isLocalBooleanFunction(node *ast.Node, visiting map[*ast.Node]bool) bool {
+	ctx := *a.ctx
+	if !ast.IsIdentifier(node) || ctx.Refs == nil {
 		return false
 	}
-	if unicornutil.IsGlobalReference(ctx, callee) && (callee.Text() == "Boolean" || callee.Text() == "isNaN" || callee.Text() == "isFinite") {
-		return true
-	}
-	if ctx.Refs == nil {
-		return false
-	}
-	symbol := ctx.Refs.ResolveInFile(callee)
+	symbol := ctx.Refs.ResolveInFile(node)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
@@ -221,7 +266,7 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 			}
 			if declaration.Body() == nil {
 				found = true
-				annotation, _ := valueTypeAnnotation(ctx, declaration)
+				annotation, _ := booleanValueAnnotation(ctx, declaration)
 				if !booleanAnnotation(ctx, annotation, visiting) {
 					return false
 				}
@@ -230,7 +275,7 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 		return found
 	}
 	declaration := symbol.Declarations[0]
-	annotation, optional := valueTypeAnnotation(ctx, declaration)
+	annotation, optional := booleanValueAnnotation(ctx, declaration)
 	if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) && !ast.IsFunctionLike(declaration) {
 		return booleanCallableAnnotation(ctx, annotation, visiting)
 	}
@@ -239,22 +284,14 @@ func booleanCall(ctx rule.RuleContext, node *ast.Node, evaluator *utils.StaticSt
 	}
 	function := sourceFunction(ctx, declaration)
 	if function != nil && ast.IsFunctionLike(function) {
-		if ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
+		if isAsyncOrGenerator(function) {
 			return false
 		}
-		if result, _ := valueTypeAnnotation(ctx, function); result != nil {
+		if result, _ := booleanValueAnnotation(ctx, function); result != nil {
 			return booleanAnnotation(ctx, result, visiting)
 		}
 		if annotation == nil {
-			body := function.Body()
-			if body != nil && body.Kind == ast.KindBlock {
-				statements := body.Statements()
-				if len(statements) != 1 || statements[0].Kind != ast.KindReturnStatement {
-					return false
-				}
-				body = statements[0].Expression()
-			}
-			return isBoolean(ctx, body, evaluator, visiting, completed)
+			return a.isBoolean(SingleReturnExpression(function), visiting)
 		}
 	}
 	if optional {
@@ -269,6 +306,33 @@ var booleanStaticMethods = map[string][]string{
 	"Object":  {"hasOwn", "is", "isExtensible", "isFrozen", "isSealed"},
 	"Reflect": {"defineProperty", "deleteProperty", "has", "isExtensible", "preventExtensions", "set", "setPrototypeOf"},
 	"URL":     {"canParse"},
+}
+
+func (a *BooleanAnalyzer) isBuiltinBooleanFunction(node *ast.Node) bool {
+	if ast.IsIdentifier(node) {
+		switch node.Text() {
+		case "Boolean", "isNaN", "isFinite":
+			return a.isGlobal(node)
+		}
+		return false
+	}
+	if !ast.IsAccessExpression(node) || ast.IsOptionalChain(node) {
+		return false
+	}
+	receiver := utils.ESTreeRuntimeExpression(node.Expression())
+	if !ast.IsIdentifier(receiver) {
+		return false
+	}
+	methods := booleanStaticMethods[receiver.Text()]
+	if len(methods) == 0 {
+		return false
+	}
+	name, known := a.memberName(node)
+	return known && slices.Contains(methods, name) && a.isGlobal(receiver)
+}
+
+func (a *BooleanAnalyzer) isGlobal(node *ast.Node) bool {
+	return a.ctx.Globals.Access(node.Text()).IsDeclared() && IsGlobalReference(*a.ctx, node)
 }
 
 func regexpReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Node]bool) bool {
@@ -308,14 +372,14 @@ func builtinReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Nod
 	}
 	if node.Kind == ast.KindNewExpression {
 		callee := utils.ESTreeRuntimeExpression(node.Expression())
-		return callee != nil && ast.IsIdentifier(callee) && slices.Contains(names, callee.Text()) && unicornutil.IsGlobalReference(ctx, callee)
+		return callee != nil && ast.IsIdentifier(callee) && slices.Contains(names, callee.Text()) && IsGlobalReference(ctx, callee)
 	}
 	var annotation *ast.Node
 	if ast.IsIdentifier(node) && ctx.Refs != nil {
 		if symbol := ctx.Refs.ResolveInFile(node); symbol != nil && len(symbol.Declarations) == 1 {
 			declaration := symbol.Declarations[0]
 			var optional bool
-			annotation, optional = valueTypeAnnotation(ctx, declaration)
+			annotation, optional = booleanValueAnnotation(ctx, declaration)
 			if optional {
 				return false
 			}
@@ -329,7 +393,7 @@ func builtinReceiver(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.Nod
 			if symbol := ctx.Refs.ResolveInFile(callee); symbol != nil && len(symbol.Declarations) == 1 && !callableHasWrites(ctx, symbol) {
 				declaration := symbol.Declarations[0]
 				if function := sourceFunction(ctx, declaration); function != nil && ast.IsFunctionLike(function) && ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
-					annotation, _ = valueTypeAnnotation(ctx, function)
+					annotation, _ = booleanValueAnnotation(ctx, function)
 				}
 			}
 		}
@@ -363,9 +427,9 @@ func builtinAnnotation(ctx rule.RuleContext, node *ast.Node, visiting map[*ast.N
 	return false
 }
 
-func memberName(node *ast.Node, evaluator *utils.StaticStringEvaluator) (string, bool) {
+func (a *BooleanAnalyzer) memberName(node *ast.Node) (string, bool) {
 	if node.Kind == ast.KindPropertyAccessExpression {
 		return utils.AccessExpressionStaticName(node)
 	}
-	return evaluator.EvalToString(node.AsElementAccessExpression().ArgumentExpression)
+	return a.StaticEvaluator().EvalAccessExpressionName(node)
 }
