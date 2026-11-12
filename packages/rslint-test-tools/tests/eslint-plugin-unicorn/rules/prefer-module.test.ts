@@ -1,71 +1,51 @@
-// Upstream tests and documentation: eslint-plugin-unicorn v79.0.0.
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-module.js
-import assert from 'node:assert/strict';
-import path from 'node:path';
-import { lint } from '@rslint/core/internal';
-import type { RslintConfigEntry } from '@rslint/core';
+import { describe } from 'rstack/test';
+import { RuleTester } from '@rslint/rule-tester';
 
-interface Case {
-  code: string;
-  filename: string;
-  languageOptions: RslintConfigEntry['languageOptions'];
-  errors: {
-    messageId: string;
-    message: string;
-    line: number;
-    column: number;
-    endLine: number;
-    endColumn: number;
-    suggestions: { messageId: string; desc: string; output: string }[];
-  }[];
-  output: string | null;
-}
+// eslint-plugin-unicorn v79.0.0 upstream and documentation cases.
+const ruleTester = new RuleTester({
+  plugin: 'unicorn',
+  languageOptions: {
+    globals: {
+      exports: 'readonly',
+      require: 'readonly',
+      module: 'readonly',
+      __filename: 'readonly',
+      __dirname: 'readonly',
+    },
+    parserOptions: {
+      project: false,
+      projectService: false,
+    },
+  },
+});
 
-const globals = {
-  exports: 'readonly',
-  require: 'readonly',
-  module: 'readonly',
-  __filename: 'readonly',
-  __dirname: 'readonly',
-} as const;
-const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
-  {
-    name: 'Strict mode',
+describe('Strict mode', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'const foo = "use strict";',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: '("use strict")',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: '"use strong";',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'eval("\'use strict\'; var x = 42; x;");',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'new Function("\'use strict\'; var x = 42; return x;");',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -90,7 +70,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '"use strict";\n\nconsole.log(1);',
@@ -113,7 +92,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'function foo () {\n\t"use strict";\n\tconsole.log(1);\n}',
@@ -136,7 +114,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "'use strict';\n\nconsole.log(1);",
@@ -156,18 +133,16 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         output: 'console.log(1);',
       },
     ],
-  },
-  {
-    name: 'Global return',
-    // rslint already parses top-level returns without Espree's
-    // ecmaFeatures.globalReturn parser flag.
+  });
+});
+
+describe('Global return', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'function a() {\n\treturn;\n}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -188,40 +163,33 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: '__dirname and __filename',
+  });
+});
+
+describe('__dirname and __filename', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'const __filename = 1;\nconst foo = __filename;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const __dirname = 1;\nconst foo = __dirname;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'import {__filename as filename} from "foo.mjs"',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const foo = 1;export {foo as __dirname}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -252,7 +220,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const dirname = __filename;',
@@ -280,7 +247,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = { __dirname};',
@@ -309,7 +275,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = {__filename, };',
@@ -338,7 +303,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'if (__dirname.startsWith("/project/src/")) {}',
@@ -368,7 +332,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'if (__filename.endsWith(".js")) {}',
@@ -397,33 +360,28 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'require',
+  });
+});
+
+describe('require', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'import {createRequire} from \'module\';\nconst require = createRequire(import.meta.url);\nconst foo = require("foo");',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const require = function require(require, id) {\n\treturn require(id);\n}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const require = class A {\n\trequire(require) {\n\t\treturn require(id);\n\t}\n}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -448,7 +406,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "require('foo');",
@@ -471,7 +428,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require( (("foo")) );',
@@ -494,7 +450,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '((require))("foo");',
@@ -517,7 +472,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( require("foo") ));',
@@ -540,7 +494,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo=require("foo");',
@@ -563,7 +516,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require.resolve("foo");',
@@ -580,7 +532,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo\n\t=\n\trequire("foo");',
@@ -603,7 +554,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo");',
@@ -626,7 +576,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require( (("foo")) );',
@@ -649,7 +598,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = ((require))("foo");',
@@ -672,7 +620,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = (( require("foo") ));',
@@ -695,7 +642,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo}=require("foo");',
@@ -718,7 +664,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo}\n\t=\n\trequire("foo");',
@@ -741,7 +686,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require("foo");',
@@ -764,7 +708,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require( (("foo")) );',
@@ -787,7 +730,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = ((require))("foo");',
@@ -810,7 +752,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = (( require("foo") ));',
@@ -833,7 +774,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo}=require("foo");',
@@ -856,7 +796,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo}\n\t=\n\trequire("foo");',
@@ -879,7 +818,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = require("foo");',
@@ -902,7 +840,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = require( (("foo")) );',
@@ -925,7 +862,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = ((require))("foo");',
@@ -948,7 +884,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = (( require("foo") ));',
@@ -971,7 +906,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar}=require("foo");',
@@ -994,7 +928,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar}\n\t=\n\trequire("foo");',
@@ -1017,7 +950,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = require("foo");',
@@ -1040,7 +972,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = require( (("foo")) );',
@@ -1063,7 +994,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = ((require))("foo");',
@@ -1086,7 +1016,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = (( require("foo") ));',
@@ -1109,7 +1038,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz}=require("foo");',
@@ -1133,7 +1061,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {\n\ta   :foo,\n\tb:   bar,\n\tdefault   :   baz,\n}\n\t=\n\trequire("foo");',
@@ -1157,7 +1084,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require("foo");',
@@ -1181,7 +1107,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require( (("foo")) );',
@@ -1205,7 +1130,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = ((require))("foo");',
@@ -1229,7 +1153,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = (( require("foo") ));',
@@ -1253,7 +1176,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {} = require("foo");',
@@ -1276,7 +1198,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const{   }=require("foo");',
@@ -1299,7 +1220,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const r = require;\nconst foo = r("foo");',
@@ -1316,7 +1236,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'new require("foo")',
@@ -1333,7 +1252,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require("foo", extraArgument)',
@@ -1350,7 +1268,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const a = require()',
@@ -1367,7 +1284,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require(..."foo")',
@@ -1384,7 +1300,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require("../" + "file.js")',
@@ -1401,7 +1316,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require(file)',
@@ -1418,7 +1332,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'a = require("foo")',
@@ -1435,7 +1348,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'function a(a = require("foo")) {}',
@@ -1452,7 +1364,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'let foo = require("foo");',
@@ -1469,7 +1380,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo"), bar = require("bar");',
@@ -1495,7 +1405,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {[foo]: foo} = require("foo");',
@@ -1512,7 +1421,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {["foo"]: foo} = require("foo");',
@@ -1529,7 +1437,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'if (foo) require("foo");',
@@ -1546,7 +1453,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require`foo`;',
@@ -1563,7 +1469,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'function loadModule() {\n\treturn require("foo");\n}',
@@ -1580,7 +1485,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'function loadModule() {\n\tconst foo = require("foo");\n\treturn foo;\n}',
@@ -1597,7 +1501,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo"), bar = 1;',
@@ -1614,54 +1517,43 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'exports and module',
+  });
+});
+
+describe('exports and module', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'function exports(exports) {}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'function module(module) {}',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const exports = foo;\nexports.bar = bar;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const exports = 1;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const module = foo;\nmodule.exports = bar;\nmodule.exports.bar = bar;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const module = 1;',
         filename: 'upstream.js',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -1686,7 +1578,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports = foo;',
@@ -1709,7 +1600,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( ((exports)) = ((foo)) ));',
@@ -1732,7 +1622,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( ((module.exports)) = ((foo)) ));',
@@ -1755,7 +1644,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;exports.foo = foo;',
@@ -1778,7 +1666,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;module.exports.foo = foo;',
@@ -1801,7 +1688,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports["foo"] = foo;',
@@ -1818,7 +1704,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports["foo"] = foo;',
@@ -1835,7 +1720,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = exports;',
@@ -1852,7 +1736,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = exports.foo;',
@@ -1869,7 +1752,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.exports;',
@@ -1886,7 +1768,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.exports.foo;',
@@ -1903,7 +1784,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module["exports"] = foo;',
@@ -1920,7 +1800,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module[exports] = foo;',
@@ -1946,7 +1825,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports.foo.bar = foo;',
@@ -1963,7 +1841,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;exports.default = foo;',
@@ -1986,7 +1863,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;module.exports.default = foo;',
@@ -2009,7 +1885,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports.foo.bar = foo;',
@@ -2026,7 +1901,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'exports = 1;',
@@ -2049,7 +1923,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports.foo = [];',
@@ -2066,7 +1939,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports = function() {};',
@@ -2089,7 +1961,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports.foo = foo || bar;',
@@ -2106,7 +1977,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'exports += foo;',
@@ -2123,7 +1993,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.children',
@@ -2140,7 +2009,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const parentModule = module.parent',
@@ -2157,7 +2025,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'function foo() {\n\texports.foo = foo;\n\tmodule.exports.foo = foo;\n}',
@@ -2183,54 +2050,43 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'TypeScript',
+  });
+});
+
+describe('TypeScript', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'type module = number[];',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const module = 1; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type module = number[]; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type Data = { [module in keyof string]: number; };',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type ModuleRegistry = { [exports: string]: string };',
         filename: 'upstream.ts',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -2249,7 +2105,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo}: Foo = require("foo");',
@@ -2266,12 +2121,13 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'JSON modules',
+  });
+});
+
+describe('JSON modules', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
@@ -2295,7 +2151,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("./a.json");',
@@ -2318,7 +2173,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "const data = (require(('./a.json')));",
@@ -2341,7 +2195,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require("./a.json");',
@@ -2358,26 +2211,24 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: '.cjs files',
+  });
+});
+
+describe('.cjs files', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: '__dirname',
         filename: 'foo.cjs',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: '__dirname',
         filename: 'foo.cjS',
+        skip: 'The native compiler excludes mixed-case .cjS filenames before rule execution; Go extras cover the suffix behavior.',
         languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
@@ -2407,7 +2258,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("lodash")',
@@ -2430,7 +2280,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("lodash")',
@@ -2453,12 +2302,13 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Comments in named exports',
+  });
+});
+
+describe('Comments in named exports', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
@@ -2476,7 +2326,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;\nexports./* c */foo = foo;',
@@ -2493,7 +2342,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;\nexports.foo /* c */ = foo;',
@@ -2510,7 +2358,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;\nmodule.exports /* c */ .foo = foo;',
@@ -2527,12 +2374,13 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Constructor callees',
+  });
+});
+
+describe('Constructor callees', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
@@ -2566,7 +2414,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new (__filename).constructor("text");',
@@ -2599,7 +2446,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __filename.constructor("text");',
@@ -2632,7 +2478,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __filename!.constructor("text");',
@@ -2665,7 +2510,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname.constructor("text");',
@@ -2698,7 +2542,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new (__dirname).constructor("text");',
@@ -2731,7 +2574,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname.constructor("text");',
@@ -2764,7 +2606,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname!.constructor("text");',
@@ -2797,12 +2638,13 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Static template module sources',
+  });
+});
+
+describe('Static template module sources', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
@@ -2826,7 +2668,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require(`file`);',
@@ -2849,7 +2690,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./file.json`);',
@@ -2872,7 +2712,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: bar} = require(`file`);',
@@ -2895,7 +2734,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "const file = require(`./it's.js`);",
@@ -2918,7 +2756,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./line\nfile.js`);',
@@ -2941,7 +2778,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./back\\`tick.js`);',
@@ -2964,7 +2800,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./fi\\u006ce`);',
@@ -2987,7 +2822,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(/* keep */ (`file`));',
@@ -3010,7 +2844,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`${name}`);',
@@ -3027,7 +2860,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(tag`file`);',
@@ -3044,7 +2876,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const file: Foo = require(`file`);',
@@ -3061,89 +2892,68 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Documentation examples',
+  });
+});
+
+describe('Documentation examples', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'const __dirname = import.meta.dirname;\nconst __filename = import.meta.filename;',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "import {fileURLToPath} from 'node:url';\nimport path from 'node:path';\nconst __filename = fileURLToPath(import.meta.url);\nconst __dirname = path.dirname(fileURLToPath(import.meta.url));",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "import {fileURLToPath} from 'node:url';\nconst foo = fileURLToPath(new URL('foo.js', import.meta.url));",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "const foo = new URL('foo.js', import.meta.url);",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: 'function run() {\n\tif (foo) {\n\t\treturn;\n\t}\n}\nrun();',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "const file = path.join(import.meta.dirname, 'foo.js');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "const file = path.join(path.dirname(url.fileURLToPath(import.meta.url)), 'foo.js');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "const content = fs.readFileSync(import.meta.filename, 'utf8');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: "import {fromPairs} from 'lodash-es';",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: 'export default foo;',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
       {
         code: 'const foo = 1;export {foo};',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
-        errors: [],
       },
     ],
     invalid: [
@@ -3151,7 +2961,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: "'use strict';",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -3176,7 +2985,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         languageOptions: {
           sourceType: 'script',
         },
-        output: null,
         errors: [
           {
             messageId: 'error/global-return',
@@ -3193,7 +3001,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: "const file = path.join(__dirname, 'foo.js');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3223,7 +3030,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: "const content = fs.readFileSync(__filename, 'utf8');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3253,7 +3059,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: "const {fromPairs} = require('lodash');",
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3276,7 +3081,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: 'module.exports = foo;',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3299,7 +3103,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         code: 'exports.foo = foo;',
         filename: 'upstream.js',
         languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3319,90 +3122,5 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         ],
       },
     ],
-  },
-];
-
-for (const group of groups) {
-  describe(group.name, () => {
-    test('valid', async () => {
-      for (const item of group.valid) {
-        // The compiler's file selection does not accept this extension. The
-        // case remains here and Go extras check the rule's suffix handling.
-        if (item.filename.endsWith('.cjS')) continue;
-        const result = await run(item);
-        assert.deepEqual(result.diagnostics, [], item.code);
-      }
-    });
-    test('diagnostics and edits', async () => {
-      for (const item of group.invalid) {
-        const result = await run(item);
-        assert.equal(result.diagnostics.length, item.errors.length, item.code);
-        for (const [index, diagnostic] of result.diagnostics.entries()) {
-          const expected = item.errors[index];
-          assert.equal(diagnostic.ruleName, 'unicorn/prefer-module', item.code);
-          assert.equal(diagnostic.messageId, expected.messageId, item.code);
-          assert.equal(diagnostic.message, expected.message, item.code);
-          assert.equal(diagnostic.severity, 'error', item.code);
-          assert.deepEqual(
-            diagnostic.range,
-            {
-              start: { line: expected.line, column: expected.column },
-              end: { line: expected.endLine, column: expected.endColumn },
-            },
-            item.code,
-          );
-          assert.deepEqual(
-            (diagnostic.suggestions ?? []).map((s) => ({
-              messageId: s.messageId,
-              desc: s.message,
-              output: apply(item.code, s.fixes ?? []),
-            })),
-            expected.suggestions,
-            item.code,
-          );
-        }
-        const fixes = result.diagnostics.flatMap((d) => d.fixes ?? []);
-        assert.equal(
-          fixes.length ? apply(item.code, fixes) : null,
-          item.output,
-          item.code,
-        );
-      }
-    });
   });
-}
-
-it.skip('mixed-case foo.cjS is excluded by compiler file selection', () => {});
-
-async function run(item: Case) {
-  const filename = path.resolve(import.meta.dirname, item.filename);
-  const result = await lint({
-    config: [
-      {
-        plugins: ['unicorn'],
-        languageOptions: {
-          ...item.languageOptions,
-          globals: { ...globals, ...item.languageOptions?.globals },
-          parserOptions: { project: false, projectService: false },
-        },
-        rules: { 'unicorn/prefer-module': 'error' },
-      },
-    ],
-    configDirectory: import.meta.dirname,
-    workingDirectory: process.cwd(),
-    fileContents: { [filename]: item.code },
-  });
-  assert.equal(result.fileCount, 1, item.code);
-  assert.equal(result.ruleCount, 1, item.code);
-  return result;
-}
-
-function apply(
-  code: string,
-  fixes: { startPos: number; endPos: number; text: string }[],
-) {
-  for (const fix of [...fixes].sort((a, b) => b.startPos - a.startPos)) {
-    code = code.slice(0, fix.startPos) + fix.text + code.slice(fix.endPos);
-  }
-  return code;
-}
+});

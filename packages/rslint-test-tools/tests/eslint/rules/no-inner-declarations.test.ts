@@ -1,277 +1,924 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
-
-function valid(code: string, options?: unknown[], ecmaVersion = 5) {
-  return {
-    code,
-    ...(options ? { options: options as any } : {}),
-    languageOptions: { ecmaVersion, sourceType: 'script' } as any,
-  };
-}
-
-function error(
-  line: number,
-  column: number,
-  endLine: number,
-  endColumn: number,
-) {
-  return { messageId: 'moveDeclToRoot', line, column, endLine, endColumn };
-}
-
-function invalid(
-  code: string,
-  options: unknown[] | undefined,
-  ecmaVersion: number,
-  ...errors: ReturnType<typeof error>[]
-) {
-  return {
-    code,
-    ...(options ? { options: options as any } : {}),
-    languageOptions: { ecmaVersion, sourceType: 'script' } as any,
-    errors,
-  };
-}
-
-// Mirrors the complete ESLint v10.8.1 upstream RuleTester suite. Native-only
-// edge shapes and branch lock-ins belong in the Go extras suite.
-ruleTester.run('no-inner-declarations', {
+// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
+new RuleTester(config).run('no-inner-declarations', {
   valid: [
-    valid('function doSomething() { }'),
-    valid('function doSomething() { function somethingElse() { } }'),
-    valid('(function() { function doSomething() { } }());'),
-    valid('if (test) { var fn = function() { }; }'),
-    valid('if (test) { var fn = function expr() { }; }'),
-    valid('function decl() { var fn = function expr() { }; }'),
-    valid('function decl(arg) { var fn; if (arg) { fn = function() { }; } }'),
-    valid(
-      'var x = {doSomething() {function doSomethingElse() {}}}',
-      undefined,
-      2015,
-    ),
-    valid(
-      'function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }',
-      undefined,
-      2015,
-    ),
-    valid(
-      'function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }',
-    ),
-    valid('if (test) { var foo; }'),
-    valid('if (test) { let x = 1; }', ['both'], 2015),
-    valid('if (test) { const x = 1; }', ['both'], 2015),
-    valid('if (test) { using x = 1; }', ['both'], 2026),
-    valid('if (test) { await using x = 1; }', ['both'], 2026),
-    valid('function doSomething() { while (test) { var foo; } }'),
-    valid('var foo;', ['both']),
-    valid('var foo = 42;', ['both']),
-    valid('function doSomething() { var foo; }', ['both']),
-    valid('(function() { var foo; }());', ['both']),
-    valid('foo(() => { function bar() { } });', undefined, 2015),
-    valid('var fn = () => {var foo;}', ['both'], 2015),
-    valid('var x = {doSomething() {var foo;}}', ['both'], 2015),
-    valid('export var foo;', ['both'], 2015),
-    valid('export function bar() {}', ['both'], 2015),
-    valid('export default function baz() {}', ['both'], 2015),
-    valid('exports.foo = () => {}', ['both'], 2015),
-    valid('exports.foo = function(){}', ['both']),
-    valid('module.exports = function foo(){}', ['both']),
-    valid('class C { method() { function foo() {} } }', ['both'], 2022),
-    valid('class C { method() { var x; } }', ['both'], 2022),
-    valid('class C { static { function foo() {} } }', ['both'], 2022),
-    valid('class C { static { var x; } }', ['both'], 2022),
-    valid(
-      "'use strict'\n if (test) { function doSomething() { } }",
-      ['functions', { blockScopedFunctions: 'allow' }],
-      2022,
-    ),
-    valid(
-      "'use strict'\n if (test) { function doSomething() { } }",
-      ['functions'],
-      2022,
-    ),
-    valid(
-      "function foo() {'use strict'\n if (test) { function doSomething() { } } }",
-      ['functions', { blockScopedFunctions: 'allow' }],
-      2015,
-    ),
     {
-      ...valid(
-        'function foo() { { function bar() { } } }',
-        ['functions', { blockScopedFunctions: 'allow' }],
-        2022,
-      ),
-      // SKIP: rslint does not support an authored sourceType: module override
-      // for native rules, and this upstream case has no module syntax.
-      skip: true,
+      code: 'function doSomething() { }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
     },
-    valid(
-      'class C { method() { if(test) { function somethingElse() { } } } }',
-      ['functions', { blockScopedFunctions: 'allow' }],
-      2022,
-    ),
-    valid(
-      'const C = class { method() { if(test) { function somethingElse() { } } } }',
-      ['functions', { blockScopedFunctions: 'allow' }],
-      2022,
-    ),
+    {
+      code: 'function doSomething() { function somethingElse() { } }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: '(function() { function doSomething() { } }());',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { var fn = function() { }; }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { var fn = function expr() { }; }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function decl() { var fn = function expr() { }; }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function decl(arg) { var fn; if (arg) { fn = function() { }; } }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'var x = {doSomething() {function doSomethingElse() {}}}',
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }',
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { var foo; }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { let x = 1; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { const x = 1; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { using x = 1; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2026,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'if (test) { await using x = 1; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2026,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function doSomething() { while (test) { var foo; } }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'var foo;',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'var foo = 42;',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function doSomething() { var foo; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: '(function() { var foo; }());',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'foo(() => { function bar() { } });',
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'var fn = () => {var foo;}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'var x = {doSomething() {var foo;}}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'export var foo;',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'export function bar() {}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'export default function baz() {}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'exports.foo = () => {}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'exports.foo = function(){}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'module.exports = function foo(){}',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'class C { method() { function foo() {} } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'class C { method() { var x; } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'class C { static { function foo() {} } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'class C { static { var x; } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: `'use strict'
+ if (test) { function doSomething() { } }`,
+      options: [
+        'functions',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: `'use strict'
+ if (test) { function doSomething() { } }`,
+      options: ['functions'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: `function foo() {'use strict'
+ if (test) { function doSomething() { } } }`,
+      options: [
+        'functions',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'function foo() { { function bar() { } } }',
+      options: [
+        'functions',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+      },
+    },
+    {
+      code: 'class C { method() { if(test) { function somethingElse() { } } } }',
+      options: [
+        'functions',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
+    {
+      code: 'const C = class { method() { if(test) { function somethingElse() { } } } }',
+      options: [
+        'functions',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+    },
   ],
   invalid: [
-    invalid(
-      'if (test) { function doSomething() { } }',
-      ['both'],
-      5,
-      error(1, 13, 1, 39),
-    ),
-    invalid('if (foo) var a; ', ['both'], 5, error(1, 10, 1, 16)),
-    invalid(
-      'if (foo) /* some comments */ var a; ',
-      ['both'],
-      5,
-      error(1, 30, 1, 36),
-    ),
-    invalid(
-      'if (foo){ function f(){ if(bar){ var a; } } }',
-      ['both'],
-      5,
-      error(1, 11, 1, 44),
-      error(1, 34, 1, 40),
-    ),
-    invalid(
-      'if (foo) function f(){ if(bar) var a; }',
-      ['both'],
-      5,
-      error(1, 10, 1, 40),
-      error(1, 32, 1, 38),
-    ),
-    invalid(
-      'if (foo) { var fn = function(){} } ',
-      ['both'],
-      5,
-      error(1, 12, 1, 33),
-    ),
-    invalid('if (foo)  function f(){} ', undefined, 5, error(1, 11, 1, 25)),
-    invalid(
-      'function bar() { if (foo) function f(){}; }',
-      ['both'],
-      5,
-      error(1, 27, 1, 41),
-    ),
-    invalid(
-      'function bar() { if (foo) var a; }',
-      ['both'],
-      5,
-      error(1, 27, 1, 33),
-    ),
-    invalid('if (foo) { var a; }', ['both'], 5, error(1, 12, 1, 18)),
-    invalid(
-      'function doSomething() { do { function somethingElse() { } } while (test); }',
-      undefined,
-      5,
-      error(1, 31, 1, 59),
-    ),
-    invalid(
-      '(function() { if (test) { function doSomething() { } } }());',
-      undefined,
-      5,
-      error(1, 27, 1, 53),
-    ),
-    invalid('while (test) { var foo; }', ['both'], 5, error(1, 16, 1, 24)),
-    invalid(
-      'function doSomething() { if (test) { var foo = 42; } }',
-      ['both'],
-      5,
-      error(1, 38, 1, 51),
-    ),
-    invalid(
-      '(function() { if (test) { var foo; } }());',
-      ['both'],
-      5,
-      error(1, 27, 1, 35),
-    ),
-    invalid(
-      'const doSomething = () => { if (test) { var foo = 42; } }',
-      ['both'],
-      2015,
-      error(1, 41, 1, 54),
-    ),
-    invalid(
-      'class C { method() { if(test) { var foo; } } }',
-      ['both'],
-      2015,
-      error(1, 33, 1, 41),
-    ),
-    invalid(
-      'class C { static { if (test) { var foo; } } }',
-      ['both'],
-      2022,
-      error(1, 32, 1, 40),
-    ),
-    invalid(
-      'class C { static { if (test) { function foo() {} } } }',
-      ['both', { blockScopedFunctions: 'disallow' }],
-      2022,
-      error(1, 32, 1, 49),
-    ),
-    invalid(
-      'class C { static { if (test) { if (anotherTest) { var foo; } } } }',
-      ['both'],
-      2022,
-      error(1, 51, 1, 59),
-    ),
-    invalid(
-      'if (test) { function doSomething() { } }',
-      ['both', { blockScopedFunctions: 'allow' }],
-      5,
-      error(1, 13, 1, 39),
-    ),
-    invalid(
-      'if (test) { function doSomething() { } }',
-      ['both', { blockScopedFunctions: 'disallow' }],
-      2022,
-      error(1, 13, 1, 39),
-    ),
-    invalid(
-      "'use strict'\n if (test) { function doSomething() { } }",
-      ['both', { blockScopedFunctions: 'disallow' }],
-      2022,
-      error(2, 14, 2, 40),
-    ),
-    invalid(
-      "'use strict'\n if (test) { function doSomething() { } }",
-      ['both', { blockScopedFunctions: 'disallow' }],
-      5,
-      error(2, 14, 2, 40),
-    ),
-    invalid(
-      "'use strict'\n if (test) { function doSomething() { } }",
-      ['both', { blockScopedFunctions: 'allow' }],
-      5,
-      error(2, 14, 2, 40),
-    ),
-    invalid(
-      "function foo() {'use strict'\n { function bar() { } } }",
-      ['both', { blockScopedFunctions: 'disallow' }],
-      2022,
-      error(2, 4, 2, 22),
-    ),
-    invalid(
-      "function foo() {'use strict'\n { function bar() { } } }",
-      ['both', { blockScopedFunctions: 'disallow' }],
-      5,
-      error(2, 4, 2, 22),
-    ),
-    invalid(
-      "function doSomething() { 'use strict'\n do { function somethingElse() { } } while (test); }",
-      ['both', { blockScopedFunctions: 'disallow' }],
-      5,
-      error(2, 7, 2, 35),
-    ),
-    invalid(
-      "{ function foo () {'use strict'\n console.log('foo called'); } }",
-      ['both'],
-      2022,
-      error(1, 3, 2, 30),
-    ),
+    {
+      code: 'if (test) { function doSomething() { } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
+    },
+    {
+      code: 'if (foo) var a; ',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to program root.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: 'if (foo) /* some comments */ var a; ',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to program root.',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
+    },
+    {
+      code: 'if (foo){ function f(){ if(bar){ var a; } } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 44,
+        },
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: 'if (foo) function f(){ if(bar) var a; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 40,
+        },
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
+    },
+    {
+      code: 'if (foo) { var fn = function(){} } ',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to program root.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: 'if (foo)  function f(){} ',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: 'function bar() { if (foo) function f(){}; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
+    },
+    {
+      code: 'function bar() { if (foo) var a; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: 'if (foo) { var a; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to program root.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: 'function doSomething() { do { function somethingElse() { } } while (test); }',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
+    },
+    {
+      code: '(function() { if (test) { function doSomething() { } } }());',
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: 'while (test) { var foo; }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to program root.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: 'function doSomething() { if (test) { var foo = 42; } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 38,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      code: '(function() { if (test) { var foo; } }());',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: 'const doSomething = () => { if (test) { var foo = 42; } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
+    },
+    {
+      code: 'class C { method() { if(test) { var foo; } } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2015,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to function body root.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { if (test) { var foo; } } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to class static block body root.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { if (test) { function foo() {} } } }',
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to class static block body root.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { if (test) { if (anotherTest) { var foo; } } } }',
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move variable declaration to class static block body root.',
+          line: 1,
+          column: 51,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
+    },
+    {
+      code: 'if (test) { function doSomething() { } }',
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
+    },
+    {
+      code: 'if (test) { function doSomething() { } }',
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
+    },
+    {
+      code: `'use strict'
+ if (test) { function doSomething() { } }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: `'use strict'
+ if (test) { function doSomething() { } }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: `'use strict'
+ if (test) { function doSomething() { } }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'allow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      code: `function foo() {'use strict'
+ { function bar() { } } }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 2,
+          column: 4,
+          endLine: 2,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: `function foo() {'use strict'
+ { function bar() { } } }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 2,
+          column: 4,
+          endLine: 2,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: `function doSomething() { 'use strict'
+ do { function somethingElse() { } } while (test); }`,
+      options: [
+        'both',
+        {
+          blockScopedFunctions: 'disallow',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 5,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to function body root.',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: `{ function foo () {'use strict'
+ console.log('foo called'); } }`,
+      options: ['both'],
+      languageOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'script',
+      },
+      errors: [
+        {
+          messageId: 'moveDeclToRoot',
+          message: 'Move function declaration to program root.',
+          line: 1,
+          column: 3,
+          endLine: 2,
+          endColumn: 30,
+        },
+      ],
+    },
   ],
 });

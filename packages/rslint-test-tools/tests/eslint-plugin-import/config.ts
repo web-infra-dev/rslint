@@ -1,0 +1,11 @@
+import type { RuleTesterConfig } from '@rslint/rule-tester';
+
+export const config: RuleTesterConfig = {
+  plugin: 'import',
+  filename: 'src/virtual.ts',
+  fixtureFiles: {
+    'tsconfig.json':
+      '{"compilerOptions":{"jsx":"preserve","target":"es5","module":"commonjs","strict":true,"esModuleInterop":true,"baseUrl":".","paths":{"@/*":["src/order-internal-modules/*"],"buffer":["src/order-internal-modules/api/service.ts"]},"lib":["es2015","es2017","esnext"],"experimentalDecorators":true},"include":["src/virtual.tsx","src/virtual.ts"]}',
+  },
+  languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+};
