@@ -1,6 +1,7 @@
 package unicornutil
 
 import (
+	"maps"
 	"math/big"
 	"slices"
 
@@ -118,7 +119,22 @@ func bigIntFromSyntax(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.N
 	return false
 }
 
+type bigIntAliasInstance struct {
+	declaration *ast.Node
+	arguments   string
+}
+
+type bigIntAnnotationWalk struct {
+	ctx       *rule.RuleContext
+	completed map[bigIntAliasInstance]bigIntAnnotationClass
+}
+
 func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bigIntAnnotationClass {
+	walk := bigIntAnnotationWalk{ctx: ctx}
+	return walk.classify(annotation, bindings)
+}
+
+func (walk *bigIntAnnotationWalk) classify(annotation *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bigIntAnnotationClass {
 	if annotation == nil {
 		return annotationOther
 	}
@@ -139,32 +155,9 @@ func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindi
 		}
 		return annotationOther
 	case ast.KindJSDocNullableType, ast.KindJSDocNonNullableType, ast.KindJSDocOptionalType:
-		return classifyBigIntAnnotation(ctx, annotation.Type(), bindings)
+		return walk.classify(annotation.Type(), bindings)
 	case ast.KindTypeReference:
-		symbol := ctx.Refs.ResolveInFileWithMeaning(annotation.AsTypeReferenceNode().TypeName, ast.SymbolFlagsType)
-		if symbol == nil {
-			return annotationOther
-		}
-		declaration := ast.GetDeclarationOfKind(symbol, ast.KindTypeAliasDeclaration)
-		var referencedType *ast.Node
-		if declaration != nil {
-			referencedType = declaration.Type()
-		} else {
-			declaration = ast.GetDeclarationOfKind(symbol, ast.KindTypeParameter)
-			// A generic alias's constraint alone cannot determine its type
-			// argument. Follow constraints from the enclosing scope.
-			if declaration == nil || ast.IsTypeAliasDeclaration(declaration.Parent) {
-				return annotationOther
-			}
-			referencedType = declaration.AsTypeParameterDeclaration().Constraint
-		}
-		if result, ok := bindings[declaration]; ok {
-			return result
-		}
-		bindings[declaration] = annotationOther
-		result := classifyBigIntAnnotation(ctx, referencedType, bindings)
-		bindings[declaration] = result
-		return result
+		return walk.classifyReference(annotation, bindings)
 	case ast.KindUnionType:
 		parts = annotation.AsUnionTypeNode().Types.Nodes
 	case ast.KindIntersectionType:
@@ -177,7 +170,7 @@ func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindi
 	// An unknown member contributes no evidence and is neutral in an intersection.
 	result := annotationOther
 	for _, part := range parts {
-		switch classifyBigIntAnnotation(ctx, part, bindings) {
+		switch walk.classify(part, bindings) {
 		case annotationAny:
 			return annotationAny
 		case annotationBigInt:
@@ -187,17 +180,83 @@ func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindi
 	return result
 }
 
+func (walk *bigIntAnnotationWalk) classifyReference(reference *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bigIntAnnotationClass {
+	symbol := walk.ctx.Refs.ResolveInFileWithMeaning(reference.AsTypeReferenceNode().TypeName, ast.SymbolFlagsType)
+	if symbol == nil {
+		return annotationOther
+	}
+	declaration := ast.GetDeclarationOfKind(symbol, ast.KindTypeAliasDeclaration)
+	var referencedType *ast.Node
+	var parameters []*ast.Node
+	if declaration != nil {
+		referencedType = declaration.Type()
+		parameters = declaration.TypeParameters()
+	} else {
+		declaration = ast.GetDeclarationOfKind(symbol, ast.KindTypeParameter)
+		if declaration == nil {
+			return annotationOther
+		}
+		referencedType = declaration.AsTypeParameterDeclaration().Constraint
+	}
+	if result, ok := bindings[declaration]; ok {
+		return result
+	}
+	// A generic alias's unbound parameter has no concrete type argument.
+	if declaration.Kind == ast.KindTypeParameter && ast.IsTypeAliasDeclaration(declaration.Parent) {
+		return annotationOther
+	}
+
+	if len(parameters) != 0 {
+		// Keep each instantiation separate. Supplied arguments use the caller's
+		// bindings, while defaults can reference earlier parameters of this alias.
+		arguments := reference.TypeArguments()
+		classes := make([]byte, min(len(arguments), len(parameters)))
+		for i := range classes {
+			classes[i] = byte(walk.classify(arguments[i], bindings))
+		}
+		key := bigIntAliasInstance{declaration: declaration, arguments: string(classes)}
+		if result, ok := walk.completed[key]; ok {
+			return result
+		}
+		instance := maps.Clone(bindings)
+		instance[declaration] = annotationOther
+		for i, parameter := range parameters {
+			if i < len(classes) {
+				instance[parameter] = bigIntAnnotationClass(classes[i])
+			} else {
+				instance[parameter] = walk.classify(parameter.AsTypeParameterDeclaration().DefaultType, instance)
+			}
+		}
+		result := walk.classify(referencedType, instance)
+		if walk.completed == nil {
+			walk.completed = make(map[bigIntAliasInstance]bigIntAnnotationClass)
+		}
+		walk.completed[key] = result
+		return result
+	}
+	bindings[declaration] = annotationOther
+	result := walk.classify(referencedType, bindings)
+	bindings[declaration] = result
+	return result
+}
+
+func isGlobalBigInt(ctx *rule.RuleContext, node *ast.Node) bool {
+	node = utils.ESTreeRuntimeExpression(node)
+	return node != nil && ast.IsIdentifier(node) && node.Text() == "BigInt" &&
+		ctx.Globals.Access("BigInt").IsDeclared() && IsGlobalReference(*ctx, node)
+}
+
 func bigIntCall(ctx *rule.RuleContext, node *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bool {
 	if ast.IsOptionalChain(node) {
 		return false
 	}
 	callee := utils.ESTreeCallCallee(node.Expression())
-	if NodeMatchesPath(callee, "BigInt") {
+	if isGlobalBigInt(ctx, callee) {
 		return true
 	}
 	if call, ok := MatchDotMethodCall(node, DotMethodCallOptions{
 		Methods: []string{"asIntN", "asUintN"},
-	}); ok && NodeMatchesPath(call.Object, "BigInt") {
+	}); ok && isGlobalBigInt(ctx, call.Object) {
 		return true
 	}
 	symbol := ctx.Refs.ResolveInFile(callee)

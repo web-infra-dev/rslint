@@ -44,7 +44,11 @@ This rule has no options.
 - Rslint skips additional cases where an operand is known to be a BigInt. For
   example, it skips a check on a property inferred to be `bigint` from
   `const state = { offset: 1n }` or a value cast with JSDoc
-  `/** @type {bigint} */`.
+  `/** @type {bigint} */`. It also recognizes generic aliases such as
+  `Id<bigint>` with `type Id<T> = T` in files without a TypeScript project.
+- Rslint can report a manual absolute value for the result of a local function
+  named `BigInt` that returns a number, such as
+  `function BigInt(value) { return Number(value); }`.
 
 ## Original documentation
 
