@@ -596,6 +596,41 @@ test('line comments support block disable and enable in both collection modes', 
   }
 });
 
+test('line suppression expires before the next target line starts', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const reversed of [false, true]) {
+      const next = `/* ${prefix}-disable-next-line no-debugger, stub/probe */`;
+      const same = `/* ${prefix}-disable-line no-debugger, stub/probe */`;
+      const source =
+        (reversed ? `${same} ${next}` : `${next} ${same}`) +
+        '\ndebugger;\ndebugger;';
+      const loaded = makeReportingPlugin((ctx) => {
+        for (const line of [2, 3])
+          ctx.report({ loc: { line, column: 0 }, message: 'probe' });
+      });
+      for (const collectDirectiveUsage of [false, true]) {
+        const result = lintFile(
+          { ...defaultRequest(source), collectDirectiveUsage },
+          loaded,
+        );
+        expect(result.parseError).toBeUndefined();
+        expect(result.diagnostics).toHaveLength(1);
+        expect(result.diagnostics[0].startPos).toBe(
+          source.lastIndexOf('debugger;'),
+        );
+        expect(result.usedDisableDirectives).toEqual(
+          collectDirectiveUsage
+            ? {
+                rules: ['stub/probe'],
+                entries: [[0, reversed ? same.length + 1 : 0, 0]],
+              }
+            : undefined,
+        );
+      }
+    }
+  }
+});
+
 test('usage summary distinguishes partial, wildcard and repeated directives', () => {
   for (const prefix of ['eslint', 'rslint']) {
     for (const source of [

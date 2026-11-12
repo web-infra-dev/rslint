@@ -15,7 +15,6 @@ type fileDirectives struct {
 	demand                                    rule.EditDemand
 	ignored                                   map[string]bool
 	mu                                        sync.Mutex
-	pendingPlugins                            int
 	nativeDone, pluginDone, failed, finalized bool
 }
 
@@ -29,10 +28,7 @@ func (f *fileDirectives) complete(native, failed bool, path string) []rule.RuleD
 	if native {
 		f.nativeDone = true
 	} else {
-		if f.pendingPlugins > 0 {
-			f.pendingPlugins--
-		}
-		f.pluginDone = f.pendingPlugins == 0
+		f.pluginDone = true
 	}
 	if !f.nativeDone || !f.pluginDone || f.finalized {
 		return nil

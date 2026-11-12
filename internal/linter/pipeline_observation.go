@@ -110,7 +110,6 @@ func prepareObservation(
 		input := &pluginWork.inputs[index]
 		input.directives = directivesByTarget[pluginWork.targetPathByWire[input.Path]]
 		if input.directives != nil {
-			input.directives.pendingPlugins++
 			input.directives.pluginDone = false
 		}
 		if input.SourceFile != nil {

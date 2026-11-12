@@ -674,6 +674,12 @@ func TestUnusedDisableDirectives(t *testing.T) {
 		{"partial first", "/* eslint-disable a, b -- reason */\nx();", "b", "/* eslint-disable b -- reason */\nx();", 1},
 		{"rule name substring", "/* eslint-disable bar, a -- reason */\nx();", "bar", "/* eslint-disable bar -- reason */\nx();", 1},
 		{"partial last", "/* eslint-disable a, b -- reason */\nx();", "a", "/* eslint-disable a -- reason */\nx();", 1},
+		{"whole LF", "/* eslint-disable a\n */\nx();", "", "\n\nx();", 1},
+		{"whole CRLF", "/* eslint-disable a\r\n */\nx();", "", "\r\n\nx();", 1},
+		{"partial first LF", "/* eslint-disable a,\nb */\nx();", "b", "/* eslint-disable \nb */\nx();", 1},
+		{"partial first CRLF", "/* eslint-disable a,\r\nb */\nx();", "b", "/* eslint-disable \r\nb */\nx();", 1},
+		{"partial last LF", "/* eslint-disable b\n, a */\nx();", "b", "/* eslint-disable b\n */\nx();", 1},
+		{"partial last CRLF", "/* eslint-disable b\r\n, a */\nx();", "b", "/* eslint-disable b\r\n */\nx();", 1},
 		{"no space partial first", "/* eslint-disable" + "a, b */\nx();", "b", "/* eslint-disable" + "b */\nx();", 1},
 		{"no space partial last", "/* eslint-disable" + "a, b */\nx();", "a", "/* eslint-disable" + "a */\nx();", 1},
 		{"rslint no space partial first", "/* rslint-disable" + "a, b */\nx();", "b", "/* rslint-disable" + "b */\nx();", 1},
@@ -989,8 +995,9 @@ func runDirectiveConformance(t *testing.T, corpus directivefixtures.Corpus) {
 									t.Fatalf("got %d fixes, want one", len(fixes))
 								}
 								fix := fixes[0]
-								if fix.Range.Pos() != directivefixtures.ByteOffset(t, source, want.Fix.Range[0]) || fix.Range.End() != directivefixtures.ByteOffset(t, source, want.Fix.Range[1]) || fix.Text != want.Fix.Text {
-									t.Errorf("fix: %+v, want %+v", fix, want.Fix)
+								wantFix := directivefixtures.LinePreservingFix(t, source, *want.Fix)
+								if fix.Range.Pos() != directivefixtures.ByteOffset(t, source, wantFix.Range[0]) || fix.Range.End() != directivefixtures.ByteOffset(t, source, wantFix.Range[1]) || fix.Text != wantFix.Text {
+									t.Errorf("fix: %+v, want %+v", fix, wantFix)
 								}
 							}
 						})

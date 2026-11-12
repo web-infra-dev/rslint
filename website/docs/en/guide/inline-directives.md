@@ -81,7 +81,9 @@ the boolean flag regardless of argument order. Pass
 
 Native rules and JavaScript plugin rules share usage tracking. A comment with
 multiple rule names can be partially unused. `--fix` removes unused entries,
-or replaces an entirely unused comment with a space to preserve token boundaries.
+or replaces an entirely unused comment with its line terminators (a space for a
+single-line comment). Both full and partial fixes preserve line terminators to
+avoid changing automatic semicolon insertion.
 Unused enable comments are reported when they do not undo a disable directive.
 The editor offers the same fixes through Quick Fix and Fix All.
 

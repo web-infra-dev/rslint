@@ -5,6 +5,8 @@ package directivefixtures
 import (
 	"encoding/json"
 	"os"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -13,6 +15,19 @@ const Revision = "bdd4b1da21dca81d50933edef0a015216059d877"
 type Fix struct {
 	Range [2]int `json:"range"`
 	Text  string `json:"text"`
+}
+
+var lineTerminators = regexp.MustCompile("\r\n|[\r\n\u2028\u2029]")
+
+// LinePreservingFix keeps the upstream range while adapting its replacement to
+// rslint's line-preservation policy. The checked-in upstream oracle stays intact.
+func LinePreservingFix(t *testing.T, source string, fix Fix) Fix {
+	t.Helper()
+	deleted := source[ByteOffset(t, source, fix.Range[0]):ByteOffset(t, source, fix.Range[1])]
+	if breaks := lineTerminators.FindAllString(deleted, -1); len(breaks) > 0 {
+		fix.Text = strings.Join(breaks, "")
+	}
+	return fix
 }
 
 type Diagnostic struct {

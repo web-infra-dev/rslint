@@ -361,10 +361,6 @@ fs.writeFileSync(
   path.join(directory, 'upstream.json'),
   JSON.stringify({ manifest, cases: normalized }, null, 2) + '\n',
 );
-fs.writeFileSync(
-  path.join(directory, 'original.json'),
-  JSON.stringify(cases, null, 2) + '\n',
-);
 console.log(
   JSON.stringify({
     upstreamTests: testCount,

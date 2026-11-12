@@ -134,7 +134,13 @@ export function applyDisableDirectives(options: Options): {
     }
   }
   blocks.sort((a, b) => a.pos - b.pos);
-  lines.sort((a, b) => a.pos - b.pos);
+  // Expire the previous line before applying suppression for the new line.
+  // Stable sorting still preserves source order among disables at that line.
+  lines.sort(
+    (a, b) =>
+      a.pos - b.pos ||
+      Number(a.type === 'disable') - Number(b.type === 'disable'),
+  );
   if (
     !used &&
     ((blocks.length === 0 && lines.length === 0) ||

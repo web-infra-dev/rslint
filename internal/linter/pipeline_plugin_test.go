@@ -780,22 +780,6 @@ func TestUnusedDirectiveCompletion(t *testing.T) {
 	}
 }
 
-func TestUnusedDirectiveMultiplePluginBatches(t *testing.T) {
-	source := pluginSyntax("/test.ts", "/* eslint-disable unused */\nx();")
-	manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
-	manager.Freeze(newTextSourceFile(source.Text()))
-	state := &fileDirectives{manager: manager, path: "/test.ts", severity: rule.SeverityWarning, pendingPlugins: 2}
-	if got := state.complete(true, false, "/test.ts"); len(got) != 0 {
-		t.Fatal("native work finalized pending plugins")
-	}
-	if got := state.complete(false, false, "/test.ts"); len(got) != 0 {
-		t.Fatal("first batch finalized file")
-	}
-	if got := state.complete(false, false, "/test.ts"); len(got) != 1 {
-		t.Fatalf("last batch produced %d reports", len(got))
-	}
-}
-
 func TestPipelineUnusedDirectiveUsageValidation(t *testing.T) {
 	name := "plugin/check"
 	for _, tc := range []struct {

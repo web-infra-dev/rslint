@@ -492,6 +492,19 @@ func TestUnusedDirectiveESLintFixOutputs(t *testing.T) {
 							if v.DisableFixes {
 								demand = 0
 							}
+							// Retain ordinary-rule oracle fixes, then adapt only the
+							// original directive replacements that delete line breaks.
+							expectedDiagnostics := append([]rule.RuleDiagnostic(nil), diagnostics...)
+							linePreserving := false
+							for _, diagnostic := range v.Diagnostics {
+								if diagnostic.Fix == nil {
+									continue
+								}
+								fix := directivefixtures.LinePreservingFix(t, source, *diagnostic.Fix)
+								linePreserving = linePreserving || fix.Text != diagnostic.Fix.Text
+								fixes := []rule.RuleFix{{Range: core.NewTextRange(directivefixtures.ByteOffset(t, source, fix.Range[0]), directivefixtures.ByteOffset(t, source, fix.Range[1])), Text: fix.Text}}
+								expectedDiagnostics = append(expectedDiagnostics, rule.RuleDiagnostic{FixesPtr: &fixes})
+							}
 							diagnostics = append(diagnostics, manager.UnusedDiagnostics("/conformance.js", rule.ParseSeverity(v.Severity), demand, ignored)...)
 							code := source
 							if tc.BOM {
@@ -506,6 +519,10 @@ func TestUnusedDirectiveESLintFixOutputs(t *testing.T) {
 							batched := v.BatchedFixed
 							if prefix == "rslint" {
 								batched = v.RslintBatchedFixed
+							}
+							if linePreserving {
+								want, _, _ = ApplyRuleFixes(code, expectedDiagnostics)
+								batched = nil
 							}
 							if fixed != want && (batched == nil || fixed != *batched) {
 								t.Fatalf("%s\nfixed: %q\nwant:  %q", tc.Name, fixed, want)

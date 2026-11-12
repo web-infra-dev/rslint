@@ -6,8 +6,8 @@ fixtures retain ESLint's MIT license in `LICENSE`.
 
 ## Coverage
 
-- `original.json` preserves all 89 directive-engine test inputs and results.
-  The importer executes the original assertions. `upstream.json` adapts 88
+- The importer executes all 89 original directive-engine assertions.
+  `upstream.json` adapts 88
   source-representable cases into 528 severity/fix-demand variants. The remaining
   internal invalid-type exception is recorded explicitly and asserted during import.
 - `source.json` captures 691 distinct source states from 486 passing upstream
@@ -28,8 +28,18 @@ fixtures retain ESLint's MIT license in `LICENSE`.
 ESLint rejects adjacent fix ranges in one pass; rslint already allows adjacent
 nonempty replacements. The importer records an alternative batched result only
 when it exactly matches a later ESLint output from the same upstream test.
-The Go fixer must match either that independently observed result or the exact
-ESLint single-pass output. Individual proposed fixes are always compared exactly.
+For edits without line terminators, the Go fixer must match either that
+independently observed result or the exact ESLint single-pass output.
+
+Unlike ESLint's recorded fixes, rslint preserves LF, CR, CRLF, U+2028, and U+2029
+when removing whole comments or individual rule entries. Removing a newline
+inside a block comment can change automatic semicolon insertion, for example
+turning `return /* eslint-disable no-debugger\n */ 42` from an implicit return
+of `undefined` into a return of `42`. The original fixtures remain unchanged.
+Go tests compare the original oracle ranges exactly, adapting only replacement
+text for ranges containing line terminators. Fixer tests replay those adapted
+oracle edits; CLI regressions independently assert the exact fixed text and
+evaluate the original and fixed programs to check their return values.
 
 These tests exercise directive behavior with upstream rule reports replayed as
 inputs. They do not port ESLint's parser errors, unknown-rule error emission,

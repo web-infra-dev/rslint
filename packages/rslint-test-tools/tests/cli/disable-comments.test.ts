@@ -2,6 +2,7 @@ import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import vm from 'node:vm';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
@@ -662,6 +663,18 @@ describe('unused disable directives', () => {
         rules: [''],
         fixed: ' \nconst x = 1;\n',
       },
+      {
+        name: 'previous line expiration precedes next-line suppression',
+        source: `/* ${prefix}-disable-next-line no-debugger, custom/check */ /* ${prefix}-disable-line no-debugger, custom/check */\ndebugger;\n`,
+        rules: [''],
+        fixed: `/* ${prefix}-disable-next-line no-debugger, custom/check */  \ndebugger;\n`,
+      },
+      {
+        name: 'line suppression expires before a later next-line directive',
+        source: `/* ${prefix}-disable-line no-debugger, custom/check */ /* ${prefix}-disable-next-line no-debugger, custom/check */\ndebugger;\n`,
+        rules: [''],
+        fixed: `  /* ${prefix}-disable-next-line no-debugger, custom/check */\ndebugger;\n`,
+      },
     ]) {
       test(`${prefix}: ${name}`, async () => {
         const tempDir = await createTempDir({
@@ -704,6 +717,56 @@ describe('unused disable directives', () => {
           await cleanupTempDir(tempDir);
         }
       });
+    }
+  }
+
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const [name, newline] of Object.entries({
+      LF: '\n',
+      CRLF: '\r\n',
+      CR: '\r',
+      LS: '\u2028',
+      PS: '\u2029',
+    })) {
+      for (const [kind, names, remaining] of [
+        ['whole', `no-console${newline}`, newline],
+        [
+          'first',
+          `no-console,${newline}no-debugger`,
+          `/* ${prefix}-disable ${newline}no-debugger */`,
+        ],
+        [
+          'last',
+          `no-debugger${newline}, no-console`,
+          `/* ${prefix}-disable no-debugger${newline} */`,
+        ],
+      ]) {
+        test(`preserves return behavior: ${prefix}/${name}/${kind}`, async () => {
+          const source = `function f() { return /* ${prefix}-disable ${names} */ 42; debugger; }\nf();`;
+          const expected = `function f() { return ${remaining} 42; debugger; }\nf();`;
+          expect(vm.runInNewContext(source)).toBeUndefined();
+          const tempDir = await createTempDir({
+            'test.ts': source,
+            'rslint.config.mjs': `export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error', 'no-debugger': 'error' } }];`,
+          });
+          try {
+            const result = await runRslint(
+              ['--report-unused-disable-directives', '--fix', 'test.ts'],
+              tempDir,
+            );
+            // Removing the whole directive exposes the debugger report.
+            expect(result.exitCode).toBe(kind === 'whole' ? 1 : 0);
+            const fixed = await fs.readFile(
+              path.join(tempDir, 'test.ts'),
+              'utf8',
+            );
+            expect(fixed).toBe(expected);
+            expect(vm.runInNewContext(fixed)).toBeUndefined();
+          } finally {
+            await cleanupTempDir(tempDir);
+          }
+        });
+      }
     }
   }
 
