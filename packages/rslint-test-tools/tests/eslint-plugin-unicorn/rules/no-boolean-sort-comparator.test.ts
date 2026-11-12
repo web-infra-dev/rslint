@@ -136,7 +136,7 @@ new RuleTester().run('no-boolean-sort-comparator', {} as never, {
     js('array.sort(function (a, b) { return a > b; })'),
     {
       ...js('array.sort(function (a, a) { return a > a; })'),
-      languageOptions: { sourceType: 'script' },
+      languageOptions: { sourceType: 'script' as const },
     },
     js('array.sort((a, b) => {\n\treturn a > b;\n})'),
     js('array.sort((a, b) => (a) > (b))'),
@@ -173,7 +173,7 @@ new RuleTester().run('no-boolean-sort-comparator', {} as never, {
     js('array.sort(Reflect.has)'),
     {
       ...js('array.sort(URL.canParse)'),
-      languageOptions: { globals: { URL: 'readonly' } },
+      languageOptions: { globals: { URL: 'readonly' as const } },
     },
     js('const compare = (a, b) => a > b;\narray.sort(compare)'),
     js(
