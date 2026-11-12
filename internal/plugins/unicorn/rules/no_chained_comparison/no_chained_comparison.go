@@ -3,6 +3,7 @@ package no_chained_comparison
 
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -11,8 +12,7 @@ var NoChainedComparisonRule = rule.Rule{
 	Name:   "unicorn/no-chained-comparison",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
-		var evaluator *utils.StaticStringEvaluator
-		var completed map[*ast.Node]bool
+		booleans := unicornutil.NewBooleanAnalyzer(&ctx)
 		return rule.RuleListeners{ast.KindBinaryExpression: func(node *ast.Node) {
 			if !isComparison(node) {
 				return
@@ -26,17 +26,9 @@ var NoChainedComparisonRule = rule.Rule{
 			if !isComparison(nested) {
 				return
 			}
-			if evaluator == nil {
-				evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
-			}
 			operator := binary.OperatorToken.Kind
-			if !isOrdering(operator) {
-				if completed == nil {
-					completed = make(map[*ast.Node]bool)
-				}
-				if isBoolean(ctx, sibling, evaluator, nil, completed) {
-					return
-				}
+			if !isOrdering(operator) && booleans.IsExpression(sibling) {
+				return
 			}
 			ctx.ReportNodeWithDeferredSuggestions(node, rule.RuleMessage{
 				Id:          "no-chained-comparison/error",
@@ -48,7 +40,7 @@ var NoChainedComparisonRule = rule.Rule{
 				if nested != left || isOrdering(operator) != isOrdering(inner.OperatorToken.Kind) ||
 					right.Kind == ast.KindTrueKeyword || right.Kind == ast.KindFalseKeyword ||
 					isComparison(right) || isComparison(utils.ESTreeRuntimeExpression(inner.Left)) ||
-					!safeLogicalReplacement(node) || evaluator.HasSideEffect(inner.Right, false) {
+					!safeLogicalReplacement(node) || booleans.StaticEvaluator().HasSideEffect(inner.Right, false) {
 					return nil
 				}
 				// Only the first and last operand are preserved once. Comments on

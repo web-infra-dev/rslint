@@ -1,4 +1,4 @@
-package no_chained_comparison
+package unicornutil
 
 import (
 	"unicode/utf8"
@@ -7,14 +7,13 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-func valueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*ast.Node, bool) {
-	annotation, optional := unicornutil.ValueTypeAnnotation(ctx, declaration)
+func booleanValueAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*ast.Node, bool) {
+	annotation, optional := ValueTypeAnnotation(ctx, declaration)
 	if annotation != nil && !utils.IsJSDocSyntaxNode(annotation) {
 		return annotation, optional
 	}
@@ -118,7 +117,7 @@ func closureCallableAnnotation(ctx rule.RuleContext, declaration *ast.Node) (*as
 				}
 				file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.ts", Path: "/annotation.ts"}, "/** @type {() => "+result+"} */ let value;", core.ScriptKindTS)
 				value := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0]
-				adapted, _ := unicornutil.ValueTypeAnnotation(rule.RuleContext{SourceFile: file}, value)
+				adapted, _ := ValueTypeAnnotation(rule.RuleContext{SourceFile: file}, value)
 				if adapted != nil && adapted.Kind == ast.KindFunctionType {
 					// Resolve any names in the annotation's original lexical scope.
 					adapted.Parent = declaration
