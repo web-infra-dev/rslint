@@ -1,5 +1,6 @@
 // Regenerates the complete pinned ESLint directive-engine suite without installing
-// dependencies. See eslint-directives/README.md for provenance and adaptation.
+// dependencies. See internal/rule/testdata/eslint-directives/README.md for
+// provenance and adaptation.
 const fs = require('node:fs'),
   assert = require('node:assert/strict'),
   Module = require('node:module'),
@@ -8,7 +9,7 @@ const fs = require('node:fs'),
 const root = process.argv[2];
 if (!root)
   throw Error(
-    'usage: node generate-eslint-directives.cjs <downloaded-source-directory>',
+    'usage: node scripts/generate-eslint-directives.cjs <downloaded-source-directory> <installed-eslint-directory>',
   );
 const revision = 'bdd4b1da21dca81d50933edef0a015216059d877';
 const inputs = {
@@ -356,7 +357,10 @@ const manifest = {
   })),
   exceptions,
 };
-const directory = path.join(__dirname, 'eslint-directives');
+const directory = path.join(
+  __dirname,
+  '../internal/rule/testdata/eslint-directives',
+);
 fs.writeFileSync(
   path.join(directory, 'upstream.json'),
   JSON.stringify({ manifest, cases: normalized }, null, 2) + '\n',

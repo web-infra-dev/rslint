@@ -310,7 +310,10 @@ const corpus = {
   cases: [...unique.values()],
 };
 fs.writeFileSync(
-  path.join(__dirname, 'eslint-directives/source.json'),
+  path.join(
+    __dirname,
+    '../internal/rule/testdata/eslint-directives/source.json',
+  ),
   JSON.stringify(corpus, null, 2) + '\n',
 );
 console.log('source corpus:', unique.size);

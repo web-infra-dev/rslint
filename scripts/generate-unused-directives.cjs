@@ -98,6 +98,6 @@ const output = cases.map(([name, original, reports]) => {
   };
 });
 fs.writeFileSync(
-  path.join(__dirname, 'unused-directives.json'),
+  path.join(__dirname, '../internal/rule/testdata/unused-directives.json'),
   JSON.stringify(output, null, 2) + '\n',
 );

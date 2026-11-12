@@ -64,9 +64,9 @@ The scripts verify the installed version and matching implementation files;
 fixture manifests record source hashes and test inventories.
 
 ```sh
-node internal/rule/testdata/generate-eslint-directives.cjs "$SOURCE" "$ESLINT"
-node internal/rule/testdata/generate-eslint-source-directives.cjs "$SOURCE" "$ESLINT"
-node internal/rule/testdata/generate-unused-directives.cjs "$ESLINT"
+node scripts/generate-eslint-directives.cjs "$SOURCE" "$ESLINT"
+node scripts/generate-eslint-source-directives.cjs "$SOURCE" "$ESLINT"
+node scripts/generate-unused-directives.cjs "$ESLINT"
 pnpm exec rs fmt internal/rule/testdata/eslint-directives/*.json internal/rule/testdata/unused-directives.json
 go test -p 1 ./internal/rule ./internal/linter -run 'Disable|Directive'
 ```
