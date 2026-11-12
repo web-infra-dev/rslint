@@ -36,7 +36,7 @@ replace (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/bmatcuk/doublestar/v4 v4.10.4
 	github.com/fatih/color v1.19.0
 	github.com/jinzhu/inflection v1.0.0
 	github.com/microsoft/TypeScript/tsc/shim/api/encoder v0.0.0
@@ -67,7 +67,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/trackingvfs v0.0.0
 	github.com/rivo/uniseg v0.4.7
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.22.0
