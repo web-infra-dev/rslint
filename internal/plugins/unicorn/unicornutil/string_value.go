@@ -363,7 +363,7 @@ func classifyStringFunctionReturn(ctx rule.RuleContext, callee *ast.Node) (class
 	}
 	defer func() { cache[symbol] = class }()
 	declaration := symbol.Declarations[0]
-	function, ok := unmodifiedFunctionValue(ctx, symbol)
+	function, ok := UnmodifiedFunctionValue(ctx, symbol)
 	if !ok {
 		return TypeUnknown
 	}

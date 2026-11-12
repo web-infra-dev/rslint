@@ -77,10 +77,10 @@ func valueTypeAnnotation(ctx rule.RuleContext, declaration *ast.Node, recoverJSD
 	return annotation, optional
 }
 
-// unmodifiedFunctionValue finds a local callable whose authored return type can
+// UnmodifiedFunctionValue finds a local callable whose authored return type can
 // be used without a checker. A nil function with ok set can still have a JSDoc
-// callable annotation on the binding.
-func unmodifiedFunctionValue(ctx rule.RuleContext, symbol *ast.Symbol) (function *ast.Node, ok bool) {
+// callable annotation on the binding. Pass a symbol with one declaration.
+func UnmodifiedFunctionValue(ctx rule.RuleContext, symbol *ast.Symbol) (function *ast.Node, ok bool) {
 	declaration := symbol.Declarations[0]
 	if declaration.Kind != ast.KindFunctionDeclaration && declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
 		return nil, false
