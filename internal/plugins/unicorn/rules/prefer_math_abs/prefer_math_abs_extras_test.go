@@ -73,6 +73,26 @@ func TestPreferMathAbsSourceOnlyBigInt(t *testing.T) {
 				"function abs(value: Value<Id<number>> | Value<Id<Id<bigint>>>) { return " + expression + "; }",
 		},
 		{
+			name:     "bigint default through another instantiation",
+			filename: "alias.ts",
+			code: "type Value<T = DefaultValue> = T; type DefaultValue = Value<bigint>; " +
+				"function abs(value: Value) { return " + expression + "; } abs(-5n);",
+		},
+		{
+			name:     "number default through another instantiation",
+			filename: "alias.ts",
+			code: "type Value<T = DefaultValue> = T; type DefaultValue = Value<number>; " +
+				"function abs(value: Value) { return " + expression + "; } abs(-5);",
+			wantSuggestion: true,
+		},
+		{
+			name:     "circular default",
+			filename: "alias.ts",
+			code: "type Value<T = DefaultValue> = T; type DefaultValue = Value; " +
+				"function abs(value: Value) { return " + expression + "; }",
+			wantSuggestion: true,
+		},
+		{
 			name:           "unused bigint type argument",
 			filename:       "alias.ts",
 			code:           "type Select<First, Second> = Second; function abs(value: Select<bigint, number>) { return " + expression + "; }",

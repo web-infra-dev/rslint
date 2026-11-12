@@ -126,7 +126,7 @@ type bigIntAliasInstance struct {
 
 type bigIntAnnotationWalk struct {
 	ctx       *rule.RuleContext
-	completed map[bigIntAliasInstance]bigIntAnnotationClass
+	instances map[bigIntAliasInstance]bigIntAnnotationClass
 }
 
 func classifyBigIntAnnotation(ctx *rule.RuleContext, annotation *ast.Node, bindings map[*ast.Node]bigIntAnnotationClass) bigIntAnnotationClass {
@@ -215,11 +215,15 @@ func (walk *bigIntAnnotationWalk) classifyReference(reference *ast.Node, binding
 			classes[i] = byte(walk.classify(arguments[i], bindings))
 		}
 		key := bigIntAliasInstance{declaration: declaration, arguments: string(classes)}
-		if result, ok := walk.completed[key]; ok {
+		if result, ok := walk.instances[key]; ok {
 			return result
 		}
+		if walk.instances == nil {
+			walk.instances = make(map[bigIntAliasInstance]bigIntAnnotationClass)
+		}
+		// A default can resolve another instance of this alias with explicit arguments.
+		walk.instances[key] = annotationOther
 		instance := maps.Clone(bindings)
-		instance[declaration] = annotationOther
 		for i, parameter := range parameters {
 			if i < len(classes) {
 				instance[parameter] = bigIntAnnotationClass(classes[i])
@@ -228,10 +232,7 @@ func (walk *bigIntAnnotationWalk) classifyReference(reference *ast.Node, binding
 			}
 		}
 		result := walk.classify(referencedType, instance)
-		if walk.completed == nil {
-			walk.completed = make(map[bigIntAliasInstance]bigIntAnnotationClass)
-		}
-		walk.completed[key] = result
+		walk.instances[key] = result
 		return result
 	}
 	bindings[declaration] = annotationOther
