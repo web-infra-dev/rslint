@@ -21,16 +21,13 @@ var iteratorTypes = unicornutil.TypeClassifierOptions{
 const annotationWrappers = ast.OEKParentheses | ast.OEKNonNullAssertions | ast.OEKSatisfies
 
 func isKnownIteratorType(ctx *rule.RuleContext, expression *ast.Node) bool {
-	if annotation := iteratorTypeAnnotation(ctx, expression); annotation != nil {
-		class := unicornutil.ClassifyTypeAnnotation(*ctx, annotation, iteratorTypes)
-		if class == unicornutil.TypeTarget {
-			options := iteratorTypesAt(ctx, expression)
-			return (options.TargetTypeNames == iteratorTypes.TargetTypeNames ||
-				unicornutil.ClassifyTypeAnnotation(*ctx, annotation, options) == unicornutil.TypeTarget) && !isArray(ctx, expression)
-		}
-		if class == unicornutil.TypeNonTarget {
-			return false
-		}
+	switch classifyIteratorSourceType(ctx, expression, iteratorTypes) {
+	case unicornutil.TypeTarget:
+		options := iteratorTypesAt(ctx, expression)
+		return options.TargetTypeNames == iteratorTypes.TargetTypeNames ||
+			classifyIteratorSourceType(ctx, expression, options) == unicornutil.TypeTarget
+	case unicornutil.TypeNonTarget:
+		return false
 	}
 
 	// Use the TypeScript project for inferred and imported types. In JavaScript
@@ -68,30 +65,58 @@ func iteratorTypesAt(ctx *rule.RuleContext, expression *ast.Node) unicornutil.Ty
 	return options
 }
 
-func iteratorTypeAnnotation(ctx *rule.RuleContext, expression *ast.Node) *ast.Node {
+func classifyIteratorSourceType(ctx *rule.RuleContext, expression *ast.Node, options unicornutil.TypeClassifierOptions) unicornutil.TypeClass {
 	node := ast.SkipOuterExpressions(expression, annotationWrappers|ast.OEKAssignments|ast.OEKComma)
+	var annotation *ast.Node
 	switch node.Kind {
+	case ast.KindConditionalExpression:
+		conditional := node.AsConditionalExpression()
+		return classifyIteratorAlternatives(ctx, conditional.WhenTrue, conditional.WhenFalse, options)
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if ast.IsLogicalOrCoalescingBinaryOperator(binary.OperatorToken.Kind) {
+			return classifyIteratorAlternatives(ctx, binary.Left, binary.Right, options)
+		}
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		if !utils.IsJSDocTypeCastWrapper(node) {
-			annotation := node.Type()
-			if annotation.Kind == ast.KindAnyKeyword || annotation.Kind == ast.KindUnknownKeyword {
-				return iteratorTypeAnnotation(ctx, node.Expression())
-			}
-			return annotation
+		if utils.IsJSDocTypeCastWrapper(node) {
+			return classifyIteratorSourceType(ctx, node.Expression(), options)
+		}
+		annotation = node.Type()
+		if annotation != nil && (annotation.Kind == ast.KindAnyKeyword || annotation.Kind == ast.KindUnknownKeyword) {
+			return classifyIteratorSourceType(ctx, node.Expression(), options)
 		}
 	case ast.KindIdentifier:
 		symbol := ctx.Refs.ResolveInFile(node)
 		if symbol != nil && len(symbol.Declarations) == 1 {
 			declaration := symbol.Declarations[0]
 			if declaration.Kind == ast.KindParameter || declaration.Kind == ast.KindVariableDeclaration {
-				annotation, _ := unicornutil.ValueTypeAnnotation(*ctx, declaration)
-				return annotation
+				annotation, _ = unicornutil.ValueTypeAnnotation(*ctx, declaration)
 			}
 		}
 	case ast.KindCallExpression:
-		return iteratorReturnAnnotation(ctx, utils.ESTreeCallCallee(node.Expression()))
+		annotation = iteratorReturnAnnotation(ctx, utils.ESTreeCallCallee(node.Expression()))
 	}
-	return nil
+	if annotation == nil {
+		return unicornutil.TypeUnknown
+	}
+	class := unicornutil.ClassifyTypeAnnotation(*ctx, annotation, options)
+	if class == unicornutil.TypeTarget && isArray(ctx, node) {
+		return unicornutil.TypeNonTarget
+	}
+	return class
+}
+
+func classifyIteratorAlternatives(ctx *rule.RuleContext, left, right *ast.Node, options unicornutil.TypeClassifierOptions) unicornutil.TypeClass {
+	leftType := classifyIteratorSourceType(ctx, left, options)
+	rightType := classifyIteratorSourceType(ctx, right, options)
+	switch {
+	case leftType == unicornutil.TypeNullish:
+		return rightType
+	case rightType == unicornutil.TypeNullish || leftType == rightType:
+		return leftType
+	default:
+		return unicornutil.TypeUnknown
+	}
 }
 
 func iteratorReturnAnnotation(ctx *rule.RuleContext, callee *ast.Node) *ast.Node {
@@ -100,15 +125,11 @@ func iteratorReturnAnnotation(ctx *rule.RuleContext, callee *ast.Node) *ast.Node
 		return nil
 	}
 	declaration := symbol.Declarations[0]
-	if declaration.Kind != ast.KindFunctionDeclaration &&
-		declaration.Kind != ast.KindVariableDeclaration && declaration.Kind != ast.KindParameter {
-		return nil
-	}
-	if !bindingIsUnchanged(ctx, symbol) {
-		return nil
-	}
-	function := declaration
-	if declaration.Kind != ast.KindFunctionDeclaration {
+	var function *ast.Node
+	switch declaration.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
+		function = declaration
+	case ast.KindVariableDeclaration, ast.KindParameter:
 		if declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
 			return nil
 		}
@@ -116,6 +137,11 @@ func iteratorReturnAnnotation(ctx *rule.RuleContext, callee *ast.Node) *ast.Node
 		if function != nil {
 			function = ast.SkipOuterExpressions(function, annotationWrappers)
 		}
+	default:
+		return nil
+	}
+	if !bindingIsUnchanged(ctx, symbol) {
+		return nil
 	}
 	if function != nil && ast.IsFunctionLike(function) {
 		if ast.HasSyntacticModifier(function, ast.ModifierFlagsAsync) ||

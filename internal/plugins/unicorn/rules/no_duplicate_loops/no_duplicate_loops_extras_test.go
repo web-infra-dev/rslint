@@ -102,3 +102,45 @@ for (const x of it.map(fn)) {}`, "case.js", loopDiagnostic("map", "for…of", 3,
 		},
 	})
 }
+
+func TestNoDuplicateLoopsSourceTypesWithoutChecker(t *testing.T) {
+	testRule := NoDuplicateLoopsRule
+	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return NoDuplicateLoopsRule.Run(ctx, options)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, []rule_tester.ValidTestCase{
+		validCase(`/** @param {IteratorObject<number>} a */
+function consume(a, flag) {
+  for (const x of (a ?? a).map(fn)) {}
+  for (const x of (flag ? a && a : a || a).filter(fn)) {}
+}`, "case.js"),
+		validCase(`function consume(a: IteratorObject<number>, empty: null, flag: boolean) {
+  for (const x of (empty ?? a).map(fn)) {}
+  for (const x of (flag ? a : empty).filter(fn)) {}
+}`, "case.ts"),
+		validCase(`/** @param {IteratorObject<number>} a */
+function consume(a) {
+  for (const x of (/** @type {any} */ (a)).map(fn)) {}
+  for (const x of (/** @type {number[]} */ (a)).filter(fn)) {}
+}`, "case.js"),
+		validCase(`const f = /** @returns {IteratorObject<number>} */ function make() {
+  for (const x of make().map(fn)) {}
+  return [1].values();
+};`, "case.js"),
+		validCase(`const f = function make(): IteratorObject<number> {
+  for (const x of make().map(fn)) {}
+  return [1].values();
+};`, "case.ts"),
+	}, []rule_tester.InvalidTestCase{
+		invalidCase(`/**
+ * @param {IteratorObject<number>} a
+ * @param {number[]} items
+ */
+function consume(a, items, flag, unknown) {
+  for (const x of (flag ? a : items).map(fn)) {}
+  for (const x of (a || unknown).filter(fn)) {}
+}`, "case.js", loopDiagnostic("map", "for…of", 6, 38, 41), loopDiagnostic("filter", "for…of", 7, 34, 40)),
+		invalidCase("for (const x of ([1] as unknown as IteratorObject<number>).map(fn)) {}", "case.ts", loopDiagnostic("map", "for…of", 1, 60, 63)),
+	})
+}
