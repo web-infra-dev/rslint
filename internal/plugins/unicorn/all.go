@@ -73,6 +73,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_recursion"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_undefined"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_xor_as_exponentiation"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_zero_fractions"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/number_literal_case"
@@ -205,6 +206,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_recursion.NoUselessRecursionRule,
 		no_useless_spread.NoUselessSpreadRule,
 		no_useless_switch_case.NoUselessSwitchCaseRule,
+		no_useless_undefined.NoUselessUndefinedRule,
 		no_xor_as_exponentiation.NoXorAsExponentiationRule,
 		no_zero_fractions.NoZeroFractionsRule,
 		number_literal_case.NumberLiteralCaseRule,

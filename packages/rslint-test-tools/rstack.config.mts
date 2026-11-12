@@ -921,6 +921,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-useless-recursion.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-spread.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-useless-undefined.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-xor-as-exponentiation.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-zero-fractions.test.ts',
     './tests/eslint-plugin-unicorn/rules/number-literal-case.test.ts',
