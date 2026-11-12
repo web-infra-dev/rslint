@@ -172,6 +172,7 @@ const ecosystemTests = {
     './tests/eslint/rules/prefer-object-has-own.test.ts',
     './tests/eslint/rules/prefer-object-spread.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
+    './tests/eslint/rules/constructor-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/prefer-spread.test.ts',
     './tests/eslint/rules/prefer-template.test.ts',

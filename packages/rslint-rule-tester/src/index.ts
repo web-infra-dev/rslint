@@ -20,7 +20,7 @@ export type {
 } from './types.ts';
 
 export class RuleTester {
-  constructor(private readonly config: RuleTesterConfig) {}
+  constructor(private readonly config: RuleTesterConfig = {}) {}
 
   run(
     name: string,

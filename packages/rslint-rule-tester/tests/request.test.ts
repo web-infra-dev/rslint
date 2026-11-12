@@ -13,6 +13,15 @@ const config = {
 };
 
 describe('buildLintRequest', () => {
+  test('runs core rules without a plugin declaration', () => {
+    const { request } = buildLintRequest({}, 'constructor-super', root, {
+      code: '',
+    });
+    expect(request.config?.[0]).toHaveProperty('plugins', []);
+    expect(request.config?.[0]).toMatchObject({
+      rules: { 'constructor-super': ['error'] },
+    });
+  });
   test('lints the case code as input.js by default', () => {
     const { request, filename } = buildLintRequest(config, 'node/x', root, {
       code: 'foo()',
