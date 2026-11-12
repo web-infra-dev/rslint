@@ -4,10 +4,20 @@ import "github.com/microsoft/TypeScript/tsc/shim/ast"
 
 // HasOptionalChainElement reports whether node's callee/object path contains
 // an optional-chain link. Its transparent-node list is deliberately closed:
-// tsgo's ParenthesizedExpression plus the four TypeScript wrappers that
-// Unicorn unwraps (as, satisfies, non-null, and angle-bracket assertions).
+// tsgo's ParenthesizedExpression plus the four TypeScript assertion wrappers
+// (as, satisfies, non-null, and angle-bracket assertions).
 // Call arguments and element-access keys are deliberately outside the path.
 func HasOptionalChainElement(node *ast.Node) bool {
+	return hasOptionalChainElement(node, false)
+}
+
+// HasOptionalChainElementThroughInstantiation also follows TypeScript
+// instantiation expressions such as f<T>.
+func HasOptionalChainElementThroughInstantiation(node *ast.Node) bool {
+	return hasOptionalChainElement(node, true)
+}
+
+func hasOptionalChainElement(node *ast.Node, throughInstantiation bool) bool {
 	for node != nil {
 		switch node.Kind {
 		case ast.KindParenthesizedExpression,
@@ -15,6 +25,11 @@ func HasOptionalChainElement(node *ast.Node) bool {
 			ast.KindSatisfiesExpression,
 			ast.KindNonNullExpression,
 			ast.KindTypeAssertionExpression:
+			node = node.Expression()
+		case ast.KindExpressionWithTypeArguments:
+			if !throughInstantiation {
+				return false
+			}
 			node = node.Expression()
 		case ast.KindCallExpression:
 			if ast.IsOptionalChain(node) {

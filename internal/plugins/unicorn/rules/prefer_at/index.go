@@ -48,25 +48,3 @@ func isArguments(node *ast.Node) bool {
 	node = unwrapped(node)
 	return node != nil && ast.IsIdentifier(node) && node.Text() == "arguments"
 }
-
-func inUnparenthesizedConstructorCallee(node *ast.Node) bool {
-	for node.Parent != nil {
-		parent := node.Parent
-		switch {
-		case ast.IsNewExpression(parent):
-			return ast.IsNewExpressionTarget(node, false, false)
-		case ast.IsTaggedTemplateExpression(parent):
-			if !ast.IsTaggedTemplateTag(node, false, false) {
-				return false
-			}
-		case ast.IsAccessExpression(parent), ast.IsOuterExpression(parent, runtimeWrappers&^ast.OEKParentheses):
-			if parent.Expression() != node {
-				return false
-			}
-		default:
-			return false
-		}
-		node = parent
-	}
-	return false
-}

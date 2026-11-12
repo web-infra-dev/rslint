@@ -19,6 +19,30 @@ func IsReferenceTarget(node *ast.Node) bool {
 	return node.Parent != nil && (ast.IsAssignmentTarget(node) || node.Parent.Kind == ast.KindDeleteExpression)
 }
 
+// IsInUnparenthesizedConstructorCallee reports whether introducing a call at
+// node would turn its argument list into the arguments to an enclosing new.
+func IsInUnparenthesizedConstructorCallee(node *ast.Node) bool {
+	for node.Parent != nil {
+		parent := node.Parent
+		switch {
+		case ast.IsNewExpression(parent):
+			return ast.IsNewExpressionTarget(node, false, false)
+		case ast.IsTaggedTemplateExpression(parent):
+			if !ast.IsTaggedTemplateTag(node, false, false) {
+				return false
+			}
+		case ast.IsAccessExpression(parent), ast.IsOuterExpression(parent, ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments):
+			if parent.Expression() != node {
+				return false
+			}
+		default:
+			return false
+		}
+		node = parent
+	}
+	return false
+}
+
 // IsReferenceContext reports whether replacing a value with a member access
 // could change its call receiver or expose a reference to an enclosing operator.
 func IsReferenceContext(node *ast.Node) bool {
