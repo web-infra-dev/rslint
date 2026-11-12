@@ -67,6 +67,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_array_splice_count"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_await"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_slice_end"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unnecessary_string_trim"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_iife"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
@@ -205,6 +206,7 @@ func GetAllRules() []rule.Rule {
 		no_unnecessary_array_splice_count.NoUnnecessaryArraySpliceCountRule,
 		no_unnecessary_await.NoUnnecessaryAwaitRule,
 		no_unnecessary_slice_end.NoUnnecessarySliceEndRule,
+		no_unnecessary_string_trim.NoUnnecessaryStringTrimRule,
 		no_unreadable_iife.NoUnreadableIifeRule,
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,

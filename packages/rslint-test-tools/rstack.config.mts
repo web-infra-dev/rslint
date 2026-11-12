@@ -914,6 +914,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-splice-count.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-await.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-slice-end.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-unnecessary-string-trim.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unnecessary-array-flat-depth.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unreadable-iife.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-unreadable-new-expression.test.ts',
