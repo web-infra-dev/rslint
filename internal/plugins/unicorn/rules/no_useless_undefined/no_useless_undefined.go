@@ -45,8 +45,9 @@ var NoUselessUndefinedRule = rule.Rule{
 			ast.KindConditionalExpression: indexedAccessListener(ctx),
 		}
 		if checkArguments && !isTypeScript {
+			var keys unicornutil.ComputedKeyEvaluator
 			listeners[ast.KindCallExpression] = func(node *ast.Node) {
-				checkLastArgument(ctx, node)
+				checkLastArgument(ctx, node, &keys)
 			}
 		}
 		return listeners
@@ -103,7 +104,7 @@ func checkIdentifier(ctx rule.RuleContext, node *ast.Node, checkArrowBody, isTyp
 	}
 }
 
-func checkLastArgument(ctx rule.RuleContext, node *ast.Node) {
+func checkLastArgument(ctx rule.RuleContext, node *ast.Node, keys *unicornutil.ComputedKeyEvaluator) {
 	call := node.AsCallExpression()
 	args := node.Arguments()
 	if len(args) == 0 {
@@ -114,23 +115,26 @@ func checkLastArgument(ctx rule.RuleContext, node *ast.Node) {
 	if !utils.IsUndefinedIdentifier(undefined) {
 		return
 	}
-	callee := utils.ESTreeCallCallee(call.Expression)
-	if callee != nil && callee.Kind == ast.KindImportKeyword {
+	callee := utils.ESTreeRuntimeExpression(call.Expression)
+	if callee == nil || callee.Kind == ast.KindImportKeyword {
 		return
 	}
 	var name string
-	if callee != nil {
-		switch callee.Kind {
-		case ast.KindIdentifier:
-			name = callee.Text()
-		case ast.KindPropertyAccessExpression:
-			if ast.IsIdentifier(callee.Name()) {
-				name = callee.Name().Text()
-			}
-			// Only the first argument of a non-optional .bind() is the thisArg.
-			if name == "bind" && call.QuestionDotToken == nil && len(args) > 1 {
-				return
-			}
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		name = callee.Text()
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		var known bool
+		name, known = utils.AccessExpressionStaticName(callee)
+		if !known && ast.IsElementAccessExpression(callee) {
+			name, _ = keys.Eval(callee.AsElementAccessExpression().ArgumentExpression)
+		}
+		// Only the first argument of a non-optional .bind() is the thisArg.
+		if name == "bind" && call.QuestionDotToken == nil && len(args) > 1 {
+			return
+		}
+		if keepsReflectArgument(ctx, callee.Expression(), name, args) {
+			return
 		}
 	}
 	if ignoresTrailingUndefined(name) || !unicornutil.IsGlobalReference(ctx, undefined) {
@@ -139,6 +143,28 @@ func checkLastArgument(ctx rule.RuleContext, node *ast.Node) {
 	ctx.ReportNodeWithDeferredFixes(undefined, uselessUndefined, func() []rule.RuleFix {
 		return lastArgumentFix(ctx, argument, len(args) == 1)
 	})
+}
+
+func keepsReflectArgument(ctx rule.RuleContext, receiver *ast.Node, name string, args []*ast.Node) bool {
+	if name != "get" && name != "construct" {
+		return false
+	}
+	if !utils.IsBuiltinGlobalCallee(receiver, "Reflect", func(name string) bool {
+		return ctx.Globals.Access(name).IsDeclared()
+	}) {
+		return false
+	}
+	// Only the third argument supplies the receiver or newTarget. A spread
+	// can supply some of the preceding arguments at runtime.
+	preceding, spread := 0, false
+	for _, arg := range args[:len(args)-1] {
+		if ast.IsSpreadElement(arg) {
+			spread = true
+		} else {
+			preceding++
+		}
+	}
+	return preceding == 2 || (spread && preceding < 2)
 }
 
 func ignoresTrailingUndefined(name string) bool {

@@ -39,6 +39,12 @@ func TestNoUselessUndefinedExtras(t *testing.T) {
 		{FileName: "file.js", Code: "([x = (target = undefined)] = source);"},
 		{FileName: "file.js", Code: "target = undefined;"},
 		{FileName: "file.js", Code: "import(undefined);"},
+		{FileName: "file.js", Code: `const a = [1, 2]; a["splice"](0, undefined); a["push"](undefined);`},
+		{FileName: "file.js", Code: `items["sp" + "lice"](0, undefined);`},
+		{FileName: "file.js", Code: "(items?.[`push`])(undefined);"},
+		{FileName: "file.js", Code: `foo["bind"](value, undefined); (foo?.bind)(value, undefined);`},
+		{FileName: "file.js", Code: `Reflect.get(obj, "x", undefined); Reflect["construct"](Object, [], undefined);`},
+		{FileName: "file.js", Code: `globalThis["Reflect"]?.["get"](obj, "x", undefined); Reflect.get(...args, undefined);`},
 		{FileName: "file.js", Code: `const value = i < items["length"] ? items[i] : undefined;`},
 		{FileName: "file.js", Code: "const value = i <= items.length - 2 ? items[i] : undefined;"},
 		{FileName: "file.js", Code: "const value = i >= 9007199254740992 ? items[i - 9007199254740992] : undefined;"},
@@ -129,12 +135,16 @@ func TestNoUselessUndefinedExtras(t *testing.T) {
 			Output: []string{"foo(/* keep */ );"}, Errors: upstreamErrorAt(1, 16),
 		},
 		{
-			FileName: "file.js", Code: "(foo?.bind)(value, undefined);",
-			Output: []string{"(foo?.bind)(value);"}, Errors: upstreamErrorAt(1, 20),
+			FileName: "file.js", Code: `Reflect.get(obj, "x", undefined, undefined);`,
+			Output: []string{`Reflect.get(obj, "x", undefined);`}, Errors: upstreamErrorAt(1, 34),
 		},
 		{
-			FileName: "file.js", Code: `foo["bind"](value, undefined);`,
-			Output: []string{`foo["bind"](value);`}, Errors: upstreamErrorAt(1, 20),
+			FileName: "file.js", Code: "Reflect.get(obj, undefined);",
+			Output: []string{"Reflect.get(obj);"}, Errors: upstreamErrorAt(1, 18),
+		},
+		{
+			FileName: "file.js", Code: `const Reflect = {get() {}}; Reflect.get(obj, "x", undefined);`,
+			Output: []string{`const Reflect = {get() {}}; Reflect.get(obj, "x");`}, Errors: upstreamErrorAt(1, 51),
 		},
 		{
 			FileName: "file.js", Code: "class C { #ref() {} f() { this.#ref(undefined); } }",

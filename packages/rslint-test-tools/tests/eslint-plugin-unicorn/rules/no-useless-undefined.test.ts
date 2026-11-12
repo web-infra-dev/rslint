@@ -1,11 +1,7 @@
 // Ported from eslint-plugin-unicorn v79.0.0. See LICENSE.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/no-useless-undefined.js
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/snapshots/no-useless-undefined.js.snapshot
-import assert from 'node:assert/strict';
-import path from 'node:path';
-import { lint } from '@rslint/core/internal';
 import { RuleTester, type ExpectedError } from '@rslint/rule-tester';
-import { test } from 'rstack/test';
 
 function undefinedAt(
   line: number,
@@ -1144,7 +1140,7 @@ const foo = nextTick();
       filename: 'foo.ts',
       errors: [undefinedAt(1, 18)],
     },
-    // The foo.MTs snapshot uses an explicit files selector below.
+    // The Go suite covers the foo.MTs snapshot.
     {
       code: 'function f(foo = undefined) {}',
       filename: 'foo.cts',
@@ -1366,39 +1362,4 @@ const foo = nextTick();
       errors: [undefinedAt(1, 19)],
     },
   ],
-});
-
-test('unicorn/no-useless-undefined with an uppercase TypeScript extension', async () => {
-  // The default config file selector covers lowercase extensions.
-  const filename = 'foo.MTs';
-  const ruleName = 'unicorn/no-useless-undefined';
-  const result = await lint({
-    configDirectory: import.meta.dirname,
-    workingDirectory: import.meta.dirname,
-    config: [
-      {
-        files: [filename],
-        plugins: ['unicorn'],
-        languageOptions: { parserOptions: { projectService: false } },
-        rules: { [ruleName]: 'error' },
-      },
-    ],
-    fileContents: {
-      [path.join(import.meta.dirname, filename)]:
-        'function f(foo = undefined) {}',
-    },
-  });
-
-  assert.equal(result.fileCount, 1);
-  assert.equal(result.ruleCount, 1);
-  assert.deepEqual(result.diagnostics, [
-    {
-      ruleName,
-      severity: 'error',
-      filePath: filename,
-      messageId: 'no-useless-undefined',
-      message: 'Do not use useless `undefined`.',
-      range: { start: { line: 1, column: 18 }, end: { line: 1, column: 27 } },
-    },
-  ]);
 });

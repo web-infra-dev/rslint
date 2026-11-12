@@ -73,6 +73,15 @@ Rslint allows a reference to a locally declared `undefined`. In
 `function read(undefined) { return undefined; }`, the return value comes from
 the parameter.
 
+The rule applies its call exceptions to statically known computed method
+names. For example, it keeps `items["splice"](0, undefined)` because omitting
+the second argument would delete the items.
+
+The rule also keeps an explicit `undefined` receiver in
+`Reflect.get(obj, "x", undefined)` and an explicit `undefined` new target in
+`Reflect.construct(Ctor, [], undefined)`. Omitting these arguments changes
+which receiver a getter sees or whether construction throws.
+
 Rslint reports the following TypeScript defaults without an automatic edit.
 
 - An unannotated parameter such as `function f(value = undefined) {}` keeps
