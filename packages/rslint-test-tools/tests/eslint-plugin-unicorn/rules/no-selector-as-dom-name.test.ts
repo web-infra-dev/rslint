@@ -369,10 +369,11 @@ const interactions = [
     'document.getElementsByClassName(".foo");',
     'document.querySelectorAll(".foo");',
   ],
+  // Rslint preserves [0] so an empty collection still returns undefined.
   [
     'file.js',
     'document.getElementsByClassName(".foo")[0];',
-    'document.querySelector(".foo");',
+    'document.querySelectorAll(".foo")[0];',
   ],
   // Rslint's prefer-query-selector omits :scope from generated selectors.
   [
