@@ -53,6 +53,10 @@ var bools = [1, 2, 3].filter(function (x) {
 
 With `checkForEach: true`, an expression-bodied arrow callback offers a suggestion to wrap its expression in braces. With `allowVoid: true`, returned expressions also offer a suggestion to prepend `void`. Suggestions are applied individually; the rule does not automatically fix code.
 
+## Differences from upstream
+
+ESLint v9.39.1 can produce invalid code when `wrapBraces` turns a function or class expression into an anonymous declaration, or a `"use strict"` string into a directive with a non-simple parameter list. Rslint preserves expression context by adding parentheses for these bodies and reuses existing parentheses. For example, `() => function () {}` becomes `() => {(function () {})}`, and `(x = 0) => "use strict"` becomes `(x = 0) => {("use strict")}`.
+
 ## Original Documentation
 
 - [ESLint: array-callback-return](https://eslint.org/docs/latest/rules/array-callback-return)

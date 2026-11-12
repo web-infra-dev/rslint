@@ -165,9 +165,19 @@ func callbackSuggestions(ctx rule.RuleContext, fn, expr *ast.Node, concise bool,
 	if concise {
 		anchorEnd = fn.AsArrowFunction().EqualsGreaterThanToken.End()
 		bodyStart := scanner.SkipTrivia(ctx.SourceFile.Text(), anchorEnd)
+		prefix, suffix := "{", "}"
+		// Function/class expressions become declarations at statement start.
+		// A bare "use strict" string becomes a directive, which can also make
+		// a non-simple parameter list illegal. Keep those bodies in expression
+		// context, reusing any parentheses already present in the source.
+		if !ast.IsParenthesizedExpression(expr.Parent) &&
+			(expr.Kind == ast.KindFunctionExpression || expr.Kind == ast.KindClassExpression ||
+				(expr.Kind == ast.KindStringLiteral && expr.Text() == "use strict")) {
+			prefix, suffix = "{(", ")}"
+		}
 		suggestions = append(suggestions, rule.RuleSuggestion{Message: wrapBracesMessage, FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(bodyStart, bodyStart), "{"),
-			rule.RuleFixInsertAfter(fn, "}"),
+			rule.RuleFixReplaceRange(core.NewTextRange(bodyStart, bodyStart), prefix),
+			rule.RuleFixInsertAfter(fn, suffix),
 		}})
 	} else {
 		// The expression may have several parenthesized wrappers. The enclosing

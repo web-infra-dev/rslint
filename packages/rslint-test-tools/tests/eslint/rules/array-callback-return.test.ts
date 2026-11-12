@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { lint } from '@rslint/core/internal';
 import { test } from 'rstack/test';
+import { parse } from 'espree';
+import { applyEdits } from '../../../../rslint-rule-tester/src/edits.ts';
 import {
   RuleTester,
   type TestCase,
@@ -2872,6 +2874,118 @@ const cases: { valid: (string | ValidTestCase)[]; invalid: TestCase[] } = {
 };
 
 ruleTester.run('array-callback-return', cases);
+
+// ESLint v9.39.1 shares this suggestion bug. Keep the upstream corpus intact
+// and separately verify safe outputs for bodies that need expression context.
+test('wrapBraces preserves callback expression context', async () => {
+  const regressionCases = [
+    ['() => function () {}', '() => {(function () {})}'],
+    ['() => class {}', '() => {(class {})}'],
+    ['(x = 0) => "use strict"', '(x = 0) => {("use strict")}'],
+    ['x => "use strict"', 'x => {("use strict")}'],
+    ["(...x) => 'use strict'", "(...x) => {('use strict')}"],
+    ['({x}) => "use strict"', '({x}) => {("use strict")}'],
+    ['() => function named() {}', '() => {(function named() {})}'],
+    ['() => class Named {}', '() => {(class Named {})}'],
+    ['() => async function () {}', '() => {(async function () {})}'],
+    ['() => function* () {}', '() => {(function* () {})}'],
+    ['() => /* keep */ function () {}', '() => /* keep */ {(function () {})}'],
+    ['() => /* keep */ class {}', '() => /* keep */ {(class {})}'],
+    [
+      '(x = 0) => /* keep */ "use strict"',
+      '(x = 0) => /* keep */ {("use strict")}',
+    ],
+    ['() => (function () {})', '() => {(function () {})}'],
+    ['() => (class {})', '() => {(class {})}'],
+    ['(x = 0) => ("use strict")', '(x = 0) => {("use strict")}'],
+    ['() => ((class {}))', '() => {((class {}))}'],
+    ['(x = 0) => "ordinary"', '(x = 0) => {"ordinary"}'],
+  ];
+  const root = await realpath(
+    await mkdtemp(path.join(tmpdir(), 'rslint-array-return-suggestions-')),
+  );
+  try {
+    for (const allowVoid of [false, true]) {
+      for (const [callback, wrappedCallback] of regressionCases) {
+        const code = `items.forEach(${callback});`;
+        const request = {
+          workingDirectory: root,
+          configDirectory: root,
+          config: [
+            {
+              plugins: [],
+              languageOptions: { parserOptions: { projectService: false } },
+              rules: {
+                'array-callback-return': [
+                  'error',
+                  { checkForEach: true, allowVoid },
+                ],
+              },
+            },
+          ],
+          fileContents: { [path.join(root, 'input.js')]: code },
+        };
+        const result = await lint(request);
+        assert.equal(result.fileCount, 1);
+        assert.equal(result.ruleCount, 1);
+        assert.equal(result.diagnostics.length, 1, code);
+        const diagnostic = result.diagnostics[0];
+        assert.equal(diagnostic.messageId, 'expectedNoReturnValue');
+        assert.equal(
+          diagnostic.message,
+          'Array.prototype.forEach() expects no useless return value from arrow function.',
+        );
+        assert.deepEqual(diagnostic.range, {
+          start: { line: 1, column: code.indexOf('=>') + 1 },
+          end: { line: 1, column: code.indexOf('=>') + 3 },
+        });
+        assert.equal(diagnostic.fixes, undefined);
+        const suggestions = diagnostic.suggestions ?? [];
+        assert.deepEqual(
+          suggestions.map((suggestion) => suggestion.messageId),
+          allowVoid ? ['wrapBraces', 'prependVoid'] : ['wrapBraces'],
+        );
+        assert.equal(suggestions[0].message, 'Wrap the expression in `{}`.');
+        for (const suggestion of suggestions) {
+          assert.ok(suggestion.fixes?.length);
+          const output = applyEdits(code, suggestion.fixes);
+          if (suggestion.messageId === 'wrapBraces') {
+            assert.equal(output, `items.forEach(${wrappedCallback});`);
+          }
+          const program = parse(output, {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+          });
+          if (suggestion.messageId === 'wrapBraces') {
+            const statement = program.body[0];
+            assert.ok(statement.type === 'ExpressionStatement');
+            const call = statement.expression;
+            assert.ok(call.type === 'CallExpression');
+            const parsedCallback = call.arguments[0];
+            assert.ok(parsedCallback.type === 'ArrowFunctionExpression');
+            const body = parsedCallback.body;
+            assert.ok(body.type === 'BlockStatement');
+            assert.equal(body.body.length, 1);
+            assert.ok(body.body[0].type === 'ExpressionStatement');
+            // The original string value must not become a directive.
+            if (callback.includes('use strict')) {
+              assert.equal(Reflect.get(body.body[0], 'directive'), undefined);
+            }
+          }
+          const relinted = await lint({
+            ...request,
+            fileContents: { [path.join(root, 'input.js')]: output },
+          });
+          assert.equal(relinted.fileCount, 1);
+          assert.equal(relinted.ruleCount, 1);
+          assert.deepEqual(relinted.diagnostics, [], output);
+        }
+      }
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 // Suggestions must stay opt-in even when the real autofix pipeline runs.
 test('array-callback-return does not autofix any upstream invalid case', async () => {
