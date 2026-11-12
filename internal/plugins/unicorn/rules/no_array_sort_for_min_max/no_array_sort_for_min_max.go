@@ -132,7 +132,8 @@ func reportExtreme(ctx rule.RuleContext, node, source *ast.Node, method, extreme
 		Description: "Use `Math." + method + "()` instead of sorting to get the " + extreme + " value.",
 		Data:        map[string]string{"method": method, "extreme": extreme},
 	}, func() []rule.RuleSuggestion {
-		if source.Kind == ast.KindSuperKeyword {
+		if source.Kind == ast.KindSuperKeyword || !ctx.Globals.Access("Math").IsDeclared() ||
+			!ctx.Refs.IsGlobalNameReference(node, "Math", ast.SymbolFlagsValue|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias) {
 			return nil
 		}
 		sourceSpan := utils.TrimNodeTextRange(ctx.SourceFile, source)

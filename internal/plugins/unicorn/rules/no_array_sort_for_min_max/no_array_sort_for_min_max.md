@@ -26,6 +26,16 @@ const first = array.toSorted((a, b) => a.value - b.value)[0];
 
 The rule offers editor suggestions. Review them before applying because `sort()` mutates the original array, and the replacement can behave differently with empty arrays, sparse arrays, `NaN`, or arrays too large to spread into a function call.
 
+## Differences from upstream
+
+Rslint reports the sort and withholds the editor suggestion when `Math` resolves to a local binding or is set to `'off'` in `languageOptions.globals`.
+
+```javascript
+function minimum(Math) {
+  return [3, 1, 2].toSorted((a, b) => a - b)[0];
+}
+```
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-array-sort-for-min-max](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/docs/rules/no-array-sort-for-min-max.md)

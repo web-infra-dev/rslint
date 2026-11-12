@@ -241,6 +241,7 @@ const result = read();
 type minMaxCase struct {
 	code       string
 	fileName   string
+	globals    map[string]any
 	method     string
 	position   [4]int
 	suggestion string
@@ -277,7 +278,10 @@ func runMinMaxCases(t *testing.T, valid []rule_tester.ValidTestCase, cases []min
 			}}
 		}
 		invalid = append(invalid, rule_tester.InvalidTestCase{
-			Code: item.code, FileName: item.fileName, Errors: []rule_tester.InvalidTestCaseError{expected},
+			Code:     item.code,
+			FileName: item.fileName,
+			Globals:  item.globals,
+			Errors:   []rule_tester.InvalidTestCaseError{expected},
 		})
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArraySortForMinMaxRule, valid, invalid)

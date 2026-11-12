@@ -125,6 +125,18 @@ function g<T extends BigInt64Array>(input: T) { return input.sort((a, b) => a - 
 			position:   [4]int{1, 20, 1, 57},
 			suggestion: "const view = <p>🧮{Math.max(...array)}</p>;",
 		},
+		// The suggestion would call Math.min on the parameter passed as null.
+		{
+			code:     "function f(Math) { return [3, 1, 2].toSorted((a, b) => a - b)[0]; }\nf(null);",
+			method:   "min",
+			position: [4]int{1, 27, 1, 65},
+		},
+		{
+			code:     "const max = values.sort((a, b) => a - b).at(-1);",
+			globals:  map[string]any{"Math": "off"},
+			method:   "max",
+			position: [4]int{1, 13, 1, 48},
+		},
 	}
 	runMinMaxCases(t, valid, invalid)
 }
