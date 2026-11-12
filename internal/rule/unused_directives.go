@@ -164,7 +164,7 @@ func (dm *DisableManager) UnusedDiagnostics(path string, severity DiagnosticSeve
 			message += ")."
 			diagnostic := RuleDiagnostic{FilePath: path, SourceFile: dm.sourceFile, Range: core.NewTextRange(d.location.Pos(), d.location.Pos()), Severity: severity, Message: RuleMessage{Description: message}}
 			if demand&EditDemandAutofix != 0 {
-				replacement := directiveLineTerminators(dm.sourceFile.Text()[d.location.Pos():d.location.End()])
+				replacement := directiveLineTerminators(dm.sourceFile.Text(), d.location.Pos(), d.location.End())
 				if replacement == "" {
 					replacement = " "
 				}
@@ -217,18 +217,32 @@ func (dm *DisableManager) removeEntry(d trackedDirective, name string) RuleFix {
 		b += next + 1
 		b += len(text[b:d.listEnd]) - len(strings.TrimLeftFunc(text[b:d.listEnd], ecmascript.IsWhiteSpaceOrLineTerminator))
 	}
-	return RuleFix{Range: core.NewTextRange(a, b), Text: directiveLineTerminators(text[a:b])}
+	return RuleFix{Range: core.NewTextRange(a, b), Text: directiveLineTerminators(text, a, b)}
 }
 
 // A newline inside a block comment participates in automatic semicolon insertion.
-// Preserve every ECMAScript line terminator, including both bytes of CRLF.
-func directiveLineTerminators(text string) string {
-	return strings.Map(func(r rune) rune {
+// Preserve every ECMAScript line terminator without joining separate CR and LF
+// into CRLF, including across the replacement's boundaries.
+func directiveLineTerminators(text string, start, end int) string {
+	var replacement strings.Builder
+	previousCR := start > 0 && text[start-1] == '\r'
+	removed := false
+	for _, r := range text[start:end] {
 		if ecmascript.IsLineTerminator(r) {
-			return r
+			if r == '\n' && previousCR && removed {
+				replacement.WriteByte(' ')
+			}
+			replacement.WriteRune(r)
+			previousCR = r == '\r'
+			removed = false
+		} else {
+			removed = true
 		}
-		return -1
-	}, text)
+	}
+	if previousCR && removed && end < len(text) && text[end] == '\n' {
+		replacement.WriteByte(' ')
+	}
+	return replacement.String()
 }
 
 func (d *trackedDirective) locateEntries(text, content string, keywordEnd int) {
