@@ -1,3 +1,4 @@
+// Upstream: typescript-eslint v8.28.0, prefer-promise-reject-errors.test.ts.
 package prefer_promise_reject_errors
 
 import (
@@ -7,7 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestPreferPromiseRejectErrorsRule(t *testing.T) {
+func TestPreferPromiseRejectErrorsUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferPromiseRejectErrorsRule, []rule_tester.ValidTestCase{
 		{Code: "Promise.resolve(5);"},
 		{
@@ -979,8 +980,6 @@ new Promise(function (reject, reject) {
   reject(5);
 });
       `,
-			// TODO(port): this is invalid TypeScript code
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "rejectAnError",
