@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_constant_condition.schema.json
@@ -49,68 +50,33 @@ func parseOptions(options []any) Options {
 	return opts
 }
 
-// getBooleanValue returns the boolean value of a literal
+// getBooleanValue evaluates only ESTree Literal equivalents. Template literals
+// and identifiers are not logical identities in the upstream helper.
 func getBooleanValue(node *ast.Node) *bool {
 	if node == nil {
 		return nil
 	}
-
+	var value bool
 	switch node.Kind {
-	case ast.KindTrueKeyword:
-		t := true
-		return &t
-	case ast.KindFalseKeyword:
-		f := false
-		return &f
-	case ast.KindNullKeyword:
-		f := false
-		return &f
+	case ast.KindTrueKeyword, ast.KindRegularExpressionLiteral:
+		value = true
+	case ast.KindFalseKeyword, ast.KindNullKeyword:
+		value = false
 	case ast.KindNumericLiteral:
-		// 0 is falsy, other numbers are truthy
-		text := node.Text()
-		if text == "0" || text == "0.0" || text == "-0" {
-			f := false
-			return &f
+		number, ok := ecmascript.StringToNumber(node.Text())
+		if !ok {
+			return nil
 		}
-		t := true
-		return &t
+		value = number != 0
 	case ast.KindBigIntLiteral:
-		// BigInt: 0n is falsy, other values are truthy
-		text := node.Text()
-		// Check for 0n, 0x0n, 0b0n, 0o0n, etc. (case-insensitive for hex prefix)
-		if text == "0n" || text == "0x0n" || text == "0X0n" ||
-			text == "0b0n" || text == "0B0n" ||
-			text == "0o0n" || text == "0O0n" {
-			f := false
-			return &f
-		}
-		t := true
-		return &t
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		// Empty string is falsy
-		text := node.Text()
-		// Remove quotes for string literals
-		if node.Kind == ast.KindStringLiteral && len(text) >= 2 {
-			text = text[1 : len(text)-1]
-		}
-		// Remove backticks for template literals
-		if node.Kind == ast.KindNoSubstitutionTemplateLiteral && len(text) >= 2 {
-			text = text[1 : len(text)-1]
-		}
-		if len(text) == 0 {
-			f := false
-			return &f
-		}
-		t := true
-		return &t
-	case ast.KindIdentifier:
-		// undefined is falsy
-		if node.Text() == "undefined" {
-			f := false
-			return &f
-		}
+		value = utils.NormalizeBigIntLiteral(node.Text()) != "0"
+	case ast.KindStringLiteral:
+		// ts-go stores cooked text without the source quotes.
+		value = len(node.Text()) != 0
+	default:
+		return nil
 	}
-	return nil
+	return &value
 }
 
 // isLogicalIdentity checks if a node is a logical identity element
@@ -126,19 +92,6 @@ func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
 			return true
 		}
 		if operator == ast.KindAmpersandAmpersandToken && !*boolVal {
-			return true
-		}
-	}
-
-	// For ||, check if node is always truthy (regex, functions, objects, arrays, etc.)
-	if operator == ast.KindBarBarToken {
-		switch node.Kind {
-		case ast.KindRegularExpressionLiteral,
-			ast.KindArrowFunction,
-			ast.KindFunctionExpression,
-			ast.KindClassExpression,
-			ast.KindObjectLiteralExpression,
-			ast.KindArrayLiteralExpression:
 			return true
 		}
 	}
@@ -207,9 +160,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 		return true
 
 	case ast.KindIdentifier:
-		// 'undefined' and 'Infinity' are constants
-		text := node.Text()
-		return text == "undefined" || text == "Infinity"
+		return node.Text() == "undefined" && isReferenceToGlobal(ctx, node)
 
 	case ast.KindArrowFunction,
 		ast.KindFunctionExpression,
@@ -421,14 +372,7 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 			return isConstant(ctx, binary.Left, false) && isConstant(ctx, binary.Right, false)
 
 		case ast.KindInKeyword:
-			// 'in' operator: not constant if right side is object/array literal (prototype properties)
-			if binary.Right != nil {
-				rightKind := binary.Right.Kind
-				if rightKind == ast.KindObjectLiteralExpression || rightKind == ast.KindArrayLiteralExpression {
-					return false
-				}
-			}
-			return isConstant(ctx, binary.Left, false) && isConstant(ctx, binary.Right, false)
+			return false
 
 		case ast.KindInstanceOfKeyword:
 			return isConstant(ctx, binary.Left, false) && isConstant(ctx, binary.Right, false)
@@ -451,105 +395,25 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 			return isConstant(ctx, binary.Left, false) && isConstant(ctx, binary.Right, false)
 		}
 
-	case ast.KindConditionalExpression:
-		// Ternary operator - only constant if test is constant
-		cond := node.AsConditionalExpression()
-		if cond != nil && cond.Condition != nil {
-			return isConstant(ctx, cond.Condition, false)
-		}
-
 	case ast.KindNewExpression:
-		// new expressions create new objects, which are always truthy
-		// In boolean context, they're always constant (always truthy)
-		// Outside boolean context, they're constant only if constructor and args are constant
-		if inBooleanPosition {
-			return true
-		}
+		return inBooleanPosition
 
-		newExpr := node.AsNewExpression()
-		if newExpr != nil && newExpr.Expression != nil {
-			if newExpr.Expression.Kind == ast.KindIdentifier {
-				name := newExpr.Expression.Text()
-				// new Boolean(), new String(), new Number() with constant arguments are constant
-				if name == "Boolean" || name == "String" || name == "Number" {
-					// Check arguments
-					if newExpr.Arguments == nil || len(newExpr.Arguments.Nodes) == 0 {
-						return true
-					}
-					// All arguments must be constant
-					for _, arg := range newExpr.Arguments.Nodes {
-						if !isConstant(ctx, arg, false) {
-							return false
-						}
-					}
-					return true
-				}
-			}
-		}
-		return false
+	case ast.KindSpreadElement:
+		return isConstant(ctx, node.AsSpreadElement().Expression, inBooleanPosition)
 
 	case ast.KindCallExpression:
-		// Boolean(), String(), Number() calls with constant arguments are constant
-		// if the function is the global built-in (not shadowed)
-		callExpr := node.AsCallExpression()
-		if callExpr != nil && callExpr.Expression != nil && inBooleanPosition {
-			if callExpr.Expression.Kind == ast.KindIdentifier {
-				name := callExpr.Expression.Text()
-				if name == "Boolean" || name == "String" || name == "Number" {
-					// First check if this identifier is the global built-in (not shadowed)
-					// If we can't determine (no TypeChecker), conservatively assume it's NOT the global builtin
-					// to avoid false positives from shadowing
-					if ctx == nil || ctx.TypeChecker == nil || ctx.Program() == nil || ctx.SourceFile == nil {
-						// Can't check for shadowing - conservatively assume it's shadowed
-						return false
-					}
-
-					// Get the symbol at this location
-					symbol := ctx.TypeChecker.GetSymbolAtLocation(callExpr.Expression)
-					if symbol == nil {
-						// Can't resolve symbol - conservatively assume it's shadowed
-						return false
-					}
-
-					// Check if any of the symbol's declarations is from the current source file
-					// If so, it's a local shadowed variable, not the global builtin
-					for _, declaration := range symbol.Declarations {
-						declarationSourceFile := ast.GetSourceFileOfNode(declaration)
-						if declarationSourceFile != nil && declarationSourceFile == ctx.SourceFile {
-							// This is a local declaration (shadowing the global), not constant
-							return false
-						}
-					}
-
-					// Check if the symbol is from the default library (not shadowed)
-					isGlobalBuiltin := utils.IsSymbolFromDefaultLibrary(ctx.Program(), symbol)
-
-					// If it's not the global builtin, it's not constant
-					if !isGlobalBuiltin {
-						return false
-					}
-
-					// Now check if all arguments produce a constant result
-					// For Boolean(), we need to check if arguments are constant in boolean position
-					if callExpr.Arguments != nil {
-						for _, arg := range callExpr.Arguments.Nodes {
-							// Skip spread elements - they make the result non-constant
-							if arg.Kind == ast.KindSpreadElement {
-								return false
-							}
-							// For Boolean(), check if the argument is constant in boolean context
-							if !isConstant(ctx, arg, name == "Boolean") {
-								return false
-							}
-						}
-					}
-
-					// It's the global builtin with constant arguments
-					return true
-				}
-			}
+		if ast.IsOptionalChain(node) {
+			return false
 		}
-		return false
+		call := node.AsCallExpression()
+		callee := ast.SkipParentheses(call.Expression)
+		// Boolean's first argument alone controls its result, also when the
+		// call is compared or coerced outside a boolean position.
+		return callee != nil && callee.Kind == ast.KindIdentifier &&
+			callee.Text() == "Boolean" &&
+			(call.Arguments == nil || len(call.Arguments.Nodes) == 0 ||
+				isConstant(ctx, call.Arguments.Nodes[0], true)) &&
+			isReferenceToGlobal(ctx, callee)
 
 	case ast.KindPostfixUnaryExpression:
 		// ++ and -- are not constant (they modify variables)
@@ -557,6 +421,18 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 	}
 
 	return false
+}
+
+// isReferenceToGlobal combines lexical binding identity with the effective
+// language globals. RefStore works in source-only Programs too.
+func isReferenceToGlobal(ctx *rule.RuleContext, node *ast.Node) bool {
+	if ctx == nil || !ctx.Globals.Access(node.Text()).IsDeclared() {
+		return false
+	}
+	if ctx.Refs != nil {
+		return ctx.Refs.IsGlobalReference(node)
+	}
+	return !utils.IsShadowed(node, node.Text())
 }
 
 // isWhileTrueLoop checks if a loop is a `while (true)` loop
@@ -605,6 +481,11 @@ func containsYield(node *ast.Node) bool {
 		ast.KindFunctionExpression,
 		ast.KindArrowFunction:
 		return false
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
+		ast.KindConstructor:
+		// ESTree visits a computed key outside the method's FunctionExpression,
+		// but yields in its body belong to that function's own loop set.
+		return containsYield(node.Name())
 	}
 
 	// Recursively check children using ForEachChild
@@ -633,30 +514,22 @@ func shouldCheckLoop(node *ast.Node, opts Options) bool {
 		}
 	}
 
-	// Get the loop body
-	var body *ast.Node
+	// Yields encountered after a loop is tracked clear it upstream. A for
+	// initializer runs before its test is re-tracked and must be excluded.
+	// Checking the entire loop body also catches yields in nested loop headers.
+	var body, condition, incrementor *ast.Node
 	switch node.Kind {
 	case ast.KindWhileStatement:
-		whileStmt := node.AsWhileStatement()
-		if whileStmt != nil {
-			body = whileStmt.Statement
-		}
+		stmt := node.AsWhileStatement()
+		body, condition = stmt.Statement, stmt.Expression
 	case ast.KindDoStatement:
-		doStmt := node.AsDoStatement()
-		if doStmt != nil {
-			body = doStmt.Statement
-		}
+		stmt := node.AsDoStatement()
+		body, condition = stmt.Statement, stmt.Expression
 	case ast.KindForStatement:
-		forStmt := node.AsForStatement()
-		if forStmt != nil {
-			body = forStmt.Statement
-		}
+		stmt := node.AsForStatement()
+		body, condition, incrementor = stmt.Statement, stmt.Condition, stmt.Incrementor
 	}
-
-	// Don't check loops in generator functions that contain yield
-	// This applies even when checkLoops is "all"
-	// If the loop body contains a yield, don't check the loop condition
-	if body != nil && containsYield(body) {
+	if containsYield(body) || containsYield(condition) || containsYield(incrementor) {
 		return false
 	}
 
@@ -706,6 +579,7 @@ func checkCondition(ctx *rule.RuleContext, node *ast.Node, opts Options) {
 	if testExpr == nil {
 		return
 	}
+	testExpr = ast.SkipParentheses(testExpr)
 
 	// For loops, check if we should skip based on options
 	switch node.Kind {
