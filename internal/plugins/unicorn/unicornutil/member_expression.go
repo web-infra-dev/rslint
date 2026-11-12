@@ -19,6 +19,31 @@ func IsReferenceTarget(node *ast.Node) bool {
 	return node.Parent != nil && (ast.IsAssignmentTarget(node) || node.Parent.Kind == ast.KindDeleteExpression)
 }
 
+// IsReferenceContext reports whether replacing a value with a member access
+// could change its call receiver or expose a reference to an enclosing operator.
+func IsReferenceContext(node *ast.Node) bool {
+	const wrappers = ast.OEKParentheses | ast.OEKAssertions | ast.OEKExpressionsWithTypeArguments
+	for node.Parent != nil && ast.IsOuterExpression(node.Parent, wrappers) && node.Parent.Expression() == node {
+		node = node.Parent
+	}
+	if utils.IsWriteReference(node) {
+		return true
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindCallExpression:
+		return ast.IsCallExpressionTarget(node, false, false)
+	case ast.KindDeleteExpression:
+		return parent.Expression() == node
+	case ast.KindTaggedTemplateExpression:
+		return ast.IsTaggedTemplateTag(node, false, false)
+	}
+	return false
+}
+
 // ShouldAddParenthesesToMemberExpressionObject mirrors Unicorn's conservative
 // helper for turning node into the object of a member expression. This is not
 // a general precedence check: decimal integers need parentheses for lexical

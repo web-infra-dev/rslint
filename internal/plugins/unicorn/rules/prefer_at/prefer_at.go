@@ -62,7 +62,7 @@ var PreferAtRule = rule.Rule{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				access := node.AsElementAccessExpression()
 				index := utils.ESTreeRuntimeExpression(access.ArgumentExpression)
-				if index == nil || ast.NodeIsMissing(index) || isReferenceContext(node) {
+				if index == nil || ast.NodeIsMissing(index) || unicornutil.IsReferenceContext(node) {
 					return
 				}
 				length := negativeIndexLength(index, access.Expression)
@@ -195,7 +195,7 @@ func reportSlice(ctx rule.RuleContext, call unicornutil.DotMethodCall) {
 	var method unicornutil.DotMethodCall
 	if ast.IsElementAccessExpression(member) {
 		index, ok := unicornutil.SafeIntegerLiteral(member.AsElementAccessExpression().ArgumentExpression)
-		if !ok || index != 0 || isReferenceContext(member) {
+		if !ok || index != 0 || unicornutil.IsReferenceContext(member) {
 			return
 		}
 		result = member

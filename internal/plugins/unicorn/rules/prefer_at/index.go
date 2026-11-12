@@ -49,30 +49,6 @@ func isArguments(node *ast.Node) bool {
 	return node != nil && ast.IsIdentifier(node) && node.Text() == "arguments"
 }
 
-func isReferenceContext(node *ast.Node) bool {
-	// A call or tag uses the access as its receiver, and an assignment,
-	// update or delete requires a reference. TS wrappers are erased.
-	for node.Parent != nil && ast.IsOuterExpression(node.Parent, runtimeWrappers) && node.Parent.Expression() == node {
-		node = node.Parent
-	}
-	if utils.IsWriteReference(node) {
-		return true
-	}
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindCallExpression:
-		return ast.IsCallExpressionTarget(node, false, false)
-	case ast.KindDeleteExpression:
-		return parent.Expression() == node
-	case ast.KindTaggedTemplateExpression:
-		return ast.IsTaggedTemplateTag(node, false, false)
-	}
-	return false
-}
-
 func inUnparenthesizedConstructorCallee(node *ast.Node) bool {
 	for node.Parent != nil {
 		parent := node.Parent
