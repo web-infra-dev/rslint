@@ -947,6 +947,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/prefer-global-this.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-identifier-import-export-specifiers.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-iterator-zip.test.ts',
+    './tests/eslint-plugin-unicorn/rules/prefer-math-constants.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-math-min-max.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-math-trunc.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-modern-math-apis.test.ts',
