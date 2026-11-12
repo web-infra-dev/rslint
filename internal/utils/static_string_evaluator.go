@@ -2233,6 +2233,19 @@ func staticValueKindOf(value any) staticValueKind {
 	return staticKindUnknown
 }
 
+// StaticValuesSameValueZero compares two folded primitives as JavaScript Map
+// keys. Aggregate values have no modeled identity.
+func StaticValuesSameValueZero(left, right any) (equal, known bool) {
+	if !IsPrimitiveStaticValue(left) || !IsPrimitiveStaticValue(right) {
+		return false, false
+	}
+	if leftNumber, ok := left.(jsnum.Number); ok && leftNumber.IsNaN() {
+		rightNumber, ok := right.(jsnum.Number)
+		return ok && rightNumber.IsNaN(), true
+	}
+	return staticValuesStrictEqual(left, right)
+}
+
 // staticValuesStrictEqual implements the strict equality comparison over folded
 // values. Comparing across kinds is always false, including `1n === 1`.
 func staticValuesStrictEqual(left any, right any) (equal bool, ok bool) {

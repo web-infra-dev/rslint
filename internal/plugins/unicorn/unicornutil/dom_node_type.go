@@ -288,7 +288,7 @@ func (c *domNodeTypeClassifier) callReturnType(callee *ast.Node) TypeClass {
 		return TypeUnknown
 	}
 	declaration := symbol.Declarations[0]
-	function, ok := unmodifiedFunctionValue(c.ctx, symbol)
+	function, ok := UnmodifiedFunctionValue(c.ctx, symbol)
 	if !ok {
 		return TypeUnknown
 	}

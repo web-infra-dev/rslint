@@ -891,6 +891,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-invalid-remove-event-listener.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-lonely-if.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-magic-array-flat-depth.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-mismatched-map-key.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-misrefactored-assignment.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-new-array.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-new-buffer.test.ts',
