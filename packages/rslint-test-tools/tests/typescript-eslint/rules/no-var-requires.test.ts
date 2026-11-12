@@ -1,8 +1,12 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
+// Upstream: typescript-eslint v8.67.0 (10 valid, 17 invalid cases).
+// This rule supplies neither autofixes nor suggestions.
 
-
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  filename: 'input.ts',
+});
 
 ruleTester.run('no-var-requires', {
   valid: [
@@ -45,8 +49,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 11,
+          endColumn: 25,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -55,8 +62,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 13,
+          endColumn: 27,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -65,8 +75,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 11,
+          endColumn: 25,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -75,8 +88,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 17,
+          endColumn: 31,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -85,8 +101,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 11,
+          endColumn: 27,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -95,8 +114,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 13,
+          endColumn: 29,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -105,8 +127,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 11,
+          endColumn: 27,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -115,8 +140,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 17,
+          endColumn: 33,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -125,8 +153,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 19,
+          endColumn: 33,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -135,8 +166,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 13,
+          endColumn: 34,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -145,8 +179,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 18,
+          endColumn: 39,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -155,8 +192,11 @@ const json = require('./some.json');
       errors: [
         {
           column: 18,
+          endColumn: 39,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -169,13 +209,19 @@ configValidator.addSchema(require('./a.json'));
       errors: [
         {
           column: 39,
+          endColumn: 58,
+          endLine: 2,
           line: 2,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
         {
           column: 27,
+          endColumn: 46,
+          endLine: 3,
           line: 3,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -184,8 +230,11 @@ configValidator.addSchema(require('./a.json'));
       errors: [
         {
           column: 13,
+          endColumn: 38,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
     },
@@ -194,8 +243,11 @@ configValidator.addSchema(require('./a.json'));
       errors: [
         {
           column: 13,
+          endColumn: 39,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
       options: [{ allow: ['/package\\.json$'] }],
@@ -205,8 +257,11 @@ configValidator.addSchema(require('./a.json'));
       errors: [
         {
           column: 13,
+          endColumn: 38,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
       options: [{ allow: ['^some-package$'] }],
@@ -216,8 +271,11 @@ configValidator.addSchema(require('./a.json'));
       errors: [
         {
           column: 13,
+          endColumn: 38,
+          endLine: 1,
           line: 1,
           messageId: 'noVarReqs',
+          message: 'Require statement not part of import statement.',
         },
       ],
       options: [{ allow: ['^some-package$'] }],
