@@ -19,6 +19,7 @@ const diagnostic: Diagnostic = {
   message: 'Unexpected var.',
   messageId: 'unexpectedVar',
   filePath: 'input.js',
+  severity: 'error',
   range: { start: { line: 1, column: 1 }, end: { line: 1, column: 4 } },
 };
 const expected: ExpectedError = {
@@ -76,6 +77,8 @@ describe('checkDiagnostic', () => {
 
   test.each([
     ['ruleName', { ...diagnostic, ruleName: 'node/other' }, 'rule name'],
+    ['severity', { ...diagnostic, severity: 'warn' }, '.severity'],
+    ['missing severity', { ...diagnostic, severity: undefined }, '.severity'],
     ['message', { ...diagnostic, message: 'Other.' }, 'errors[0].message'],
     ['messageId', { ...diagnostic, messageId: 'other' }, '.messageId'],
     [
