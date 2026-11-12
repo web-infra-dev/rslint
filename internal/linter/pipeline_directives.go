@@ -48,10 +48,24 @@ func prepareDirectiveStates(plan *LintPlan, generation Generation, policy Observ
 	if plan == nil {
 		return nil
 	}
+	var syntaxErrors map[string]bool
+	for _, group := range plan.syntacticDiagnosticGroups {
+		for _, diagnostic := range group.diagnostics {
+			if syntaxErrors == nil {
+				syntaxErrors = make(map[string]bool)
+			}
+			syntaxErrors[diagnostic.FilePath] = true
+		}
+	}
 	var states map[string]*fileDirectives
 	for _, program := range plan.programs {
 		for _, file := range program.files {
 			source := file.file
+			// Malformed comments are unsafe to parse, and syntax-error files
+			// cannot establish directive usage through rule execution.
+			if syntaxErrors[source.FileName()] {
+				continue
+			}
 			severity := rule.SeverityOff
 			if generation.Native.UnusedDirectiveSeverity != nil {
 				severity = generation.Native.UnusedDirectiveSeverity(source.FileName())
@@ -87,13 +101,6 @@ func prepareDirectiveStates(plan *LintPlan, generation Generation, policy Observ
 				states = make(map[string]*fileDirectives)
 			}
 			states[source.FileName()] = f
-		}
-	}
-	for _, group := range plan.syntacticDiagnosticGroups {
-		for _, diagnostic := range group.diagnostics {
-			if f := states[diagnostic.FilePath]; f != nil {
-				f.failed = true
-			}
 		}
 	}
 	return states

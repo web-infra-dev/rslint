@@ -191,7 +191,7 @@ func TestMatchDirective(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			kind, rules := matchDirective(tt.input)
+			kind, rules, _ := matchDirective(tt.input)
 			if kind != tt.expectedKind {
 				t.Errorf("kind: expected %d, got %d", tt.expectedKind, kind)
 			}
@@ -674,6 +674,13 @@ func TestUnusedDisableDirectives(t *testing.T) {
 		{"partial first", "/* eslint-disable a, b -- reason */\nx();", "b", "/* eslint-disable b -- reason */\nx();", 1},
 		{"rule name substring", "/* eslint-disable bar, a -- reason */\nx();", "bar", "/* eslint-disable bar -- reason */\nx();", 1},
 		{"partial last", "/* eslint-disable a, b -- reason */\nx();", "a", "/* eslint-disable a -- reason */\nx();", 1},
+		{"no space partial first", "/* eslint-disable" + "a, b */\nx();", "b", "/* eslint-disable" + "b */\nx();", 1},
+		{"no space partial last", "/* eslint-disable" + "a, b */\nx();", "a", "/* eslint-disable" + "a */\nx();", 1},
+		{"rslint no space partial first", "/* rslint-disable" + "a, b */\nx();", "b", "/* rslint-disable" + "b */\nx();", 1},
+		{"rslint no space partial last", "/* rslint-disable" + "a, b */\nx();", "a", "/* rslint-disable" + "a */\nx();", 1},
+		{"next line no space", "// eslint-disable-next-line" + "a, b -- reason\nx();", "b", "// eslint-disable-next-line" + "b -- reason\nx();", 1},
+		{"same line no space", "x(); // rslint-disable-line" + "a,b", "a", "x(); // rslint-disable-line" + "a", 1},
+		{"enable no space", "/* eslint-disable a */\nx();\n/* eslint-enable" + "a,b */", "a", "/* eslint-disable a */\nx();\n/* eslint-enable" + "a */", 1},
 		{"empty explanation", "/* eslint-disable a, b -- */\nx();", "a", "/* eslint-disable a -- */\nx();", 1},
 		{"used empty explanation", "/* eslint-disable a -- */\nx();", "a", "", 0},
 		{"unused enable", "/* eslint-enable a */\nx();", "", " \nx();", 1},

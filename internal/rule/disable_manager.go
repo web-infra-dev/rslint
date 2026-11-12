@@ -130,7 +130,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
-		kind, rules := matchDirective(commentContent)
+		kind, rules, keywordEnd := matchDirective(commentContent)
 		if kind == directiveNone {
 			continue
 		}
@@ -173,7 +173,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 				tracked.entries = append(tracked.entries, directiveEntry{name: name})
 			}
 		}
-		tracked.locateEntries(text, commentContent)
+		tracked.locateEntries(text, commentContent, keywordEnd)
 		index := len(dm.tracked)
 		dm.tracked = append(dm.tracked, tracked)
 		if kind == directiveBlock || kind == directiveEnable {
@@ -188,8 +188,8 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 }
 
 // matchDirective checks if a comment content string is a disable/enable directive.
-// Returns the directive kind and any specified rule names.
-func matchDirective(commentContent string) (directiveKind, []string) {
+// Returns the directive kind, any specified rule names, and the keyword's end offset.
+func matchDirective(commentContent string) (directiveKind, []string, int) {
 	for _, p := range directivePrefixes {
 		var rest string
 		var kind directiveKind
@@ -209,9 +209,9 @@ func matchDirective(commentContent string) (directiveKind, []string) {
 		} else {
 			continue
 		}
-		return kind, parseRuleNames(rest)
+		return kind, parseRuleNames(rest), len(commentContent) - len(rest)
 	}
-	return directiveNone, nil
+	return directiveNone, nil, 0
 }
 
 // parseRuleNames parses rule names from a string like " rule1, rule2, rule3"

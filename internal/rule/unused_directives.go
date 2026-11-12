@@ -216,12 +216,8 @@ func (dm *DisableManager) removeEntry(d trackedDirective, name string) RuleFix {
 	return RuleFix{Range: core.NewTextRange(a, b)}
 }
 
-func (d *trackedDirective) locateEntries(text, content string) {
+func (d *trackedDirective) locateEntries(text, content string, keywordEnd int) {
 	contentStart := d.location.Pos() + 2 + strings.Index(text[d.location.Pos()+2:d.location.End()], content)
-	keywordEnd := strings.IndexFunc(content, ecmascript.IsWhiteSpaceOrLineTerminator)
-	if keywordEnd < 0 {
-		keywordEnd = len(content)
-	}
 	d.listStart = contentStart + keywordEnd
 	d.listEnd = contentStart + len(content)
 	if explanation := directiveExplanationStart(text[d.listStart:d.listEnd]); explanation >= 0 {

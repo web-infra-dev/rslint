@@ -726,6 +726,33 @@ func TestPipelineUnusedDirectives(t *testing.T) {
 	}
 }
 
+func TestPipelineUnusedDirectivesSyntaxErrors(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, demand := range []rule.EditDemand{0, rule.EditDemandAutofix} {
+			t.Run(fmt.Sprintf("%s/demand=%d", prefix, demand), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				path := tspath.ResolvePath(root, "source.ts")
+				generation := pipelineTestGeneration(t, root, path, "/* "+prefix+"-disable */\n/*", nil, nil)
+				generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+				generation.Native.DirectiveRuleExists = func(string, string) bool { return true }
+				result, err := RunPipeline(t.Context(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{
+					Demand: ArtifactDemand{Native: demand},
+				}, nil))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, complete := result.Observation.CompleteDiagnostics()
+				if !complete || len(diagnostics) != 1 || diagnostics[0].RuleName != "TypeScript(TS1010)" {
+					t.Fatalf("expected only unterminated-comment diagnostic, complete=%v: %+v", complete, diagnostics)
+				}
+				if len(diagnostics[0].Fixes()) != 0 {
+					t.Fatal("syntax-error file produced fixes")
+				}
+			})
+		}
+	}
+}
+
 func TestUnusedDirectiveCompletion(t *testing.T) {
 	for _, nativeFirst := range []bool{false, true} {
 		for _, fail := range []bool{false, true} {
