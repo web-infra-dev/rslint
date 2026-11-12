@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const errorMessage =
-  'aria-hidden="true" must not be set on focusable elements.';
-const expectedError = { message: errorMessage };
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -18,7 +15,7 @@ const polymorphicSettings = {
   },
 };
 
-new RuleTester().run('no-aria-hidden-on-focusable', null as never, {
+new RuleTester(config).run('no-aria-hidden-on-focusable', {
   valid: [
     // ---- Upstream valid ----
     { code: '<div aria-hidden="true" />;' },
@@ -123,200 +120,772 @@ new RuleTester().run('no-aria-hidden-on-focusable', null as never, {
     // ---- Upstream invalid ----
     {
       code: '<div aria-hidden="true" tabIndex="0" />;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
-    { code: '<input aria-hidden="true" />;', errors: [expectedError] },
-    { code: '<a href="/" aria-hidden="true" />', errors: [expectedError] },
-    { code: '<button aria-hidden="true" />', errors: [expectedError] },
-    { code: '<textarea aria-hidden="true" />', errors: [expectedError] },
+    {
+      code: '<input aria-hidden="true" />;',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<a href="/" aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<textarea aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
     {
       code: '<p tabindex="0" aria-hidden="true">text</p>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- aria-hidden value-extraction → boolean true ----
-    { code: '<button aria-hidden />', errors: [expectedError] },
-    { code: '<button aria-hidden={true} />', errors: [expectedError] },
-    { code: '<button aria-hidden="True" />', errors: [expectedError] },
-    { code: '<button aria-hidden="TRUE" />', errors: [expectedError] },
-    { code: '<button aria-hidden={"true"} />', errors: [expectedError] },
-    { code: '<button aria-hidden={"True"} />', errors: [expectedError] },
+    {
+      code: '<button aria-hidden />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden={true} />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden="True" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden="TRUE" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden={"true"} />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
+    {
+      code: '<button aria-hidden={"True"} />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
 
     // ---- Interactive element survey, no tabIndex ----
-    { code: '<a href="#" aria-hidden="true" />', errors: [expectedError] },
-    { code: '<area href="#" aria-hidden="true" />', errors: [expectedError] },
-    { code: '<select aria-hidden="true" />', errors: [expectedError] },
+    {
+      code: '<a href="#" aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<area href="#" aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      code: '<select aria-hidden="true" />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
 
     // ---- Non-interactive + tabIndex >= 0 ----
     {
       code: '<div aria-hidden="true" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: '<div aria-hidden="true" tabIndex={1} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: '<div aria-hidden="true" tabIndex={42} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: '<span aria-hidden="true" tabIndex="0">x</span>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: '<p aria-hidden="true" tabIndex="2">x</p>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- Boolean attribute form + interactive ----
-    { code: '<input aria-hidden />', errors: [expectedError] },
-    { code: '<a href="/" aria-hidden />', errors: [expectedError] },
-    { code: '<select aria-hidden />', errors: [expectedError] },
+    {
+      code: '<input aria-hidden />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<a href="/" aria-hidden />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<select aria-hidden />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
 
     // ---- TS wrappers around boolean true on interactive ----
-    { code: '<button aria-hidden={(true)} />', errors: [expectedError] },
+    {
+      code: '<button aria-hidden={(true)} />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
     {
       code: '<button aria-hidden={true as boolean} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
-    { code: '<input aria-hidden={(true)} />', errors: [expectedError] },
+    {
+      code: '<input aria-hidden={(true)} />',
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
 
     // ---- Logical / conditional resolving to true ----
     {
       code: '<button aria-hidden={true && true} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<button aria-hidden={false || true} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: '<button aria-hidden={true ? true : false} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
 
     // ---- components map remapping to interactive ----
     {
       code: '<Btn aria-hidden="true" />',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
 
     // ---- polymorphicPropName resolving to interactive ----
     {
       code: '<Box as="input" aria-hidden="true" />',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<Box as="button" aria-hidden="true" />',
       settings: polymorphicSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
 
     // ---- Custom component with explicit positive tabIndex ----
     {
       code: '<MyButton aria-hidden="true" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<MyButton aria-hidden="true" tabIndex="1" />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<UX.Layout aria-hidden="true" tabIndex={3} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
 
     // ---- tabIndex via expressions that staticEval resolves ----
     {
       code: '<div aria-hidden="true" tabIndex={true ? 0 : -1} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div aria-hidden="true" tabIndex={"5"} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // ---- Lowercase tabindex on interactive (case-insensitive prop) ----
     {
       code: '<button aria-hidden="true" tabindex="0" />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
 
     // ---- Nested elements report independently ----
     {
       code: '<button aria-hidden="true"><a href="/" aria-hidden="true">x</a></button>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
     },
 
     // ---- Multiple offending elements ----
     {
       code: '<form><input aria-hidden="true" /><textarea aria-hidden="true" /></form>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 35,
+        },
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
 
     // ---- Real-world component patterns ----
     {
       code: 'function Icon() { return <button aria-hidden="true">x</button>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'function Foo({cond}) { return cond ? <input aria-hidden="true" /> : <div />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 38,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
     {
       code: 'const xs = arr.map((x) => <button aria-hidden="true" key={x}>{x}</button>);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
     {
       code: 'const Wrapped = withTracking(({v}) => <input aria-hidden="true" value={v} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 77,
+        },
+      ],
     },
     {
       code: 'const x = <>{cond && <button aria-hidden="true" />}</>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: 'function A() { return <input aria-hidden="true" />; }\nfunction B() { return <textarea aria-hidden="true" />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 51,
+        },
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'function* render() { yield <input aria-hidden="true" />; yield <textarea aria-hidden="true" />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 64,
+          endLine: 1,
+          endColumn: 95,
+        },
+      ],
     },
     {
       code: 'async function render() { return <button aria-hidden="true">x</button>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: 'const x = (() => <input aria-hidden="true" />)();',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
     {
       code: 'function Modal() { return <dialog open><button aria-hidden="true">OK</button></dialog>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 40,
+          endLine: 1,
+          endColumn: 67,
+        },
+      ],
     },
     {
       code: 'class Form extends React.Component { render() { return <input aria-hidden="true" />; } }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 84,
+        },
+      ],
     },
 
     // ---- TS generic JSX ----
     {
       code: '<Cell<{a: number}> aria-hidden="true" tabIndex={0} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
 
     // ---- Comments don't suppress ----
     {
       code: '<input /* a */ aria-hidden="true" /* b */ />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<button aria-hidden={/* truthy */ true} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'noAriaHiddenOnFocusable',
+          message: 'aria-hidden="true" must not be set on focusable elements.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
   ],
 });

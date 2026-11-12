@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const components = [{ components: ['Heading', 'Title'] }];
 
@@ -12,10 +13,7 @@ const componentsSettings = {
   },
 };
 
-const errorMessage =
-  'Headings must have content and the content must be accessible by a screen reader.';
-
-new RuleTester().run('heading-has-content', null as never, {
+new RuleTester(config).run('heading-has-content', {
   valid: [
     // ---- DEFAULT ELEMENT TESTS ----
     { code: '<div />;' },
@@ -55,43 +53,139 @@ new RuleTester().run('heading-has-content', null as never, {
   ],
   invalid: [
     // ---- DEFAULT ELEMENT TESTS ----
-    { code: '<h1 />', errors: [{ message: errorMessage }] },
+    {
+      code: '<h1 />',
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
+      ],
+    },
     {
       code: '<h1><Bar aria-hidden /></h1>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
     },
-    { code: '<h1>{undefined}</h1>', errors: [{ message: errorMessage }] },
+    {
+      code: '<h1>{undefined}</h1>',
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
     {
       code: '<h1><input type="hidden" /></h1>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
     },
 
     // ---- CUSTOM ELEMENT TESTS FOR COMPONENTS OPTION ----
     {
       code: '<Heading />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
       options: components,
     },
     {
       code: '<Heading><Bar aria-hidden /></Heading>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
       options: components,
     },
     {
       code: '<Heading>{undefined}</Heading>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
       options: components,
     },
 
     // ---- CUSTOM ELEMENT TESTS FOR COMPONENTS SETTINGS ----
     {
       code: '<Heading />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
       settings: componentsSettings,
     },
     {
       code: '<h1><CustomInput type="hidden" /></h1>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'headingHasContent',
+          message:
+            'Headings must have content and the content must be accessible by a screen reader.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
       settings: componentsSettings,
     },
   ],

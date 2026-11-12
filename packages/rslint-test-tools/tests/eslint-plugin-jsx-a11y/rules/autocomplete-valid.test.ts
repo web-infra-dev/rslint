@@ -1,9 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // failMessage mirrors axe-core's `lib/checks/forms/autocomplete-valid.json`
 // `messages.fail` — the upstream ESLint rule extracts the same string via
 // `violations[0].nodes[0].all[0].message`.
-const failMessage = 'the autocomplete attribute is incorrectly formatted';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -13,7 +13,7 @@ const componentsSettings = {
   },
 };
 
-new RuleTester().run('autocomplete-valid', null as never, {
+new RuleTester(config).run('autocomplete-valid', {
   valid: [
     // Upstream `valid` block — INAPPLICABLE / PASSED AUTOCOMPLETE.
     { code: '<input type="text" />;' },
@@ -291,245 +291,697 @@ new RuleTester().run('autocomplete-valid', null as never, {
     // Upstream `invalid` block.
     {
       code: '<input type="text" autocomplete="foo" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: '<input type="text" autocomplete="name invalid" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<input type="text" autocomplete="invalid name" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<input type="text" autocomplete="home url" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
     {
       code: '<Bar autocomplete="baz"></Bar>;',
       options: [{ inputComponents: ['Bar'] }],
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: '<Input type="text" autocomplete="baz" />',
       settings: componentsSettings,
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
 
     // Extra grammar-boundary lockdowns.
     // webauthn alone is invalid.
     {
       code: '<input autocomplete="webauthn" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     // section- alone (after stripping prefix) leaves no purpose token.
     {
       code: '<input autocomplete="section-foo" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     // Bare "section-" (8 chars, NOT stripped — length must be > 8).
     {
       code: '<input autocomplete="section-" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     // Two consecutive locations.
     {
       code: '<input autocomplete="billing shipping name" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 47,
+        },
+      ],
     },
     // Two consecutive qualifiers.
     {
       code: '<input autocomplete="home work tel" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     // qualifier + standaloneTerm — only qualifiedTerms allowed after a qualifier.
     {
       code: '<input autocomplete="home name" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     // qualifier alone — no purpose token.
     {
       code: '<input autocomplete="home" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // location alone — no purpose token.
     {
       code: '<input autocomplete="billing" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     // section + location + qualifier without final field-name token.
     {
       code: '<input autocomplete="section-foo shipping work" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     // <Input autocomplete="baz"> WITHOUT a type attribute, with components map
     // — locks that the type attribute does not affect autocomplete-valid.
     {
       code: '<Input autocomplete="baz" />',
       settings: componentsSettings,
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // polymorphic resolves to <input>.
     {
       code: '<Box as="input" autocomplete="foo" />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     // Multiple invalid <input> elements at the same level.
     {
       code: '<><input autocomplete="foo" /><input autocomplete="bar" /></>',
-      errors: [{ message: failMessage }, { message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 31,
+        },
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
     },
     // Mixed valid + invalid — only the invalid one reports.
     {
       code: '<><input autocomplete="name" /><input autocomplete="foo" /></>',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     // Uppercase invalid value.
     {
       code: '<input autocomplete="FOO" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // Whitespace around an invalid value.
     {
       code: '<input autocomplete="  foo  " />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     // Paired (non-self-closing) form.
     {
       code: '<input autocomplete="foo"></input>',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     // Multi-line invalid attribute.
     {
       code: '<input\n  autocomplete="foo"\n/>',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 3,
+          endColumn: 3,
+        },
+      ],
     },
     // Spread-of-literal with invalid autocomplete — must report.
     {
       code: '<input {...{autocomplete: "foo"}} />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     // Non-excluded type still reports.
     {
       code: '<input type="email" autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     // Dynamic type → undefined to axe-core → check still runs.
     {
       code: '<input type={cond ? "hidden" : "text"} autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
     // Boolean type form — getLiteralPropValue returns true (not a string),
     // so the type filter doesn't skip.
     {
       code: '<input type autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     // TemplateExpression with substitutions — synthesized placeholder string fails grammar.
     {
       code: '<input autocomplete={`name${suffix}`} />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: '<input autocomplete={`${dynVar}`} />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: '<input autocomplete={`name ${suffix}`} />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // Attribute name case variants.
     {
       code: '<input autoComplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: '<input AUTOCOMPLETE="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
 
     // Duplicate attribute first wins.
     {
       code: '<input autocomplete="foo" autocomplete="name" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: '<input {...{autocomplete: "foo"}} autocomplete="name" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
 
     // disabled / readonly / aria-* / tabindex / role NOT excluded —
     // upstream's runVirtualRule call doesn't forward them to axe-core.
     {
       code: '<input disabled autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<input readOnly autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<input aria-disabled="true" autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<input aria-readonly="true" autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<input tabIndex={-1} autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: '<input role="presentation" autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
 
     // Type via spread that resolves to a non-excluded type → check runs.
     {
       code: '<input {...{type: "text"}} autocomplete="foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
 
     // Multi-element with progressively complex bad values.
     {
       code: '<><input autocomplete="foo" /><input autocomplete="name invalid" /><input autocomplete="home url" /></>',
       errors: [
-        { message: failMessage },
-        { message: failMessage },
-        { message: failMessage },
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 31,
+        },
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 68,
+        },
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 68,
+          endLine: 1,
+          endColumn: 101,
+        },
       ],
     },
 
     // Grammar boundaries.
     {
       code: '<input autocomplete="webauthn webauthn" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: '<input autocomplete="name section-foo" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: '<input autocomplete="section-a section-b name" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<input autocomplete="name extra webauthn" />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<input autocomplete={/* leading */ "foo" /* trailing */} />',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     // `type={"hidden" as const}` — jsx-ast-utils' LITERAL_TYPES maps
     // TSAsExpression to noop → null, so the type is unknown and the
     // autocomplete value gets validated → reported.
     {
       code: '<input type={"hidden" as const} autocomplete="foo" />;',
-      errors: [{ message: failMessage }],
+      errors: [
+        {
+          messageId: 'autocompleteValid',
+          message: 'the autocomplete attribute is incorrectly formatted',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
   ],
 });

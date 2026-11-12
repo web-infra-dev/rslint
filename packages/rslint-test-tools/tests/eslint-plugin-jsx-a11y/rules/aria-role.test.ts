@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // `aria-query`'s `roles.keys()`, partitioned by `abstract === false` / `=== true`.
 // Order matches the live aria-query output (ARIA 1.x core alphabetic,
@@ -136,24 +137,6 @@ const validRoles = [
   'graphics-symbol',
 ];
 
-const abstractRoles = [
-  'command',
-  'composite',
-  'input',
-  'landmark',
-  'range',
-  'roletype',
-  'section',
-  'sectionhead',
-  'select',
-  'structure',
-  'widget',
-  'window',
-];
-
-const errorMessage =
-  'Elements with ARIA roles must use a valid, non-abstract ARIA role.';
-
 const allowedInvalidRolesOption = [
   { allowedInvalidRoles: ['invalid-role', 'other-invalid-role'] },
 ];
@@ -166,7 +149,7 @@ const customDivSettings = {
   },
 };
 
-new RuleTester().run('aria-role', null as never, {
+new RuleTester(config).run('aria-role', {
   valid: [
     // Upstream test file — order preserved.
     { code: '<div />' },
@@ -205,59 +188,431 @@ new RuleTester().run('aria-role', null as never, {
     ...validRoles.map((role) => ({ code: `<div role="${role}" />` })),
   ],
   invalid: [
-    // Upstream test file — order preserved.
-    { code: '<div role="foobar" />', errors: [{ message: errorMessage }] },
+    {
+      code: '<div role="foobar" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
     {
       code: '<div role="datepicker"></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
-    { code: '<div role="range"></div>', errors: [{ message: errorMessage }] },
+    {
+      code: '<div role="range"></div>',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: '<div role="Button"></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
-    { code: '<div role=""></div>', errors: [{ message: errorMessage }] },
+    {
+      code: '<div role=""></div>',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
     {
       code: '<div role="tabpanel row foobar"></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: '<div role="tabpanel row range"></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div role="doc-endnotes range"></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
-    { code: '<div role />', errors: [{ message: errorMessage }] },
+    {
+      code: '<div role />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
     {
       code: '<div role="unknown-invalid-role" />',
-      options: allowedInvalidRolesOption,
-      errors: [{ message: errorMessage }],
+      options: [
+        {
+          allowedInvalidRoles: ['invalid-role', 'other-invalid-role'],
+        },
+      ],
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
-    { code: '<div role={null}></div>', errors: [{ message: errorMessage }] },
-    { code: '<Foo role="datepicker" />', errors: [{ message: errorMessage }] },
-    { code: '<Foo role="Button" />', errors: [{ message: errorMessage }] },
+    {
+      code: '<div role={null}></div>',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<Foo role="datepicker" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<Foo role="Button" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
     {
       code: '<Div role="Button" />',
-      settings: customDivSettings,
-      errors: [{ message: errorMessage }],
+      settings: {
+        'jsx-a11y': {
+          polymorphicPropName: 'asChild',
+          components: {
+            Div: 'div',
+          },
+        },
+      },
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<Div role="Button" />',
-      options: ignoreNonDOMOption,
-      settings: customDivSettings,
-      errors: [{ message: errorMessage }],
+      options: [
+        {
+          ignoreNonDOM: true,
+        },
+      ],
+      settings: {
+        'jsx-a11y': {
+          polymorphicPropName: 'asChild',
+          components: {
+            Div: 'div',
+          },
+        },
+      },
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<Box asChild="div" role="Button" />',
-      settings: customDivSettings,
-      errors: [{ message: errorMessage }],
+      settings: {
+        'jsx-a11y': {
+          polymorphicPropName: 'asChild',
+          components: {
+            Div: 'div',
+          },
+        },
+      },
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
-    // Upstream's createTests(invalidRoles) — one per abstract role.
-    ...abstractRoles.map((role) => ({
-      code: `<div role="${role}" />`,
-      errors: [{ message: errorMessage }],
-    })),
+    {
+      code: '<div role="command" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div role="composite" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div role="input" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div role="landmark" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div role="range" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div role="roletype" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div role="section" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div role="sectionhead" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<div role="select" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div role="structure" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div role="widget" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div role="window" />',
+      errors: [
+        {
+          messageId: 'invalidAriaRole',
+          message:
+            'Elements with ARIA roles must use a valid, non-abstract ARIA role.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
   ],
 });

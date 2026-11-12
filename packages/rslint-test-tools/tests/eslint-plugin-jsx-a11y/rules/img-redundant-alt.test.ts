@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const arrayOpts = [
   {
@@ -15,12 +16,7 @@ const componentsSettings = {
   },
 };
 
-const errorMessage =
-  'Redundant alt attribute. Screen-readers already announce `img` tags as an image. ' +
-  'You don’t need to use the words `image`, `photo,` or `picture` ' +
-  '(or any specified custom words) in the alt prop.';
-
-new RuleTester().run('img-redundant-alt', null as never, {
+new RuleTester(config).run('img-redundant-alt', {
   valid: [
     // ---- Upstream valid cases ----
     { code: '<img alt="foo" />;' },
@@ -172,315 +168,1202 @@ new RuleTester().run('img-redundant-alt', null as never, {
     // ---- Upstream invalid cases ----
     {
       code: '<img alt="Photo of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<img alt="Picture of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: '<img alt="Image of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<img alt="PhOtO of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<img alt={"photo"} />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<img alt="piCTUre of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: '<img alt="imAGE of friend." />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<img alt="photo of cool person" aria-hidden={false} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: '<img alt="picture of cool person" aria-hidden={false} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
     {
       code: '<img alt="image of cool person" aria-hidden={false} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: '<img alt="photo" {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<img alt="image" {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<img alt="picture" {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<img alt={`picture doing ${things}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
     },
     {
       code: '<img alt={`photo doing ${things}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: '<img alt={`image doing ${things}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: '<img alt={`picture doing ${picture}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
     {
       code: '<img alt={`photo doing ${photo}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: '<img alt={`image doing ${image}`} {...this.props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: '<Image alt="Photo of a friend" />',
       settings: componentsSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
 
     // ---- Array option tests ----
     {
       code: '<img alt="Word1" />;',
       options: arrayOpts,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<img alt="Word2" />;',
       options: arrayOpts,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<Image alt="Word1" />;',
       options: arrayOpts,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Image alt="Word2" />;',
       options: arrayOpts,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<img alt="イメージ" />',
       options: [{ words: ['イメージ'] }],
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<img alt="イメージです" />',
       options: [{ words: ['イメージ'] }],
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
 
     // ---- rslint extras ----
     {
       code: '<img alt="    photo    " />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<img alt="画像 photo" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<img alt="photo image picture" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: '<img alt={("photo")} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<img alt={(("photo"))} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<img alt={`photo`} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<img {...{alt: "photo"}} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<img {...{alt: `photo of bar`}} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: '<div><img alt="photo of bar" /></div>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: 'function L({xs}) { return xs.map(x => <img alt="photo" key={x} />); }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
     {
       code: 'class C { render() { return <img alt="picture" />; } }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: 'function f<T>(x: T) { return <img alt="image" />; }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: 'function F() { return <div>{cond && <img alt="photo" />}</div>; }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 37,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
     },
     {
       code: '<>{cond && <img alt="photo" />}</>',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<Box as="img" alt="photo of cat" />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<MyImg alt="photo of cat" />',
       settings: { 'jsx-a11y': { components: { MyImg: 'img' } } },
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // TaggedTemplate with redundant content.
-    { code: '<img alt={tag`photo`} />', errors: [{ message: errorMessage }] },
+    {
+      code: '<img alt={tag`photo`} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
     {
       code: '<img alt={tag`picture of cat`} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: '<img alt={tag`image doing ${x}`} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     // Unicode whitespace classifications — split by JS \s, redundant token.
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo﻿bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo　bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
-    { code: '<img alt={"photo bar"} />', errors: [{ message: errorMessage }] },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo﻿bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo　bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 2,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 2,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<img alt={"photo bar"} />',
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
     // Real-world React patterns with redundancy.
     {
       code: 'const Logo = () => <img alt="Photo of brand" />;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: 'const X = forwardRef((p, r) => <img ref={r} alt="photo of x" />);',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 64,
+        },
+      ],
     },
     {
       code: 'const Y = memo(() => <img alt="photo of memo" />);',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: 'function H() { useEffect(() => {}); return <img alt="picture hook" />; }',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 44,
+          endLine: 1,
+          endColumn: 70,
+        },
+      ],
     },
     {
       code: 'const j = (() => <img alt="photo iife" />)();',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: 'const o = { render() { return <img alt="photo method" />; } };',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
     {
       code: 'function G({c}) { return c ? <img alt="photo true" /> : <img alt="picture false" />; }',
-      errors: [{ message: errorMessage }, { message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 54,
+        },
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 57,
+          endLine: 1,
+          endColumn: 84,
+        },
+      ],
     },
     {
       code: 'const T = <section><header><img alt="photo header" /></header></section>;',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: '<><img alt="photo" /><img alt="picture" /></>',
-      errors: [{ message: errorMessage }, { message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 22,
+        },
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: '<img alt="photo cat" aria-label="Cat" aria-describedby="d1" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
       code: '<img aria-labelledby="x" alt="photo of y" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<img src="x" srcSet="x@2x" sizes="100vw" alt="photo of bar" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
       code: '<img onClick={f} onLoad={g} alt="photo handler" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
     },
     {
       code: '<img data-test="x" data-foo="y" alt="photo data" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<img role="presentation" alt="photo role" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: '<img {...a} {...b} alt="photo" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: '<img {...{src: "x", alt: "photo"}} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<img alt="🐱 photo of cat" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: '<img alt="A NICE PHOTO TODAY" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: '<img alt="    photo" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<img alt="photo    " />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<img alt="lovely photo today" />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     // AssignmentExpression — LITERAL_TYPES inherits TYPES, synthesizes
     // "x = photo" string → fires.
     {
       code: '<img alt={x = "photo"} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<img alt={x += "image"} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<img alt={x ||= "picture"} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // Parenthesized ObjectLiteral spread — ESTree folds parens, ObjectExpression matches.
     {
       code: '<img {...({alt: "photo"})} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'redundantAlt',
+          message:
+            'Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
   ],
 });

@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const htmlTopSettings = {
   'jsx-a11y': {
@@ -8,9 +9,7 @@ const htmlTopSettings = {
   },
 };
 
-const errorMessage = '<html> elements must have the lang prop.';
-
-new RuleTester().run('html-has-lang', null as never, {
+new RuleTester(config).run('html-has-lang', {
   valid: [
     { code: '<div />;' },
     { code: '<html lang="en" />' },
@@ -23,20 +22,56 @@ new RuleTester().run('html-has-lang', null as never, {
   invalid: [
     {
       code: '<html />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'htmlHasLang',
+          message: '<html> elements must have the lang prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
     },
     {
       code: '<html {...props} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'htmlHasLang',
+          message: '<html> elements must have the lang prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<html lang={undefined} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'htmlHasLang',
+          message: '<html> elements must have the lang prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<HTMLTop />',
       settings: htmlTopSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'htmlHasLang',
+          message: '<html> elements must have the lang prop.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
   ],
 });

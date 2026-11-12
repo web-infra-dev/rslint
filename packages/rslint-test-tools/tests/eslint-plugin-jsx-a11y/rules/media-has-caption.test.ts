@@ -1,9 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const expectedError = {
-  message:
-    'Media elements such as <audio> and <video> must have a <track> for captions.',
-};
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const customSchema = {
   audio: ['Audio'],
@@ -22,7 +18,7 @@ const componentsSettings = {
   },
 };
 
-new RuleTester().run('media-has-caption', null as never, {
+new RuleTester(config).run('media-has-caption', {
   valid: [
     // ---- Upstream valid ----
     { code: '<div />;' },
@@ -176,193 +172,839 @@ new RuleTester().run('media-has-caption', null as never, {
   ],
   invalid: [
     // ---- Upstream invalid ----
-    { code: '<audio><track /></audio>', errors: [expectedError] },
+    {
+      code: '<audio><track /></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
     {
       code: '<audio><track kind="subtitles" /></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
-    { code: '<audio />', errors: [expectedError] },
-    { code: '<video><track /></video>', errors: [expectedError] },
+    {
+      code: '<audio />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<video><track /></video>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
     {
       code: '<video><track kind="subtitles" /></video>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Audio muted={false}></Audio>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Video muted={false}></Video>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Audio muted={false}></Audio>',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Video muted={false}></Video>',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
-    { code: '<video />', errors: [expectedError] },
-    { code: '<audio>Foo</audio>', errors: [expectedError] },
-    { code: '<video>Foo</video>', errors: [expectedError] },
-    { code: '<Audio />', options: [customSchema], errors: [expectedError] },
-    { code: '<Video />', options: [customSchema], errors: [expectedError] },
+    {
+      code: '<video />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<audio>Foo</audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '<video>Foo</video>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '<Audio />',
+      options: [customSchema],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<Video />',
+      options: [customSchema],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
     {
       code: '<Audio />',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: '<Video />',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: '<audio><Track /></audio>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<video><Track /></video>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Audio><Track kind="subtitles" /></Audio>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Video><Track kind="subtitles" /></Video>',
       options: [customSchema],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Audio><Track kind="subtitles" /></Audio>',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Video><Track kind="subtitles" /></Video>',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<Box as="audio"><Track kind="subtitles" /></Box>',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
 
     // ---- Paired form: report on the OPENING element only ----
-    { code: '<audio>scrolling</audio>', errors: [expectedError] },
-    { code: '<audio></audio>', errors: [expectedError] },
+    {
+      code: '<audio>scrolling</audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '<audio></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
 
     // ---- Same-kind / cross-kind nesting: each fires independently ----
     {
       code: '<video><audio /></video>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: '<audio><video><track kind="captions" /></video></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
 
     // ---- Muted edge shapes — only strict literal `true` silences ----
-    { code: '<audio muted={undefined} />', errors: [expectedError] },
-    { code: '<audio muted={null} />', errors: [expectedError] },
-    { code: '<audio muted={someVar} />', errors: [expectedError] },
-    { code: '<audio muted={1} />', errors: [expectedError] },
-    { code: '<audio muted="anything" />', errors: [expectedError] },
-    { code: '<audio muted={cond ? true : false} />', errors: [expectedError] },
-    { code: '<audio muted={!true} />', errors: [expectedError] },
-    { code: '<audio muted={true as any} />', errors: [expectedError] },
-    { code: '<audio muted={`true`} />', errors: [expectedError] },
+    {
+      code: '<audio muted={undefined} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={null} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={someVar} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={1} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<audio muted="anything" />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={cond ? true : false} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={!true} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={true as any} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: '<audio muted={`true`} />',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
 
     // ---- Captions extraction edge shapes ----
     {
       code: '<audio><track kind={someVar} /></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<audio><track kind={cond ? "captions" : "subtitles"} /></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
-    { code: '<audio><track kind="" /></audio>', errors: [expectedError] },
-    { code: '<audio><track kind={""} /></audio>', errors: [expectedError] },
-    { code: '<audio><track kind="true" /></audio>', errors: [expectedError] },
+    {
+      code: '<audio><track kind="" /></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '<audio><track kind={""} /></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '<audio><track kind="true" /></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
     {
       code: '<audio><track kind={"captions" as string} /></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
-    { code: '<audio><track kind /></audio>', errors: [expectedError] },
+    {
+      code: '<audio><track kind /></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
+    },
     {
       code: '<audio><track kind="subtitles" /><track kind="metadata" /></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
 
     // ---- Filter rejects JsxFragment / JsxExpression children ----
     {
       code: '<audio><><track kind="captions" /></></audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<audio>{cond && <track kind="captions" />}</audio>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
 
     // ---- Spread attributes don't carry muted / muted=false ----
-    { code: '<audio {...props}></audio>', errors: [expectedError] },
-    { code: '<audio {...{muted: false}}></audio>', errors: [expectedError] },
+    {
+      code: '<audio {...props}></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<audio {...{muted: false}}></audio>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
 
     // ---- Options extension via array-wrapped JSON shape ----
     {
       code: '<MyAudio />',
       options: [{ audio: ['MyAudio'] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: '<audio><MyTrack kind="subtitles" /></audio>',
       options: [{ track: ['MyTrack'] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: '<MyAudio><MyTrack kind="subtitles" /></MyAudio>',
       options: [{ audio: ['MyAudio'], track: ['MyTrack'] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: '<MyVideo />',
       options: [{ video: ['MyVideo'] }],
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
 
     // ---- Settings: components map ----
     {
       code: '<MyAudio />',
       settings: { 'jsx-a11y': { components: { MyAudio: 'audio' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: '<MyVideo />',
       settings: { 'jsx-a11y': { components: { MyVideo: 'video' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: '<audio />',
       settings: { 'jsx-a11y': { components: { audio: 'audio' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
 
     // ---- Polymorphic without allow-list ----
     {
       code: '<Foo as="audio" />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
 
     // ---- Polymorphic + components combo / chain ----
@@ -374,7 +1016,17 @@ new RuleTester().run('media-has-caption', null as never, {
           components: { Foo: 'div' },
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<Foo as="Bar" />',
@@ -384,29 +1036,114 @@ new RuleTester().run('media-has-caption', null as never, {
           components: { Bar: 'audio' },
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
 
     // ---- Real-world component patterns ----
     {
       code: 'function Banner() { return <video />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'const x = items.map(item => <video key={item.id} />)',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: 'const x = cond ? <audio /> : <div />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: 'class C { render() { return <div><audio /><video /></div>; } }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 43,
+        },
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
 
     // ---- Listener boundary: wrapped in non-media ----
-    { code: '<div><audio /></div>', errors: [expectedError] },
-    { code: '<><audio /></>', errors: [expectedError] },
+    {
+      code: '<div><audio /></div>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<><audio /></>',
+      errors: [
+        {
+          messageId: 'mediaHasCaption',
+          message:
+            'Media elements such as <audio> and <video> must have a <track> for captions.',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
   ],
 });

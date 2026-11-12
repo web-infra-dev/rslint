@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -8,9 +9,7 @@ const componentsSettings = {
   },
 };
 
-const errorMessage = '<iframe> elements must have a unique title property.';
-
-new RuleTester().run('iframe-has-title', null as never, {
+new RuleTester(config).run('iframe-has-title', {
   valid: [
     { code: '<div />;' },
     { code: '<iframe title="Unique title" />' },
@@ -22,23 +21,149 @@ new RuleTester().run('iframe-has-title', null as never, {
     },
   ],
   invalid: [
-    { code: '<iframe />', errors: [{ message: errorMessage }] },
-    { code: '<iframe {...props} />', errors: [{ message: errorMessage }] },
+    {
+      code: '<iframe />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<iframe {...props} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     {
       code: '<iframe title={undefined} />',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
-    { code: '<iframe title="" />', errors: [{ message: errorMessage }] },
-    { code: '<iframe title={false} />', errors: [{ message: errorMessage }] },
-    { code: '<iframe title={true} />', errors: [{ message: errorMessage }] },
-    { code: "<iframe title={''} />", errors: [{ message: errorMessage }] },
-    { code: '<iframe title={``} />', errors: [{ message: errorMessage }] },
-    { code: '<iframe title={""} />', errors: [{ message: errorMessage }] },
-    { code: '<iframe title={42} />', errors: [{ message: errorMessage }] },
+    {
+      code: '<iframe title="" />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<iframe title={false} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<iframe title={true} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: "<iframe title={''} />",
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<iframe title={``} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<iframe title={""} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<iframe title={42} />',
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     {
       code: '<FooComponent />',
       settings: componentsSettings,
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'iframeHasTitle',
+          message: '<iframe> elements must have a unique title property.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
   ],
 });

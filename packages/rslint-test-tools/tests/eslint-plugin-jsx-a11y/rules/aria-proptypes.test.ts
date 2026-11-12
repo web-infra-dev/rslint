@@ -1,95 +1,16 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // Mirrors aria-query's `ariaPropsMap` — keyed by lowercase canonical name.
 // Used to drive procedural error-message generation, matching upstream's
 // `__tests__/src/rules/aria-proptypes-test.js` local `errorMessage(name)`
 // helper which looks up `aria.get(name.toLowerCase())`.
-const ariaPropertyDefinitions: Record<
-  string,
-  { type: string; values?: (string | boolean)[] }
-> = {
-  'aria-activedescendant': { type: 'id' },
-  'aria-atomic': { type: 'boolean' },
-  'aria-autocomplete': {
-    type: 'token',
-    values: ['inline', 'list', 'both', 'none'],
-  },
-  'aria-busy': { type: 'boolean' },
-  'aria-checked': { type: 'tristate' },
-  'aria-colcount': { type: 'integer' },
-  'aria-controls': { type: 'idlist' },
-  'aria-current': {
-    type: 'token',
-    values: ['page', 'step', 'location', 'date', 'time', true, false],
-  },
-  'aria-describedby': { type: 'idlist' },
-  'aria-details': { type: 'id' },
-  'aria-disabled': { type: 'boolean' },
-  'aria-dropeffect': {
-    type: 'tokenlist',
-    values: ['copy', 'execute', 'link', 'move', 'none', 'popup'],
-  },
-  'aria-errormessage': { type: 'id' },
-  'aria-expanded': { type: 'boolean' },
-  'aria-grabbed': { type: 'boolean' },
-  'aria-haspopup': {
-    type: 'token',
-    values: [false, true, 'menu', 'listbox', 'tree', 'grid', 'dialog'],
-  },
-  'aria-hidden': { type: 'boolean' },
-  'aria-invalid': {
-    type: 'token',
-    values: ['grammar', false, 'spelling', true],
-  },
-  'aria-label': { type: 'string' },
-  'aria-labelledby': { type: 'idlist' },
-  'aria-level': { type: 'integer' },
-  'aria-live': { type: 'token', values: ['assertive', 'off', 'polite'] },
-  'aria-orientation': {
-    type: 'token',
-    values: ['vertical', 'undefined', 'horizontal'],
-  },
-  'aria-posinset': { type: 'integer' },
-  'aria-pressed': { type: 'tristate' },
-  'aria-relevant': {
-    type: 'tokenlist',
-    values: ['additions', 'all', 'removals', 'text'],
-  },
-  'aria-rowcount': { type: 'integer' },
-  'aria-selected': { type: 'boolean' },
-  'aria-setsize': { type: 'integer' },
-  'aria-sort': {
-    type: 'token',
-    values: ['ascending', 'descending', 'none', 'other'],
-  },
-  'aria-valuemax': { type: 'number' },
-  'aria-valuemin': { type: 'number' },
-  'aria-valuenow': { type: 'number' },
-};
 
 // Mirrors the rule's `errorMessage(name, type, permittedValues)`.
 // `${permittedValues}` interpolation hits `Array.prototype.toString` and
 // joins with a bare comma (no space). Booleans stringify as "true"/"false".
-const errorMessage = (name: string): string => {
-  const def = ariaPropertyDefinitions[name.toLowerCase()];
-  const { type, values: permittedValues = [] } = def;
-  switch (type) {
-    case 'tristate':
-      return `The value for ${name} must be a boolean or the string "mixed".`;
-    case 'token':
-      return `The value for ${name} must be a single token from the following: ${permittedValues.join(',')}.`;
-    case 'tokenlist':
-      return `The value for ${name} must be a list of one or more tokens from the following: ${permittedValues.join(',')}.`;
-    case 'idlist':
-      return `The value for ${name} must be a list of strings that represent DOM element IDs (idlist)`;
-    case 'id':
-      return `The value for ${name} must be a string that represents a DOM element ID`;
-    default:
-      return `The value for ${name} must be a ${type}.`;
-  }
-};
 
-new RuleTester().run('aria-proptypes', null as never, {
+new RuleTester(config).run('aria-proptypes', {
   valid: [
     // Upstream test file — order preserved.
     { code: '<div aria-foo="true" />' },
@@ -260,207 +181,664 @@ new RuleTester().run('aria-proptypes', null as never, {
     // Upstream test file — order preserved.
     {
       code: '<div aria-hidden="yes" />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-hidden="no" />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<div aria-hidden={1234} />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-hidden={`${abc}`} />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<div aria-label />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: '<div aria-label={true} />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-label={false} />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-label={1234} />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-label={!true} />',
-      errors: [{ message: errorMessage('aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-checked="yes" />',
-      errors: [{ message: errorMessage('aria-checked') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-checked must be a boolean or the string "mixed".',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-checked="no" />',
-      errors: [{ message: errorMessage('aria-checked') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-checked must be a boolean or the string "mixed".',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-checked={1234} />',
-      errors: [{ message: errorMessage('aria-checked') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-checked must be a boolean or the string "mixed".',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: '<div aria-checked={`${abc}`} />',
-      errors: [{ message: errorMessage('aria-checked') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-checked must be a boolean or the string "mixed".',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: '<div aria-level="yes" />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<div aria-level="no" />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: '<div aria-level={`abc`} />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-level={true} />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-level />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: '<div aria-level={"false"} />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<div aria-level={!"false"} />',
-      errors: [{ message: errorMessage('aria-level') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-level must be a integer.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax="yes" />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax="no" />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax={`abc`} />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax={true} />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax={"false"} />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: '<div aria-valuemax={!"false"} />',
-      errors: [{ message: errorMessage('aria-valuemax') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-valuemax must be a number.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: '<div aria-sort="" />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: '<div aria-sort="descnding" />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<div aria-sort />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
     },
     {
       code: '<div aria-sort={true} />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<div aria-sort={"false"} />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: '<div aria-sort="ascending descending" />',
-      errors: [{ message: errorMessage('aria-sort') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-sort must be a single token from the following: ascending,descending,none,other.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: '<div aria-relevant="" />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<div aria-relevant="foobar" />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<div aria-relevant />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: '<div aria-relevant={true} />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<div aria-relevant={"false"} />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: '<div aria-relevant="additions removalss" />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: '<div aria-relevant="additions removalss " />',
-      errors: [{ message: errorMessage('aria-relevant') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // Extra rslint lockdowns.
     // Case-insensitive: message reflects ORIGINAL (cased) name.
     {
       code: '<div ARIA-HIDDEN="yes" />',
-      errors: [{ message: 'The value for ARIA-HIDDEN must be a boolean.' }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for ARIA-HIDDEN must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div Aria-Hidden={1234} />',
-      errors: [{ message: 'The value for Aria-Hidden must be a boolean.' }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for Aria-Hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     // Parenthesized invalid still reports.
     {
       code: '<div aria-hidden={(1234)} />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     // aria-haspopup unknown token.
     {
       code: '<div aria-haspopup="dropdown" />',
-      errors: [{ message: errorMessage('aria-haspopup') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-haspopup must be a single token from the following: false,true,menu,listbox,tree,grid,dialog.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // aria-orientation unknown token.
     {
       code: '<div aria-orientation="diagonal" />',
-      errors: [{ message: errorMessage('aria-orientation') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-orientation must be a single token from the following: vertical,undefined,horizontal.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     // aria-pressed invalid.
     {
       code: '<div aria-pressed="partial" />',
-      errors: [{ message: errorMessage('aria-pressed') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message:
+            'The value for aria-pressed must be a boolean or the string "mixed".',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     // Nested JSX with invalid attrs at multiple depths.
     {
       code: '<main><section><h2 aria-hidden="yes"><span aria-label={1} /></h2></section></main>',
       errors: [
-        { message: errorMessage('aria-hidden') },
-        { message: errorMessage('aria-label') },
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 37,
+        },
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-label must be a string.',
+          line: 1,
+          column: 44,
+          endLine: 1,
+          endColumn: 58,
+        },
       ],
     },
     // Mixed valid + invalid attrs on a single element.
     {
       code: '<div aria-label="ok" aria-hidden="yes" aria-level={3} />',
-      errors: [{ message: errorMessage('aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaPropType',
+          message: 'The value for aria-hidden must be a boolean.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
   ],
 });

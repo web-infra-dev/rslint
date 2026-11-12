@@ -1,4 +1,5 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 // Mirrors aria-query's `aria.keys()` — the canonical list of recognized
 // ARIA states and properties. Used to drive procedural valid-test generation
@@ -58,17 +59,12 @@ const ariaAttributes = [
   'aria-valuetext',
 ];
 
-const bareMessage = (name: string) =>
-  `${name}: This attribute is an invalid ARIA attribute.`;
-const withSuggestions = (name: string, ...suggestions: string[]) =>
-  `${bareMessage(name)} Did you mean to use ${suggestions.join(',')}?`;
-
 // Each recognized aria attribute round-trips clean on a `<div>` element.
 const basicValidityTests = ariaAttributes.map((prop) => ({
   code: `<div ${prop}="foobar" />`,
 }));
 
-new RuleTester().run('aria-props', null as never, {
+new RuleTester(config).run('aria-props', {
   valid: [
     // Upstream literal valid cases.
     { code: '<div />' },
@@ -183,77 +179,209 @@ new RuleTester().run('aria-props', null as never, {
     // Upstream literal invalid cases.
     {
       code: '<div aria-="foobar" />',
-      errors: [{ message: bareMessage('aria-') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<div aria-labeledby="foobar" />',
       errors: [
-        { message: withSuggestions('aria-labeledby', 'aria-labelledby') },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-labeledby: This attribute is an invalid ARIA attribute. Did you mean to use aria-labelledby?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
       ],
     },
     {
       code: '<div aria-skldjfaria-klajsd="foobar" />',
-      errors: [{ message: bareMessage('aria-skldjfaria-klajsd') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-skldjfaria-klajsd: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     // Multiple invalid aria attributes on one element.
     {
       code: '<div aria-labeledby="x" aria-describeby="y" />',
       errors: [
-        { message: withSuggestions('aria-labeledby', 'aria-labelledby') },
-        { message: withSuggestions('aria-describeby', 'aria-describedby') },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-labeledby: This attribute is an invalid ARIA attribute. Did you mean to use aria-labelledby?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-describeby: This attribute is an invalid ARIA attribute. Did you mean to use aria-describedby?',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 44,
+        },
       ],
     },
     // Mix of valid + invalid — only invalid reports.
     {
       code: '<div aria-hidden aria-foo="x" aria-label="y" />',
-      errors: [{ message: bareMessage('aria-foo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-foo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // Multi-line.
     {
       code: '<div\n  aria-typo="x"\n/>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 2,
+          column: 3,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
     },
     // Boolean form of invalid aria-*.
     {
       code: '<div aria-foobar />',
-      errors: [{ message: bareMessage('aria-foobar') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-foobar: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // Component (capitalized) with invalid aria-*.
     {
       code: '<MyComponent aria-typo="x" />',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     // Child JSX element carries the invalid attribute.
     {
       code: '<div><span aria-bogus="x" /></div>',
-      errors: [{ message: bareMessage('aria-bogus') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-bogus: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     // Inside Array.map callback.
     {
       code: 'function L({xs}) { return xs.map(x => <div aria-typo="y" key={x} />); }',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 44,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
     // Self-closing without trailing space.
     {
       code: '<div aria-foo="x"/>',
-      errors: [{ message: bareMessage('aria-foo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-foo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     // JSX fragment.
     {
       code: '<>{cond && <div aria-typo="y">x</div>}</>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // TS type-assertion on value of invalid attribute — name extraction
     // is unaffected by value-side wrappers.
     {
       code: '<div aria-typo={"x" as const} />',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     // Suggestion ranking with a close typo to a long attribute.
     {
       code: '<div aria-describeby="x" />',
       errors: [
-        { message: withSuggestions('aria-describeby', 'aria-describedby') },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-describeby: This attribute is an invalid ARIA attribute. Did you mean to use aria-describedby?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
     // Lowercase prefix + uppercase suffix — `aria.has` is case-sensitive
@@ -262,192 +390,579 @@ new RuleTester().run('aria-props', null as never, {
     {
       code: '<div aria-LABEL="x" />',
       errors: [
-        { message: withSuggestions('aria-LABEL', 'aria-label', 'aria-level') },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-LABEL: This attribute is an invalid ARIA attribute. Did you mean to use aria-label,aria-level?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: '<div aria-Hidden />',
-      errors: [{ message: withSuggestions('aria-Hidden', 'aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-Hidden: This attribute is an invalid ARIA attribute. Did you mean to use aria-hidden?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // Deeply nested JSX.
     {
       code: '<section><article><header><h1 aria-typo="x" /></header></article></section>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
     },
     // Invalid attribute on outer AND inner — no bleed across boundaries.
     // Far-from-canonical names so suggestion ranking doesn't interfere.
     {
       code: '<div aria-zzzz="o"><span aria-qxqq="i" /></div>',
       errors: [
-        { message: bareMessage('aria-zzzz') },
-        { message: bareMessage('aria-qxqq') },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-zzzz: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-qxqq: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 39,
+        },
       ],
     },
     // Conditional rendering — JSX in a ternary arm.
     {
       code: 'function F({c}: {c: boolean}) { return c ? <div aria-typo /> : null; }',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 49,
+          endLine: 1,
+          endColumn: 58,
+        },
+      ],
     },
     // JSX as a call argument.
     {
       code: 'render(<div aria-typo="x" />);',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     // Distance-2 typo — still within THRESHOLD.
     {
       code: '<div aria-rowind="x" />',
-      errors: [{ message: withSuggestions('aria-rowind', 'aria-rowindex') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-rowind: This attribute is an invalid ARIA attribute. Did you mean to use aria-rowindex?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     // Distance-3 typo — past THRESHOLD, no suggestion suffix.
     {
       code: '<div aria-rowin="x" />',
-      errors: [{ message: bareMessage('aria-rowin') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-rowin: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     // Adjacent transposition typo — OSA distance 1 (swap i↔d from
     // `aria-hidden`). Locks the transposition arm of OSA.
     {
       code: '<div aria-hdiden />',
-      errors: [{ message: withSuggestions('aria-hdiden', 'aria-hidden') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-hdiden: This attribute is an invalid ARIA attribute. Did you mean to use aria-hidden?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // Real-user typos with suggestions.
     {
       code: '<div aria-readyonly="true" />',
-      errors: [{ message: withSuggestions('aria-readyonly', 'aria-readonly') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-readyonly: This attribute is an invalid ARIA attribute. Did you mean to use aria-readonly?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<div aria-busys="true" />',
-      errors: [{ message: withSuggestions('aria-busys', 'aria-busy') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-busys: This attribute is an invalid ARIA attribute. Did you mean to use aria-busy?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-checke="true" />',
-      errors: [{ message: withSuggestions('aria-checke', 'aria-checked') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-checke: This attribute is an invalid ARIA attribute. Did you mean to use aria-checked?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: '<div aria-haspup="menu" />',
-      errors: [{ message: withSuggestions('aria-haspup', 'aria-haspopup') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-haspup: This attribute is an invalid ARIA attribute. Did you mean to use aria-haspopup?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
     },
     // User confuses native HTML / React props with ARIA.
     {
       code: '<div aria-tabindex="0" />',
-      errors: [{ message: bareMessage('aria-tabindex') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-tabindex: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<div aria-onclick={handler} />',
-      errors: [{ message: bareMessage('aria-onclick') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-onclick: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<div aria-class="x" />',
-      errors: [{ message: bareMessage('aria-class') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-class: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<div aria-id="x" aria-style="color: red" />',
       errors: [
-        { message: bareMessage('aria-id') },
-        { message: bareMessage('aria-style') },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-id: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-style: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 41,
+        },
       ],
     },
     // AST shape edges: JSX in expression child / prop value / array /
     // object / arrow body / library wrappers.
     {
       code: '<div>{<span aria-typo="x" />}</div>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<Outer icon={<span aria-typo="x" />} />',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: 'const xs = [<div key="a" aria-typo="x" />];',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: 'const m = { a: <div aria-typo="x" /> };',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: 'const f = () => <div aria-typo="x" />;',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'const X = React.forwardRef((p, r) => <div ref={r} aria-typo="x" />);',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 51,
+          endLine: 1,
+          endColumn: 64,
+        },
+      ],
     },
     {
       code: 'function F() { return React.useMemo(() => <div aria-typo="x" />, []); }',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: '<Suspense fallback={<div aria-typo="x" />}><Page /></Suspense>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     // Spread interleaved with invalid named attr — spread not inspected.
     {
       code: '<div {...a} aria-typo="x" {...b} />',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: "<div {...{'aria-hidden': true}} aria-typo />",
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     // settings cannot make `aria-typo` valid — rule doesn't read it.
     {
       code: '<Foo aria-typo="x" />',
       settings: { 'jsx-a11y': { components: { Foo: 'div' } } },
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     // Stress: many invalid + valid attrs interleaved.
     {
       code: '<div aria-foo="1" aria-hidden aria-bar="2" aria-label="x" aria-baz="3" aria-qux="4" aria-quux="5" />',
       errors: [
-        { message: bareMessage('aria-foo') },
-        { message: bareMessage('aria-bar') },
-        { message: bareMessage('aria-baz') },
-        { message: bareMessage('aria-qux') },
-        { message: bareMessage('aria-quux') },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-foo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-bar: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 43,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-baz: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 59,
+          endLine: 1,
+          endColumn: 71,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-qux: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 72,
+          endLine: 1,
+          endColumn: 84,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-quux: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 85,
+          endLine: 1,
+          endColumn: 98,
+        },
       ],
     },
     // Algorithm extremes.
     {
       code: '<div aria-thisisaveryverylongbogusattributename="x" />',
       errors: [
-        { message: bareMessage('aria-thisisaveryverylongbogusattributename') },
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-thisisaveryverylongbogusattributename: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 52,
+        },
       ],
     },
     {
       code: '<div aria-a="x" />',
-      errors: [{ message: bareMessage('aria-a') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-a: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: '<div aria-foo123="x" />',
-      errors: [{ message: bareMessage('aria-foo123') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-foo123: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: '<div aria-label- />',
-      errors: [{ message: withSuggestions('aria-label-', 'aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria-label-: This attribute is an invalid ARIA attribute. Did you mean to use aria-label?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: '<div aria--label />',
-      errors: [{ message: withSuggestions('aria--label', 'aria-label') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message:
+            'aria--label: This attribute is an invalid ARIA attribute. Did you mean to use aria-label?',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // Deeply nested JSX with invalid attrs at multiple depths.
     {
       code: '<main><section><article><h2 aria-t1="a"><span aria-t2="b" /></h2></article></section></main>',
       errors: [
-        { message: bareMessage('aria-t1') },
-        { message: bareMessage('aria-t2') },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-t1: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 40,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-t2: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 47,
+          endLine: 1,
+          endColumn: 58,
+        },
       ],
     },
     // Component with mixed custom + invalid aria attrs.
     {
       code: '<MyButton onClick={fn} disabled aria-typo title="x">label</MyButton>',
-      errors: [{ message: bareMessage('aria-typo') }],
+      errors: [
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-typo: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     // Outer + inner invalid aria — both report.
     {
       code: '<div aria-outer="x" content={<span aria-inner="y" />}>k</div>',
       errors: [
-        { message: bareMessage('aria-outer') },
-        { message: bareMessage('aria-inner') },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-outer: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'invalidAriaProp',
+          message: 'aria-inner: This attribute is an invalid ARIA attribute.',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 50,
+        },
       ],
     },
   ],

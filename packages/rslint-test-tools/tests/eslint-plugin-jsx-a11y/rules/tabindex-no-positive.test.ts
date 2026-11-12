@@ -1,9 +1,7 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const errorMessage = 'Avoid positive integer values for tabIndex.';
-const expectedError = { message: errorMessage };
-
-new RuleTester().run('tabindex-no-positive', null as never, {
+new RuleTester(config).run('tabindex-no-positive', {
   valid: [
     // ============================================================
     // Upstream-suite valid cases
@@ -247,162 +245,952 @@ new RuleTester().run('tabindex-no-positive', null as never, {
     // ============================================================
     // Upstream-suite invalid cases
     // ============================================================
-    { code: '<div tabIndex="1" />', errors: [expectedError] },
-    { code: '<div tabIndex={1} />', errors: [expectedError] },
-    { code: '<div tabIndex={"1"} />', errors: [expectedError] },
-    { code: '<div tabIndex={`1`} />', errors: [expectedError] },
-    { code: '<div tabIndex={1.589} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="1" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={"1"} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={`1`} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1.589} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
 
     // ============================================================
     // String "true" → boolean coercion
     // ============================================================
-    { code: '<div tabIndex="true" />', errors: [expectedError] },
-    { code: '<div tabIndex="True" />', errors: [expectedError] },
-    { code: '<div tabIndex="TRUE" />', errors: [expectedError] },
-    { code: '<div tabIndex={"true"} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="true" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="True" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="TRUE" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={"true"} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
 
     // ============================================================
     // Boolean attribute form / direct true
     // ============================================================
-    { code: '<div tabIndex />', errors: [expectedError] },
-    { code: '<div tabIndex={true} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={true} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
 
     // ============================================================
     // Non-integer numerics (explicit divergence from no-noninteractive-tabindex)
     // ============================================================
-    { code: '<div tabIndex={0.5} />', errors: [expectedError] },
-    { code: '<div tabIndex={1.5} />', errors: [expectedError] },
-    { code: '<div tabIndex="0.5" />', errors: [expectedError] },
-    { code: '<div tabIndex="1.5" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0.5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1.5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0.5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="1.5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
 
     // ============================================================
     // Numeric variations
     // ============================================================
-    { code: '<div tabIndex={5} />', errors: [expectedError] },
-    { code: '<div tabIndex={100} />', errors: [expectedError] },
-    { code: '<div tabIndex={0x10} />', errors: [expectedError] },
-    { code: '<div tabIndex={0o10} />', errors: [expectedError] },
-    { code: '<div tabIndex={0b10} />', errors: [expectedError] },
-    { code: '<div tabIndex={1e2} />', errors: [expectedError] },
-    { code: '<div tabIndex={1_000} />', errors: [expectedError] },
-    { code: '<div tabIndex={1e1000} />', errors: [expectedError] }, // +Infinity
-    { code: '<div tabIndex={(5)} />', errors: [expectedError] },
-    { code: '<div tabIndex={((5))} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={100} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0x10} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0o10} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0b10} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1e2} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1_000} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1e1000} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    }, // +Infinity
+    {
+      code: '<div tabIndex={(5)} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={((5))} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
 
     // ============================================================
     // String numerics — hex / oct / bin / decimal
     // ============================================================
-    { code: '<div tabIndex="5" />', errors: [expectedError] },
-    { code: '<div tabIndex="100" />', errors: [expectedError] },
-    { code: '<div tabIndex="0x10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0X10" />', errors: [expectedError] },
-    { code: '<div tabIndex="0o7" />', errors: [expectedError] },
-    { code: '<div tabIndex="0b10" />', errors: [expectedError] },
-    { code: '<div tabIndex="+1" />', errors: [expectedError] },
-    { code: '<div tabIndex=" 1 " />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="100" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0x10" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0X10" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0o7" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="0b10" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="+1" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex=" 1 " />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
 
     // ============================================================
     // NoSubstitutionTemplateLiteral / TaggedTemplate
     // ============================================================
-    { code: '<div tabIndex={`5`} />', errors: [expectedError] },
-    { code: '<div tabIndex={tag`1`} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={`5`} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={tag`1`} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
 
     // ============================================================
     // BigInt — Number(bigint) coercion
     // ============================================================
-    { code: '<div tabIndex={2n} />', errors: [expectedError] },
-    { code: '<div tabIndex={1n} />', errors: [expectedError] },
-    { code: '<div tabIndex={9007199254740992n} />', errors: [expectedError] },
-    { code: '<div tabIndex={1.0e2} />', errors: [expectedError] },
-    { code: '<div tabIndex={[1 + 1]} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={2n} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1n} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={9007199254740992n} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1.0e2} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[1 + 1]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
     {
       code: '<div tabIndex={[cond ? 1 : 2]} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
-    { code: '<div tabIndex={[`5`]} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={[`5`]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
 
     // ============================================================
     // Extreme small positive numerics, separators, small BigInt
     // ============================================================
-    { code: '<div tabIndex={1e-10} />', errors: [expectedError] },
-    { code: '<div tabIndex={0.0000001} />', errors: [expectedError] },
-    { code: '<div tabIndex={5_000_000} />', errors: [expectedError] },
-    { code: '<div tabIndex={5n} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1e-10} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={0.0000001} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5_000_000} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={5n} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
 
     // ============================================================
     // Real-world component / framework placement
     // ============================================================
-    { code: 'export default <div tabIndex={1} />;', errors: [expectedError] },
-    { code: 'const f = () => <div tabIndex={1} />;', errors: [expectedError] },
+    {
+      code: 'export default <div tabIndex={1} />;',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: 'const f = () => <div tabIndex={1} />;',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
     {
       code: 'const f = function() { return <div tabIndex={1} />; };',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: 'const o = { render() { return <div tabIndex={1} />; } };',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 48,
+        },
+      ],
     },
     {
       code: 'async function* g() { yield <div tabIndex={1} />; await x; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
     {
       code: 'const Comp = ({render}) => render(<div tabIndex={1} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 40,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div>{cond && <span tabIndex={1} />}</div>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: '<div>{cond ? <span tabIndex={1} /> : null}</div>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
 
     // ============================================================
     // JSX tag shapes
     // ============================================================
-    { code: '<svg:foo tabIndex={1} />', errors: [expectedError] },
-    { code: '<A.B tabIndex={1} />', errors: [expectedError] },
-    { code: '<A.B.C tabIndex={1} />', errors: [expectedError] },
-    { code: '<tabIndex tabIndex={1} />', errors: [expectedError] },
+    {
+      code: '<svg:foo tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<A.B tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<A.B.C tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<tabIndex tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
 
     // ============================================================
     // Coexisting attributes
     // ============================================================
-    { code: '<li key="k" tabIndex={1}>x</li>', errors: [expectedError] },
-    { code: '<input required tabIndex={1} />', errors: [expectedError] },
-    { code: '<div {...{key:"x"}} tabIndex={1} />', errors: [expectedError] },
+    {
+      code: '<li key="k" tabIndex={1}>x</li>',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<input required tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<div {...{key:"x"}} tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
 
     // ============================================================
     // Whitespace / newlines around attribute
     // ============================================================
-    { code: '<div  tabIndex={1}  />', errors: [expectedError] },
-    { code: '<div\n\ttabIndex={1}\n/>', errors: [expectedError] },
+    {
+      code: '<div  tabIndex={1}  />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div\n\ttabIndex={1}\n/>',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 14,
+        },
+      ],
+    },
 
     // ============================================================
     // Array of JSX with own positive tabIndex — only inner reports
     // ============================================================
     {
       code: '<div tabIndex={[<X tabIndex={1} />]} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
 
     // ============================================================
     // Self-closing vs paired form
     // ============================================================
-    { code: '<div tabIndex={1}></div>', errors: [expectedError] },
+    {
+      code: '<div tabIndex={1}></div>',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
 
     // ============================================================
     // Cross-function / fragment counts
     // ============================================================
     {
       code: 'function A(){return <div tabIndex={1} />;} function B(){return <span tabIndex={5} />;}',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 38,
+        },
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 70,
+          endLine: 1,
+          endColumn: 82,
+        },
+      ],
     },
     {
       code: '<><div tabIndex={1} /><span tabIndex={2} /><p tabIndex={0} /></>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
 
     // ============================================================
@@ -410,108 +1198,669 @@ new RuleTester().run('tabindex-no-positive', null as never, {
     // ============================================================
     {
       code: '<div tabIndex={5}>tabIndex=5</div>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
 
     // ============================================================
     // Tab/newline in string — JS Number trims all whitespace
     // ============================================================
-    { code: '<div tabIndex="\t1\t" />', errors: [expectedError] },
-    { code: '<div tabIndex="\n1\n" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="\t1\t" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="\n1\n" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 3,
+          endColumn: 2,
+        },
+      ],
+    },
 
     // ============================================================
     // HTML entities — decoded by jsxtransforms.DecodeEntities
     // ============================================================
-    { code: '<div tabIndex="&#49;" />', errors: [expectedError] },
-    { code: '<div tabIndex="&#x31;" />', errors: [expectedError] },
-    { code: '<div tabIndex="&nbsp;5" />', errors: [expectedError] },
-    { code: '<div tabIndex="&#53;" />', errors: [expectedError] },
-    { code: '<div tabIndex="&#x35;" />', errors: [expectedError] },
+    {
+      code: '<div tabIndex="&#49;" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="&#x31;" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="&nbsp;5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="&#53;" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex="&#x35;" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
 
     // ============================================================
     // ArrayLiteralExpression → Array.join → Number
     // ============================================================
-    { code: '<div tabIndex={[5]} />', errors: [expectedError] },
-    { code: '<div tabIndex={["5"]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[Infinity]} />', errors: [expectedError] }, // TYPES.Identifier resolves Infinity
-    { code: '<div tabIndex={[1n]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[[5]]} />', errors: [expectedError] }, // nested
-    { code: '<div tabIndex={[[[5]]]} />', errors: [expectedError] }, // triple-nested
+    {
+      code: '<div tabIndex={[5]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={["5"]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[Infinity]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    }, // TYPES.Identifier resolves Infinity
+    {
+      code: '<div tabIndex={[1n]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[[5]]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    }, // nested
+    {
+      code: '<div tabIndex={[[[5]]]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    }, // triple-nested
     // Array with Unary on non-numeric operand — TYPES.UnaryExpression
     // ToNumber-on-operand makes `[+true]` resolve to "1" → 1 → report.
-    { code: '<div tabIndex={[+true]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[+"5"]} />', errors: [expectedError] },
-    { code: '<div tabIndex={[~-2]} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={[+true]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[+"5"]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={[~-2]} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
     // Large BigInt within Float64 precision.
     {
       code: '<div tabIndex={[9007199254740992n]} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ============================================================
     // Unary on coerced operand
     // ============================================================
-    { code: '<div tabIndex={+true} />', errors: [expectedError] },
-    { code: '<div tabIndex={+"5"} />', errors: [expectedError] },
-    { code: '<div tabIndex={-"-5"} />', errors: [expectedError] },
-    { code: '<div tabIndex={+"0x10"} />', errors: [expectedError] },
-    { code: '<div tabIndex={+5} />', errors: [expectedError] },
-    { code: '<div tabIndex={-(-1)} />', errors: [expectedError] },
-    { code: '<div tabIndex={-(-5)} />', errors: [expectedError] },
-    { code: '<div tabIndex={+"  5  "} />', errors: [expectedError] },
-    { code: '<div tabIndex={!0} />', errors: [expectedError] },
-    { code: '<div tabIndex={~-2} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={+true} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+"5"} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={-"-5"} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+"0x10"} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={-(-1)} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={-(-5)} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={+"  5  "} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={!0} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={~-2} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
 
     // ============================================================
     // delete operator
     // ============================================================
-    { code: '<div tabIndex={delete a.b} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={delete a.b} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
 
     // ============================================================
     // Custom components / namespaced / member tag names — rule fires
     // regardless of element type (unlike no-noninteractive-tabindex).
     // ============================================================
-    { code: '<MyButton tabIndex={5} />', errors: [expectedError] },
-    { code: '<UX.Layout tabIndex={5} />', errors: [expectedError] },
-    { code: '<svg:circle tabIndex={3} />', errors: [expectedError] },
-    { code: '<this.Foo tabIndex={5} />', errors: [expectedError] },
-    { code: '<Foo.Bar.Baz tabIndex={5} />', errors: [expectedError] },
+    {
+      code: '<MyButton tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<UX.Layout tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: '<svg:circle tabIndex={3} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '<this.Foo tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<Foo.Bar.Baz tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
 
     // ============================================================
     // Case-insensitive name match — propName.toUpperCase() === 'TABINDEX'
     // ============================================================
-    { code: '<div TABINDEX="5" />', errors: [expectedError] },
-    { code: '<div tabindex="5" />', errors: [expectedError] },
-    { code: '<div TabIndex="5" />', errors: [expectedError] },
-    { code: '<div Tabindex="5" />', errors: [expectedError] },
-    { code: '<div TaBiNdEx="5" />', errors: [expectedError] },
+    {
+      code: '<div TABINDEX="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div tabindex="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div TabIndex="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div Tabindex="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div TaBiNdEx="5" />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
 
     // ============================================================
     // Multiple tabIndex props — each visited independently
     // ============================================================
-    { code: '<div tabIndex={0} tabIndex={1} />', errors: [expectedError] },
-    { code: '<div tabIndex={1} tabIndex={0} />', errors: [expectedError] },
+    {
+      code: '<div tabIndex={0} tabIndex={1} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={1} tabIndex={0} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: '<div tabIndex={1} tabIndex={5} />',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
 
     // ============================================================
     // Comments don't suppress
     // ============================================================
-    { code: '<div /* a */ tabIndex={5} /* b */ />', errors: [expectedError] },
-    { code: '<div tabIndex={/* truthy */ 5} />', errors: [expectedError] },
+    {
+      code: '<div /* a */ tabIndex={5} /* b */ />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: '<div tabIndex={/* truthy */ 5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
 
     // ============================================================
     // Listener boundary — nested invalid elements each report
     // ============================================================
     {
       code: '<div tabIndex={5}><span tabIndex={1} /></div>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: '<><div tabIndex={5} /><span tabIndex={1} /></>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
 
     // ============================================================
@@ -519,24 +1868,72 @@ new RuleTester().run('tabindex-no-positive', null as never, {
     // ============================================================
     {
       code: 'function Outer() { return <div tabIndex={5}>focusable</div>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
     },
     {
       code: 'const items = arr.map(item => <li key={item.id} tabIndex={1}>{item.name}</li>);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 49,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
     {
       code: 'const Pane = React.forwardRef((props, ref) => <div ref={ref} tabIndex={3} {...props} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 62,
+          endLine: 1,
+          endColumn: 74,
+        },
+      ],
     },
     {
       code: 'class Form extends React.Component { render() { return <div tabIndex={5}>ready</div>; } }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 73,
+        },
+      ],
     },
 
     // ============================================================
     // Generic JSX
     // ============================================================
-    { code: '<Map<string, number> tabIndex={5} />', errors: [expectedError] },
+    {
+      code: '<Map<string, number> tabIndex={5} />',
+      errors: [
+        {
+          messageId: 'tabIndexNoPositive',
+          message: 'Avoid positive integer values for tabIndex.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
   ],
 });

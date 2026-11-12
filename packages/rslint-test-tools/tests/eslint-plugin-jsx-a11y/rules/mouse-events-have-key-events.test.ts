@@ -1,19 +1,7 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const mouseOverError = {
-  message: 'onMouseOver must be accompanied by onFocus for accessibility.',
-};
-const mouseOutError = {
-  message: 'onMouseOut must be accompanied by onBlur for accessibility.',
-};
-const pointerEnterError = {
-  message: 'onPointerEnter must be accompanied by onFocus for accessibility.',
-};
-const pointerLeaveError = {
-  message: 'onPointerLeave must be accompanied by onBlur for accessibility.',
-};
-
-new RuleTester().run('mouse-events-have-key-events', null as never, {
+new RuleTester(config).run('mouse-events-have-key-events', {
   valid: [
     // ============================================================
     // Upstream valid suite (mirrors __tests__/src/rules/mouse-events-have-key-events-test.js)
@@ -110,27 +98,87 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onMouseOver={() => void 0} />;',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: '<div onMouseOut={() => void 0} />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div onMouseOver={() => void 0} onFocus={undefined} />;',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: '<div onMouseOut={() => void 0} onBlur={undefined} />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div onMouseOver={() => void 0} {...props} />',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: '<div onMouseOut={() => void 0} {...props} />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div onMouseOver={() => {}} onMouseOut={() => {}} />',
@@ -140,7 +188,26 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
           hoverOutHandlers: ['onMouseOut'],
         },
       ],
-      errors: [mouseOverError, mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
     {
       code: '<div onPointerEnter={() => {}} onPointerLeave={() => {}} />',
@@ -150,27 +217,86 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
           hoverOutHandlers: ['onPointerLeave'],
         },
       ],
-      errors: [pointerEnterError, pointerLeaveError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onPointerEnter must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+        {
+          messageId: 'mouseOut',
+          message:
+            'onPointerLeave must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
     },
     {
       code: '<div onMouseOver={() => {}} />',
       options: [{ hoverInHandlers: ['onMouseOver'] }],
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<div onPointerEnter={() => {}} />',
       options: [{ hoverInHandlers: ['onPointerEnter'] }],
-      errors: [pointerEnterError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onPointerEnter must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<div onMouseOut={() => {}} />',
       options: [{ hoverOutHandlers: ['onMouseOut'] }],
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<div onPointerLeave={() => {}} />',
       options: [{ hoverOutHandlers: ['onPointerLeave'] }],
-      errors: [pointerLeaveError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onPointerLeave must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
 
     // ============================================================
@@ -178,11 +304,31 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onMouseOver />',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: '<div onMouseOut />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
 
     // ============================================================
@@ -190,11 +336,31 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onmouseover={() => {}} />',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: '<div onmouseout={() => {}} />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
 
     // ============================================================
@@ -202,11 +368,31 @@ new RuleTester().run('mouse-events-have-key-events', null as never, {
     // ============================================================
     {
       code: '<div onMouseOver={fn} onFocus={null} />',
-      errors: [mouseOverError],
+      errors: [
+        {
+          messageId: 'mouseOver',
+          message:
+            'onMouseOver must be accompanied by onFocus for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<div onMouseOut={fn} onBlur={null} />',
-      errors: [mouseOutError],
+      errors: [
+        {
+          messageId: 'mouseOut',
+          message:
+            'onMouseOut must be accompanied by onBlur for accessibility.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
   ],
 });

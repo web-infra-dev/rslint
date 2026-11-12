@@ -58,13 +58,15 @@ var polymorphicAllowListSettings = map[string]interface{}{
 }
 
 // TestNoAutofocusExtras is the catch-all for everything beyond upstream's
-// 18-case suite (which lives in no_autofocus_upstream_test.go). Cases here
-// fall in three groups, kept in one suite so a regression bisects easily:
+// suite (adapted in no_autofocus_upstream_test.go). Upstream v6.10.2
+// does not evaluate values; the evaluator cases below exercise Rslint's
+// intentional extension using jsx-ast-utils semantics. Cases here
+// fall in four groups, kept in one suite so a regression bisects easily:
 //
 //  1. **Dimension 4 universal edge shapes** — TS wrappers, namespaced names,
 //     paired vs self-closing element kinds, satisfies opaqueness, template
 //     substitution placeholders, listener boundary across nested elements.
-//  2. **Upstream getPropValue branches lacking dedicated upstream coverage**
+//  2. **Rslint value-evaluation branches (an intentional upstream difference)**
 //     — boolean form, numeric / null / bigint / call / member / template
 //     literals, the "true"/"false" string coercion direction, exact position
 //     assertions per JSX surface.
@@ -106,7 +108,7 @@ func TestNoAutofocusExtras(t *testing.T) {
 		{Code: `<div autoFocus={false as boolean} />`, Tsx: true},
 		// NoSubstitutionTemplateLiteral does NOT route through
 		// jsxAstUtilsLiteralCoerce, so `` `false` `` extracts to string
-		// "false", which matches the upstream `=== 'false'` defensive check.
+		// "false", which matches Rslint's intentional `=== 'false'` check.
 		{Code: "<div autoFocus={`false`} />", Tsx: true},
 
 		// ============================================================
@@ -386,7 +388,7 @@ func TestNoAutofocusExtras(t *testing.T) {
 		// ============================================================
 		// Group 5: Non-coerced falsy values still report
 		// ============================================================
-		// upstream's check is `!== false` (strict) — null / 0 / "" / NaN are
+		// Rslint's check is `!== false` (strict) — null / 0 / "" / NaN are
 		// all falsy in JS but distinct from boolean false → still report.
 		{Code: `<div autoFocus={null} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div autoFocus={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},

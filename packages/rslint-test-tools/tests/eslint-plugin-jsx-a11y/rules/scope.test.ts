@@ -1,8 +1,5 @@
-import { RuleTester } from '../rule-tester';
-
-const expectedError = {
-  message: 'The scope prop can only be used on <th> elements.',
-};
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const componentsSettings = {
   'jsx-a11y': {
@@ -13,7 +10,7 @@ const componentsSettings = {
   },
 };
 
-new RuleTester().run('scope', null as never, {
+new RuleTester(config).run('scope', {
   valid: [
     // ---- Upstream valid ----
     { code: '<div />;' },
@@ -243,91 +240,548 @@ new RuleTester().run('scope', null as never, {
   ],
   invalid: [
     // ---- Upstream invalid ----
-    { code: '<div scope />', errors: [expectedError] },
+    {
+      code: '<div scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
     {
       code: '<Foo scope="bar" />',
       settings: componentsSettings,
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
 
     // ---- Case-insensitive prop name match → still reports on non-th ----
-    { code: '<div SCOPE />', errors: [expectedError] },
-    { code: '<div Scope />', errors: [expectedError] },
-    { code: '<div SCoPe="row" />', errors: [expectedError] },
-    { code: '<span scope />', errors: [expectedError] },
+    {
+      code: '<div SCOPE />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<div Scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<div SCoPe="row" />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<span scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
 
     // ---- Listener boundary — nested elements report independently ----
     {
       code: '<div scope><span scope /></div>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: '<th scope="col"><div scope /></th>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     // Multiple scope attributes on one non-th element each report.
     {
       code: '<div scope scope />',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
 
     // ---- Element kind survey — every DOM tag fires ----
-    { code: '<a scope />', errors: [expectedError] },
-    { code: '<button scope />', errors: [expectedError] },
-    { code: '<table scope />', errors: [expectedError] },
-    { code: '<tr scope />', errors: [expectedError] },
-    { code: '<td scope />', errors: [expectedError] },
-    { code: '<thead scope />', errors: [expectedError] },
-    { code: '<tbody scope />', errors: [expectedError] },
-    { code: '<tfoot scope />', errors: [expectedError] },
-    { code: '<input scope />', errors: [expectedError] },
+    {
+      code: '<a scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: '<button scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<table scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<tr scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<td scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<thead scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<tbody scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<tfoot scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<input scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
 
     // ---- scope value variants on a non-th element — all report ----
-    { code: '<div scope="col" />', errors: [expectedError] },
-    { code: '<div scope={"row"} />', errors: [expectedError] },
-    { code: '<div scope={someVar} />', errors: [expectedError] },
-    { code: '<div scope={null} />', errors: [expectedError] },
-    { code: '<div scope={undefined} />', errors: [expectedError] },
-    { code: '<div scope={0} />', errors: [expectedError] },
-    { code: '<div scope={false} />', errors: [expectedError] },
-    { code: '<div scope={""} />', errors: [expectedError] },
-    { code: '<div scope={fn()} />', errors: [expectedError] },
-    { code: '<div scope={obj.x} />', errors: [expectedError] },
-    { code: '<div scope={obj?.x} />', errors: [expectedError] },
-    { code: '<div scope={`row`} />', errors: [expectedError] },
-    { code: '<div scope={`${x}`} />', errors: [expectedError] },
+    {
+      code: '<div scope="col" />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: '<div scope={"row"} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div scope={someVar} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div scope={null} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div scope={undefined} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: '<div scope={0} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<div scope={false} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div scope={""} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<div scope={fn()} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div scope={obj.x} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div scope={obj?.x} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: '<div scope={`row`} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div scope={`${x}`} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
 
     // ---- TS wrappers around the value — irrelevant to rule ----
-    { code: '<div scope={"col" as string} />', errors: [expectedError] },
-    { code: '<div scope={("col")} />', errors: [expectedError] },
-    { code: '<div scope={"col"!} />', errors: [expectedError] },
+    {
+      code: '<div scope={"col" as string} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: '<div scope={("col")} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: '<div scope={"col"!} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
     {
       code: '<div scope={"col" satisfies string} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- components map flips custom INTO scope-rule coverage ----
     {
       code: '<Cell scope="col" />',
       settings: { 'jsx-a11y': { components: { Cell: 'td' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: '<Wrapper scope="row" />',
       settings: { 'jsx-a11y': { components: { Wrapper: 'section' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
 
     // ---- polymorphicPropName resolving to non-th DOM → reports ----
     {
       code: '<Box as="div" scope />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: '<Box as="span" scope="col" />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: '<Box as="div" scope />',
@@ -337,192 +791,964 @@ new RuleTester().run('scope', null as never, {
           polymorphicAllowList: ['Box'],
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
 
     // ---- TypeScript generic JSX components → reports via components map ----
     {
       code: '<List<string> scope />',
       settings: { 'jsx-a11y': { components: { List: 'div' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
 
     // ---- Comments around / inside the prop don't suppress ----
-    { code: '<div /* a */ scope /* b */ />', errors: [expectedError] },
-    { code: '<div scope={/* row */ "row"} />', errors: [expectedError] },
+    {
+      code: '<div /* a */ scope /* b */ />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div scope={/* row */ "row"} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
 
     // ---- Real-world misuse patterns ----
     {
       code: 'function Header({ title }) { return <h1 scope="col">{title}</h1>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
     },
     {
       code: '<div role="columnheader" scope="col">Header</div>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'function Cell({ value }) { return <td scope="col">{value}</td>; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
 
     // ---- Multiple components in one file ----
     {
       code: 'function A() { return <div scope />; }\nfunction B() { return <span scope />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 33,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 2,
+          column: 29,
+          endLine: 2,
+          endColumn: 34,
+        },
+      ],
     },
 
     // ---- List-rendered JSX with offending scope ----
     {
       code: 'const items = arr.map((x, i) => <div key={i} scope={x.scope} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 46,
+          endLine: 1,
+          endColumn: 61,
+        },
+      ],
     },
 
     // ---- Class component with state-driven JSX ----
     {
       code: 'class T extends React.Component { render() { return this.state.ready ? <div scope="row" /> : null; } }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 77,
+          endLine: 1,
+          endColumn: 88,
+        },
+      ],
     },
 
     // ---- Generator / async / IIFE bodies ----
     {
       code: 'function* render() { yield <div scope />; yield <span scope />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 38,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 55,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: 'async function render() { return <div scope />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
     },
     {
       code: 'const x = (() => <div scope />)();',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
 
     // ---- Fragment + conditional rendering ----
     {
       code: 'const x = <>{cond && <div scope />}</>;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
     {
       code: 'function Foo({a, b}) { return a ? <div scope /> : <span scope />; }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 40,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 57,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
 
     // ---- HOC / forwardRef / memo wrappers carrying scope ----
     {
       code: 'const Enhanced = withTracking(({ value }) => <div value={value} scope />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 65,
+          endLine: 1,
+          endColumn: 70,
+        },
+      ],
     },
     {
       code: 'const FocusInput = React.forwardRef((props, ref) => <div ref={ref} scope {...props} />);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 68,
+          endLine: 1,
+          endColumn: 73,
+        },
+      ],
     },
     {
       code: 'const Item = React.memo(({ id }) => <li id={id} scope>{id}</li>);',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 49,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
 
     // ---- Extended DOM element survey ----
-    { code: '<article scope />', errors: [expectedError] },
-    { code: '<section scope />', errors: [expectedError] },
-    { code: '<aside scope />', errors: [expectedError] },
-    { code: '<header scope />', errors: [expectedError] },
-    { code: '<footer scope />', errors: [expectedError] },
-    { code: '<nav scope />', errors: [expectedError] },
-    { code: '<main scope />', errors: [expectedError] },
-    { code: '<h1 scope />', errors: [expectedError] },
-    { code: '<h6 scope />', errors: [expectedError] },
-    { code: '<form scope />', errors: [expectedError] },
-    { code: '<fieldset scope />', errors: [expectedError] },
-    { code: '<label scope />', errors: [expectedError] },
-    { code: '<select scope />', errors: [expectedError] },
-    { code: '<option scope />', errors: [expectedError] },
-    { code: '<textarea scope />', errors: [expectedError] },
-    { code: '<dialog scope />', errors: [expectedError] },
-    { code: '<details scope />', errors: [expectedError] },
-    { code: '<summary scope />', errors: [expectedError] },
-    { code: '<canvas scope />', errors: [expectedError] },
-    { code: '<picture scope />', errors: [expectedError] },
-    { code: '<video scope />', errors: [expectedError] },
-    { code: '<audio scope />', errors: [expectedError] },
-    { code: '<iframe scope />', errors: [expectedError] },
+    {
+      code: '<article scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<section scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<aside scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<header scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<footer scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<nav scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<main scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
+    {
+      code: '<h1 scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<h6 scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '<form scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
+    {
+      code: '<fieldset scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<label scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<select scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<option scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<textarea scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<dialog scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<details scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<summary scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<canvas scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: '<picture scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<video scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<audio scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: '<iframe scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
     // Table-related neighbors of th — confusable, all illegal.
-    { code: '<caption scope />', errors: [expectedError] },
-    { code: '<colgroup scope />', errors: [expectedError] },
-    { code: '<col scope />', errors: [expectedError] },
+    {
+      code: '<caption scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: '<colgroup scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: '<col scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
 
     // ---- Spread + scope mixing on non-th (literal scope reports) ----
-    { code: '<div {...props} scope />', errors: [expectedError] },
-    { code: '<div scope {...props} />', errors: [expectedError] },
-    { code: '<div {...a} scope {...b} />', errors: [expectedError] },
+    {
+      code: '<div {...props} scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '<div scope {...props} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<div {...a} scope {...b} />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
     {
       code: "<div {...{scope: 'row'}} scope />",
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
 
     // ---- Multi-element multi-error scenarios ----
     {
       code: '<><th scope /><div scope /><span scope /></>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 25,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: '<thead scope><tr><th scope="col" /></tr></thead>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: '<><div scope /><span scope /><th scope /><a scope /></>',
-      errors: [expectedError, expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 13,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 27,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 45,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
 
     // ---- JSX as render prop / children-as-function (offending body) ----
     {
       code: '<DataTable render={() => <div scope />} />',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<DataTable>{() => <div scope />}</DataTable>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
 
     // ---- JSX in array literal / cloneElement / Provider (offending) ----
     {
       code: 'const items = [<div scope key="1" />, <span scope key="2" />, <th scope key="3" />];',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 26,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 45,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
-    { code: 'cloneElement(<div scope />);', errors: [expectedError] },
+    {
+      code: 'cloneElement(<div scope />);',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
     {
       code: '<Provider value={data}>{<div scope />}</Provider>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'const obj = { content: <div scope /> };',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
 
     // ---- Whitespace / formatting variations on non-th ----
-    { code: '<div  scope  />', errors: [expectedError] },
-    { code: '<div scope = "row" />', errors: [expectedError] },
-    { code: '<div\n\tscope\n/>', errors: [expectedError] },
+    {
+      code: '<div  scope  />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
+    {
+      code: '<div scope = "row" />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: '<div\n\tscope\n/>',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 7,
+        },
+      ],
+    },
 
     // ---- scope at varied positions ----
-    { code: '<div scope id="x" className="y" />', errors: [expectedError] },
-    { code: '<div id="x" scope className="y" />', errors: [expectedError] },
-    { code: '<div id="x" className="y" scope />', errors: [expectedError] },
+    {
+      code: '<div scope id="x" className="y" />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: '<div id="x" scope className="y" />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '<div id="x" className="y" scope />',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
 
     // ---- th sibling with non-th sibling carrying scope ----
     {
       code: '<><th scope="col" /><td scope="row" /></>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: '<><th scope /><tr scope /><td scope /></>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- Component library patterns — components map → non-th ----
     {
       code: '<TableCell scope="col" />',
       settings: { 'jsx-a11y': { components: { TableCell: 'td' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
 
     // ---- polymorphic + components chain → non-th ----
@@ -534,80 +1760,274 @@ new RuleTester().run('scope', null as never, {
           components: { DataCell: 'td' },
         },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
 
     // ---- Suspense / ErrorBoundary / Context wrapping offending JSX ----
     {
       code: '<Suspense fallback={<div scope />}><div>x</div></Suspense>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '<ErrorBoundary><div scope /></ErrorBoundary>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: '<Context.Provider value={data}><div scope /></Context.Provider>',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 37,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
 
     // ---- TS-only JSX shapes ----
     {
       code: 'const x = <div scope /> as React.ReactNode;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: 'const x = (<div scope />) satisfies any;',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
-    { code: 'const x = (<div scope />)!;', errors: [expectedError] },
+    {
+      code: 'const x = (<div scope />)!;',
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
 
     // ---- TypeScript generic JSX with components remap ----
     {
       code: '<List<Header> scope />',
       settings: { 'jsx-a11y': { components: { List: 'div' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
 
     // ---- Realistic table cell misuse patterns ----
     {
       code: '<table><tr><td scope="col" /><td scope="col" /></tr><tr><td scope="row" /><td scope="row" /></tr></table>',
-      errors: [expectedError, expectedError, expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 27,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 72,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 79,
+          endLine: 1,
+          endColumn: 90,
+        },
+      ],
     },
     {
       code: '<table><tr><th scope="col" /><td scope="col" /><th scope="col" /><td scope="col" /></tr></table>',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 45,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 70,
+          endLine: 1,
+          endColumn: 81,
+        },
+      ],
     },
 
     // ---- try / catch / finally JSX ----
     {
       code: 'function App() { try { return <div scope />; } catch (e) { return <span scope />; } }',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 41,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 73,
+          endLine: 1,
+          endColumn: 78,
+        },
+      ],
     },
 
     // ---- switch returning JSX ----
     {
       code: "function App({type}) { switch(type) { case 'a': return <div scope />; case 'b': return <span scope />; default: return null; } }",
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 61,
+          endLine: 1,
+          endColumn: 66,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 94,
+          endLine: 1,
+          endColumn: 99,
+        },
+      ],
     },
 
     // ---- Class with class-field arrow returning JSX ----
     {
       code: 'class C { render = () => <div scope />; }',
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // ---- JSX in attribute value triggers nested + outer reports ----
     {
       code: '<div header={<span scope />} scope />',
-      errors: [expectedError, expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 25,
+        },
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
 
     // ---- Web Components via components map ----
     {
       code: '<my-table scope />',
       settings: { 'jsx-a11y': { components: { 'my-table': 'td' } } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
 
     // ---- Components map with dotted key remapping member-expression tag to non-th DOM ----
@@ -616,7 +2036,16 @@ new RuleTester().run('scope', null as never, {
       settings: {
         'jsx-a11y': { components: { 'DataGrid.Header': 'div' } },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // ---- Namespaced tag remapped via composite key ----
     {
@@ -624,19 +2053,46 @@ new RuleTester().run('scope', null as never, {
       settings: {
         'jsx-a11y': { components: { 'svg:circle': 'div' } },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
 
     // ---- Polymorphic prop value forms ----
     {
       code: '<Box as={"div"} scope />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: '<Box as={`div`} scope />',
       settings: { 'jsx-a11y': { polymorphicPropName: 'as' } },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
 
     // ---- Defensive: invalid settings types should still fall back ----
@@ -645,14 +2101,32 @@ new RuleTester().run('scope', null as never, {
       settings: {
         'jsx-a11y': { components: 'invalid' as unknown as object },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: '<div as="th" scope />',
       settings: {
         'jsx-a11y': { polymorphicPropName: 123 as unknown as string },
       },
-      errors: [expectedError],
+      errors: [
+        {
+          messageId: 'scopeOnTh',
+          message: 'The scope prop can only be used on <th> elements.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
   ],
 });

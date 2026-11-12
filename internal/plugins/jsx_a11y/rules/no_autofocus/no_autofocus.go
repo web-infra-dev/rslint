@@ -8,6 +8,11 @@
 //
 //	options: { ignoreNonDOM?: boolean (default false) }
 //
+// Intentional difference from eslint-plugin-jsx-a11y v6.10.2: upstream reports
+// every autoFocus attribute without inspecting its value. Rslint permits values
+// statically resolved to false or "false" so explicitly disabled props can stay.
+// See Differences from upstream in no_autofocus.md.
+//
 // Trigger: a JsxAttribute whose name is exactly `autoFocus` (case-sensitive
 // per upstream `propName`) and whose extracted value is anything other than
 // the JS boolean `false` or the literal string `"false"`. The boolean-attribute
@@ -36,7 +41,8 @@ import (
 //go:embed no_autofocus.schema.json
 var schemaJSON []byte
 
-// errorMessage mirrors upstream's `errorMessage` string verbatim.
+// errorMessage says enabled rather than upstream's used to reflect the
+// intentional allowance for statically disabled values.
 const errorMessage = "The autoFocus prop should not be enabled, as it can reduce usability and accessibility for users."
 
 // options holds the rule's parsed configuration. Mirrors the upstream
@@ -89,19 +95,11 @@ var NoAutofocusRule = rule.Rule{
 						return
 					}
 				}
-				// Mirrors upstream's
-				//   getPropValue(attribute) !== false &&
-				//   getPropValue(attribute) !== 'false'
-				// `=== false` covers boolean false and the
-				// jsxAstUtilsLiteralCoerce'd string literals "true"/"false"
-				// (case-insensitive) which extract to a JS boolean.
-				// `=== 'false'` is upstream-defensive: the only path that
-				// produces the literal string "false" is a
-				// NoSubstitutionTemplateLiteral (`` `false` ``), which routes
-				// through ESTree's TemplateLiteral extractor and skips the
-				// boolean coercion. Both checks must match exactly per JS `===`
-				// semantics; a non-coerced falsy value (null, undefined, 0, "")
-				// still trips the rule.
+				// Intentional extension to upstream's presence-only check: allow
+				// values resolved to boolean false or the string "false" by our
+				// jsx-ast-utils-compatible evaluator. Other falsy values such as
+				// null, undefined, 0 and "" still report; this is not a truthiness
+				// check. Upstream v6.10.2 does not call getPropValue here.
 				if boolVal, ok := jsxa11yutil.PropStaticBoolValue(attr); ok && !boolVal {
 					return
 				}
