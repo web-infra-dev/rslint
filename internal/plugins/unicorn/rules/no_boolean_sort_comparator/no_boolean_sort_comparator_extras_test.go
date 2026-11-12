@@ -76,10 +76,11 @@ func TestNoBooleanSortComparatorSubtractionSafety(t *testing.T) {
 			invalidComparator("[-2n, -1n].sort((a, b) => a > b);", "case.js", 1, 17, 1, 32),
 			invalidComparator("BigInt64Array.of(1n, 2n).sort((a, b) => a > b);", "case.js", 1, 31, 1, 46),
 			invalidComparator("BigUint64Array['from']([1n, 2n]).toSorted((a, b) => a > b);", "case.js", 1, 43, 1, 58),
-			invalidComparator("Int32Array.of(1, 2).sort((a, b) => a > b);", "case.js", 1, 26, 1, 41,
-				"Int32Array.of(1, 2).sort((a, b) => a - b);"),
-			invalidComparator("function f(BigInt64Array) { return BigInt64Array.of(1, 2).sort((a, b) => a > b); }", "case.js", 1, 64, 1, 79,
-				"function f(BigInt64Array) { return BigInt64Array.of(1, 2).sort((a, b) => a - b); }"),
+			invalidComparator("const method = 'of'; BigInt64Array[method](1n, 2n).sort((a, b) => a > b);", "case.js", 1, 57, 1, 72),
+			invalidComparator("const method = 'of'; Int32Array[method](1, 2).sort((a, b) => a > b);", "case.js", 1, 52, 1, 67,
+				"const method = 'of'; Int32Array[method](1, 2).sort((a, b) => a - b);"),
+			invalidComparator("function f(BigInt64Array) { const method = 'of'; return BigInt64Array[method](1, 2).sort((a, b) => a > b); }", "case.js", 1, 90, 1, 105,
+				"function f(BigInt64Array) { const method = 'of'; return BigInt64Array[method](1, 2).sort((a, b) => a - b); }"),
 		})
 	})
 }

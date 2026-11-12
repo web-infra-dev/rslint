@@ -32,11 +32,7 @@ var NoBooleanSortComparatorRule = rule.Rule{
 			if callee == nil || !ast.IsAccessExpression(callee) {
 				return
 			}
-			name, known := utils.AccessExpressionStaticName(callee)
-			if !known && ast.IsElementAccessExpression(callee) {
-				name, _ = booleans.StaticEvaluator().EvalAccessExpressionName(callee)
-			}
-			if name != "sort" && name != "toSorted" {
+			if name := staticMemberName(booleans, callee); name != "sort" && name != "toSorted" {
 				return
 			}
 			comparator := utils.ESTreeRuntimeExpression(args[0])
@@ -63,10 +59,18 @@ var NoBooleanSortComparatorRule = rule.Rule{
 				return
 			}
 			ctx.ReportNodeWithDeferredSuggestions(comparator, comparatorMessage, func() []rule.RuleSuggestion {
-				return comparatorSuggestion(ctx, comparator, result, receiver)
+				return comparatorSuggestion(ctx, booleans, comparator, result, receiver)
 			})
 		}}
 	},
+}
+
+func staticMemberName(booleans *unicornutil.BooleanAnalyzer, node *ast.Node) string {
+	name, known := utils.AccessExpressionStaticName(node)
+	if !known && ast.IsElementAccessExpression(node) {
+		name, _ = booleans.StaticEvaluator().EvalAccessExpressionName(node)
+	}
+	return name
 }
 
 func unwrapComparator(booleans *unicornutil.BooleanAnalyzer, node *ast.Node) (*ast.Node, bool) {
@@ -80,7 +84,7 @@ func unwrapComparator(booleans *unicornutil.BooleanAnalyzer, node *ast.Node) (*a
 	return node, assertedBoolean
 }
 
-func comparatorSuggestion(ctx rule.RuleContext, comparator, result, receiver *ast.Node) []rule.RuleSuggestion {
+func comparatorSuggestion(ctx rule.RuleContext, booleans *unicornutil.BooleanAnalyzer, comparator, result, receiver *ast.Node) []rule.RuleSuggestion {
 	result = utils.ESTreeRuntimeExpression(result)
 	if result == nil || !ast.IsBinaryExpression(result) {
 		// A replacement would remove an authored assertion around the result.
@@ -118,7 +122,7 @@ func comparatorSuggestion(ctx rule.RuleContext, comparator, result, receiver *as
 			return nil
 		}
 	}
-	if hasStringOrBigIntOperand(ctx, left, right, receiver) {
+	if hasStringOrBigIntOperand(ctx, booleans, left, right, receiver) {
 		return nil
 	}
 	span := utils.TrimNodeTextRange(ctx.SourceFile, comparator)
@@ -142,7 +146,7 @@ func comparatorSuggestion(ctx rule.RuleContext, comparator, result, receiver *as
 
 // Subtracting strings changes their ordering. BigInt subtraction returns a
 // BigInt, which sort cannot convert to a Number.
-func hasStringOrBigIntOperand(ctx rule.RuleContext, left, right, receiver *ast.Node) bool {
+func hasStringOrBigIntOperand(ctx rule.RuleContext, booleans *unicornutil.BooleanAnalyzer, left, right, receiver *ast.Node) bool {
 	if types := ctx.TypeChecker; types != nil {
 		const nonNumeric = checker.TypeFlagsStringLike | checker.TypeFlagsBigIntLike
 		if utils.IsTypeFlagSetWithUnion(utils.GetConstrainedTypeAtLocation(types, left), nonNumeric) ||
@@ -171,23 +175,28 @@ func hasStringOrBigIntOperand(ctx rule.RuleContext, left, right, receiver *ast.N
 			return ast.IsStringLiteralLike(element) || ast.IsTemplateExpression(element) || ast.IsBigIntLiteral(element)
 		})
 	}
-	if !ast.IsNewExpression(receiver) && !ast.IsCallExpression(receiver) {
+	isCall := ast.IsCallExpression(receiver)
+	if !isCall && !ast.IsNewExpression(receiver) {
 		return false
 	}
-	constructor := utils.ESTreeCallCallee(receiver.Expression())
-	if ast.IsCallExpression(receiver) {
-		if constructor == nil || !ast.IsAccessExpression(constructor) {
+	callee := utils.ESTreeCallCallee(receiver.Expression())
+	constructor := callee
+	if isCall {
+		if callee == nil || !ast.IsAccessExpression(callee) {
 			return false
 		}
-		method, _ := utils.AccessExpressionStaticName(constructor)
-		if method != "from" && method != "of" {
-			return false
-		}
-		constructor = utils.ESTreeRuntimeExpression(constructor.Expression())
+		constructor = utils.ESTreeRuntimeExpression(callee.Expression())
 	}
-	return constructor != nil && ast.IsIdentifier(constructor) &&
-		(constructor.Text() == "BigInt64Array" || constructor.Text() == "BigUint64Array") &&
-		unicornutil.IsGlobalReference(ctx, constructor)
+	if constructor == nil || !ast.IsIdentifier(constructor) ||
+		(constructor.Text() != "BigInt64Array" && constructor.Text() != "BigUint64Array") ||
+		!unicornutil.IsGlobalReference(ctx, constructor) {
+		return false
+	}
+	if !isCall {
+		return true
+	}
+	method := staticMemberName(booleans, callee)
+	return method == "from" || method == "of"
 }
 
 func mirrorParameters(left, right, first, second *ast.Node) bool {
