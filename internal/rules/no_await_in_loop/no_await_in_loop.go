@@ -12,166 +12,79 @@ func buildUnexpectedAwaitMessage() rule.RuleMessage {
 	}
 }
 
-// isLoopNode checks if a node is a loop statement
-func isLoopNode(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	kind := node.Kind
-	return kind == ast.KindWhileStatement ||
-		kind == ast.KindDoStatement ||
-		kind == ast.KindForStatement ||
-		kind == ast.KindForInStatement ||
-		kind == ast.KindForOfStatement
-}
-
-// isForAwaitOfNode checks if a node is a for-await-of loop
-func isForAwaitOfNode(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindForOfStatement {
-		return false
-	}
-	// Check for await modifier on ForOfStatement
-	stmt := node.AsForInOrOfStatement()
-	if stmt == nil {
-		return false
-	}
-	return stmt.AwaitModifier != nil
-}
-
-// isInLoop checks if we're currently inside a loop (excluding for-await-of and loop initializers)
-func isInLoop(node *ast.Node) bool {
-	current := node.Parent
-	for current != nil {
-		// If we hit a for-await-of, it's allowed
-		if isForAwaitOfNode(current) {
-			return false
-		}
-
-		// Check if we're in a loop initializer position (which is allowed)
-		if isLoopNode(current) {
-			return !isInLoopInitializer(node, current)
-		}
-
-		// Stop if we hit a function boundary (functions create new async contexts)
-		kind := current.Kind
-		if kind == ast.KindFunctionDeclaration ||
-			kind == ast.KindFunctionExpression ||
-			kind == ast.KindArrowFunction ||
-			kind == ast.KindMethodDeclaration ||
-			kind == ast.KindConstructor ||
-			kind == ast.KindGetAccessor ||
-			kind == ast.KindSetAccessor {
-			return false
-		}
-
-		current = current.Parent
-	}
-	return false
-}
-
-// isInLoopInitializer checks if a node is in a loop initializer position
-func isInLoopInitializer(node *ast.Node, loop *ast.Node) bool {
-	if loop == nil || node == nil {
-		return false
-	}
-
-	switch loop.Kind {
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		// For for-in/for-of, the initializer is the expression being iterated over
-		stmt := loop.AsForInOrOfStatement()
-		if stmt == nil {
-			return false
-		}
-		// Check if the node is in the iterable expression
-		expr := stmt.Expression
-		return isNodeInSubtree(node, expr)
-
-	case ast.KindForStatement:
-		// For regular for loops, the initializer is the first part
-		stmt := loop.AsForStatement()
-		if stmt == nil {
-			return false
-		}
-		// Check if the node is in the initializer
-		init := stmt.Initializer
-		return isNodeInSubtree(node, init)
-
+// isBoundary distinguishes function execution from computed method names, which
+// are evaluated in the enclosing context. Async iteration is intentionally serial.
+func isBoundary(node, child *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindConstructor:
+		return true
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return child != node.Name()
+	case ast.KindForOfStatement:
+		return node.AsForInOrOfStatement().AwaitModifier != nil
 	default:
 		return false
 	}
 }
 
-// isNodeInSubtree checks if a node is within a subtree rooted at root
-func isNodeInSubtree(node *ast.Node, root *ast.Node) bool {
-	if root == nil || node == nil {
+// isLooped checks the direct child visited while walking ancestors. Initializers
+// and iterables run once for this loop, but may still repeat in an outer loop.
+func isLooped(node, parent *ast.Node) bool {
+	switch parent.Kind {
+	case ast.KindForStatement:
+		stmt := parent.AsForStatement()
+		return node == stmt.Condition || node == stmt.Incrementor || node == stmt.Statement
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		stmt := parent.AsForInOrOfStatement()
+		return node == stmt.Statement || (node == stmt.Initializer && ast.IsVarAwaitUsing(node))
+	case ast.KindWhileStatement:
+		stmt := parent.AsWhileStatement()
+		return node == stmt.Expression || node == stmt.Statement
+	case ast.KindDoStatement:
+		stmt := parent.AsDoStatement()
+		return node == stmt.Expression || node == stmt.Statement
+	default:
 		return false
 	}
-	current := node
-	for current != nil {
-		if current == root {
-			return true
-		}
-		// Stop at certain boundaries
-		if isLoopNode(current) || isFunctionNode(current) {
-			return false
-		}
-		current = current.Parent
-	}
-	return false
 }
 
-// isFunctionNode checks if a node is a function
-func isFunctionNode(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	kind := node.Kind
-	return kind == ast.KindFunctionDeclaration ||
-		kind == ast.KindFunctionExpression ||
-		kind == ast.KindArrowFunction ||
-		kind == ast.KindMethodDeclaration ||
-		kind == ast.KindConstructor ||
-		kind == ast.KindGetAccessor ||
-		kind == ast.KindSetAccessor
-}
-
-// NoAwaitInLoopRule disallows await inside of loops
+// NoAwaitInLoopRule disallows await inside of loops, matching ESLint v10.8.1.
 var NoAwaitInLoopRule = rule.Rule{
 	Name:   "no-await-in-loop",
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindAwaitExpression: func(node *ast.Node) {
-				if node == nil {
+		validate := func(awaitNode *ast.Node) {
+			switch awaitNode.Kind {
+			case ast.KindForOfStatement:
+				if awaitNode.AsForInOrOfStatement().AwaitModifier == nil {
 					return
 				}
-
-				// Check if this await is inside a loop
-				if isInLoop(node) {
-					ctx.ReportNode(node, buildUnexpectedAwaitMessage())
-				}
-			},
-
-			// Handle for-await-of in loops
-			ast.KindForOfStatement: func(node *ast.Node) {
-				if node == nil {
+			case ast.KindVariableDeclarationList:
+				if !ast.IsVarAwaitUsing(awaitNode) {
 					return
 				}
+			}
 
-				// Check if this is a for-await-of
-				if !isForAwaitOfNode(node) {
+			for node, parent := awaitNode, awaitNode.Parent; parent != nil; node, parent = parent, parent.Parent {
+				if isBoundary(parent, node) {
 					return
 				}
-
-				// Check if the for-await-of is nested inside another loop
-				if isInLoop(node) {
-					// Report the await modifier
-					stmt := node.AsForInOrOfStatement()
-					if stmt != nil && stmt.AwaitModifier != nil {
-						ctx.ReportNode(stmt.AwaitModifier, buildUnexpectedAwaitMessage())
+				if isLooped(node, parent) {
+					// ESTree VariableDeclaration includes a statement's semicolon;
+					// ts-go stores it on the surrounding VariableStatement instead.
+					reportNode := awaitNode
+					if awaitNode.Kind == ast.KindVariableDeclarationList && awaitNode.Parent.Kind == ast.KindVariableStatement {
+						reportNode = awaitNode.Parent
 					}
+					ctx.ReportNode(reportNode, buildUnexpectedAwaitMessage())
+					return
 				}
-			},
+			}
+		}
+		return rule.RuleListeners{
+			ast.KindAwaitExpression:         validate,
+			ast.KindForOfStatement:          validate,
+			ast.KindVariableDeclarationList: validate,
 		}
 	},
 }

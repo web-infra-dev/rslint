@@ -73,6 +73,7 @@ const ecosystemTests = {
     './tests/cli/type-check/type-check-only.test.ts',
 
     // eslint
+    './tests/eslint/rules/no-await-in-loop.test.ts',
     './tests/eslint/rules/no-class-assign.test.ts',
     './tests/eslint/rules/no-debugger.test.ts',
     './tests/eslint/rules/no-constant-condition.test.ts',

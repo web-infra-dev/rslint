@@ -4,6 +4,8 @@
 
 Disallows `await` expressions inside loop bodies (`for`, `for-in`, `for-of`, `while`, `do-while`). Using `await` in a loop is usually a sign that the program is not taking full advantage of the parallelization benefits of `async`/`await`, as each iteration waits for the previous one to complete. The operations can often be refactored to use `Promise.all()` instead.
 
+This rule also reports `await using` declarations that dispose resources on each iteration, including `for (await using resource of resources)`. Loop initializers and iterable expressions are allowed when they run only once, but are reported when they repeat inside an outer loop.
+
 This rule allows `await` in `for-await-of` loops, since those are designed to work with async iterables. However, a `for-await-of` nested inside another loop will be flagged.
 
 Examples of **incorrect** code for this rule:
