@@ -1,0 +1,5 @@
+-- types.ts --
+export type Opaque = any;
+export interface Tag {
+  readonly tag: string;
+}
