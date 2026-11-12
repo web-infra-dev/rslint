@@ -1,3 +1,4 @@
+// Upstream: https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/tests/rules/no-base-to-string.test.ts
 package no_base_to_string
 
 import (

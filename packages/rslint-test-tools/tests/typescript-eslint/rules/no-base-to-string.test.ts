@@ -1,25 +1,48 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+// All 275 valid and 81 invalid cases from typescript-eslint v8.28.0.
+// Original inputs, options, generators and messages are preserved; complete
+// diagnostic ranges are additionally pinned from ESLint at the same version.
+// This version has no autofixes or suggestions; the shared tester asserts their absence.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.28.0/packages/eslint-plugin/tests/rules/no-base-to-string.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootDir = getFixturesRootDir();
 const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json': `{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "target": "es5",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "lib": ["es2015", "es2017", "esnext"],
+    "experimentalDecorators": true
   },
+  "include": [
+    "file.ts",
+    "consistent-type-exports.ts",
+    "deprecated.ts",
+    "mixed-enums-decl.ts",
+    "react.tsx",
+    "var-declaration.ts",
+    "errors.ts",
+    "switch-exhaustiveness-check.ts"
+  ]
+}
+`,
+    'tsconfig.noUncheckedIndexedAccess.json': `{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  }
+}
+`,
+  },
+  languageOptions: { parserOptions: { project: './tsconfig.json' } },
 });
 
-/**
- * ref: https://github.com/typescript-eslint/typescript-eslint/issues/11043
- * Be careful with dynamic test case generation.
- * Iterate based on the following cases:
- * 1. literalListBasic
- * ```
-[
+const literalListBasic: string[] = [
   "''",
   "'text'",
   'true',
@@ -29,190 +52,45 @@ const ruleTester = new RuleTester({
   '[]',
   '/regex/',
 ];
- * ```
- * 2. literalListNeedParen
- * ```
-[
+
+const literalListNeedParen: string[] = [
   "__dirname === 'foobar'",
   '{}.constructor()',
   '() => {}',
   'function() {}',
 ];
- * ```
- */
+
+const literalList = [...literalListBasic, ...literalListNeedParen];
+
+const literalListWrapped = [
+  ...literalListBasic,
+  ...literalListNeedParen.map(i => `(${i})`),
+];
+
 ruleTester.run('no-base-to-string', {
   valid: [
     // template
-    "`${''}`;",
-    "`${'text'}`;",
-    '`${true}`;',
-    '`${false}`;',
-    '`${1}`;',
-    '`${1n}`;',
-    '`${[]}`;',
-    '`${/regex/}`;',
-    "`${__dirname === 'foobar'}`;",
-    '`${{}.constructor()}`;',
-    '`${() => {}}`;',
-    '`${function () {}}`;',
+    ...literalList.map(i => `\`\${${i}}\`;`),
 
     // operator + +=
-    "'' + 'text';",
-    "'' + true;",
-    "'' + false;",
-    "'' + 1;",
-    "'' + 1n;",
-    "'' + [];",
-    "'' + /regex/;",
-    "'' + (__dirname === 'foobar');",
-    "'' + {}.constructor();",
-    "'' + (() => {});",
-    "'' + function () {};",
-    "'text' + true;",
-    "'text' + false;",
-    "'text' + 1;",
-    "'text' + 1n;",
-    "'text' + [];",
-    "'text' + /regex/;",
-    "'text' + (__dirname === 'foobar');",
-    "'text' + {}.constructor();",
-    "'text' + (() => {});",
-    "'text' + function () {};",
-    'true + false;',
-    'true + 1;',
-    'true + 1n;',
-    'true + [];',
-    'true + /regex/;',
-    "true + (__dirname === 'foobar');",
-    'true + {}.constructor();',
-    'true + (() => {});',
-    'true + function () {};',
-    'false + 1;',
-    'false + 1n;',
-    'false + [];',
-    'false + /regex/;',
-    "false + (__dirname === 'foobar');",
-    'false + {}.constructor();',
-    'false + (() => {});',
-    'false + function () {};',
-    '1 + 1n;',
-    '1 + [];',
-    '1 + /regex/;',
-    "1 + (__dirname === 'foobar');",
-    '1 + {}.constructor();',
-    '1 + (() => {});',
-    '1 + function () {};',
-    '1n + [];',
-    '1n + /regex/;',
-    "1n + (__dirname === 'foobar');",
-    '1n + {}.constructor();',
-    '1n + (() => {});',
-    '1n + function () {};',
-    '[] + /regex/;',
-    "[] + (__dirname === 'foobar');",
-    '[] + {}.constructor();',
-    '[] + (() => {});',
-    '[] + function () {};',
-    "/regex/ + (__dirname === 'foobar');",
-    '/regex/ + {}.constructor();',
-    '/regex/ + (() => {});',
-    '/regex/ + function () {};',
-    "(__dirname === 'foobar') + {}.constructor();",
-    "(__dirname === 'foobar') + (() => {});",
-    "(__dirname === 'foobar') + function () {};",
-    '({}).constructor() + (() => {});',
-    '({}).constructor() + function () {};',
-    '(() => {}) + function () {};',
+    ...literalListWrapped.flatMap(l =>
+      literalListWrapped.map(r => `${l} + ${r};`),
+    ),
 
     // toString()
-    "''.toString();",
-    "'text'.toString();",
-    'true.toString();',
-    'false.toString();',
-    '(1).toString();',
-    '1n.toString();',
-    '[].toString();',
-    '/regex/.toString();',
-    "(__dirname === 'foobar').toString();",
-    '({}).constructor().toString();',
-    '(() => {}).toString();',
-    '(function () {}).toString();',
+    ...literalListWrapped.map(i => `${i === '1' ? `(${i})` : i}.toString();`),
 
     // variable toString() and template
-    `
-      let value = '';
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = 'text';
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = true;
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = false;
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = 1;
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = 1n;
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = [];
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = /regex/;
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = __dirname === 'foobar';
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = {}.constructor();
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = () => {};
-      value.toString();
-      let text = \`\${value}\`;
-    `,
-    `
-      let value = function () {};
-      value.toString();
-      let text = \`\${value}\`;
-    `,
+    ...literalList.map(
+      i => `
+        let value = ${i};
+        value.toString();
+        let text = \`\${value}\`;
+      `,
+    ),
 
     // String()
-    "String('');",
-    "String('text');",
-    'String(true);',
-    'String(false);',
-    'String(1);',
-    'String(1n);',
-    'String([]);',
-    'String(/regex/);',
-    "String(__dirname === 'foobar');",
-    'String({}.constructor());',
-    'String(() => {});',
-    'String(function () {});',
+    ...literalList.map(i => `String(${i});`),
     `
 function someFunction() {}
 someFunction.toString();
@@ -626,6 +504,15 @@ declare const bb: ExtendedGuildChannel;
 bb.toString();
     `,
     `
+function foo<T>(x: T) {
+  String(x);
+}
+    `,
+    `
+declare const u: unknown;
+String(u);
+    `,
+    `
 type Value = string | Value[];
 declare const v: Value;
 
@@ -653,211 +540,18 @@ String(v);
 declare const v: ('foo' | 'bar')[][];
 String(v);
     `,
-    `
-declare const x: unknown;
-\`\${x})\`;
-    `,
-    `
-declare const x: unknown;
-x.toString();
-    `,
-    `
-declare const x: unknown;
-x.toLocaleString();
-    `,
-    `
-declare const x: unknown;
-'' + x;
-    `,
-    `
-declare const x: unknown;
-String(x);
-    `,
-    `
-declare const x: unknown;
-'' += x;
-    `,
-    `
-function foo<T>(x: T) {
-  String(x);
-}
-    `,
-    `
-declare const x: any;
-\`\${x})\`;
-    `,
-    `
-declare const x: any;
-x.toString();
-    `,
-    `
-declare const x: any;
-x.toLocaleString();
-    `,
-    `
-declare const x: any;
-'' + x;
-    `,
-    `
-declare const x: any;
-String(x);
-    `,
-    `
-declare const x: any;
-'' += x;
-    `,
   ],
   invalid: [
-    {
-      code: `
-declare const x: unknown;
-\`\${x})\`;
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-declare const x: unknown;
-x.toString();
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-declare const x: unknown;
-x.toLocaleString();
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-declare const x: unknown;
-'' + x;
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-declare const x: unknown;
-String(x);
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-declare const x: unknown;
-'' += x;
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
-    {
-      code: `
-function foo<T>(x: T) {
-  String(x);
-}
-      `,
-      errors: [
-        {
-          data: {
-            certainty: 'may',
-            name: 'x',
-          },
-          messageId: 'baseToString',
-        },
-      ],
-      options: [
-        {
-          checkUnknown: true,
-        },
-      ],
-    },
     {
       code: '`${{}})`;',
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 6,
         },
       ],
     },
@@ -865,11 +559,12 @@ function foo<T>(x: T) {
       code: '({}).toString();',
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 4,
         },
       ],
     },
@@ -877,11 +572,12 @@ function foo<T>(x: T) {
       code: '({}).toLocaleString();',
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 4,
         },
       ],
     },
@@ -889,11 +585,12 @@ function foo<T>(x: T) {
       code: "'' + {};",
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 8,
         },
       ],
     },
@@ -901,11 +598,12 @@ function foo<T>(x: T) {
       code: 'String({});',
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 10,
         },
       ],
     },
@@ -913,11 +611,12 @@ function foo<T>(x: T) {
       code: "'' += {};",
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '{}',
-          },
           messageId: 'baseToString',
+          message: "'{}' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -928,11 +627,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'someObjectOrString',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrString' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -943,11 +643,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'someObjectOrString',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrString' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -958,11 +659,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'someObjectOrString',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrString' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -973,11 +675,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'someObjectOrObject',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrObject' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -988,11 +691,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'someObjectOrObject',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrObject' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -1003,11 +707,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'someObjectOrObject',
-          },
           messageId: 'baseToString',
+          message: "'someObjectOrObject' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 27,
         },
       ],
     },
@@ -1021,11 +726,12 @@ function foo<T>(x: T) {
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'intersection',
-          },
           messageId: 'baseToString',
+          message: "'intersection' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 21,
+          endLine: 5,
+          endColumn: 33,
         },
       ],
     },
@@ -1039,11 +745,12 @@ declare const foo: string | Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'foo',
-          },
           messageId: 'baseToString',
+          message: "'foo' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 4,
+          endLine: 6,
+          endColumn: 7,
         },
       ],
     },
@@ -1060,11 +767,12 @@ declare const foo: Bar | Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'foo',
-          },
           messageId: 'baseToString',
+          message: "'foo' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 4,
+          endLine: 9,
+          endColumn: 7,
         },
       ],
     },
@@ -1081,11 +789,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'foo',
-          },
           messageId: 'baseToString',
+          message: "'foo' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 4,
+          endLine: 9,
+          endColumn: 7,
         },
       ],
     },
@@ -1095,11 +804,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '[{}, {}]',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for [{}, {}] will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 17,
         },
       ],
     },
@@ -1110,11 +820,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 14,
         },
       ],
     },
@@ -1127,11 +838,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: "[new A(), 'str']",
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for [new A(), 'str'] may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 25,
         },
       ],
     },
@@ -1145,11 +857,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1163,11 +876,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1184,11 +898,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 9,
+          endLine: 9,
+          endColumn: 14,
         },
       ],
     },
@@ -1202,11 +917,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1220,11 +936,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for tuple will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1238,11 +955,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for tuple will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1256,11 +974,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for tuple may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1274,11 +993,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for tuple may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1292,11 +1012,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for tuple will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1307,17 +1028,17 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 14,
         },
       ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
-          tsconfigRootDir: rootDir,
         },
       },
     },
@@ -1330,11 +1051,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for array may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 23,
         },
       ],
     },
@@ -1345,11 +1067,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '[{}, {}]',
-          },
           messageId: 'baseToString',
+          message: "'[{}, {}]' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 2,
+          column: 16,
+          endLine: 2,
+          endColumn: 24,
         },
       ],
     },
@@ -1360,11 +1083,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 21,
         },
       ],
     },
@@ -1377,11 +1101,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: "[new A(), 'str']",
-          },
           messageId: 'baseToString',
+          message: "'[new A(), 'str']' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 16,
+          endLine: 5,
+          endColumn: 32,
         },
       ],
     },
@@ -1395,11 +1120,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1413,11 +1139,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1434,11 +1161,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 16,
+          endLine: 9,
+          endColumn: 21,
         },
       ],
     },
@@ -1452,11 +1180,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1470,11 +1199,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1488,11 +1218,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1506,11 +1237,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1524,11 +1256,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1542,11 +1275,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 16,
+          endLine: 6,
+          endColumn: 21,
         },
       ],
     },
@@ -1557,17 +1291,17 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 21,
         },
       ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
-          tsconfigRootDir: rootDir,
         },
       },
     },
@@ -1580,11 +1314,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 25,
+          endLine: 4,
+          endColumn: 30,
         },
       ],
     },
@@ -1595,11 +1330,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '[{}, {}]',
-          },
           messageId: 'baseToString',
+          message: "'[{}, {}]' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 17,
         },
       ],
     },
@@ -1610,11 +1346,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 14,
         },
       ],
     },
@@ -1627,11 +1364,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: "[new A(), 'str']",
-          },
           messageId: 'baseToString',
+          message: "'[new A(), 'str']' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 25,
         },
       ],
     },
@@ -1645,11 +1383,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1663,11 +1402,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1684,11 +1424,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 9,
+          endLine: 9,
+          endColumn: 14,
         },
       ],
     },
@@ -1702,11 +1443,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1720,11 +1462,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1738,11 +1481,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1756,11 +1500,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1774,11 +1519,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1792,11 +1538,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 14,
         },
       ],
     },
@@ -1807,17 +1554,17 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 14,
         },
       ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
-          tsconfigRootDir: rootDir,
         },
       },
     },
@@ -1830,11 +1577,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 23,
         },
       ],
     },
@@ -1845,11 +1593,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: '[{}, {}]',
-          },
           messageId: 'baseToString',
+          message: "'[{}, {}]' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 2,
+          column: 12,
+          endLine: 2,
+          endColumn: 20,
         },
       ],
     },
@@ -1860,11 +1609,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 17,
         },
       ],
     },
@@ -1877,11 +1627,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: "[new A(), 'str']",
-          },
           messageId: 'baseToString',
+          message: "'[new A(), 'str']' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 12,
+          endLine: 5,
+          endColumn: 28,
         },
       ],
     },
@@ -1895,11 +1646,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -1913,11 +1665,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -1934,11 +1687,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 9,
+          column: 12,
+          endLine: 9,
+          endColumn: 17,
         },
       ],
     },
@@ -1952,11 +1706,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -1970,11 +1725,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -1988,11 +1744,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -2006,11 +1763,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -2024,11 +1782,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -2042,11 +1801,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'tuple',
-          },
           messageId: 'baseToString',
+          message: "'tuple' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 17,
         },
       ],
     },
@@ -2057,17 +1817,17 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 17,
         },
       ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
-          tsconfigRootDir: rootDir,
         },
       },
     },
@@ -2080,11 +1840,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array',
-          },
           messageId: 'baseToString',
+          message: "'array' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 26,
         },
       ],
     },
@@ -2098,11 +1859,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'array[0]',
-          },
           messageId: 'baseToString',
+          message: "'array[0]' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 19,
         },
       ],
     },
@@ -2115,11 +1877,12 @@ declare const foo: Bar & Foo;
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'value',
-          },
           messageId: 'baseToString',
+          message: "'value' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 16,
         },
       ],
     },
@@ -2131,11 +1894,12 @@ foo.toString();
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'foo',
-          },
           messageId: 'baseToString',
+          message: "'foo' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 4,
         },
       ],
     },
@@ -2149,11 +1913,12 @@ foo.toString();
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: "foo([{ foo: 'foo' }])",
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for foo([{ foo: 'foo' }]) will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 30,
         },
       ],
     },
@@ -2167,11 +1932,12 @@ foo.toString();
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: "foo([{ foo: 'foo' }, 'bar'])",
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for foo([{ foo: 'foo' }, 'bar']) may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 6,
+          column: 9,
+          endLine: 6,
+          endColumn: 37,
         },
       ],
     },
@@ -2184,11 +1950,12 @@ String(v);
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'v',
-          },
           messageId: 'baseToString',
+          message: "'v' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 8,
+          endLine: 5,
+          endColumn: 9,
         },
       ],
     },
@@ -2201,11 +1968,12 @@ String(v);
       `,
       errors: [
         {
-          data: {
-            certainty: 'may',
-            name: 'v',
-          },
           messageId: 'baseToString',
+          message: "'v' may use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 8,
+          endLine: 5,
+          endColumn: 9,
         },
       ],
     },
@@ -2218,11 +1986,12 @@ String(v);
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'v',
-          },
           messageId: 'baseToString',
+          message: "'v' will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 5,
+          column: 8,
+          endLine: 5,
+          endColumn: 9,
         },
       ],
     },
@@ -2233,11 +2002,12 @@ v.join();
       `,
       errors: [
         {
-          data: {
-            certainty: 'will',
-            name: 'v',
-          },
           messageId: 'baseArrayJoin',
+          message: "Using `join()` for v will use Object's default stringification format ('[object Object]') when stringified.",
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 2,
         },
       ],
     },

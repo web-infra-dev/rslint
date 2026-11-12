@@ -19,9 +19,9 @@ func certaintyToString(certainty usefulness) string {
 	case usefulnessAlways:
 		return "always"
 	case usefulnessNever:
-		return "always"
+		return "will"
 	case usefulnessSometimes:
-		return "always"
+		return "may"
 	default:
 		panic("unknown certainty")
 	}
@@ -83,8 +83,9 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 		) usefulness
 
 		checkExpression := func(node *ast.Expression, t *checker.Type) {
-			// TODO(port): boolean, null, etc?
-			if ast.IsLiteralExpression(node) {
+			// ESTree omits ParenthesizedExpression nodes and leading trivia.
+			node = ast.SkipParentheses(node)
+			if utils.IsESTreeLiteralKind(node.Kind) {
 				return
 			}
 
@@ -100,20 +101,21 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, buildBaseToStringMessage(ctx.SourceFile.Text()[node.Pos():node.End()], certainty))
+			ctx.ReportNode(node, buildBaseToStringMessage(utils.TrimmedNodeText(ctx.SourceFile, node), certainty))
 		}
 
 		checkExpressionForArrayJoin := func(
 			node *ast.Node,
 			t *checker.Type,
 		) {
+			node = ast.SkipParentheses(node)
 			certainty := collectJoinCertainty(t, []*checker.Type{})
 
 			if certainty == usefulnessAlways {
 				return
 			}
 
-			ctx.ReportNode(node, buildBaseArrayJoinMessage(ctx.SourceFile.Text()[node.Pos():node.End()], certainty))
+			ctx.ReportNode(node, buildBaseArrayJoinMessage(utils.TrimmedNodeText(ctx.SourceFile, node), certainty))
 		}
 
 		collectUnionTypeCertainty := func(
@@ -280,16 +282,17 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 		}
 
 		isBuiltInStringCall := func(node *ast.CallExpression) bool {
-			if ast.IsIdentifier(node.Expression) && node.Expression.AsIdentifier().Text == "String" && len(node.Arguments.Nodes) > 0 {
-				tt := ctx.TypeChecker.GetTypeAtLocation(node.Expression)
+			callee := ast.SkipParentheses(node.Expression)
+			if ast.IsIdentifier(callee) && callee.Text() == "String" && len(node.Arguments.Nodes) > 0 {
+				// A script's local String declaration can merge with the lib symbol.
+				// Check the file's lexical binding before consulting its inferred type.
+				if ctx.Refs.ResolveInFile(callee) != nil {
+					return false
+				}
+				tt := ctx.TypeChecker.GetTypeAtLocation(callee)
 				s := utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, tt, "String")
 				sc := utils.IsBuiltinSymbolLike(ctx.Program(), ctx.TypeChecker, tt, "StringConstructor")
 				return s || sc
-				// TODO(port-scopemanager)
-				// const scope = context.sourceCode.getScope(node);
-				// // eslint-disable-next-line @typescript-eslint/internal/prefer-ast-types-enum
-				// const variable = scope.set.get('String');
-				// return !variable?.defs.length;
 			}
 			return false
 		}
@@ -317,16 +320,25 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if ast.IsPropertyAccessExpression(callExpr.Expression) {
-					memberExpr := callExpr.Expression.AsPropertyAccessExpression()
-					propertyName := memberExpr.Name().Text()
-					switch propertyName {
+				callee := ast.SkipParentheses(callExpr.Expression)
+				var object, property *ast.Node
+				if ast.IsPropertyAccessExpression(callee) {
+					memberExpr := callee.AsPropertyAccessExpression()
+					object, property = memberExpr.Expression, memberExpr.Name()
+				} else if ast.IsElementAccessExpression(callee) {
+					memberExpr := callee.AsElementAccessExpression()
+					object, property = memberExpr.Expression, ast.SkipParentheses(memberExpr.ArgumentExpression)
+				}
+				// Upstream selects Identifier properties, including computed identifiers,
+				// but not string literals or private names.
+				if property != nil && ast.IsIdentifier(property) {
+					switch property.Text() {
 					case "join":
-						t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, memberExpr.Expression)
-						checkExpressionForArrayJoin(memberExpr.Expression, t)
+						t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, object)
+						checkExpressionForArrayJoin(object, t)
 						return
 					case "toLocaleString", "toString":
-						checkExpression(memberExpr.Expression, nil)
+						checkExpression(object, nil)
 						return
 					}
 				}
