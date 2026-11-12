@@ -8,7 +8,8 @@ copy-paste error.
 
 The rule checks single-statement `if` and `while` branches, conditional
 expressions, and short-circuit expressions with the check on the left.
-Reassigning the checked receiver suppresses reports in that branch.
+Reassigning the checked receiver or the index that selects it suppresses
+reports in that branch.
 
 Examples of **incorrect** code for this rule
 
@@ -56,6 +57,12 @@ const cache = /** @type {{has: (key: string) => boolean, get: (key: string) => n
 );
 if (cache.has('a')) cache.get('b');
 ```
+
+Rslint also recognizes `const` aliases of the same object key. For a receiver
+such as `cache[index]`, Rslint checks that the same binding selects the map and
+skips accesses after index reassignments. Destructuring assignments such as
+`[holder.map] = maps` can also invalidate the check. ESLint Unicorn v79.0.0
+can report these accesses.
 
 ## Original documentation
 

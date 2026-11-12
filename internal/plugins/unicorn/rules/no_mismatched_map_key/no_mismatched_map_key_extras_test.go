@@ -32,13 +32,37 @@ if (map.has(a)) use(({p: (map)} = next), map.get(b));`},
 		{FileName: "case.js", Code: `if (map.has(a)) use(([(map) = other] = next), map.get(b));
 if (map.has(a)) { for ([(map)] of next) map.get(b); }`},
 		{FileName: "case.js", Code: "if (cache.map.has(a)) { ([{value: cache}] = next, cache.map.get(b)); }"},
+		{FileName: "case.js", Code: `if (holder.map.has("a")) ([holder.map] = [other], holder.map.get("b"));
+if (holder.map.has("a")) ({value: holder.map = other} = next, holder.map.get("b"));
+if (holder.map.has("a")) { for ([holder.map] of next) holder.map.get("b"); }`},
 		{FileName: "case.js", Code: "if (map.has(a)) { if (other || map.has(b)) map.get(c); }"},
 		{FileName: "case.js", Code: "if (map.has(a)) use(() => map.get(b), function () { map.get(c); });"},
+
+		// A computed receiver can change through index shadowing or assignment.
+		{FileName: "case.js", Code: `const cache = {a: new Map(), b: new Map()};
+const k = "a";
+if (cache[k].has("x")) { const k = "b", value = cache[k].get("y"); }`},
+		{FileName: "case.js", Code: `let k = "a";
+if (cache[k].has("x")) (k = "b", cache[k].get("y"));
+if (cache[k].has("x")) ([k] = next, cache[k].get("y"));
+if (cache[config.key].has("x")) (config.key = "b", cache[config.key].get("y"));`},
+		{FileName: "case.js", Code: `let k = "a";
+if (cache[k].has("x")) {
+  for (const item of items) {
+    if (cache[k].has("x")) k = "b";
+    cache[k].get("y");
+  }
+}`},
 
 		// Static keys with different syntax or bindings.
 		{FileName: "case.js", Code: "if (map.has(0 / 0)) map.get(NaN); if (map.has(1n)) map.get(0x1n);"},
 		{FileName: "case.js", Code: "const k1 = 3; const k2 = 3; if (map.has(k1)) map.get(k2);"},
 		{FileName: "case.js", Code: "if (map.has(`a`)) map.get(\"a\");"},
+		{FileName: "case.js", Code: `const key = {}, alias = key;
+const map = new Map([[key, 1]]);
+if (map.has(key)) map.get(alias);`},
+		{FileName: "case.ts", Code: `const key = {}, alias = key as object, secondAlias = (alias!);
+if (map.has(secondAlias)) map.get(key);`},
 
 		// Source annotations also work through const aliases and local factories.
 		{FileName: "case.ts", Code: `type Cache = { has(k: string): boolean; get(k: string): unknown };
@@ -77,11 +101,19 @@ if (values.has("a")) values.get("b");`},
 		},
 		// Computed method names run in the branch, unlike their function bodies.
 		keyCase("case.js", "if (map.has(a)) { use({ [map.get(b)]() { map.get(c); } }); }", 1, 34, 1, 35),
-		// Destructuring only checks writes to the root binding.
+		// The computed property name reads the receiver during destructuring.
 		keyCase("case.js", "if (cache.map.has(a)) { ({[cache.map]: other} = next, cache.map.get(b)); }", 1, 69, 1, 70),
-		keyCase("case.js", "if (cache.map.has(a)) { ([cache.map = other] = next, cache.map.get(b)); }", 1, 68, 1, 69),
 		keyCase("case.js", `if (cache.map.has(a)) cache["m" + "ap"].get(b);`, 1, 45, 1, 46),
 		keyCase("case.js", "if (cache[k].has(a)) cache[k].get(b);", 1, 35, 1, 36),
+		keyCase("case.js", `let k = "a";
+if (cache[k].has("x")) {
+  for (const item of items) {
+    { let k = "b"; consume(k); }
+    cache[k].get("y");
+  }
+}`, 5, 18, 5, 21),
+		keyCase("case.js", "let key = {}; const alias = key; key = {}; if (map.has(key)) map.get(alias);", 1, 70, 1, 75),
+		keyCase("case.js", "const key = {}, other = {}; if (map.has(key)) map.get(other);", 1, 55, 1, 60),
 		keyCase("case.js", "if ((cache?.map).has(a)) cache?.map.get(b);", 1, 41, 1, 42),
 		keyCase("case.js", "class Example { #map; run() { if (this.#map.has(a)) this.#map.get(b); } }", 1, 67, 1, 68),
 		keyCase("case.js", `if (map.has(a)) map.get(keys[import("pkg")]);`, 1, 25, 1, 44),

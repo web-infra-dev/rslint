@@ -14,6 +14,31 @@ func (a *analyzer) sameReference(left, right *ast.Node) bool {
 	return leftRoot == nil || rightRoot == nil || a.sameBinding(leftRoot, rightRoot)
 }
 
+func (a *analyzer) sameReceiver(left, right *ast.Node) bool {
+	return unicornutil.IsSameComparisonOperandWithKeyEvaluator(left, right, a.computedKeys.Eval) &&
+		a.sameReceiverBindings(left, right)
+}
+
+// The structural comparison already matched property names. Check the
+// bindings of identifiers that are read to obtain the receiver or an index.
+func (a *analyzer) sameReceiverBindings(left, right *ast.Node) bool {
+	left, right = unwrap(left), unwrap(right)
+	if left == nil || right == nil {
+		return true
+	}
+	if ast.IsIdentifier(left) && ast.IsIdentifier(right) {
+		return a.sameBinding(left, right)
+	}
+	if !ast.IsAccessExpression(left) || !ast.IsAccessExpression(right) {
+		return true
+	}
+	if ast.IsElementAccessExpression(left) && ast.IsElementAccessExpression(right) &&
+		!a.sameReceiverBindings(left.AsElementAccessExpression().ArgumentExpression, right.AsElementAccessExpression().ArgumentExpression) {
+		return false
+	}
+	return a.sameReceiverBindings(left.Expression(), right.Expression())
+}
+
 func rootIdentifier(node *ast.Node) *ast.Node {
 	for node = unwrap(node); node != nil; node = unwrap(node.Expression()) {
 		if ast.IsIdentifier(node) {
@@ -43,11 +68,13 @@ func (a *analyzer) sameBinding(left, right *ast.Node) bool {
 	return a.ctx.Refs.ResolveInFile(left) == rightSymbol
 }
 
-func (a *analyzer) writesReceiver(node, receiver, root *ast.Node) bool {
+func (a *analyzer) writesReceiver(node, receiver *ast.Node) bool {
 	var target *ast.Node
 	switch node.Kind {
 	case ast.KindVariableDeclaration:
-		return root != nil && node.Initializer() != nil && a.patternWritesBinding(node.Name(), root)
+		if node.Initializer() != nil {
+			target = node.Name()
+		}
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) && !utils.IsDefaultValueInDestructuringAssignment(node) {
@@ -66,20 +93,35 @@ func (a *analyzer) writesReceiver(node, receiver, root *ast.Node) bool {
 			return false
 		}
 	}
-	target = unwrap(target)
-	return target != nil && (a.sameReference(receiver, target) || root != nil && a.patternWritesBinding(target, root))
+	return a.patternWritesReceiver(target, receiver)
 }
 
-func (a *analyzer) patternWritesBinding(pattern, root *ast.Node) bool {
-	pattern = utils.ESTreeRuntimeExpression(pattern)
+func (a *analyzer) patternWritesReceiver(pattern, receiver *ast.Node) bool {
+	pattern = unwrap(pattern)
 	if pattern == nil {
 		return false
 	}
-	if ast.IsIdentifier(pattern) {
-		return a.sameBinding(root, pattern)
+	if ast.IsIdentifier(pattern) || ast.IsAccessExpression(pattern) {
+		return a.changesReceiver(receiver, pattern)
 	}
 	for _, element := range ast.GetElementsOfBindingOrAssignmentPattern(pattern) {
-		if a.patternWritesBinding(ast.GetTargetOfBindingOrAssignmentElement(element), root) {
+		if a.patternWritesReceiver(ast.GetTargetOfBindingOrAssignmentElement(element), receiver) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *analyzer) changesReceiver(receiver, target *ast.Node) bool {
+	for node := unwrap(receiver); node != nil; node = unwrap(node.Expression()) {
+		if a.sameReceiver(node, target) {
+			return true
+		}
+		if !ast.IsAccessExpression(node) {
+			break
+		}
+		if ast.IsElementAccessExpression(node) &&
+			a.changesReceiver(node.AsElementAccessExpression().ArgumentExpression, target) {
 			return true
 		}
 	}

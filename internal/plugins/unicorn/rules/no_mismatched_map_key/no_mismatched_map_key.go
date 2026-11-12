@@ -61,10 +61,9 @@ func (a *analyzer) checkGuard(node *ast.Node) {
 
 	var keys [2]*ast.Node
 	accessKeys := keys[:0]
-	root := rootIdentifier(guard.Object)
 	for _, branch := range branches {
 		if branch != nil {
-			accessKeys = a.collectAccessKeys(branch, guard.Object, root, accessKeys)
+			accessKeys = a.collectAccessKeys(branch, guard.Object, accessKeys)
 		}
 	}
 	if len(accessKeys) > 0 && !a.isKnownNonMap(guard.Object) {
@@ -120,23 +119,32 @@ func singleStatement(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func (a *analyzer) collectAccessKeys(branch, receiver, root *ast.Node, keys []*ast.Node) []*ast.Node {
+func (a *analyzer) collectAccessKeys(branch, receiver *ast.Node, keys []*ast.Node) []*ast.Node {
 	previous := len(keys)
+	writesReceiver := func(node *ast.Node) bool { return a.writesReceiver(node, receiver) }
+	var nestedGuards []*ast.Node
 	hasWrite := walkBranch(branch, func(node *ast.Node) bool {
-		return a.isNestedGuard(node, receiver)
+		if a.isNestedGuard(node, receiver) {
+			nestedGuards = append(nestedGuards, node)
+			return true
+		}
+		return false
 	}, func(node *ast.Node) bool {
-		if a.writesReceiver(node, receiver, root) {
+		if writesReceiver(node) {
 			return true
 		}
 		if access, ok := unicornutil.MatchDotMethodCall(node, accessCallOptions); ok &&
 			!slices.ContainsFunc(access.Call.Arguments(), ast.IsSpreadElement) &&
-			a.sameReference(receiver, access.Object) {
+			a.sameReceiver(receiver, access.Object) {
 			keys = append(keys, utils.ESTreeRuntimeExpression(access.Call.Arguments()[0]))
 		}
 		return false
 	})
-	// A write anywhere in this branch invalidates the guard for every access.
-	if hasWrite {
+	// Inner guards own their access diagnostics. Their writes can still
+	// invalidate the outer guard for other accesses in this branch.
+	if hasWrite || len(keys) > previous && slices.ContainsFunc(nestedGuards, func(guard *ast.Node) bool {
+		return walkBranch(guard, nil, writesReceiver)
+	}) {
 		return keys[:previous]
 	}
 	return keys
@@ -184,7 +192,7 @@ func (a *analyzer) isNestedGuard(node, receiver *ast.Node) bool {
 	}
 	return walkBranch(test, nil, func(node *ast.Node) bool {
 		call, ok := unicornutil.MatchDotMethodCall(node, hasCallOptions)
-		return ok && a.sameReference(receiver, call.Object)
+		return ok && a.sameReceiver(receiver, call.Object)
 	})
 }
 
@@ -204,7 +212,38 @@ func (a *analyzer) differentKeys(left, right *ast.Node, leftValue any, leftKnown
 			}
 		}
 	}
-	return isKeyReference(left) && isKeyReference(right) && !a.sameReference(left, right)
+	if !isKeyReference(left) || !isKeyReference(right) || a.sameReference(left, right) {
+		return false
+	}
+	if ast.IsIdentifier(left) && ast.IsIdentifier(right) {
+		if initializer := a.constantKeyInitializer(left); initializer != nil && initializer == a.constantKeyInitializer(right) {
+			return false
+		}
+	}
+	return true
+}
+
+// Follow aliases that capture the same value, including objects and functions.
+// Distinct initializer nodes can produce distinct keys even with identical text.
+func (a *analyzer) constantKeyInitializer(node *ast.Node) *ast.Node {
+	seen := map[*ast.Symbol]bool{}
+	for node != nil && ast.IsIdentifier(node) {
+		symbol := a.ctx.Refs.ResolveInFile(node)
+		if symbol == nil || len(symbol.Declarations) != 1 || seen[symbol] {
+			return nil
+		}
+		declaration := symbol.Declarations[0]
+		if !ast.IsVariableDeclaration(declaration) || !ast.IsVarConst(declaration) {
+			return nil
+		}
+		initializer, ok := a.keyValues.ResolveIdentifierInitializer(node)
+		if !ok {
+			return nil
+		}
+		seen[symbol] = true
+		node = unwrap(initializer)
+	}
+	return node
 }
 
 func isKeyReference(node *ast.Node) bool {
