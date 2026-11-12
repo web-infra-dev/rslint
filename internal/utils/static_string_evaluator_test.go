@@ -499,6 +499,135 @@ func TestStaticStringEvaluator(t *testing.T) {
 
 type staticEvaluatorTestResolver struct{ resolver binder.NameResolver }
 
+func TestStaticStringEvaluatorRegExp(t *testing.T) {
+	root := fixtures.GetRootDir()
+	filePath := tspath.ResolvePath(root.Dir, "regexp.ts")
+	code := `
+		const literal = /a/gi;
+		const alias = literal;
+		let stable = new RegExp("x", "y");
+		const stableUse = stable;
+		let changed = /x/;
+		changed = /y/g;
+		const changedUse = changed;
+		const mutatedLiteral = /x/;
+		mutatedLiteral[Symbol.match] = () => null;
+		const mutatedLiteralUse = mutatedLiteral;
+		const aliasedLiteral = /x/;
+		const mutationAlias = aliasedLiteral;
+		mutationAlias[Symbol.match] = () => null;
+		const mutatedAliasUse = aliasedLiteral;
+		let mutatedConstructor = new RegExp("x");
+		Reflect.set(mutatedConstructor, "test", () => false);
+		const mutatedConstructorUse = mutatedConstructor;
+		const constructor = new RegExp("a" + "b", "u");
+		const copied = new RegExp(/a/gi);
+		const overridden = new RegExp(/a/g, "y");
+		const empty = new RegExp();
+		const primitive = new RegExp(null);
+		const unicodeSets = new RegExp("[a&&b]", "v");
+		const invalidPattern = new RegExp("[", "u");
+		const duplicateFlags = new RegExp("a", "gg");
+		const invalidFlags = new RegExp("a", "z");
+		const incompatibleFlags = new RegExp("a", "uv");
+		const coercion = new RegExp({toString() { effect(); return "a"; }});
+		const array = new RegExp(["a"]);
+		const spread = new RegExp(...["a"]);
+		const effect = new RegExp(read());
+		const object = {pattern: /a/};
+		Object.defineProperty(object, "pattern", {get() { return "a"; }});
+		const mutableMember = object.pattern;
+		const memberAlias = mutableMember || /b/;
+		const called = parseInt("1");
+		const calledAlias = called || /b/;
+		const missingMember = object.missing;
+		const literalMember = ({pattern: /a/}).pattern;
+		const cycle = cycle;
+		const textValue = "a";
+		const numberValue = 1;
+		const nullValue = null;
+		const undefinedValue = undefined;
+		const symbolValue = Symbol.iterator;
+		const arrayValue = [];
+		const objectValue = {};
+		{ const RegExp = Custom; const shadowed = new RegExp("a"); }
+	`
+	fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+	program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+	assert.NilError(t, err)
+	source := program.GetSourceFile(filePath)
+	typeChecker, done := program.GetTypeChecker(t.Context())
+	defer done()
+	evaluator := NewStaticStringEvaluatorWithSourceFile(typeChecker, source)
+	for _, test := range []struct {
+		name, pattern, flags string
+		known                bool
+	}{
+		{"literal", "a", "gi", true},
+		{"alias", "a", "gi", true},
+		{"stableUse", "x", "y", true},
+		{"constructor", "ab", "u", true},
+		{"copied", "a", "gi", true},
+		{"overridden", "a", "y", true},
+		{"empty", "", "", true},
+		{"primitive", "null", "", true},
+		{"unicodeSets", "[a&&b]", "v", true},
+		{"changedUse", "", "", false},
+		{"mutatedLiteralUse", "", "", false},
+		{"mutatedAliasUse", "", "", false},
+		{"mutatedConstructorUse", "", "", false},
+		{"invalidPattern", "", "", false},
+		{"duplicateFlags", "", "", false},
+		{"invalidFlags", "", "", false},
+		{"incompatibleFlags", "", "", false},
+		{"coercion", "", "", false},
+		{"array", "", "", false},
+		{"spread", "", "", false},
+		{"effect", "", "", false},
+		{"mutableMember", "", "", false},
+		{"literalMember", "a", "", true},
+		{"cycle", "", "", false},
+		{"shadowed", "", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			pattern, flags, known := evaluator.EvalRegExp(findVariableInitializer(t, source, test.name))
+			if known != test.known || pattern != test.pattern || flags != test.flags {
+				t.Fatalf("EvalRegExp = (%q, %q, %v), want (%q, %q, %v)", pattern, flags, known, test.pattern, test.flags, test.known)
+			}
+		})
+	}
+	for _, test := range []struct {
+		name  string
+		known bool
+	}{
+		{"mutableMember", true},
+		{"memberAlias", true},
+		{"calledAlias", false},
+		{"missingMember", false},
+		{"literalMember", false},
+		{"changedUse", false},
+		{"cycle", false},
+	} {
+		node := findVariableInitializer(t, source, test.name)
+		if got := evaluator.HasNonUndefinedValueIgnoringPropertyMutations(node); got != test.known {
+			t.Errorf("HasNonUndefinedValueIgnoringPropertyMutations(%s) = %v, want %v", test.name, got, test.known)
+		}
+	}
+	for _, test := range []struct {
+		name      string
+		primitive bool
+	}{
+		{"textValue", true}, {"numberValue", true}, {"nullValue", true},
+		{"undefinedValue", true}, {"symbolValue", true},
+		{"arrayValue", false}, {"objectValue", false}, {"literal", false},
+	} {
+		value, known := evaluator.EvalValue(findVariableInitializer(t, source, test.name))
+		if !known || IsPrimitiveStaticValue(value) != test.primitive {
+			t.Errorf("IsPrimitiveStaticValue(%s): known = %v, want primitive = %v", test.name, known, test.primitive)
+		}
+	}
+}
+
 func (r *staticEvaluatorTestResolver) Resolve(node *ast.Node) *ast.Symbol {
 	return r.resolver.Resolve(node, node.Text(), ast.SymbolFlagsValue|ast.SymbolFlagsAlias, nil, true, false)
 }

@@ -1,0 +1,16 @@
+{
+  "name": "@rslint/rule-tester",
+  "version": "0.10.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "private": true,
+  "scripts": {
+    "test": "rs test"
+  },
+  "description": "Rule tester for Rslint integration tests",
+  "license": "MIT",
+  "dependencies": {
+    "@rslint/core": "workspace:*",
+    "rstack": "catalog:"
+  }
+}

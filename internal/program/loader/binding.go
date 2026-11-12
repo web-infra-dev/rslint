@@ -16,15 +16,18 @@ import (
 )
 
 // LoadResult is the complete Program input for one lint generation. It carries
-// only the unified Program sequence, lint projection, and source/target path
-// mappings needed by integrations; compiler and parser assembly details remain
-// private to the loader. Its slices and maps are immutable after LoadCLI or
-// LoadAPI returns.
+// the unified Program sequence, lint projection, source/target path mappings,
+// and requested frozen root identities; compiler and parser assembly details
+// remain private to the loader. Its slices and maps are immutable after LoadCLI
+// or LoadAPI returns.
 type LoadResult struct {
 	compilerPrograms       []*compiler.Program
 	Programs               []*lintprogram.Program
 	TargetsByProgram       [][]string
 	LintTargetBySourcePath map[string]target.File
+	// ProgramRootIdentities is the optional immutable projection requested by
+	// ProjectBuildRequest.IncludeProgramRootIdentities.
+	ProgramRootIdentities []string
 }
 
 func authoritativePath(filePath string, fsys vfs.FS) string {

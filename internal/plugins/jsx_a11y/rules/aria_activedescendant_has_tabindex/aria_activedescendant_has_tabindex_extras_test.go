@@ -210,7 +210,6 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 		// component reference per JSX semantics; not in lowercase dom map.
 		// ============================================================
 		{Code: `<DIV aria-activedescendant={x} />;`, Tsx: true},
-
 	}, []rule_tester.InvalidTestCase{
 		// TSNonNullExpression on tabIndex — jsx-ast-utils' TSNonNullExpression
 		// extractor stringifies (`0!` → "0!", `(0)!` → "0!", `(5)!` → "5!").
@@ -278,7 +277,7 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 		// Outer span has no activedescendant (gate-1 skip); inner div has
 		// activedescendant but no tabIndex (report). Position assertion
 		// covers the inner element's column (after `<span>`).
-		{Code: `<span><div aria-activedescendant={x} /></span>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 7}}},
+		{Code: `<span><div aria-activedescendant={x} /></span>;`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 7}}},
 
 		// ---- Multi-line case for position assertion ----
 		// Locks line/column accounting on a non-trivial source layout. The
@@ -290,7 +289,7 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
   />;`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 2, Column: 3},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 2, Column: 3},
 			},
 		},
 
@@ -311,9 +310,9 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 			Code: `<><div aria-activedescendant={x} /><span aria-activedescendant={y} /><p aria-activedescendant={z} /></>;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 36},
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 70},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 3},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 36},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 70},
 			},
 		},
 
@@ -323,12 +322,12 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 		{
 			Code:   `const Item = () => <li aria-activedescendant={x} />;`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 20}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 20}},
 		},
 		{
 			Code:   `function R() { return <div aria-activedescendant={x} />; }`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 23}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 23}},
 		},
 
 		// ============================================================
@@ -377,19 +376,19 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 		{
 			Code:   `<ul aria-activedescendant={x}><li>x</li></ul>;`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 1}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 1}},
 		},
 		// Custom focusable wrapper with negative-2 tabIndex.
 		{
 			Code:   `<section aria-activedescendant={x} tabIndex={-2}>content</section>;`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 1}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 1}},
 		},
 		// Map render produces multiple offending elements.
 		{
 			Code:   `function L() { return items.map(i => <li aria-activedescendant={i.id}>x</li>); }`,
 			Tsx:    true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: errorMessage, Line: 1, Column: 38}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 1, Column: 38}},
 		},
 
 		// ============================================================
@@ -407,7 +406,7 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
   />;`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 2, Column: 3},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 2, Column: 3},
 			},
 		},
 
@@ -424,8 +423,8 @@ func TestAriaActivedescendantHasTabindexExtras(t *testing.T) {
 }`,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 3, Column: 5},
-				{MessageId: "tabIndexRequired", Message: errorMessage, Line: 4, Column: 7},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 3, Column: 5},
+				{MessageId: "tabIndexRequired", Message: "An element that manages focus with `aria-activedescendant` must have a tabindex", Line: 4, Column: 7},
 			},
 		},
 	})

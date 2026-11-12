@@ -3438,20 +3438,32 @@ func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdenti
 	configDir := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	upper := tspath.ResolvePath(configDir, "Source.ts")
 	lower := tspath.ResolvePath(configDir, "source.ts")
+	safe := tspath.ResolvePath(configDir, "safe/file.ts")
 	fsys := &exactCaseProgramFS{
 		FS: osvfs.FS(),
 		files: map[string]string{
 			configDir + "/tsconfig.json": `{"compilerOptions":{"noLib":true},"files":["Source.ts"]}`,
 			upper:                        "export const upper = 1;\n",
 			lower:                        "export const lower = 2;\n",
+			tspath.ResolvePath(configDir, "safe/tsconfig.json"): `{"compilerOptions":{"noLib":true},"files":["file.ts"]}`,
+			safe: "export const safe = 3;\n",
 		},
 	}
 	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
 		ParserOptions: &rslintconfig.ParserOptions{ProjectService: rslintconfig.BoolPtr(true)},
 	}}}
-	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{lower}, fsys)}))
-	if err != nil || len(plan.Files) != 1 || plan.Files[0].CanonicalPath != lower {
+	plan, err := target.Resolve(withGitPolicyForTest(target.Request{Config: config, ConfigDirectory: configDir, FS: fsys, Files: rslintconfig.ResolveFileIdentities([]string{lower, safe}, fsys)}))
+	if err != nil || len(plan.Files) != 2 {
 		t.Fatalf("fixture must retain the distinct physical target: files=%v error=%v", plan.Files, err)
+	}
+	configs := map[string]rslintconfig.RslintConfig{configDir: config}
+	resolver := configLint.NewResolver(configLint.ResolverOptions{
+		ConfigsByOwner: configs, DefaultRootDirectory: configDir, FS: fsys,
+		PathSpaces: plan.PathSpaces(), Catalog: rule.NewCatalog(),
+	})
+	policies, err := resolver.ProjectPolicies(plan.Files, true)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, scope := range []ProjectScope{AllDeclared, ActiveOwners, Targeted} {
 		t.Run(strconv.Itoa(int(scope)), func(t *testing.T) {
@@ -3459,6 +3471,12 @@ func TestBuildProjectsRejectsCaseFoldedServiceSourceWithDifferentCanonicalIdenti
 				map[string]rslintconfig.RslintConfig{configDir: config}, plan, scope, true)
 			if err == nil || !strings.Contains(err.Error(), "was absent") || !strings.Contains(err.Error(), lower) {
 				t.Fatalf("case-folded source escaped selected-root validation: projects=%d error=%v", projects.Len(), err)
+			}
+			loads, err := NewSession(fsys).PlanLoads(ProjectBuildRequest{
+				Configs: configs, Targets: plan, Policies: policies, Scope: scope, SingleThreaded: true,
+			}, configDir, false)
+			if err != nil || len(loads) != 0 {
+				t.Fatalf("deferred loading must retain authoritative service-source validation: loads=%d error=%v", len(loads), err)
 			}
 		})
 	}
@@ -4137,9 +4155,23 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 		name          string
 		scope         ProjectScope
 		compilerRoots bool
-	}{{"broad native roots", ActiveOwners, false}, {"focused compiler roots", Targeted, true}} {
+		references    bool
+	}{
+		{"broad native roots", ActiveOwners, false, false},
+		{"focused compiler roots", Targeted, true, false},
+		{"declared native roots", AllDeclared, false, false},
+		{"declared compiler roots", AllDeclared, true, false},
+		{"broad referenced roots", ActiveOwners, false, true},
+		{"focused referenced roots", Targeted, true, true},
+		{"declared referenced roots", AllDeclared, false, true},
+	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := tspath.NormalizePath(txtarfs.MustParseFile(t, "testdata/project_service.txtar").Materialize(t, ""))
+			if test.references {
+				writeProgramTestFiles(t, dir, map[string]string{
+					"a/tsconfig.json": `{"compilerOptions":{"strict":true},"include":["src/**/*.ts"],"references":[{"path":"../b"}]}`,
+				})
+			}
 			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 			config := rslintconfig.RslintConfig{{
 				Files: []string{"**/*.ts"},
@@ -4166,7 +4198,10 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			request := ProjectBuildRequest{Configs: configs, Targets: plan, Policies: policies, Scope: test.scope}
+			request := ProjectBuildRequest{
+				Configs: configs, Targets: plan, Policies: policies, Scope: test.scope,
+				IncludeProgramRootIdentities: true,
+			}
 			materialized := NewSession(fsys)
 			set, err := materialized.BuildProjects(request)
 			if err != nil {
@@ -4196,7 +4231,6 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 					for _, source := range program.SourceFiles() {
 						sources = append(sources, source.FileName())
 					}
-					slices.Sort(sources)
 					targets := append([]string(nil), binding.TargetsByProgram[index]...)
 					slices.Sort(targets)
 					result[strings.Join(targets, "\n")] = projection{targets, sources, program.CanProvideProgramDiagnostics()}
@@ -4206,6 +4240,7 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 			wantPrograms := project(want)
 			gotPrograms := make(map[string]projection)
 			gotMapping := make(map[string]target.File)
+			var gotRootIdentities []string
 			for _, load := range loads {
 				binding, err := load.Load()
 				if err != nil {
@@ -4217,10 +4252,98 @@ func TestProgramLoadsPreserveCompleteBindings(t *testing.T) {
 				for key, value := range binding.LintTargetBySourcePath {
 					gotMapping[key] = value
 				}
+				gotRootIdentities = append(gotRootIdentities, binding.ProgramRootIdentities...)
 			}
 			if !reflect.DeepEqual(gotPrograms, wantPrograms) || !reflect.DeepEqual(gotMapping, want.LintTargetBySourcePath) {
 				t.Fatal("admitted loads changed complete source graphs, target grouping, capabilities, or source identity")
 			}
+			if len(want.ProgramRootIdentities) == 0 || !slices.Equal(gotRootIdentities, want.ProgramRootIdentities) {
+				t.Fatalf("admitted loads changed frozen root identities: got %v, want %v", gotRootIdentities, want.ProgramRootIdentities)
+			}
 		})
+	}
+}
+
+func TestProgramLoadsKeepReferenceRedirectsCoherent(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		b           string
+		c           string
+		independent bool
+	}{
+		{"unrelated roots", `{"files":["other.ts"]}`, "", true},
+		{"nested unrelated roots", `{"files":["other.ts"],"references":[{"path":"./c.json"}]}`, `{"files":["dependency.ts"]}`, true},
+		{"overlapping roots", `{"files":["target.ts","other.ts"]}`, "", false},
+		{"nested overlapping roots", `{"files":["other.ts"],"references":[{"path":"./c.json"}]}`, `{"files":["target.ts"]}`, false},
+		{"reference cycle", `{"files":["other.ts"],"references":[{"path":"./a.json"}]}`, "", false},
+		{"unknown reference", `{"files":["other.ts"],"references":[{"path":"./missing.json"}]}`, "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := tspath.NormalizePath(t.TempDir())
+			files := map[string]string{
+				"a.json": `{"files":["target.ts"],"references":[{"path":"./b.json"}]}`,
+				"b.json": test.b, "target.ts": "export const target = 1;",
+				"other.ts": "export const other = 2;", "dependency.ts": "export const dependency = 3;",
+			}
+			if test.c != "" {
+				files["c.json"] = test.c
+			}
+			writeProgramTestFiles(t, dir, files)
+			fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+			first := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "target.ts"))
+			second := testLintTarget(fsys, dir, tspath.ResolvePath(dir, "other.ts"))
+			declaration := &rslintconfig.ProjectDeclaration{Patterns: rslintconfig.ProjectPaths{"a.json", "b.json"}, BaseDirectory: dir}
+			loads, err := NewSession(fsys).PlanLoads(ProjectBuildRequest{
+				Scope: ActiveOwners, Targets: target.Plan{Files: []target.File{first, second}},
+				Policies: map[target.File]rslintconfig.ProjectPolicy{
+					first: {ExplicitProject: declaration}, second: {ExplicitProject: declaration},
+				},
+			}, dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if (len(loads) == 2) != test.independent || (!test.independent && len(loads) != 0) {
+				t.Fatalf("independent=%t, loads=%d", test.independent, len(loads))
+			}
+		})
+	}
+}
+
+func TestProgramLoadsAllDeclaredWithoutLintTargets(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	writeProgramTestFiles(t, dir, map[string]string{
+		"a.json": `{"files":["a.ts"]}`,
+		"b.json": `{"files":["b.ts"]}`,
+		"a.ts":   "interface Parent { value: string; } interface Child extends Parent { value: number; }",
+		"b.ts":   `export const value: number = "wrong";`,
+	})
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	config := rslintconfig.RslintConfig{{LanguageOptions: &rslintconfig.LanguageOptions{
+		ParserOptions: &rslintconfig.ParserOptions{Project: rslintconfig.ProjectPaths{"a.json", "b.json"}},
+	}}}
+	loads, err := NewSession(fsys).PlanLoads(ProjectBuildRequest{
+		Configs: map[string]rslintconfig.RslintConfig{dir: config}, Scope: AllDeclared,
+	}, dir, false)
+	if err != nil || len(loads) != 2 {
+		t.Fatalf("loads=%d, error=%v", len(loads), err)
+	}
+	var programs []*lintprogram.Program
+	for index, load := range loads {
+		if load.TargetCount != 0 || load.Options == nil || load.Options.Checkers != nil {
+			t.Fatalf("zero-target Program changed compiler/checker metadata: %+v", load)
+		}
+		binding, err := load.Load()
+		if err != nil || len(binding.Programs) != 1 || len(binding.TargetsByProgram) != 1 || len(binding.TargetsByProgram[0]) != 0 {
+			t.Fatalf("load %d: binding=%+v, error=%v", index, binding, err)
+		}
+		want := tspath.ResolvePath(dir, []string{"a.json", "b.json"}[index])
+		if binding.Programs[0].Options().ConfigFilePath != want {
+			t.Fatalf("declaration order changed: got %q, want %q", binding.Programs[0].Options().ConfigFilePath, want)
+		}
+		programs = append(programs, binding.Programs...)
+	}
+	diagnostics := collectProgramTypeDiagnostics(t, programs)
+	if !containsTSDiagnostic(diagnostics, "TS2430") || !containsTSDiagnostic(diagnostics, "TS2322") {
+		t.Fatalf("declared Programs lost type-check coverage: %+v", diagnostics)
 	}
 }

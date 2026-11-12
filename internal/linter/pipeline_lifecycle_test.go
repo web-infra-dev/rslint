@@ -526,33 +526,45 @@ func TestDiagnosticSourceProjectionPreservesIdentityAndPositions(t *testing.T) {
 		Message: rule.RuleMessage{Id: "message", Description: "message"}, Range: core.NewTextRange(0, len(text)),
 		FixesPtr: &fixes, Suggestions: &suggestions, Origin: rule.DiagnosticOriginTypeScript, PreFormatted: true,
 	}
-	observation := ObservationResult{
-		Native: NativeObservation{Diagnostics: []rule.RuleDiagnostic{
-			original,
-			{FilePath: path, SourceFile: second},
-			{FilePath: path, SourceFile: alreadyText},
-			{FilePath: path},
-		}},
+	key := typeCheckDedupeKey{path: "/physical/source.ts", code: 2322, message: "type"}
+	execution := observationUnitExecution{
+		native: nativeObservationUnit{
+			syntacticDiagnostics: []rule.RuleDiagnostic{{FilePath: path, SourceFile: first}},
+			diagnostics: []rule.RuleDiagnostic{
+				original,
+				{FilePath: path, SourceFile: second},
+				{FilePath: path, SourceFile: alreadyText},
+				{FilePath: path},
+			},
+			typeDiagnostics: [][]collectedTypeCheckDiagnostic{{{
+				key: key, ruleDiagnostic: rule.RuleDiagnostic{FilePath: path, SourceFile: first},
+			}}},
+		},
 		pluginOutcome: EslintPluginDispatchOutcome{Diagnostics: []rule.RuleDiagnostic{{FilePath: path, SourceFile: first}}},
 	}
-	observation.detachDiagnosticSources()
-	projected := observation.Native.Diagnostics[0]
+	execution.detachDiagnosticSources()
+	projected := execution.native.diagnostics[0]
 	if _, retained := projected.SourceFile.(*ast.SourceFile); retained {
 		t.Fatal("compiler source was not detached")
 	}
-	if projected.SourceFile != observation.pluginOutcome.Diagnostics[0].SourceFile || projected.SourceFile == observation.Native.Diagnostics[1].SourceFile {
+	if projected.SourceFile != execution.pluginOutcome.Diagnostics[0].SourceFile || projected.SourceFile == execution.native.diagnostics[1].SourceFile {
 		t.Fatal("source identity was replaced with path identity")
 	}
-	if observation.Native.Diagnostics[1].SourceFile.Text() != "const other = 2;" || observation.Native.Diagnostics[2].SourceFile != alreadyText || observation.Native.Diagnostics[3].SourceFile != nil {
+	if execution.native.diagnostics[1].SourceFile.Text() != "const other = 2;" || execution.native.diagnostics[2].SourceFile != alreadyText || execution.native.diagnostics[3].SourceFile != nil {
 		t.Fatal("projection changed a distinct, text-only, or missing source")
+	}
+	typeDiagnostic := execution.native.typeDiagnostics[0][0]
+	if typeDiagnostic.key != key || typeDiagnostic.ruleDiagnostic.SourceFile != projected.SourceFile ||
+		execution.native.syntacticDiagnostics[0].SourceFile != projected.SourceFile {
+		t.Fatal("projection changed a frozen type key or source identity across diagnostic groups")
 	}
 	frame := projected.SourceFile
 	projected.SourceFile = original.SourceFile
 	if !reflect.DeepEqual(projected, original) {
 		t.Fatal("projection changed diagnostic metadata, fixes, or suggestions")
 	}
-	observation.detachDiagnosticSources()
-	if observation.Native.Diagnostics[0].SourceFile != frame {
+	execution.detachDiagnosticSources()
+	if execution.native.diagnostics[0].SourceFile != frame {
 		t.Fatal("repeated projection changed text source identity")
 	}
 	wantLines := first.ECMALineMap()
@@ -969,5 +981,175 @@ func TestPipelineJoinsAcquiredUnitsAfterLoadFailure(t *testing.T) {
 	result, err := RunPipeline(context.Background(), NewLintRequest(provider, ObservationPolicy{}, nil))
 	if !errors.Is(err, wantErr) || len(result.Observation.Native.Diagnostics) != 0 || released.Load() != 1 {
 		t.Fatalf("failed partial observation escaped: error=%v result=%+v released=%d", err, result, released.Load())
+	}
+}
+
+func TestPipelineRetainsConfiguredPoolUntilLastPluginBorrower(t *testing.T) {
+	previous := runtime.GOMAXPROCS(4)
+	defer runtime.GOMAXPROCS(previous)
+	pluginStarted := make(chan struct{})
+	resume := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(resume) })
+	defer unblock()
+	var releases atomic.Int32
+	loads := make([]GenerationLoad, 2)
+	for index := range loads {
+		loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			if index == 1 && releases.Load() != 1 {
+				t.Error("next pool was constructed before the previous binding's last borrower joined")
+			}
+			cp, paths := createTestProgramWithFilesAndCompilerOptions(t,
+				map[string]string{"file.ts": "const value = 1;"}, `{"noLib":true}`)
+			return Generation{
+				Native: NativeGeneration{
+					Programs: wrapTestPrograms(cp), TargetsByProgram: [][]string{{paths["file.ts"]}},
+					RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+						if index == 0 {
+							return []rule.ConfiguredRule{
+								{Name: "native/check", Run: func(rule.RuleContext) rule.RuleListeners { return nil }},
+								{Name: "plugin/check", IsEslintPluginRule: true},
+							}
+						}
+						return nil
+					},
+				},
+				Plugin: &PluginGeneration{},
+				Target: TargetProjection{ReadText: func(_ string, source ast.SourceFileLike) (string, error) { return source.Text(), nil }},
+			}, func() { releases.Add(1) }, nil
+		}}
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := RunPipeline(context.Background(), NewLintRequest(
+			pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}, ObservationPolicy{},
+			EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				close(pluginStarted)
+				<-resume
+				return &EslintPluginLintResult{}, nil
+			}),
+		))
+		done <- err
+	}()
+	select {
+	case <-pluginStarted:
+	case err := <-done:
+		t.Fatalf("pipeline ended before the last borrower started: %v", err)
+	}
+	if releases.Load() != 0 {
+		t.Error("binding released while its plugin borrower was blocked")
+	}
+	unblock()
+	if err := <-done; err != nil || releases.Load() != 2 {
+		t.Fatalf("error=%v, releases=%d", err, releases.Load())
+	}
+}
+
+func TestPipelineLoadsPreserveTypeCheckOrderAndDeduplication(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	paths := writeFiles(t, root, map[string]string{
+		"shared.d.ts":     "interface Parent { value: string; } interface Child extends Parent { value: number; }",
+		"a/tsconfig.json": `{"files":["file.ts","../shared.d.ts"]}`,
+		"b/tsconfig.json": `{"files":["file.ts","../shared.d.ts"]}`,
+		"c/tsconfig.json": `{"files":["file.ts"]}`,
+		"a/file.ts":       "export const value = 1;",
+		"b/file.ts":       "export const value = 2;",
+		"c/file.ts":       `export const value: number = "wrong";`,
+	})
+	for _, mode := range []ProgramExecution{ProgramPhases, ProgramComplete} {
+		for _, typeCheckOnly := range []bool{false, true} {
+			t.Run(fmt.Sprintf("mode-%d-only-%t", mode, typeCheckOnly), func(t *testing.T) {
+				loads := make([]GenerationLoad, 3)
+				for index, name := range []string{"a", "b", "c"} {
+					loads[index] = GenerationLoad{TargetCount: 1, CheckerCount: 4, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+						cp := createProgramFromTsconfigDir(t, tspath.ResolvePath(root, name))
+						generation := Generation{
+							Native: NativeGeneration{Programs: wrapTestPrograms(cp), TypeCheck: true},
+							Target: TargetProjection{Path: func(path string) string {
+								if path == paths["shared.d.ts"] {
+									return tspath.ResolvePath(root, name+"/shared.d.ts")
+								}
+								return path
+							}},
+						}
+						if !typeCheckOnly {
+							generation.Native.TargetsByProgram = [][]string{nil}
+							if index < 2 {
+								generation.Native.TargetsByProgram[0] = []string{paths[name+"/file.ts"]}
+							}
+							generation.Native.RulesForFile = func(*ast.SourceFile) []rule.ConfiguredRule {
+								return []rule.ConfiguredRule{{Name: "native/query", RequiresTypeInfo: true, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+									ctx.ReportRange(core.NewTextRange(13, 18), rule.RuleMessage{Description: "native"})
+									return rule.RuleListeners{ast.KindIdentifier: func(node *ast.Node) { ctx.TypeChecker.GetTypeAtLocation(node) }}
+								}}}
+							}
+						}
+						return generation, nil, nil
+					}}
+				}
+				result, err := RunPipeline(context.Background(), NewLintRequest(
+					pipelinePlanProvider{plan: GenerationPlan{Loads: loads}}, ObservationPolicy{ProgramExecution: mode}, nil))
+				if err != nil {
+					t.Fatal(err)
+				}
+				counts := make(map[string]int)
+				seenType := false
+				var typeOrder []string
+				for _, diagnostic := range result.Observation.Native.Diagnostics {
+					counts[diagnostic.RuleName]++
+					if strings.HasPrefix(diagnostic.RuleName, "TypeScript(") {
+						seenType = true
+						typeOrder = append(typeOrder, diagnostic.RuleName+" "+diagnostic.FilePath)
+						if _, retainsAST := diagnostic.SourceFile.(*ast.SourceFile); retainsAST {
+							t.Fatal("frozen type diagnostics retained a compiler AST")
+						}
+					} else if seenType {
+						t.Fatal("type diagnostics preceded native reports from a later load")
+					}
+				}
+				wantNative := 2
+				if typeCheckOnly {
+					wantNative = 0
+				}
+				if counts["native/query"] != wantNative || counts["TypeScript(TS2430)"] != 1 || counts["TypeScript(TS2322)"] != 1 {
+					t.Fatalf("lost native/type-only coverage or cross-load deduplication: %v", counts)
+				}
+				wantTypeOrder := []string{
+					"TypeScript(TS2430) " + tspath.ResolvePath(root, "a/shared.d.ts"),
+					"TypeScript(TS2322) " + paths["c/file.ts"],
+				}
+				if !slices.Equal(typeOrder, wantTypeOrder) {
+					t.Fatalf("changed Program diagnostic order or first-declaration survivor: got %v, want %v", typeOrder, wantTypeOrder)
+				}
+			})
+		}
+	}
+}
+
+func TestPipelineLoadsPublishSyntaxBeforeNativeReports(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	validPath := tspath.ResolvePath(root, "valid.ts")
+	brokenPath := tspath.ResolvePath(root, "broken.ts")
+	loads := []GenerationLoad{
+		{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			return pipelineTestGeneration(t, root, validPath, "const value = 1;", []rule.ConfiguredRule{{
+				Name: "native/report", Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					ctx.ReportRange(core.NewTextRange(0, 5), rule.RuleMessage{Description: "native"})
+					return nil
+				},
+			}}, nil), nil, nil
+		}},
+		{TargetCount: 1, Acquire: func(context.Context) (Generation, ReleaseFunc, error) {
+			return pipelineTestGeneration(t, root, brokenPath, "const value = ;", nil, nil), nil, nil
+		}},
+	}
+	result, err := RunPipeline(context.Background(), NewLintRequest(
+		pipelinePlanProvider{plan: GenerationPlan{Loads: loads, SingleThreaded: true}}, ObservationPolicy{}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics := result.Observation.Native.Diagnostics
+	if len(diagnostics) != 2 || diagnostics[0].Origin != rule.DiagnosticOriginTypeScript ||
+		diagnostics[0].FilePath != brokenPath || diagnostics[1].RuleName != "native/report" || diagnostics[1].FilePath != validPath {
+		t.Fatalf("later load's syntax diagnostic must precede earlier native reports: %+v", diagnostics)
 	}
 }

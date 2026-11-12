@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('max-expects', {} as never, {
+ruleTester.run('max-expects', {
   valid: [
     { code: `test('should pass')` },
     { code: `test('should pass', () => {})` },
@@ -74,6 +75,8 @@ ruleTester.run('max-expects', {} as never, {
           message: 'Too many assertion calls (6) - maximum allowed is 5',
           line: 8,
           column: 11,
+          endLine: 8,
+          endColumn: 37,
         },
       ],
     },
@@ -94,6 +97,8 @@ ruleTester.run('max-expects', {} as never, {
           message: 'Too many assertion calls (6) - maximum allowed is 5',
           line: 8,
           column: 11,
+          endLine: 8,
+          endColumn: 37,
         },
       ],
     },
@@ -111,6 +116,8 @@ ruleTester.run('max-expects', {} as never, {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 4,
           column: 11,
+          endLine: 4,
+          endColumn: 37,
         },
       ],
     },
@@ -139,12 +146,16 @@ ruleTester.run('max-expects', {} as never, {
           message: 'Too many assertion calls (4) - maximum allowed is 3',
           line: 13,
           column: 13,
+          endLine: 13,
+          endColumn: 36,
         },
         {
           messageId: 'exceededMaxAssertion',
           message: 'Too many assertion calls (5) - maximum allowed is 3',
           line: 14,
           column: 13,
+          endLine: 14,
+          endColumn: 36,
         },
       ],
     },
@@ -162,6 +173,8 @@ ruleTester.run('max-expects', {} as never, {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 4,
           column: 11,
+          endLine: 4,
+          endColumn: 42,
         },
       ],
     },
@@ -178,6 +191,8 @@ test('wrapped callback with non-literal options', options, fakeAsync(() => {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 4,
           column: 3,
+          endLine: 4,
+          endColumn: 20,
         },
       ],
     },
@@ -194,6 +209,8 @@ test('callback behind as expression', (() => {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 4,
           column: 3,
+          endLine: 4,
+          endColumn: 20,
         },
       ],
     },
@@ -209,6 +226,8 @@ test('callback behind as expression', (() => {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 3,
           column: 3,
+          endLine: 3,
+          endColumn: 20,
         },
       ],
     },
@@ -224,6 +243,8 @@ test('callback behind as expression', (() => {
           message: 'Too many assertion calls (2) - maximum allowed is 1',
           line: 3,
           column: 3,
+          endLine: 3,
+          endColumn: 20,
         },
       ],
     },

@@ -4,6 +4,7 @@ import util from 'node:util';
 import { lint } from '@rslint/core/internal';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
+import { rejectFocusedCases } from '../src/util/reject-focused-cases';
 
 // Port from 'eslint'
 export interface ValidTestCase {
@@ -56,30 +57,13 @@ export class RuleTester {
     },
   ) {
     ruleName = 'react/' + ruleName;
+    rejectFocusedCases(cases);
     describe(ruleName, () => {
       const cwd = process.cwd();
       const config = path.resolve(import.meta.dirname, './rslint.config.mjs');
 
-      // test whether case has only
-      let hasOnly =
-        cases.valid.some((x) => {
-          if (typeof x === 'object' && x.only) {
-            return true;
-          } else {
-            return false;
-          }
-        }) || cases.invalid.some((x) => x.only);
-
       test('valid', async () => {
         for (const validCase of cases.valid) {
-          if (hasOnly) {
-            if (typeof validCase === 'string') {
-              continue;
-            }
-            if (!validCase.only) {
-              continue;
-            }
-          }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
 
@@ -131,10 +115,7 @@ export class RuleTester {
             assert.fail('Invalid cases must have at least one error');
           }
 
-          const { code, only = false, options = [], settings } = item;
-          if (hasOnly && !only) {
-            continue;
-          }
+          const { code, options = [], settings } = item;
           const defaultFilename = 'src/virtual.tsx';
           const filename =
             typeof item === 'string'

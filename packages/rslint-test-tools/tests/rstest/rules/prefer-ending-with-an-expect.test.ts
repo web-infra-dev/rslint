@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-ending-with-an-expect', {} as never, {
+ruleTester.run('prefer-ending-with-an-expect', {
   valid: [
     {
       code: `
@@ -39,7 +40,16 @@ ruleTester.run('prefer-ending-with-an-expect', {} as never, {
           checkout();
         });
       `,
-      errors: [{ messageId: 'mustEndWithExpect', line: 4, column: 9 }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          message: 'Tests should end with an assertion',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: `
@@ -47,7 +57,16 @@ ruleTester.run('prefer-ending-with-an-expect', {} as never, {
           checkout();
         });
       `,
-      errors: [{ messageId: 'mustEndWithExpect', line: 2, column: 9 }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          message: 'Tests should end with an assertion',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: `
@@ -56,7 +75,16 @@ ruleTester.run('prefer-ending-with-an-expect', {} as never, {
         });
       `,
       options: [{ assertFunctionNames: ['expect', 'expectSaga'] }],
-      errors: [{ messageId: 'mustEndWithExpect', line: 2, column: 9 }],
+      errors: [
+        {
+          messageId: 'mustEndWithExpect',
+          message: 'Tests should end with an assertion',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 13,
+        },
+      ],
     },
   ],
 });

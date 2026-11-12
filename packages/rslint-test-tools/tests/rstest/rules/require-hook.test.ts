@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('require-hook', {} as never, {
+ruleTester.run('require-hook', {
   valid: [
     {
       code: `
@@ -41,7 +42,16 @@ ruleTester.run('require-hook', {} as never, {
       code: `
         initializeCityDatabase();
       `,
-      errors: [{ messageId: 'useHook', line: 2, column: 1 }],
+      errors: [
+        {
+          messageId: 'useHook',
+          message: 'This should be done within a hook',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: `
@@ -49,7 +59,16 @@ ruleTester.run('require-hook', {} as never, {
           let consoleWarnSpy = rs.spyOn(console, 'warn');
         });
       `,
-      errors: [{ messageId: 'useHook', line: 3, column: 3 }],
+      errors: [
+        {
+          messageId: 'useHook',
+          message: 'This should be done within a hook',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 58,
+        },
+      ],
     },
     {
       code: `
@@ -57,7 +76,16 @@ ruleTester.run('require-hook', {} as never, {
           seedProducts();
         });
       `,
-      errors: [{ messageId: 'useHook', line: 3, column: 3 }],
+      errors: [
+        {
+          messageId: 'useHook',
+          message: 'This should be done within a hook',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: `
@@ -65,7 +93,16 @@ ruleTester.run('require-hook', {} as never, {
           seedProducts();
         }));
       `,
-      errors: [{ messageId: 'useHook', line: 3, column: 3 }],
+      errors: [
+        {
+          messageId: 'useHook',
+          message: 'This should be done within a hook',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: `
@@ -76,9 +113,11 @@ ruleTester.run('require-hook', {} as never, {
       errors: [
         {
           messageId: 'useTest',
-          data: { name: 'onTestFinished' },
+          message: 'onTestFinished() can only be called inside a test',
           line: 4,
-          column: 1,
+          column: 9,
+          endLine: 4,
+          endColumn: 47,
         },
       ],
     },

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('valid-expect', {} as never, {
+ruleTester.run('valid-expect', {
   valid: [
     {
       code: `
@@ -69,7 +70,16 @@ ruleTester.run('valid-expect', {} as never, {
         import { expect } from '@rstest/core';
         expect(value);
       `,
-      errors: [{ messageId: 'matcherNotFound' }],
+      errors: [
+        {
+          messageId: 'matcherNotFound',
+          message: 'Expect must have a corresponding matcher call',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: `
@@ -78,7 +88,18 @@ ruleTester.run('valid-expect', {} as never, {
           expect(promise).resolves.toBe(1);
         });
       `,
-      errors: [{ messageId: 'asyncMustBeAwaited' }],
+      errors: [
+        {
+          messageId: 'asyncMustBeAwaited',
+          message: 'Async assertions must be awaited or returned',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 43,
+        },
+      ],
+      output:
+        "\n        import { expect, test } from '@rstest/core';\n        test('t', async () => {\n          await expect(promise).resolves.toBe(1);\n        });\n      ",
     },
     {
       code: `
@@ -87,7 +108,16 @@ ruleTester.run('valid-expect', {} as never, {
           expect(promise).resolves.to.be.true;
         });
       `,
-      errors: [{ messageId: 'asyncMustBeAwaited' }],
+      errors: [
+        {
+          messageId: 'asyncMustBeAwaited',
+          message: 'Async assertions must be awaited or returned',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 46,
+        },
+      ],
       output: `
         import { expect, test } from '@rstest/core';
         test('t', async () => {
@@ -102,7 +132,17 @@ ruleTester.run('valid-expect', {} as never, {
           Promise.all(([expect(p).resolves.toBe(1), expect(q).resolves.toBe(2)]));
         });
       `,
-      errors: [{ messageId: 'promisesWithAsyncAssertionsMustBeAwaited' }],
+      errors: [
+        {
+          messageId: 'promisesWithAsyncAssertionsMustBeAwaited',
+          message:
+            'Promises which return async assertions must be awaited or returned',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 82,
+        },
+      ],
       output: `
         import { expect, test } from '@rstest/core';
         test('t', async () => {

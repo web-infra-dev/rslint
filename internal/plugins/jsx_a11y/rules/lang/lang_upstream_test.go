@@ -75,14 +75,14 @@ func TestLangUpstream(t *testing.T) {
 			Code: `<html lang="foo" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<html lang="zz-LL" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -92,7 +92,7 @@ func TestLangUpstream(t *testing.T) {
 			Code: `<html lang={undefined} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 7},
 			},
 		},
 
@@ -102,7 +102,7 @@ func TestLangUpstream(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 6},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 6},
 			},
 		},
 
@@ -112,7 +112,7 @@ func TestLangUpstream(t *testing.T) {
 			Tsx:      true,
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 16},
+				{MessageId: "invalidLangValue", Message: "lang attribute must have a valid value.", Line: 1, Column: 16},
 			},
 		},
 	})

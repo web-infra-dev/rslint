@@ -309,7 +309,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -320,7 +320,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a><>x</></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -329,7 +329,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a><span aria-hidden="true">x</span></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -338,7 +338,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a><input type="hidden" /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -349,7 +349,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `  <a></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 3},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 3},
 			},
 		},
 
@@ -359,7 +359,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Tsx:     true,
 			Options: componentsRuleOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -367,7 +367,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Tsx:     true,
 			Options: componentsRuleOpts,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -377,7 +377,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: polymorphicSettings,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -389,7 +389,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a><a /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 4},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 4},
 			},
 		},
 
@@ -399,7 +399,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: map[string]interface{}{"jsx-a11y": map[string]interface{}{"components": map[string]interface{}{"Anchor": "a"}}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -410,7 +410,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Tsx:      true,
 			Settings: map[string]interface{}{"jsx-a11y": map[string]interface{}{"polymorphicPropName": "as", "polymorphicAllowList": []interface{}{"Foo"}}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -426,7 +426,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a aria-labelledby="id1" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -435,14 +435,14 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a href="/about" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<a href="/about" className="link" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -452,14 +452,14 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a href="/"><Icon aria-hidden="true" /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<a href="/"><i aria-hidden="true" className="icon-x" /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -470,7 +470,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a href="/"><input type="hidden" /></a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -485,7 +485,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a>{((undefined))}</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -496,7 +496,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...this.props} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -506,8 +506,8 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<><a /><a>x</a><a /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 3},
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 16},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 3},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 16},
 			},
 		},
 
@@ -516,7 +516,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `cond ? <a /> : <a>x</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 8},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 8},
 			},
 		},
 
@@ -526,7 +526,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a>{undefined}{undefined}</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -536,7 +536,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...rest} {...other} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -554,7 +554,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...{title: 'x'}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -563,7 +563,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...{"aria-label": 'x'}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -573,7 +573,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...{children: 'x'}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -582,7 +582,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...{dangerouslySetInnerHTML: {__html: "x"}}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 
@@ -591,7 +591,7 @@ func TestAnchorHasContentExtras(t *testing.T) {
 			Code: `<a {...{title}} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 	})
@@ -625,7 +625,7 @@ func TestAnchorHasContentOptionParsing(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"components": []interface{}{"Anchor"}},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
+				{MessageId: "anchorHasContent", Message: "Anchors must have content and the content must be accessible by a screen reader.", Line: 1, Column: 1},
 			},
 		},
 	})

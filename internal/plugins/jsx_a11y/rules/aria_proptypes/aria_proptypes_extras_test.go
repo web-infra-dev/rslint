@@ -253,95 +253,95 @@ func TestAriaProptypesExtras(t *testing.T) {
 			// Parenthesized invalid value still reports.
 			{
 				Code: `<div aria-hidden={(1234)} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 			{
 				Code: `<div aria-hidden={((1234))} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 
 			// aria-haspopup invalid token.
 			{
 				Code: `<div aria-haspopup="dropdown" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-haspopup")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-haspopup must be a single token from the following: false,true,menu,listbox,tree,grid,dialog."}},
 			},
 			{
 				Code: `<div aria-haspopup={123} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-haspopup")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-haspopup must be a single token from the following: false,true,menu,listbox,tree,grid,dialog."}},
 			},
 
 			// aria-current cross-class — strings and booleans valid; numbers / other strings not.
 			{
 				Code: `<div aria-current="foo" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-current")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-current must be a single token from the following: page,step,location,date,time,true,false."}},
 			},
 
 			// aria-orientation — non-listed string.
 			{
 				Code: `<div aria-orientation="diagonal" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-orientation")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-orientation must be a single token from the following: vertical,undefined,horizontal."}},
 			},
 
 			// aria-pressed invalid (similar to aria-checked).
 			{
 				Code: `<div aria-pressed="partial" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-pressed")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-pressed must be a boolean or the string "mixed".`}},
 			},
 			{
 				Code: `<div aria-pressed={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-pressed")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-pressed must be a boolean or the string "mixed".`}},
 			},
 
 			// aria-live invalid token.
 			{
 				Code: `<div aria-live="loud" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-live")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-live must be a single token from the following: assertive,off,polite."}},
 			},
 
 			// aria-dropeffect — tokenlist, one unknown token in a multi-token list.
 			{
 				Code: `<div aria-dropeffect="copy fake" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-dropeffect")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-dropeffect must be a list of one or more tokens from the following: copy,execute,link,move,none,popup."}},
 			},
 
 			// aria-colcount / aria-rowcount / aria-setsize / aria-posinset — integer.
 			{
 				Code: `<div aria-colcount="abc" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-colcount")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-colcount must be a integer."}},
 			},
 			{
 				Code: `<div aria-setsize={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-setsize")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-setsize must be a integer."}},
 			},
 
 			// aria-valuenow / aria-valuemin — number.
 			{
 				Code: `<div aria-valuenow="abc" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuenow")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuenow must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemin={false} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemin")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemin must be a number."}},
 			},
 
 			// aria-details / aria-errormessage — id (string).
 			{
 				Code: `<div aria-details={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-details")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-details must be a string that represents a DOM element ID"}},
 			},
 			{
 				Code: `<div aria-errormessage={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-errormessage")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-errormessage must be a string that represents a DOM element ID"}},
 			},
 
 			// aria-controls / aria-describedby — idlist (string).
 			{
 				Code: `<div aria-controls={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-controls")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-controls must be a list of strings that represent DOM element IDs (idlist)"}},
 			},
 			{
 				Code: `<div aria-describedby={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-describedby")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-describedby must be a list of strings that represent DOM element IDs (idlist)"}},
 			},
 
 			// Position assertions — confirm the diagnostic lands on the
@@ -350,7 +350,7 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `<div aria-hidden="yes" />`, Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidAriaPropType",
-					Message:   upstreamErrorMessage("aria-hidden"),
+					Message:   "The value for aria-hidden must be a boolean.",
 					Line:      1, Column: 6,
 				}},
 			},
@@ -358,7 +358,7 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `<div aria-label  =  "x"   aria-checked={1234} />`, Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidAriaPropType",
-					Message:   upstreamErrorMessage("aria-checked"),
+					Message:   `The value for aria-checked must be a boolean or the string "mixed".`,
 					Line:      1, Column: 27,
 				}},
 			},
@@ -368,7 +368,7 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidAriaPropType",
-					Message:   upstreamErrorMessage("aria-hidden"),
+					Message:   "The value for aria-hidden must be a boolean.",
 					Line:      2, Column: 3,
 				}},
 			},
@@ -378,8 +378,8 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `<main><section><h2 aria-hidden="yes"><span aria-label={1} /></h2></section></main>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")},
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."},
 				},
 			},
 
@@ -389,7 +389,7 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `<div aria-label="ok" aria-hidden="yes" aria-level={3} />`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."},
 				},
 			},
 
@@ -398,11 +398,11 @@ func TestAriaProptypesExtras(t *testing.T) {
 			// all reject; token / idlist / tokenlist need string. Report.
 			{
 				Code: `<div aria-hidden={123n} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 			{
 				Code: `<div aria-label={123n} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 
 			// Library wrappers should not insulate the rule — invalid
@@ -412,15 +412,15 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `const Btn = React.forwardRef<HTMLButtonElement, {}>((props, ref) => <button ref={ref} aria-pressed={1234} />);`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-pressed")},
+					{MessageId: "invalidAriaPropType", Message: `The value for aria-pressed must be a boolean or the string "mixed".`},
 				},
 			},
 			{
 				Code: `<Suspense fallback={<div aria-busy="yes">loading</div>}><Page aria-label={1} /></Suspense>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-busy")},
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-busy must be a boolean."},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."},
 				},
 			},
 
@@ -429,24 +429,24 @@ func TestAriaProptypesExtras(t *testing.T) {
 				Code: `function L({xs}) { return xs.map(x => <div aria-hidden="yes" key={x} />); }`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")},
+					{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."},
 				},
 			},
 
 			// idlist with non-string value — boolean / number.
 			{
 				Code: `<div aria-labelledby={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-labelledby")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-labelledby must be a list of strings that represent DOM element IDs (idlist)"}},
 			},
 			{
 				Code: `<div aria-labelledby={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-labelledby")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-labelledby must be a list of strings that represent DOM element IDs (idlist)"}},
 			},
 
 			// id type with non-string value.
 			{
 				Code: `<div aria-activedescendant={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-activedescendant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-activedescendant must be a string that represents a DOM element ID"}},
 			},
 		})
 }

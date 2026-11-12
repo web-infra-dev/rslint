@@ -1,10 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const message = 'The use of `.todo` is not recommended.';
-
-ruleTester.run('warn-todo', {} as never, {
+ruleTester.run('warn-todo', {
   valid: [
     { code: 'describe("foo", function () {})' },
     { code: 'it("foo", function () {})' },
@@ -21,39 +20,120 @@ ruleTester.run('warn-todo', {} as never, {
   invalid: [
     {
       code: 'describe.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 10 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'it.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 4 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: 'test.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 6 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: 'describe.todo.each([])("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 10 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'it.todo.each([])("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 4 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: 'test.todo.each([])("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 6 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: 'describe.only.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 15 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: 'it.only.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 9 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: 'test.only.todo("foo", function () {})',
-      errors: [{ messageId: 'warnTodo', message, line: 1, column: 11 }],
+      errors: [
+        {
+          messageId: 'warnTodo',
+          message: 'The use of `.todo` is not recommended.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
     },
   ],
 });

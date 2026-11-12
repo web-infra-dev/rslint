@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('max-nested-describe', {} as never, {
+ruleTester.run('max-nested-describe', {
   valid: [
     {
       code: `
@@ -40,6 +41,8 @@ ruleTester.run('max-nested-describe', {} as never, {
           message: 'Too many nested describe calls (3) - maximum allowed is 2',
           line: 4,
           column: 13,
+          endLine: 4,
+          endColumn: 53,
         },
       ],
     },
@@ -57,6 +60,8 @@ ruleTester.run('max-nested-describe', {} as never, {
           message: 'Too many nested describe calls (2) - maximum allowed is 1',
           line: 4,
           column: 11,
+          endLine: 4,
+          endColumn: 51,
         },
       ],
     },

@@ -16,59 +16,33 @@ import (
 // visible. ast.IsDottedName is intentionally not used because it also accepts
 // property accesses containing optional-chain links.
 func NodeMatchesPath(node *ast.Node, path string) bool {
-	node = utils.ESTreeRuntimeExpression(node)
 	path = ecmascript.StringTrim(path)
-	// Simple names need no split, and only member/meta expressions can match
-	// dotted paths. Avoid allocating path segments for the common cases.
-	if !strings.Contains(path, ".") {
-		return nodeMatchesPathParts(node, []string{path})
-	}
-	if node == nil || (!ast.IsPropertyAccessExpression(node) && node.Kind != ast.KindMetaProperty) {
-		return false
-	}
-	return nodeMatchesPathParts(node, strings.Split(path, "."))
-}
-
-func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
-	node = utils.ESTreeRuntimeExpression(node)
-	if node == nil || len(parts) == 0 {
-		return false
-	}
-
-	if len(parts) == 1 {
+	// Member expressions expose the last segment first. Match it before
+	// visiting the receiver, without allocating a slice for every candidate.
+	for node = utils.ESTreeRuntimeExpression(node); node != nil; node = utils.ESTreeRuntimeExpression(node.Expression()) {
 		switch node.Kind {
 		case ast.KindIdentifier:
-			return node.AsIdentifier().Text == parts[0]
+			return node.AsIdentifier().Text == path && !strings.Contains(path, ".")
 		case ast.KindThisKeyword:
-			return parts[0] == "this"
+			return path == "this"
 		case ast.KindSuperKeyword:
-			return parts[0] == "super"
+			return path == "super"
+		case ast.KindMetaProperty:
+			root, property, dotted := strings.Cut(path, ".")
+			meta := node.AsMetaProperty()
+			return dotted && meta != nil && meta.Name() != nil && meta.Name().Text() == property &&
+				scanner.TokenToString(meta.KeywordToken) == root
+		case ast.KindPropertyAccessExpression:
+			dot := strings.LastIndexByte(path, '.')
+			name := node.Name()
+			if dot < 0 || ast.IsOptionalChainRoot(node) || name == nil ||
+				!ast.IsIdentifier(name) || name.Text() != path[dot+1:] {
+				return false
+			}
+			path = path[:dot]
 		default:
 			return false
 		}
 	}
-
-	if len(parts) == 2 && node.Kind == ast.KindMetaProperty {
-		meta := node.AsMetaProperty()
-		return meta != nil &&
-			scanner.TokenToString(meta.KeywordToken) == parts[0] &&
-			meta.Name() != nil &&
-			meta.Name().Text() == parts[1]
-	}
-
-	if !ast.IsPropertyAccessExpression(node) {
-		return false
-	}
-
-	propertyAccess := node.AsPropertyAccessExpression()
-	if propertyAccess == nil || ast.IsOptionalChainRoot(node) {
-		return false
-	}
-	name := propertyAccess.Name()
-	if name == nil || !ast.IsIdentifier(name) ||
-		name.AsIdentifier().Text != parts[len(parts)-1] {
-		return false
-	}
-
-	return nodeMatchesPathParts(propertyAccess.Expression, parts[:len(parts)-1])
+	return false
 }

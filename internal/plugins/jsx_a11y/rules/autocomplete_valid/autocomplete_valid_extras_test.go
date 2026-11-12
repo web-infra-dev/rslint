@@ -429,7 +429,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// section- alone (after stripping the prefix) leaves no purpose token.
@@ -438,7 +438,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Bare "section-" (8 chars) is NOT stripped (length > 8 boundary),
@@ -449,7 +449,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Two consecutive locations — only one is consumed, leaving an
@@ -459,7 +459,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Two consecutive qualifiers — second one isn't recognized and the
@@ -469,7 +469,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// qualifier + standaloneTerm: after a qualifier upstream resets
@@ -480,7 +480,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// qualifier alone — terms.length !== 1 (it's 0 after the qualifier
@@ -490,7 +490,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// location alone — terms.length !== 1 (0 after shift) → invalid.
@@ -499,7 +499,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// section + location + qualifier without a final field-name token
@@ -509,7 +509,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// `<Input autocomplete="baz" />` with NO type attribute, with the
@@ -523,7 +523,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// polymorphicPropName resolves a polymorphic component TO `input`
@@ -536,7 +536,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Diagnostic position locking: upstream reports on the
@@ -549,7 +549,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 29,
 			}},
 		},
@@ -559,7 +559,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 				Line:      1, Column: 1, EndLine: 3, EndColumn: 3,
 			}},
 		},
@@ -570,7 +570,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 27,
 			}},
 		},
@@ -580,8 +580,8 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Code: `<><input autocomplete="foo" /><input autocomplete="bar" /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "autocompleteValid", Message: failMessage},
-				{MessageId: "autocompleteValid", Message: failMessage},
+				{MessageId: "autocompleteValid", Message: "the autocomplete attribute is incorrectly formatted"},
+				{MessageId: "autocompleteValid", Message: "the autocomplete attribute is incorrectly formatted"},
 			},
 		},
 		// Mixed valid + invalid — only the invalid one reports.
@@ -590,7 +590,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Uppercase invalid value — algorithm lowercases first, but the
@@ -600,7 +600,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Whitespace around an invalid value: trim then split, "foo" → invalid.
@@ -609,7 +609,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Spread-of-literal with invalid autocomplete — must report.
@@ -618,7 +618,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Type filter does NOT skip non-excluded types (so `type="text"`
@@ -629,7 +629,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Dynamic type (ConditionalExpression noop in LITERAL_TYPES) →
@@ -641,7 +641,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Boolean type form (`<input type />`) — getLiteralPropValue
@@ -651,7 +651,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// TemplateExpression with substitutions — literalPropValue
@@ -664,7 +664,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Template substitution with a non-undefined identifier —
@@ -677,7 +677,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Template with surrounding text + substitution.
@@ -686,7 +686,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 
@@ -698,7 +698,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -706,7 +706,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 
@@ -720,7 +720,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Spread-of-literal duplicate: literal-spread with autocomplete:
@@ -731,7 +731,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 
@@ -744,7 +744,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -752,7 +752,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -760,7 +760,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -768,7 +768,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -776,7 +776,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		{
@@ -784,7 +784,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 
@@ -798,7 +798,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 
@@ -809,9 +809,9 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Code: `<><input autocomplete="foo" /><input autocomplete="name invalid" /><input autocomplete="home url" /></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "autocompleteValid", Message: failMessage},
-				{MessageId: "autocompleteValid", Message: failMessage},
-				{MessageId: "autocompleteValid", Message: failMessage},
+				{MessageId: "autocompleteValid", Message: "the autocomplete attribute is incorrectly formatted"},
+				{MessageId: "autocompleteValid", Message: "the autocomplete attribute is incorrectly formatted"},
+				{MessageId: "autocompleteValid", Message: "the autocomplete attribute is incorrectly formatted"},
 			},
 		},
 
@@ -823,7 +823,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// section-* prefix appearing in second position — only the FIRST
@@ -834,7 +834,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Two sections: only the first is shifted, second stays.
@@ -843,7 +843,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// Trailing webauthn with too many tokens leftover.
@@ -852,7 +852,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// JsxExpression with comments around an invalid literal — comments
@@ -862,7 +862,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 		// `<input type={"hidden" as const} autocomplete="foo" />` —
@@ -874,7 +874,7 @@ func TestAutocompleteValidExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",
-				Message:   failMessage,
+				Message:   "the autocomplete attribute is incorrectly formatted",
 			}},
 		},
 	}

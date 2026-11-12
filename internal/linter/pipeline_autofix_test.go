@@ -26,7 +26,13 @@ func TestAutofixPipelineOwnsMemoryRoundsAndReobservesSnapshots(t *testing.T) {
 		next:     map[string]string{"a": "b", "b": "c"},
 	}
 	result, err := RunPipeline(context.Background(), NewAutofixRequest(
-		provider,
+		GenerationProviderFunc(func(ctx context.Context, snapshot SourceSnapshot) (Generation, ReleaseFunc, error) {
+			generation, release, err := provider.AcquireGeneration(ctx, snapshot)
+			if snapshot.Empty() {
+				generation.ProgramRootIdentities = []string{provider.fileName}
+			}
+			return generation, release, err
+		}),
 		ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}},
 		AutofixPolicy{},
 		nil,
@@ -44,6 +50,10 @@ func TestAutofixPipelineOwnsMemoryRoundsAndReobservesSnapshots(t *testing.T) {
 	}
 	if applied.Rounds[0].AppliedDiagnostics != 1 || applied.Rounds[1].AppliedDiagnostics != 1 {
 		t.Fatalf("applied diagnostic counts = %+v", applied.Rounds)
+	}
+	if len(applied.Initial.ProgramRootIdentities) != 1 || applied.Initial.ProgramRootIdentities[0] != provider.fileName ||
+		applied.Last.ProgramRootIdentities != nil {
+		t.Fatalf("initial root metadata leaked into rebuilt observations: initial=%v last=%v", applied.Initial.ProgramRootIdentities, applied.Last.ProgramRootIdentities)
 	}
 }
 

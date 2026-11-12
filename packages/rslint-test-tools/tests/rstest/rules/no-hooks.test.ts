@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-hooks', {} as never, {
+ruleTester.run('no-hooks', {
   valid: [
     { code: 'test("foo")' },
     { code: 'describe("foo", () => { it("bar") })' },
@@ -18,19 +19,55 @@ ruleTester.run('no-hooks', {} as never, {
   invalid: [
     {
       code: 'beforeAll(() => {})',
-      errors: [{ message: "Unexpected 'beforeAll' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'beforeAll' hook",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: 'beforeEach(() => {})',
-      errors: [{ message: "Unexpected 'beforeEach' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'beforeEach' hook",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: 'afterAll(() => {})',
-      errors: [{ message: "Unexpected 'afterAll' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'afterAll' hook",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: 'afterEach(() => {})',
-      errors: [{ message: "Unexpected 'afterEach' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'afterEach' hook",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: [
@@ -38,12 +75,30 @@ ruleTester.run('no-hooks', {} as never, {
         '',
         'afterEachTest(() => {})',
       ].join('\n'),
-      errors: [{ message: "Unexpected 'afterEach' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'afterEach' hook",
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: 'beforeEach(() => {}); afterEach(() => { resetModules() });',
       options: [{ allow: ['afterEach'] }],
-      errors: [{ message: "Unexpected 'beforeEach' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'beforeEach' hook",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: [
@@ -53,7 +108,16 @@ ruleTester.run('no-hooks', {} as never, {
         'beforeEach(() => { resetModules() });',
       ].join('\n'),
       options: [{ allow: ['afterEach'] }],
-      errors: [{ message: "Unexpected 'beforeEach' hook" }],
+      errors: [
+        {
+          messageId: 'unexpectedHook',
+          message: "Unexpected 'beforeEach' hook",
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

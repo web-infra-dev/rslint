@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('hoisted-apis-on-top', {} as never, {
+ruleTester.run('hoisted-apis-on-top', {
   valid: [
     { code: `rs.mock();` },
     {
@@ -50,6 +51,20 @@ if (foo) {
           column: 3,
           endLine: 4,
           endColumn: 19,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport { rs } from 'some-other-module';\nrs.mock('./foo');\nif (foo) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.mock()' with 'rs.doMock()', which is not hoisted.",
+              output:
+                "\nimport { rs } from 'some-other-module';\nif (foo) {\n  rs.doMock('./foo');\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -62,10 +77,24 @@ if (foo) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 3,
           column: 3,
           endLine: 3,
           endColumn: 27,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output: "rs.mock('foo', () => {});\n\nif (foo) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.mock()' with 'rs.doMock()', which is not hoisted.",
+              output: "\nif (foo) {\n  rs.doMock('foo', () => {});\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -80,10 +109,20 @@ if (foo) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport foo from 'bar';\nrs.hoisted();\n\nif (foo) {\n  ;\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -98,10 +137,26 @@ if (foo) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport foo from 'bar';\nrs.unmock();\n\nif (foo) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.unmock()' with 'rs.doUnmock()', which is not hoisted.",
+              output:
+                "\nimport foo from 'bar';\n\nif (foo) {\n  rs.doUnmock();\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -116,10 +171,26 @@ if (foo) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport foo from 'bar';\nrs.mock();\n\nif (foo) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.mock()' with 'rs.doMock()', which is not hoisted.",
+              output:
+                "\nimport foo from 'bar';\n\nif (foo) {\n  rs.doMock();\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -134,10 +205,26 @@ import something from 'something';
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 3,
           column: 3,
           endLine: 3,
           endColumn: 42,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nif (shouldMock) {\n  ;\n}\n\nimport something from 'something';\nrs.mock(import('something'), () => bar);\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.mock()' with 'rs.doMock()', which is not hoisted.",
+              output:
+                "\nif (shouldMock) {\n  rs.doMock(import('something'), () => bar);\n}\n\nimport something from 'something';\n",
+            },
+          ],
         },
       ],
     },
@@ -152,10 +239,26 @@ if (condition) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport { rstest } from '@rstest/core';\nrstest.mock('./foo');\n\nif (condition) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rstest.mock()' with 'rstest.doMock()', which is not hoisted.",
+              output:
+                "\nimport { rstest } from '@rstest/core';\n\nif (condition) {\n  rstest.doMock('./foo');\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -170,10 +273,20 @@ if (condition) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport { rs } from '@rstest/core';\nrs.hoisted(() => {});\n\nif (condition) {\n  ;\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -188,10 +301,26 @@ if (condition) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 25,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport { rstest } from '@rstest/core';\nrstest.unmock('./foo');\n\nif (condition) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rstest.unmock()' with 'rstest.doUnmock()', which is not hoisted.",
+              output:
+                "\nimport { rstest } from '@rstest/core';\n\nif (condition) {\n  rstest.doUnmock('./foo');\n}\n",
+            },
+          ],
         },
       ],
     },
@@ -206,10 +335,26 @@ if (condition) {
       errors: [
         {
           messageId: 'hoistedApisOnTop',
+          message:
+            'Hoisted API is used in a runtime location in this file, but it is actually executed before this file is loaded.',
           line: 5,
           column: 3,
           endLine: 5,
           endColumn: 19,
+          suggestions: [
+            {
+              messageId: 'suggestMoveHoistedApiToTop',
+              desc: 'Move this hoisted API to the top of the file to better reflect its behavior.',
+              output:
+                "\nimport { rs } from '@rstest/core';\nrs.mock('./foo');\n\nif (condition) {\n  ;\n}\n",
+            },
+            {
+              messageId: 'suggestUseNonHoistedApi',
+              desc: "Replace 'rs.mock()' with 'rs.doMock()', which is not hoisted.",
+              output:
+                "\nimport { rs } from '@rstest/core';\n\nif (condition) {\n  rs.doMock('./foo');\n}\n",
+            },
+          ],
         },
       ],
     },

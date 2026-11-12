@@ -1,7 +1,7 @@
 // Mirrors all cases and the package example from eslint-plugin-n v18.3.0.
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-unpublished-bin.js
 import { readFileSync } from 'node:fs';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const archive = readFileSync(
   new URL(
@@ -18,9 +18,10 @@ for (let i = 0; i < entries.length; i += 2)
   fixtureFiles[entries[i]] = entries[i + 1];
 
 new RuleTester({
+  plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'commonjs' },
-}).run('no-unpublished-bin', null, {
+}).run('no-unpublished-bin', {
   valid: [
     {
       filename: 'simple-ok/a.js',

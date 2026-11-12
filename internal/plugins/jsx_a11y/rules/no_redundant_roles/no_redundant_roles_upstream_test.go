@@ -34,7 +34,7 @@ func invalidErr(element, implicitRole string) rule_tester.InvalidTestCaseError {
 func invalidErrAt(element, implicitRole string, line, col int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "noRedundantRoles",
-		Message:   errorMessage(element, implicitRole),
+		Message:   "The element " + element + " has an implicit role of " + implicitRole + ". Defining this explicitly is redundant and should be avoided.",
 		Line:      line,
 		Column:    col,
 	}
@@ -50,7 +50,7 @@ func invalidErrAt(element, implicitRole string, line, col int) rule_tester.Inval
 func invalidErrLine(element, implicitRole string, line int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "noRedundantRoles",
-		Message:   errorMessage(element, implicitRole),
+		Message:   "The element " + element + " has an implicit role of " + implicitRole + ". Defining this explicitly is redundant and should be avoided.",
 		Line:      line,
 	}
 }
@@ -192,7 +192,7 @@ var listExceptionOptions = map[string]interface{}{
 // null → no comparison.
 //
 // `<img src="example.svg" role="img" />` is valid because the SVG src
-// arm of `implicitRoleForImg` returns '' → null → no comparison.
+// arm of `implicitRoleForImg` returns ” → null → no comparison.
 //
 // `<svg role="img" />` is valid because `svg` isn't in the implicitRoles
 // table at all → null → no comparison.

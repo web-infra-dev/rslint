@@ -1,0 +1,179 @@
+// Rstest Snapshot v1
+
+exports[`no-sparse-arrays > invalid 1`] = `
+{
+  "code": "var a = [,];",
+  "diagnostics": [
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sparse-arrays > invalid 2`] = `
+{
+  "code": "var a = [ 1,, 2];",
+  "diagnostics": [
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sparse-arrays > invalid 3`] = `
+{
+  "code": "[
+	/* comment */,
+// comment
+ ,];",
+  "diagnostics": [
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 4,
+        },
+        "start": {
+          "column": 2,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sparse-arrays > invalid 4`] = `
+{
+  "code": "[(( [a,] )),,,];",
+  "diagnostics": [
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sparse-arrays > invalid 5`] = `
+{
+  "code": "[,(( [a,] )),,];",
+  "diagnostics": [
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+    {
+      "message": "Unexpected comma in middle of array.",
+      "messageId": "unexpectedSparseArray",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sparse-arrays",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

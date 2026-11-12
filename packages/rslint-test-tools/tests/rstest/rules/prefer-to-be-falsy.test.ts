@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-to-be-falsy', {} as never, {
+ruleTester.run('prefer-to-be-falsy', {
   valid: [
     { code: `[].push(false)` },
     { code: `expect("something");` },
@@ -27,9 +28,9 @@ ruleTester.run('prefer-to-be-falsy', {} as never, {
           messageId: 'preferToBeFalsy',
           message: 'Prefer using toBeFalsy()',
           line: 1,
-          column: 15,
+          column: 14,
           endLine: 1,
-          endColumn: 19,
+          endColumn: 18,
         },
       ],
     },

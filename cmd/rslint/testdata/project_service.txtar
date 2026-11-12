@@ -22,3 +22,18 @@ debugger;
 export const values = [1, 2];
 for (const key in values) {}
 debugger;
+-- deferred/a/tsconfig.json --
+{"files":["file.ts"]}
+-- deferred/a/file.ts --
+import { value } from "./real";
+export const result = value;
+-- deferred/a/real.ts --
+export const value: number = "wrong";
+-- deferred/b/tsconfig.json --
+{"files":["file.ts"]}
+-- deferred/b/file.ts --
+export const other = 1;
+-- deferred/b/alias.json --
+{"files":["alias.ts"]}
+-- deferred/loose.ts --
+export const loose = 1;

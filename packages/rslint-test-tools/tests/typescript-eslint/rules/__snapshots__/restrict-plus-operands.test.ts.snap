@@ -1,0 +1,1803 @@
+// Rstest Snapshot v1
+
+exports[`restrict-plus-operands > invalid 1`] = `
+{
+  "code": "let foo = '1' + 1;",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 2`] = `
+{
+  "code": "let foo = '1' + 1;",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 3`] = `
+{
+  "code": "let foo = [] + {};",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`never[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`{}\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 4`] = `
+{
+  "code": "let foo = 5 + '10';",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 5`] = `
+{
+  "code": "let foo = [] + 5;",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`never[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 6`] = `
+{
+  "code": "let foo = [] + [];",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`never[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`never[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 7`] = `
+{
+  "code": "let foo = 5 + [3];",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`number[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 8`] = `
+{
+  "code": "let foo = '5' + {};",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`{}\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 9`] = `
+{
+  "code": "let foo = 5.5 + '5';",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 10`] = `
+{
+  "code": "let foo = '5.5' + 5;",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 11`] = `
+{
+  "code": "
+let x = 5;
+let y = '10';
+let foo = x + y;
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 12`] = `
+{
+  "code": "
+let x = 5;
+let y = '10';
+let foo = y + x;
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 13`] = `
+{
+  "code": "
+let x = 5;
+let foo = x + {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`{}\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 14`] = `
+{
+  "code": "
+let y = '10';
+let foo = [] + y;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`never[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 15`] = `
+{
+  "code": "
+let pair = { first: 5, second: '10' };
+let foo = pair + pair;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`{ first: number; second: string; }\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`{ first: number; second: string; }\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 16`] = `
+{
+  "code": "
+type Valued = { value: number };
+let value: Valued = { value: 0 };
+let combined = value + 0;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`Valued\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 17`] = `
+{
+  "code": "let foo = 1n + 1;",
+  "diagnostics": [
+    {
+      "message": "Numeric '+' operations must either be both bigints or both numbers. Got \`bigint\` + \`number\`.",
+      "messageId": "bigintAndNumber",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 18`] = `
+{
+  "code": "let foo = 1 + 1n;",
+  "diagnostics": [
+    {
+      "message": "Numeric '+' operations must either be both bigints or both numbers. Got \`number\` + \`bigint\`.",
+      "messageId": "bigintAndNumber",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 19`] = `
+{
+  "code": "
+let foo = 1n;
+foo + 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Numeric '+' operations must either be both bigints or both numbers. Got \`bigint\` + \`number\`.",
+      "messageId": "bigintAndNumber",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 20`] = `
+{
+  "code": "
+let foo = 1;
+foo + 1n;
+      ",
+  "diagnostics": [
+    {
+      "message": "Numeric '+' operations must either be both bigints or both numbers. Got \`number\` + \`bigint\`.",
+      "messageId": "bigintAndNumber",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 21`] = `
+{
+  "code": "
+function foo<T extends string>(a: T) {
+  return a + 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 22`] = `
+{
+  "code": "
+function foo<T extends 'a' | 'b'>(a: T) {
+  return a + 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 23`] = `
+{
+  "code": "
+function foo<T extends number>(a: T) {
+  return a + '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 24`] = `
+{
+  "code": "
+function foo<T extends 1>(a: T) {
+  return a + '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 25`] = `
+{
+  "code": "
+declare const a: \`template\${number}\`;
+declare const b: number;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 26`] = `
+{
+  "code": "
+declare const a: never;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`never\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 27`] = `
+{
+  "code": "
+declare const a: never & string;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`never\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 28`] = `
+{
+  "code": "
+declare const a: boolean & string;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`never\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 29`] = `
+{
+  "code": "
+declare const a: any & string;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 30`] = `
+{
+  "code": "
+declare const a: { a: 1 } & { b: 2 };
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`{ a: 1; } & { b: 2; }\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 31`] = `
+{
+  "code": "
+interface A {
+  a: 1;
+}
+declare const a: A;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`A\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 32`] = `
+{
+  "code": "
+interface A {
+  a: 1;
+}
+interface A2 extends A {
+  b: 2;
+}
+declare const a: A2;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`A2\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 10,
+        },
+        "start": {
+          "column": 11,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 33`] = `
+{
+  "code": "
+type A = { a: 1 } & { b: 2 };
+declare const a: A;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`A\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 34`] = `
+{
+  "code": "
+declare const a: { a: 1 } & { b: 2 };
+declare const b: number;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`{ a: 1; } & { b: 2; }\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 35`] = `
+{
+  "code": "
+declare const a: never;
+declare const b: bigint;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`never\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 36`] = `
+{
+  "code": "
+declare const a: any;
+declare const b: bigint;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 37`] = `
+{
+  "code": "
+declare const a: { a: 1 } & { b: 2 };
+declare const b: bigint;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`{ a: 1; } & { b: 2; }\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 38`] = `
+{
+  "code": "
+declare const a: RegExp;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`RegExp\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 39`] = `
+{
+  "code": "
+const a = /regexp/;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`RegExp\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 40`] = `
+{
+  "code": "
+declare const a: Symbol;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`Symbol\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 41`] = `
+{
+  "code": "
+declare const a: symbol;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`symbol\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 42`] = `
+{
+  "code": "
+declare const a: unique symbol;
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`unique symbol\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 43`] = `
+{
+  "code": "
+const a = Symbol('');
+declare const b: string;
+const x = a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`unique symbol\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 44`] = `
+{
+  "code": "
+let foo: string | undefined;
+foo += 'some data';
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`string | undefined\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 45`] = `
+{
+  "code": "
+let foo: string | null;
+foo += 'some data';
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string. Got \`string | null\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 46`] = `
+{
+  "code": "
+let foo: string = '';
+foo += 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`string\` + \`number\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 47`] = `
+{
+  "code": "
+let foo = 0;
+foo += '';
+      ",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string. Got \`number\` + \`string\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 48`] = `
+{
+  "code": "
+const f = (a: any, b: boolean) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`boolean\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 49`] = `
+{
+  "code": "
+const f = (a: any, b: []) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`[]\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 50`] = `
+{
+  "code": "
+const f = (a: any, b: boolean) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 51`] = `
+{
+  "code": "
+const f = (a: any, b: any) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 31,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 52`] = `
+{
+  "code": "
+const f = (a: any, b: string) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 53`] = `
+{
+  "code": "
+const f = (a: any, b: bigint) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 54`] = `
+{
+  "code": "
+const f = (a: any, b: number) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 55`] = `
+{
+  "code": "
+const f = (a: any, b: boolean) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`null\`, \`RegExp\`, \`undefined\`. Got \`any\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`null\`, \`RegExp\`, \`undefined\`. Got \`boolean\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 56`] = `
+{
+  "code": "
+const f = (a: number, b: RegExp) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`RegExp\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 41,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 57`] = `
+{
+  "code": "
+let foo: string | boolean;
+foo = foo + 'some data';
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`string | boolean\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 58`] = `
+{
+  "code": "
+let foo: boolean;
+foo = foo + 'some data';
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`boolean\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 59`] = `
+{
+  "code": "
+const f = (a: any, b: unknown) => a + b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`unknown\`.",
+      "messageId": "invalid",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`restrict-plus-operands > invalid 60`] = `
+{
+  "code": "let foo = '1' + 1n;",
+  "diagnostics": [
+    {
+      "message": "Operands of '+' operations must be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`string\` + \`bigint\`.",
+      "messageId": "mismatched",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/restrict-plus-operands",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

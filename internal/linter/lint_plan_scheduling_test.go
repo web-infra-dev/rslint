@@ -41,6 +41,42 @@ func TestPreparedRuleSetsPublishCompleteConcurrentViews(t *testing.T) {
 	}
 }
 
+func TestRunLinterSharesEnvironmentCacheAcrossFiles(t *testing.T) {
+	raw, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "export {};", "b.ts": "export {};",
+	})
+	p := program.NewFromCompiler(raw)
+	environment := &rule.RuleEnvironment{Settings: map[string]any{"configured": true}}
+	var builds atomic.Int32
+	type environmentTestKey struct{}
+	configured := []rule.ConfiguredRule{{
+		Name: "test/environment", Environment: environment,
+		Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			if ctx.Settings["configured"] != true {
+				t.Error("environment settings were not forwarded")
+			}
+			rule.CachedByEnvironment(ctx, environmentTestKey{}, func() int { return int(builds.Add(1)) })
+			return nil
+		},
+	}}
+	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
+		Programs: []*program.Program{p}, TargetsByProgram: [][]string{{paths["a.ts"], paths["b.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule { return configured },
+	})
+	for range 2 {
+		result, err := RunLinter(RunLinterOptions{LintPlan: plan})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.LintedFileCount != 2 {
+			t.Fatalf("linted %d files, want 2", result.LintedFileCount)
+		}
+	}
+	if builds.Load() != 1 {
+		t.Fatalf("environment preparation ran %d times across files and passes, want 1", builds.Load())
+	}
+}
+
 func TestCompleteProgramsJoinsBorrowersBeforeRethrowing(t *testing.T) {
 	previousProcs := runtime.GOMAXPROCS(2)
 	defer runtime.GOMAXPROCS(previousProcs)

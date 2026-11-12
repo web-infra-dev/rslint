@@ -180,7 +180,7 @@ func TestForwardRefUsesRefUpstream(t *testing.T) {
 func missingRefError(line int, column int, addOutput string, removeOutput string) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "missingRefParameter",
-		Message:   missingRefParameterText,
+		Message:   "forwardRef is used with this component but no ref parameter is set",
 		Line:      line,
 		Column:    column,
 		Suggestions: []rule_tester.InvalidTestCaseSuggestion{

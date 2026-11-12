@@ -39,11 +39,11 @@ func TestIframeMissingSandboxExtras(t *testing.T) {
 			Code:     "import { createElement } from 'react'; createElement('div'); createElement('iframe');",
 			FileName: "sandbox.jsx",
 			TSConfig: "tsconfig.allow-js.json",
-			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 62, EndLine: 1, EndColumn: 85}},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 62, EndLine: 1, EndColumn: 85}},
 		},
 		{
 			Code: `React.createElement("iframe", {"sandbox": "allow-forms"})`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 58}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 58}},
 		},
 		{
 			Code: `React.createElement("iframe", {[sandbox]: "__unknown__"})`, Tsx: true,
@@ -51,19 +51,19 @@ func TestIframeMissingSandboxExtras(t *testing.T) {
 		},
 		{
 			Code: `import { createElement } from "react"; createElement("iframe")`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 40, EndLine: 1, EndColumn: 63}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 40, EndLine: 1, EndColumn: 63}},
 		},
 		{
 			Code: `React[createElement]("iframe")`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 31}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 31}},
 		},
 		{
 			Code: `React?.[createElement]("iframe")`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 33}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 33}},
 		},
 		{
 			Code: `h.createElement("iframe")`, Tsx: true, Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: msgAttributeMissing, Line: 1, Column: 1, EndLine: 1, EndColumn: 26}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "attributeMissing", Message: "An iframe element is missing a sandbox attribute", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}},
 		},
 	})
 }

@@ -14,7 +14,7 @@ import (
 func inlineElementError(line, column, endColumn int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "inlineElement",
-		Message:   inlineElementMessage,
+		Message:   "Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.",
 		Line:      line,
 		Column:    column,
 		EndLine:   line,

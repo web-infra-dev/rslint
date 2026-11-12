@@ -31,17 +31,17 @@ func TestVarsOnTopExtras(t *testing.T) {
 		},
 		[]rule_tester.InvalidTestCase{
 			// TypeScript expression wrappers are not transparent ESTree parentheses.
-			{Code: "('directive' as const); var x;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "('directive' as const); var x;", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 			// ---- Dimension 4: loop and labeled statement boundaries ----
-			{Code: "function f() { label: { var x; } }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "function f() { label: { var x; } }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 			// ---- Real-user: var nested in a conditional block ----
-			{Code: "function render() { if (ready) { var value = getValue(); } return value; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "function render() { if (ready) { var value = getValue(); } return value; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 			// ---- Real-user: var in a catch block ----
-			{Code: "function load() { try { run(); } catch (error) { var message = error.message; } }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "function load() { try { run(); } catch (error) { var message = error.message; } }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 			// Locks in blockScopeVarCheck()'s non-function-block arm.
-			{Code: "{ var x; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "{ var x; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 			// Upstream's TSModuleBlock special case applies only to exported vars.
-			{Code: "namespace N { var value = 1; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: varsOnTopMessage.Description}}},
+			{Code: "namespace N { var value = 1; }", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "top", Message: "All 'var' declarations must be at the top of the function scope."}}},
 		},
 	)
 }

@@ -22,7 +22,7 @@ func TestNoDebuggerComputedAssignmentKey(t *testing.T) {
 			{
 				Code: `({ [(() => { debugger; })()]: target } = source);`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "no-debugger", Line: 1, Column: 14, EndLine: 1, EndColumn: 23},
+					{MessageId: "unexpected", Line: 1, Column: 14, EndLine: 1, EndColumn: 23},
 				},
 			},
 		},

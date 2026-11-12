@@ -278,6 +278,7 @@ hotpink
 HTTPSURL
 hujson
 humanfs
+hypot
 idlist
 iface
 imul
@@ -587,6 +588,7 @@ SIGSEGV
 slashless
 smajobber
 somethingelse
+SOML
 sonarjs
 sourcegraph
 spinbutton
@@ -646,6 +648,7 @@ trae
 treegrid
 trimpath
 trippable
+trunc
 tsconfiga
 tses
 tseslint

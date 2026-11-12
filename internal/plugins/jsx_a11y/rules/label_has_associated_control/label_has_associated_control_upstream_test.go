@@ -24,27 +24,27 @@ import (
 // configured `assert` mode).
 var expectedAccessibleLabel = rule_tester.InvalidTestCaseError{
 	MessageId: "accessibleLabel",
-	Message:   msgAccessibleLabel,
+	Message:   "A form label must have accessible text.",
 }
 
 var expectedHtmlFor = rule_tester.InvalidTestCaseError{
 	MessageId: "htmlFor",
-	Message:   msgHtmlFor,
+	Message:   "A form label must have a valid htmlFor attribute.",
 }
 
 var expectedNesting = rule_tester.InvalidTestCaseError{
 	MessageId: "nesting",
-	Message:   msgNesting,
+	Message:   "A form label must have an associated control as a descendant.",
 }
 
 var expectedBoth = rule_tester.InvalidTestCaseError{
 	MessageId: "both",
-	Message:   msgBoth,
+	Message:   "A form label must have a valid htmlFor attribute and a control as a descendant.",
 }
 
 var expectedEither = rule_tester.InvalidTestCaseError{
 	MessageId: "either",
-	Message:   msgEither,
+	Message:   "A form label must either have a valid htmlFor attribute or a control as a descendant.",
 }
 
 // componentsSettings mirrors upstream `componentsSettings` —

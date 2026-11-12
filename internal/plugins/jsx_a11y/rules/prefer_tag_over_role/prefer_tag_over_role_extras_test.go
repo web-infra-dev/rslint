@@ -43,7 +43,7 @@ var componentsSettings = map[string]interface{}{
 func expectedErrAt(role, tag string, line, col int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: "preferTagOverRole",
-		Message:   errorMessage(tag, role),
+		Message:   "Use " + tag + ` instead of the "` + role + `" role to ensure accessibility across all devices.`,
 		Line:      line,
 		Column:    col,
 	}

@@ -1,21 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const methodError = (
-  functionName: string,
-  preferred: string,
-  actual: string,
-  line: number,
-  column: number,
-) => ({
-  messageId: 'consistentMethod',
-  message: `Prefer using \`${functionName}.${preferred}\` over \`${functionName}.${actual}\``,
-  line,
-  column,
-});
-
-ruleTester.run('consistent-each-for', {} as never, {
+ruleTester.run('consistent-each-for', {
   valid: [
     {
       code: 'test.each([1, 2, 3])("test", (n) => { expect(n).toBeDefined() })',
@@ -84,55 +72,150 @@ describe.for([1, 2, 3])("suite", ([n]) => { test("test", () => {}) })`,
     {
       code: 'test.for([1, 2, 3])("test", ([n]) => { expect(n).toBeDefined() })',
       options: [{ test: 'each' }],
-      errors: [methodError('test', 'each', 'for', 1, 6)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.each` over `test.for`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
     },
     {
       code: 'test.skip.for([1, 2, 3])("test", ([n]) => { expect(n).toBeDefined() })',
       options: [{ test: 'each' }],
-      errors: [methodError('test', 'each', 'for', 1, 11)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.each` over `test.for`',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'test.only.for([1, 2, 3])("test", ([n]) => { expect(n).toBeDefined() })',
       options: [{ test: 'each' }],
-      errors: [methodError('test', 'each', 'for', 1, 11)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.each` over `test.for`',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'test.each([1, 2, 3])("test", (n) => { expect(n).toBeDefined() })',
       options: [{ test: 'for' }],
-      errors: [methodError('test', 'for', 'each', 1, 6)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.for` over `test.each`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: 'test.skip.each([1, 2, 3])("test", (n) => { expect(n).toBeDefined() })',
       options: [{ test: 'for' }],
-      errors: [methodError('test', 'for', 'each', 1, 11)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.for` over `test.each`',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
     },
     {
       code: 'it.for([1, 2, 3])("test", ([n]) => { expect(n).toBeDefined() })',
       options: [{ it: 'each' }],
-      errors: [methodError('it', 'each', 'for', 1, 4)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `it.each` over `it.for`',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: 'it.each([1, 2, 3])("test", (n) => { expect(n).toBeDefined() })',
       options: [{ it: 'for' }],
-      errors: [methodError('it', 'for', 'each', 1, 4)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `it.for` over `it.each`',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: 'describe.for([1, 2, 3])("suite", ([n]) => { test("test", () => {}) })',
       options: [{ describe: 'each' }],
-      errors: [methodError('describe', 'each', 'for', 1, 10)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `describe.each` over `describe.for`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: 'describe.each([1, 2, 3])("suite", (n) => { test("test", () => {}) })',
       options: [{ describe: 'for' }],
-      errors: [methodError('describe', 'for', 'each', 1, 10)],
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `describe.for` over `describe.each`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: `test.for([1, 2])("test1", ([n]) => {})
 test.for([3, 4])("test2", ([n]) => {})`,
       options: [{ test: 'each' }],
       errors: [
-        methodError('test', 'each', 'for', 1, 6),
-        methodError('test', 'each', 'for', 2, 6),
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.each` over `test.for`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 9,
+        },
+        {
+          messageId: 'consistentMethod',
+          message: 'Prefer using `test.each` over `test.for`',
+          line: 2,
+          column: 6,
+          endLine: 2,
+          endColumn: 9,
+        },
       ],
     },
   ],

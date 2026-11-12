@@ -195,7 +195,7 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 		// answering means going back to whatever produced that text; a file no
 		// rule asks about never does.
 		sourceBOM := rule.NewSourceBOM(sourceProgram.FS(), file.FileName())
-		fileCache := rule.NewFileCacheWithProcessCurrentDirectory(opts.Cwd)
+		fileCache := rule.NewFileCacheWithEnvironment(opts.Cwd, filePlan.rules.environment)
 		baseContext := (rule.RuleContext{
 			SourceFile:      file,
 			Settings:        environment.Settings,
@@ -466,7 +466,10 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	return execution.run(normalizeDiagnosticConsumer(opts.Consumer)), nil
+	consumer := normalizeDiagnosticConsumer(opts.Consumer)
+	result, typeDiagnostics := execution.run(consumer)
+	emitDeduplicatedTypeCheckDiagnostics(typeDiagnostics, consumer.Report)
+	return result, nil
 }
 
 // LintSingleFile runs lint rules against one already selected file in one

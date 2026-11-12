@@ -36,14 +36,18 @@ func TestArrayClassificationQueryOrder(t *testing.T) {
 						}
 						// A typed array is an indexed collection, but never a plain
 						// array. Sharing a file cache must not mix those two answers.
-						if isArray || skipIndexed || !IsKnownNonArray(ctx, node) {
+						if isArray || skipIndexed || !IsKnownNonArray(ctx, node) || !IsIndexedCollection(ctx, node) {
 							ctx.ReportNode(node, rule.RuleMessage{Id: "classification", Description: "Typed array classification depends on query order."})
 						}
 					}}
 				},
 			}
 			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule,
-				[]rule_tester.ValidTestCase{{Code: "const value = new Uint8Array(); use(value);", FileName: "file.js"}}, nil)
+				[]rule_tester.ValidTestCase{
+					{Code: "const value = new Uint8Array(); use(value);", FileName: "file.js"},
+					{Code: "const value = Uint8Array.of(...input); use(value);", FileName: "file.js"},
+					{Code: "const value = Float32Array.from(input); use(value);", FileName: "file.js"},
+				}, nil)
 		})
 	}
 }
@@ -246,6 +250,7 @@ func TestNodeMatchesPathNestedBoundaries(t *testing.T) {
 		want       bool
 	}{
 		{text: "utils.deep.flat", path: "utils.deep.flat", want: true},
+		{text: "utils.deep.flat", path: "utils..deep.flat"},
 		{text: "(utils.deep).flat", path: "utils.deep.flat", want: true},
 		{text: "utils?.deep.flat", path: "utils.deep.flat"},
 		{text: "utils.deep?.flat", path: "utils.deep.flat"},
@@ -263,6 +268,7 @@ func TestNodeMatchesPathNestedBoundaries(t *testing.T) {
 		{text: "super", path: "super.deep"},
 		{text: "import.meta", path: "import.meta", want: true},
 		{text: "import.meta", path: "import"},
+		{text: "import.meta.last", path: "import.meta.last", want: true},
 	}
 	for _, test := range tests {
 		sourceFile := parseTestSource(test.text + ";")
@@ -347,6 +353,27 @@ func TestShouldAddParenthesesToMemberExpressionObject(t *testing.T) {
 			); got != test.want {
 				t.Fatalf("ShouldAddParenthesesToMemberExpressionObject(%q) = %v, want %v",
 					test.code, got, test.want)
+			}
+		})
+	}
+	for _, test := range []struct {
+		code string
+		call string
+		want bool
+	}{
+		{`target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, true},
+		{`!target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, false},
+		{`const f = () => target({pattern: /x/}.pattern);`, `target({pattern: /x/}.pattern)`, true},
+		{`if (target({pattern: /x/}.pattern)) {}`, `target({pattern: /x/}.pattern)`, false},
+		{`target(function() {});`, `target(function() {})`, true},
+		{`target(import("x"));`, `target(import("x"))`, false},
+		{`target((value as RegExp)!);`, `target((value as RegExp)!)`, false},
+	} {
+		t.Run(test.code, func(t *testing.T) {
+			source := parseTestSource(test.code)
+			call := findTestCall(t, source, test.call)
+			if got := ShouldAddParenthesesToMemberExpressionObjectAt(source, utils.ESTreeRuntimeExpression(call.Arguments()[0]), call.Expression()); got != test.want {
+				t.Fatalf("parentheses at replacement position = %v, want %v", got, test.want)
 			}
 		})
 	}

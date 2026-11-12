@@ -1,0 +1,23 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "getLastElementFunctions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Additional functions that return the last element."
+        },
+        "checkAllIndexAccess": {
+          "type": "boolean",
+          "description": "Whether to also check non-negative integer index access."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

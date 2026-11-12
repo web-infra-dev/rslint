@@ -56,7 +56,7 @@ func TestAriaRoleUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidAriaRole",
-				Message:   errorMessage,
+				Message:   "Elements with ARIA roles must use a valid, non-abstract ARIA role.",
 			}},
 		})
 	}
@@ -110,68 +110,68 @@ func TestAriaRoleUpstream(t *testing.T) {
 		// Unknown / abstract / case-sensitive / empty / boolean form / null.
 		{
 			Code: `<div role="foobar" />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role="datepicker"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role="range"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role="Button"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role=""></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// Space-split with one bad token in the middle — every() short-circuits.
 		{
 			Code: `<div role="tabpanel row foobar"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role="tabpanel row range"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<div role="doc-endnotes range"></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// Boolean-attribute form — String(true) = "true", "true" not a role.
 		{
 			Code: `<div role />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// allowedInvalidRoles does NOT cover the unknown token here.
 		{
 			Code: `<div role="unknown-invalid-role" />`, Tsx: true,
 			Options: allowedInvalidRolesOption,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// `{null}` resolves to the literal STRING "null" via LITERAL_TYPES.Literal
 		// override — NOT to the JS null sentinel. So it doesn't hit the
 		// step-3 early return; it's validated and fails the role lookup.
 		{
 			Code: `<div role={null}></div>`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// Custom component without ignoreNonDOM — rule still runs.
 		{
 			Code: `<Foo role="datepicker" />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		{
 			Code: `<Foo role="Button" />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// Components-map: `Div` resolves to `div`; "Button" still fails case check.
 		{
 			Code: `<Div role="Button" />`, Tsx: true, Settings: customDivSettings,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// ignoreNonDOM + components-map: `Div` → `div` IS in the DOM map, so
 		// the rule still runs.
@@ -179,12 +179,12 @@ func TestAriaRoleUpstream(t *testing.T) {
 			Code: `<Div role="Button" />`, Tsx: true,
 			Options:  ignoreNonDOMOption,
 			Settings: customDivSettings,
-			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 		// Polymorphic prop: `Box asChild="div"` → `div`; "Button" fails.
 		{
 			Code: `<Box asChild="div" role="Button" />`, Tsx: true, Settings: customDivSettings,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: errorMessage}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaRole", Message: "Elements with ARIA roles must use a valid, non-abstract ARIA role."}},
 		},
 	}
 	invalid = append(invalid, invalidRoleTests...)

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-hooks-in-order', {} as never, {
+ruleTester.run('prefer-hooks-in-order', {
   valid: [
     {
       code: `
@@ -39,9 +40,11 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'beforeAll', previousHook: 'afterAll' },
-          line: 2,
-          column: 1,
+          message: '`beforeAll` hooks should be before any `afterAll` hooks',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
     },
@@ -53,9 +56,11 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'beforeEach', previousHook: 'afterEach' },
-          line: 2,
-          column: 1,
+          message: '`beforeEach` hooks should be before any `afterEach` hooks',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 29,
         },
       ],
     },
@@ -67,9 +72,11 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'beforeAll', previousHook: 'beforeEach' },
-          line: 2,
-          column: 1,
+          message: '`beforeAll` hooks should be before any `beforeEach` hooks',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
     },
@@ -81,9 +88,11 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'afterEach', previousHook: 'afterAll' },
-          line: 2,
-          column: 1,
+          message: '`afterEach` hooks should be before any `afterAll` hooks',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
     },
@@ -102,15 +111,19 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'afterEach', previousHook: 'afterAll' },
-          line: 3,
-          column: 3,
+          message: '`afterEach` hooks should be before any `afterAll` hooks',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 30,
         },
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'beforeAll', previousHook: 'beforeEach' },
-          line: 8,
-          column: 3,
+          message: '`beforeAll` hooks should be before any `beforeEach` hooks',
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 30,
         },
       ],
     },
@@ -127,9 +140,11 @@ ruleTester.run('prefer-hooks-in-order', {} as never, {
       errors: [
         {
           messageId: 'reorderHooks',
-          data: { currentHook: 'beforeAll', previousHook: 'afterEach' },
+          message: '`beforeAll` hooks should be before any `afterEach` hooks',
           line: 6,
-          column: 1,
+          column: 9,
+          endLine: 6,
+          endColumn: 28,
         },
       ],
     },

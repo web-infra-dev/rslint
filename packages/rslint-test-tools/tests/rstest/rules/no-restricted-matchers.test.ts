@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-restricted-matchers', {} as never, {
+ruleTester.run('no-restricted-matchers', {
   valid: [
     { code: `expect(a).toHaveBeenCalled()` },
     { code: `expect(a).not.toHaveBeenCalled()` },
@@ -37,6 +38,7 @@ ruleTester.run('no-restricted-matchers', {} as never, {
       errors: [
         {
           messageId: 'restrictedChain',
+          message: 'Use of `to.be.a` is disallowed',
           line: 1,
           column: 11,
           endLine: 1,
@@ -50,6 +52,7 @@ ruleTester.run('no-restricted-matchers', {} as never, {
       errors: [
         {
           messageId: 'restrictedChain',
+          message: 'Use of `resolves.not` is disallowed',
           line: 1,
           column: 11,
           endLine: 1,

@@ -12,7 +12,7 @@ import (
 // inside a `function X() { return <button /> }` wrapper or `arr.map(...)`.
 var expectedErrorAnyPos = rule_tester.InvalidTestCaseError{
 	MessageId: "controlHasAssociatedLabel",
-	Message:   errorMessage,
+	Message:   "A control must be associated with a text label.",
 }
 
 // polymorphicSettings exercises `settings['jsx-a11y'].polymorphicPropName`.
@@ -616,7 +616,7 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "controlHasAssociatedLabel",
-					Message:   errorMessage,
+					Message:   "A control must be associated with a text label.",
 					Line:      1,
 					Column:    1,
 				}},
@@ -633,7 +633,7 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "controlHasAssociatedLabel",
-					Message:   errorMessage,
+					Message:   "A control must be associated with a text label.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -646,8 +646,8 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Code: `<><button /><a href="x" /></>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 1, Column: 3},
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 1, Column: 13},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 1, Column: 3},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 1, Column: 13},
 				},
 			},
 
@@ -681,8 +681,8 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Code: `<button><a href="#" /></button>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 1, Column: 1},
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 1, Column: 9},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 1, Column: 1},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 1, Column: 9},
 				},
 			},
 
@@ -805,8 +805,8 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 					`}`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 4, Column: 7},
-					{MessageId: "controlHasAssociatedLabel", Message: errorMessage, Line: 5, Column: 7},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 4, Column: 7},
+					{MessageId: "controlHasAssociatedLabel", Message: "A control must be associated with a text label.", Line: 5, Column: 7},
 				},
 			},
 
@@ -875,7 +875,7 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "controlHasAssociatedLabel",
-					Message:   errorMessage,
+					Message:   "A control must be associated with a text label.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -891,7 +891,7 @@ func TestControlHasAssociatedLabelExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "controlHasAssociatedLabel",
-					Message:   errorMessage,
+					Message:   "A control must be associated with a text label.",
 					Line:      1,
 					Column:    1,
 				}},

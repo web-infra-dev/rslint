@@ -41,16 +41,22 @@ func IsSameIdentifier(left *ast.Node, right *ast.Node) bool {
 // Unicorn additionally equates e.g. object["a" + "b"] with object.ab.
 // All non-member comparisons retain the shared helper's literal semantics.
 func IsSameReference(left, right *ast.Node) bool {
-	return isSameReference(left, right, false)
+	return isSameReference(left, right, false, nil)
 }
 
 // IsSameComparisonOperand additionally normalizes computed TypeScript keys and
 // static string literals, matching Unicorn's comparison.isSame operation.
 func IsSameComparisonOperand(left, right *ast.Node) bool {
-	return isSameReference(left, right, true)
+	return isSameReference(left, right, true, nil)
 }
 
-func isSameReference(left, right *ast.Node, comparison bool) bool {
+// IsSameComparisonOperandWithKeyEvaluator lets a rule supply its own static
+// evaluation for computed keys while retaining Unicorn's reference comparison.
+func IsSameComparisonOperandWithKeyEvaluator(left, right *ast.Node, evaluateKey func(*ast.Node) (string, bool)) bool {
+	return isSameReference(left, right, true, evaluateKey)
+}
+
+func isSameReference(left, right *ast.Node, comparison bool, evaluateKey func(*ast.Node) (string, bool)) bool {
 	left, right = utils.SkipAssertionsAndParens(left), utils.SkipAssertionsAndParens(right)
 	if left == nil || right == nil {
 		return false
@@ -66,11 +72,11 @@ func isSameReference(left, right *ast.Node, comparison bool) bool {
 	if !ast.IsAccessExpression(left) || !ast.IsAccessExpression(right) {
 		return utils.IsSameReference(left, right, true)
 	}
-	if !isSameReference(left.Expression(), right.Expression(), comparison) {
+	if !isSameReference(left.Expression(), right.Expression(), comparison, evaluateKey) {
 		return false
 	}
-	if name, known := referencePropertyName(left, comparison); known {
-		other, known := referencePropertyName(right, comparison)
+	if name, known := referencePropertyName(left, comparison, evaluateKey); known {
+		other, known := referencePropertyName(right, comparison, evaluateKey)
 		return known && name == other
 	}
 	if left.Kind != right.Kind {
@@ -78,10 +84,10 @@ func isSameReference(left, right *ast.Node, comparison bool) bool {
 	}
 	_, leftKey := utils.MemberExpressionParts(left)
 	_, rightKey := utils.MemberExpressionParts(right)
-	return isSameReference(leftKey, rightKey, comparison)
+	return isSameReference(leftKey, rightKey, comparison, evaluateKey)
 }
 
-func referencePropertyName(node *ast.Node, comparison bool) (string, bool) {
+func referencePropertyName(node *ast.Node, comparison bool, evaluateKey func(*ast.Node) (string, bool)) (string, bool) {
 	if node.Kind == ast.KindPropertyAccessExpression {
 		return utils.AccessExpressionStaticName(node)
 	}
@@ -90,6 +96,9 @@ func referencePropertyName(node *ast.Node, comparison bool) (string, bool) {
 		key = ast.SkipOuterExpressions(key, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
 	} else if _, wrapped := utils.TransparentExpression(key); wrapped {
 		return "", false
+	}
+	if evaluateKey != nil {
+		return evaluateKey(key)
 	}
 	return utils.NewStaticStringEvaluatorWithoutScope().EvalToString(key)
 }

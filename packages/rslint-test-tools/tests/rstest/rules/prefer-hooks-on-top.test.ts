@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-hooks-on-top', {} as never, {
+ruleTester.run('prefer-hooks-on-top', {
   valid: [
     {
       code: `
@@ -85,8 +86,11 @@ ruleTester.run('prefer-hooks-on-top', {} as never, {
       errors: [
         {
           messageId: 'noHookOnTop',
+          message: 'Hooks should come before test cases',
           line: 5,
           column: 11,
+          endLine: 5,
+          endColumn: 31,
         },
       ],
     },
@@ -103,8 +107,11 @@ ruleTester.run('prefer-hooks-on-top', {} as never, {
       errors: [
         {
           messageId: 'noHookOnTop',
+          message: 'Hooks should come before test cases',
           line: 6,
           column: 11,
+          endLine: 6,
+          endColumn: 30,
         },
       ],
     },
@@ -120,13 +127,19 @@ ruleTester.run('prefer-hooks-on-top', {} as never, {
       errors: [
         {
           messageId: 'noHookOnTop',
+          message: 'Hooks should come before test cases',
           line: 5,
           column: 11,
+          endLine: 5,
+          endColumn: 31,
         },
         {
           messageId: 'noHookOnTop',
+          message: 'Hooks should come before test cases',
           line: 6,
           column: 11,
+          endLine: 6,
+          endColumn: 29,
         },
       ],
     },

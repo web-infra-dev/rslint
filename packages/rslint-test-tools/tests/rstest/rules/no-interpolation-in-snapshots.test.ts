@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-interpolation-in-snapshots', {} as never, {
+ruleTester.run('no-interpolation-in-snapshots', {
   valid: [
     {
       code: 'expect(something).toMatchInlineSnapshot(`No interpolation`);',
@@ -24,19 +25,55 @@ ruleTester.run('no-interpolation-in-snapshots', {} as never, {
   invalid: [
     {
       code: 'expect(something).toMatchInlineSnapshot(`${interpolated}`);',
-      errors: [{ messageId: 'noInterpolation', line: 1, column: 41 }],
+      errors: [
+        {
+          messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 58,
+        },
+      ],
     },
     {
       code: 'expect(something).toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
-      errors: [{ messageId: 'noInterpolation', line: 1, column: 54 }],
+      errors: [
+        {
+          messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column: 54,
+          endLine: 1,
+          endColumn: 71,
+        },
+      ],
     },
     {
       code: 'expect(something).toMatchInlineSnapshot({}, `${interpolated}`, `case ${id}`);',
-      errors: [{ messageId: 'noInterpolation', line: 1, column: 45 }],
+      errors: [
+        {
+          messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column: 45,
+          endLine: 1,
+          endColumn: 62,
+        },
+      ],
     },
     {
       code: 'test("case", ({ expect }) => expect(value).toMatchInlineSnapshot(`${interpolated}`));',
-      errors: [{ messageId: 'noInterpolation', line: 1, column: 66 }],
+      errors: [
+        {
+          messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column: 66,
+          endLine: 1,
+          endColumn: 83,
+        },
+      ],
     },
   ],
 });

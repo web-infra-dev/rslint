@@ -3,26 +3,12 @@
 package aria_proptypes
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/jsxa11yutil"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
-
-// upstreamErrorMessage mirrors the test file's local `errorMessage(name)`
-// helper byte-for-byte. It looks up the ARIA property's type / values in
-// aria-query's map, then formats the same template the rule itself uses.
-// Defined at package scope so aria_proptypes_extras_test.go can reuse.
-//
-// `${permittedValues}` in upstream's template literal hits
-// `Array.prototype.toString`, which joins with a bare comma (no space).
-// Booleans stringify as "true" / "false". Mirror byte-for-byte.
-func upstreamErrorMessage(name string) string {
-	def := jsxa11yutil.AriaPropertyDefinitions[strings.ToLower(name)]
-	return errorMessage(name, def.Type, def.Values)
-}
 
 // TestValidityCheckDefault locks in upstream's tape unit test:
 //
@@ -244,149 +230,149 @@ func TestAriaProptypesUpstream(t *testing.T) {
 			// with substitution (placeholder string).
 			{
 				Code: `<div aria-hidden="yes" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 			{
 				Code: `<div aria-hidden="no" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 			{
 				Code: `<div aria-hidden={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 			{
 				Code: "<div aria-hidden={`${abc}`} />", Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-hidden")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-hidden must be a boolean."}},
 			},
 
 			// aria-label (string) — boolean form, boolean literals, number,
 			// PrefixUnary boolean.
 			{
 				Code: `<div aria-label />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 			{
 				Code: `<div aria-label={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 			{
 				Code: `<div aria-label={false} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 			{
 				Code: `<div aria-label={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 			{
 				Code: `<div aria-label={!true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-label")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-label must be a string."}},
 			},
 
 			// aria-checked (tristate) — non-mixed string, number, template
 			// with substitution.
 			{
 				Code: `<div aria-checked="yes" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-checked")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-checked must be a boolean or the string "mixed".`}},
 			},
 			{
 				Code: `<div aria-checked="no" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-checked")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-checked must be a boolean or the string "mixed".`}},
 			},
 			{
 				Code: `<div aria-checked={1234} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-checked")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-checked must be a boolean or the string "mixed".`}},
 			},
 			{
 				Code: "<div aria-checked={`${abc}`} />", Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-checked")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: `The value for aria-checked must be a boolean or the string "mixed".`}},
 			},
 
 			// aria-level (integer) — non-numeric strings, boolean, boolean-form,
 			// coerced "false" boolean, PrefixUnary boolean.
 			{
 				Code: `<div aria-level="yes" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: `<div aria-level="no" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: "<div aria-level={`abc`} />", Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: `<div aria-level={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: `<div aria-level />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: `<div aria-level={"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 			{
 				Code: `<div aria-level={!"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-level")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-level must be a integer."}},
 			},
 
 			// aria-valuemax (number) — same shape as aria-level.
 			{
 				Code: `<div aria-valuemax="yes" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemax="no" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: "<div aria-valuemax={`abc`} />", Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemax={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemax />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemax={"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 			{
 				Code: `<div aria-valuemax={!"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-valuemax")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-valuemax must be a number."}},
 			},
 
 			// aria-sort (token) — empty string, typo, boolean form, boolean
 			// literal, coerced "false" boolean, multi-token string.
 			{
 				Code: `<div aria-sort="" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 			{
 				Code: `<div aria-sort="descnding" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 			{
 				Code: `<div aria-sort />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 			{
 				Code: `<div aria-sort={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 			{
 				Code: `<div aria-sort={"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 			{
 				Code: `<div aria-sort="ascending descending" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-sort")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-sort must be a single token from the following: ascending,descending,none,other."}},
 			},
 
 			// aria-relevant (tokenlist) — empty string, unknown token, boolean
@@ -394,31 +380,31 @@ func TestAriaProptypesUpstream(t *testing.T) {
 			// space (split yields empty trailing token).
 			{
 				Code: `<div aria-relevant="" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant="foobar" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant={true} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant={"false"} />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant="additions removalss" />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 			{
 				Code: `<div aria-relevant="additions removalss " />`, Tsx: true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: upstreamErrorMessage("aria-relevant")}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "invalidAriaPropType", Message: "The value for aria-relevant must be a list of one or more tokens from the following: additions,all,removals,text."}},
 			},
 		})
 }

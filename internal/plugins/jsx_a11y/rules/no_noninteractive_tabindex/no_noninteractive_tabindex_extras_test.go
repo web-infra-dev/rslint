@@ -97,7 +97,7 @@ var allOptionsCombo = []interface{}{
 //     generators / async / IIFE / class / fragment / map / multi-component.
 //  10. **Spread literal** — `{...{role: "..."}}` shapes.
 //  11. **TypeScript JSX** — generics, satisfies, non-null, namespaced,
-//      long-chain member expression.
+//     long-chain member expression.
 func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveTabindexRule, []rule_tester.ValidTestCase{
 		// ============================================================
@@ -557,20 +557,20 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		// TYPES no entry → null. `null >= 0` true → REPORT. Lock-in for
 		// the Cluster H fix.
 		{Code: `<div tabIndex={} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 
 		// BigInt — upstream Number(BigInt) coerces. 0n → 0 → `0>=0` REPORT;
 		// 1n → 1 → REPORT; 2n → 2 → REPORT. Lock-in for Cluster B.
 		{Code: `<div tabIndex={0n} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `<div tabIndex={1n} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `<div tabIndex={2n} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `<div tabIndex={5n} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `<div tabIndex={true ? 1n : 0n} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 
 		// ============================================================
 		// Group 0: Opaque expression types — upstream returns null which
@@ -580,13 +580,13 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		// pre-Ex behavior that silently skipped these.
 		// ============================================================
 		{Code: `<div tabIndex={-1 satisfies number} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `<div tabIndex={5 satisfies number} />`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `async function f() { return <div tabIndex={await p} />; }`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 		{Code: `function* g() { yield <div tabIndex={yield 0} />; }`, Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."}}},
 
 		// ============================================================
 		// Group 1: Position assertions
@@ -597,7 +597,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 18,
 			}},
 		},
@@ -607,7 +607,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 18,
 			}},
 		},
@@ -617,7 +617,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      2, Column: 3, EndLine: 4, EndColumn: 4,
 			}},
 		},
@@ -627,7 +627,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 18,
 			}},
 		},
@@ -637,7 +637,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      1, Column: 21, EndLine: 1, EndColumn: 33,
 			}},
 		},
@@ -650,8 +650,8 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Code: `<article tabIndex={0}><span tabIndex={0} /></article>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
 			},
 		},
 		// Three levels deep — outer/mid/inner all report.
@@ -659,9 +659,9 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Code: `<article tabIndex={0}><section tabIndex={0}><span tabIndex={0} /></section></article>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
 			},
 		},
 		// Mixed: outer interactive, inner non-interactive — only inner reports.
@@ -669,7 +669,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Code: `<button tabIndex={0}><span tabIndex={0} /></button>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noNoninteractiveTabindex", Message: errorMessage},
+				{MessageId: "noNoninteractiveTabindex", Message: "`tabIndex` should only be declared on interactive elements."},
 			},
 		},
 		// Two siblings — both report.
@@ -794,7 +794,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex="0O10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // uppercase O
 		{Code: `<div tabIndex="0b10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex="0B10" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // uppercase B
-		{Code: `<div tabIndex="0x0" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // hex 0
+		{Code: `<div tabIndex="0x0" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},  // hex 0
 		{Code: `<div tabIndex="0xff" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}}, // mixed-case hex digits
 		{Code: `<div tabIndex="0xFF" />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		// Step-2 fallback hex via ConditionalExpression — staticEval picks
@@ -1075,8 +1075,8 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		},
 		// Switch-case rendering.
 		{
-			Code: `function Foo({type}) { switch(type) { case 'a': return <div tabIndex={0} />; default: return null; } }`,
-			Tsx:  true,
+			Code:   `function Foo({type}) { switch(type) { case 'a': return <div tabIndex={0} />; default: return null; } }`,
+			Tsx:    true,
 			Errors: []rule_tester.InvalidTestCaseError{expectedError},
 		},
 
@@ -1088,7 +1088,7 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveTabindex",
-				Message:   errorMessage,
+				Message:   "`tabIndex` should only be declared on interactive elements.",
 				Line:      1, Column: 14, EndLine: 1, EndColumn: 26,
 			}},
 		},

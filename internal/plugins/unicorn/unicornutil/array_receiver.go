@@ -6,8 +6,6 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
-	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
@@ -25,29 +23,27 @@ func IsKnownNonArray(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassNonTarget
 }
 
-// IsKnownNonIndexedCollection reports whether node is definitely a keyed
-// collection. Typed arrays remain indexed-collection targets.
+// IsKnownNonIndexedCollection reports whether node is definitely outside the
+// indexed collections. Typed arrays remain indexed-collection targets.
 func IsKnownNonIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
-	return classifyArrayReceiver(ctx, node, indexedCollectionTargets, keyedCollectionNames) == arrayClassNonTarget
+	return classifyArrayReceiver(ctx, node, indexedCollectionTargets, knownNonIndexedCollectionNames) == arrayClassNonTarget
 }
 
 // ArrayReceiverOptions controls the upstream opt-in receiver policies. The
 // zero value preserves the existing class and union policies.
 type ArrayReceiverOptions struct {
 	AllowNullishInMixedUnion   bool
+	CheckArrayProducers        bool // Rest parameters, array-producing calls, and value-preserving expressions.
 	CheckClassHeritage         bool
 	CheckClassSyntax           bool
+	ReadJSDoc                  bool
 	TreatMixedUnionAsNonTarget bool
 }
 
 // IsKnownNonIndexedCollectionWithOptions applies rule-specific receiver
 // policies without changing the defaults used by other array rules.
 func IsKnownNonIndexedCollectionWithOptions(ctx rule.RuleContext, node *ast.Node, options ArrayReceiverOptions) bool {
-	class := classifyArrayReceiverInner(ctx, node, indexedCollectionTargets, keyedCollectionNames, &arrayReceiverWalkState{
-		useTypeInformation: !isSourceOnlyFile(ctx),
-		visiting:           map[*ast.Symbol]bool{},
-		options:            options,
-	})
+	class := classifyArrayReceiverWithOptions(ctx, node, indexedCollectionTargets, knownNonIndexedCollectionNames, options)
 	return class == arrayClassNonTarget || class == arrayClassNullish
 }
 
@@ -61,13 +57,18 @@ func IsArray(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassTarget
 }
 
+// IsArrayWithOptions applies the selected receiver policies to plain arrays.
+func IsArrayWithOptions(ctx rule.RuleContext, node *ast.Node, options ArrayReceiverOptions) bool {
+	return classifyArrayReceiverWithOptions(ctx, node, arrayTargets, knownNonArrayNames, options) == arrayClassTarget
+}
+
 // IsIndexedCollection reports a proven Array, ReadonlyArray, tuple, or typed
 // array, using the same receiver classification as the negative predicate.
 func IsIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
-	return classifyArrayReceiverInner(ctx, node, indexedCollectionTargets, keyedCollectionNames, &arrayReceiverWalkState{
+	return classifyArrayReceiverInner(ctx, node, indexedCollectionTargets, knownNonIndexedCollectionNames, &arrayReceiverWalkState{
 		useTypeInformation: true,
-		readJSDoc:          true,
 		visiting:           map[*ast.Symbol]bool{},
+		options:            ArrayReceiverOptions{ReadJSDoc: true},
 	}) == arrayClassTarget
 }
 
@@ -77,10 +78,10 @@ func IsIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
 type arrayClass = TypeClass
 
 const (
-	arrayClassUnknown              = TypeUnknown
-	arrayClassTarget               = TypeTarget
-	arrayClassNonTarget            = TypeNonTarget
-	arrayClassNullish   arrayClass = 3
+	arrayClassUnknown   = TypeUnknown
+	arrayClassTarget    = TypeTarget
+	arrayClassNonTarget = TypeNonTarget
+	arrayClassNullish   = TypeNullish
 )
 
 var arrayTargets = utils.NewSetFromItems("Array", "ReadonlyArray")
@@ -93,15 +94,14 @@ var indexedCollectionTargets = func() *utils.Set[string] {
 	return s
 }()
 
-var keyedCollectionNames = utils.NewSetFromItems(
+var knownNonIndexedCollectionNames = utils.NewSetFromItems(
 	"Map", "ReadonlyMap", "WeakMap", "Set", "ReadonlySet", "WeakSet",
+	"URLSearchParams", "Headers", "FormData", "CanvasRenderingContext2D", "OffscreenCanvasRenderingContext2D",
 )
 
 var knownNonArrayNames = func() *utils.Set[string] {
-	s := utils.NewSetFromItems(
-		"Map", "ReadonlyMap", "WeakMap", "Set", "ReadonlySet", "WeakSet",
-	)
-	for _, name := range typedArrayNames {
+	s := utils.NewSetFromItems(typedArrayNames...)
+	for name := range knownNonIndexedCollectionNames.Keys() {
 		s.Add(name)
 	}
 	return s
@@ -121,12 +121,12 @@ func IsTypedArrayName(name string) bool {
 type arrayReceiverStaticEvaluatorFileCacheKey struct{}
 type sourceOnlyArrayReceiverCacheKey struct {
 	targetNames, nonTargetNames *utils.Set[string]
+	options                     ArrayReceiverOptions
 }
 
 type arrayReceiverWalkState struct {
 	options            ArrayReceiverOptions
 	useTypeInformation bool
-	readJSDoc          bool
 	visiting           map[*ast.Symbol]bool
 	memo               map[*ast.Symbol]arrayClass
 	depth              int
@@ -148,6 +148,14 @@ func classifyArrayReceiver(ctx rule.RuleContext, node *ast.Node, targetNames, no
 	})
 }
 
+func classifyArrayReceiverWithOptions(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string], options ArrayReceiverOptions) arrayClass {
+	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, &arrayReceiverWalkState{
+		useTypeInformation: !isSourceOnlyFile(ctx),
+		visiting:           map[*ast.Symbol]bool{},
+		options:            options,
+	})
+}
+
 // classifySourceOnlyArrayReceiver follows Unicorn's syntax and static-value
 // paths without letting tsgo's ambient JavaScript types turn an otherwise
 // unknown expression into a known non-array.
@@ -156,14 +164,8 @@ func classifySourceOnlyArrayReceiver(
 	node *ast.Node,
 	targetNames, nonTargetNames *utils.Set[string],
 ) arrayClass {
-	// Plain arrays and indexed collections disagree about typed arrays, so
-	// their const-binding classifications cannot share the same cache entry.
-	memo := rule.CachedByFile(ctx, sourceOnlyArrayReceiverCacheKey{targetNames, nonTargetNames}, func() map[*ast.Symbol]arrayClass {
-		return map[*ast.Symbol]arrayClass{}
-	})
 	return classifyArrayReceiverInner(ctx, node, targetNames, nonTargetNames, &arrayReceiverWalkState{
 		visiting: map[*ast.Symbol]bool{},
-		memo:     memo,
 	})
 }
 
@@ -199,8 +201,8 @@ func classifyArrayReceiverInner(
 		)
 	}
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if state.useTypeInformation {
-			if class := classifyArrayTypeNode(ctx, node.Type(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+		if state.useTypeInformation || state.options.ReadJSDoc && utils.IsJSDocTypeCastWrapper(node) {
+			if class := ClassifyTypeAnnotation(ctx, node.Type(), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
 		}
@@ -215,26 +217,36 @@ func classifyArrayReceiverInner(
 			return class
 		}
 	}
-	if state.useTypeInformation && ctx.TypeChecker == nil && ast.IsCallExpression(node) {
+	if ast.IsCallExpression(node) && (state.options.ReadJSDoc || (state.useTypeInformation && ctx.TypeChecker == nil)) {
 		if class := classifyArrayFactoryReturn(ctx, node.Expression(), targetNames, nonTargetNames, state); class != arrayClassUnknown {
 			return class
 		}
 	}
 	if node.Kind == ast.KindConditionalExpression {
 		conditional := node.AsConditionalExpression()
-		class := combineArrayClassesUnion([]arrayClass{
+		class := combineSourceTypeUnion([]TypeClass{
 			classifyArrayReceiverInner(ctx, conditional.WhenTrue, targetNames, nonTargetNames, state),
 			classifyArrayReceiverInner(ctx, conditional.WhenFalse, targetNames, nonTargetNames, state),
-		}, state.options)
+		}, arrayTypeOptions(targetNames, nonTargetNames, state.options))
 		if class != arrayClassUnknown || state.useTypeInformation {
 			return class
 		}
 	}
-	if ast.IsBinaryExpression(node) &&
-		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
-		return classifyArrayReceiverInner(
-			ctx, node.AsBinaryExpression().Right, targetNames, nonTargetNames, state,
-		)
+	if ast.IsBinaryExpression(node) {
+		binary := node.AsBinaryExpression()
+		operator := binary.OperatorToken.Kind
+		if operator == ast.KindCommaToken || state.options.CheckArrayProducers && operator == ast.KindEqualsToken {
+			return classifyArrayReceiverInner(ctx, binary.Right, targetNames, nonTargetNames, state)
+		}
+		if state.options.CheckArrayProducers && ast.IsLogicalOrCoalescingBinaryOperator(operator) {
+			class := combineSourceTypeUnion([]TypeClass{
+				classifyArrayReceiverInner(ctx, binary.Left, targetNames, nonTargetNames, state),
+				classifyArrayReceiverInner(ctx, binary.Right, targetNames, nonTargetNames, state),
+			}, arrayTypeOptions(targetNames, nonTargetNames, state.options))
+			if class != arrayClassUnknown {
+				return class
+			}
+		}
 	}
 	if state.options.CheckClassSyntax && node.Kind == ast.KindSuperKeyword {
 		for parent := node.Parent; parent != nil; parent = parent.Parent {
@@ -244,7 +256,7 @@ func classifyArrayReceiverInner(
 			}
 			if ast.IsClassLike(parent) {
 				if base := ast.GetClassExtendsHeritageElement(parent); base != nil {
-					if class := classifyArrayClassReference(ctx, base.AsExpressionWithTypeArguments().Expression, targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+					if class := classifyClassReference(ctx, base.AsExpressionWithTypeArguments().Expression, map[*ast.Symbol]bool{}, arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 						return class
 					}
 					break
@@ -279,7 +291,7 @@ func classifyArrayReceiverInner(
 		}
 	}
 	if state.options.CheckClassSyntax && ast.IsNewExpression(node) {
-		if class := classifyArrayClassReference(ctx, node.Expression(), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+		if class := classifyClassReference(ctx, node.Expression(), map[*ast.Symbol]bool{}, arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 			return class
 		}
 	}
@@ -288,6 +300,27 @@ func classifyArrayReceiverInner(
 	}
 	if isSyntacticTargetConstructor(node, targetNames) {
 		return arrayClassTarget
+	}
+	if call, ok := MatchDotMethodCall(node, DotMethodCallOptions{}); ok {
+		switch call.Property.Text() {
+		case "from", "of":
+			constructor := utils.ESTreeRuntimeExpression(call.Object)
+			if ast.IsIdentifier(constructor) && IsTypedArrayName(constructor.Text()) {
+				if targetNames.Has(constructor.Text()) {
+					return arrayClassTarget
+				}
+				return arrayClassNonTarget
+			}
+		case "keys", "values", "entries", "getOwnPropertyNames", "getOwnPropertySymbols":
+			if state.options.CheckArrayProducers && NodeMatchesPath(call.Object, "Object") {
+				return arrayClassTarget
+			}
+		case "copyWithin", "fill", "reverse", "sort", "toReversed", "toSorted", "toSpliced", "with":
+			if state.options.CheckArrayProducers && targetNames == arrayTargets &&
+				classifyArrayReceiverInner(ctx, call.Object, targetNames, nonTargetNames, state) == arrayClassTarget {
+				return arrayClassTarget
+			}
+		}
 	}
 
 	if state.useTypeInformation && ctx.TypeChecker != nil {
@@ -538,7 +571,19 @@ func classifyArrayIdentifier(
 	if state.visiting[symbol] {
 		return arrayClassUnknown
 	}
-	if state.memo != nil {
+	declaration := symbol.Declarations[0]
+	if declaration == nil {
+		return arrayClassUnknown
+	}
+	if !state.useTypeInformation && ast.IsVariableDeclaration(declaration) {
+		// Const initializer proofs are independent of where the binding is read.
+		// Receiver policies and target types can produce different proofs.
+		if state.memo == nil {
+			key := sourceOnlyArrayReceiverCacheKey{targetNames, nonTargetNames, state.options}
+			state.memo = rule.CachedByFile(ctx, key, func() map[*ast.Symbol]arrayClass {
+				return map[*ast.Symbol]arrayClass{}
+			})
+		}
 		if class, ok := state.memo[symbol]; ok {
 			return class
 		}
@@ -548,22 +593,25 @@ func classifyArrayIdentifier(
 		delete(state.visiting, symbol)
 	}()
 
-	declaration := symbol.Declarations[0]
-	if declaration == nil {
-		return arrayClassUnknown
-	}
-	if state.useTypeInformation {
+	if state.useTypeInformation || state.options.ReadJSDoc {
 		annotation := arrayBindingTypeAnnotation(declaration)
-		if state.readJSDoc && (declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter) {
-			var optional bool
-			annotation, optional = ValueTypeAnnotation(ctx, declaration)
-			if optional {
-				return arrayClassUnknown
-			}
+		var optional bool
+		if state.options.ReadJSDoc && (declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter) {
+			annotation, optional = valueTypeAnnotation(ctx, declaration, true)
 		}
-		if class := classifyArrayTypeNode(ctx, annotation, targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+		options := arrayTypeOptions(targetNames, nonTargetNames, state.options)
+		class := ClassifyTypeAnnotation(ctx, annotation, options)
+		if optional {
+			return includeNullishSourceType(class, options)
+		}
+		// An explicit JSDoc annotation may deliberately leave the type unknown.
+		if class != arrayClassUnknown || state.options.ReadJSDoc && utils.IsJSDocSyntaxNode(annotation) {
 			return class
 		}
+	}
+	if state.options.CheckArrayProducers && utils.IsRestParameterDeclaration(declaration) && ast.IsIdentifier(declaration.Name()) &&
+		!slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference) {
+		return arrayClassTarget
 	}
 	if !ast.IsVariableDeclaration(declaration) {
 		return arrayClassUnknown
@@ -577,7 +625,8 @@ func classifyArrayIdentifier(
 		return arrayClassUnknown
 	}
 	class := classifyArrayReceiverInner(ctx, variable.Initializer, targetNames, nonTargetNames, state)
-	if state.memo != nil {
+	// A cycle or a walk limit can make this query inconclusive.
+	if state.memo != nil && class != arrayClassUnknown {
 		state.memo[symbol] = class
 	}
 	return class
@@ -622,332 +671,32 @@ func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNa
 		declaration := symbol.Declarations[0]
 		if ast.IsVariableDeclaration(declaration) {
 			initializer, ok := arrayReceiverStaticEvaluator(ctx).ResolveIdentifierInitializer(callee)
-			if !ok {
+			if !ok || state.options.ReadJSDoc && hasContextDependentFactoryReturn(utils.SkipAssertionsAndParens(initializer)) {
 				return arrayClassUnknown
 			}
-			if class := classifyArrayTypeNode(ctx, arrayFactoryReturnAnnotation(ctx, declaration), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options); class != arrayClassUnknown {
+			if class := ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, declaration), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
 			return classifyArrayFactoryReturn(ctx, initializer, targetNames, nonTargetNames, state)
 		}
-		for _, reference := range ctx.Refs.References(symbol) {
-			if utils.IsWriteReference(reference) {
-				return arrayClassUnknown
-			}
+		if slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference) {
+			return arrayClassUnknown
 		}
 		callee = declaration
 	}
-	if !ast.IsFunctionLike(callee) {
-		return arrayClassUnknown
-	}
-	return classifyArrayTypeNode(ctx, arrayFactoryReturnAnnotation(ctx, callee), targetNames, nonTargetNames, map[*ast.Symbol]bool{}, state.options)
-}
-
-func arrayFactoryReturnAnnotation(ctx rule.RuleContext, declaration *ast.Node) *ast.Node {
-	annotation := declaration.Type()
-	if ast.IsVariableDeclaration(declaration) && annotation != nil {
-		if ast.IsFunctionTypeNode(annotation) {
-			annotation = annotation.Type()
-		} else {
-			annotation = nil
-		}
-	}
-	if annotation == nil && ast.IsInJSFile(declaration) {
-		for host := declaration; host != nil && annotation == nil; host = ast.GetNextJSDocCommentLocation(host) {
-			for _, doc := range host.JSDoc(ctx.SourceFile) {
-				if doc.AsJSDoc().Tags == nil {
-					continue
-				}
-				for _, tag := range doc.AsJSDoc().Tags.Nodes {
-					if tag.TypeExpression() == nil {
-						continue
-					}
-					tagType := tag.TypeExpression().Type()
-					if ast.IsJSDocReturnTag(tag) {
-						annotation = tagType
-					} else if ast.IsJSDocTypeTag(tag) && ast.IsFunctionTypeNode(tagType) {
-						annotation = tagType.Type()
-					} else if ast.IsJSDocTypeTag(tag) && ast.IsTypeReferenceNode(tagType) && ast.IsIdentifier(tagType.AsTypeReferenceNode().TypeName) && tagType.AsTypeReferenceNode().TypeName.Text() == "function" {
-						annotation = arrayClosureFactoryReturnAnnotation(ctx, tag, declaration)
-					}
-					if annotation != nil {
-						break
-					}
-				}
-			}
-		}
-	}
-	return annotation
-}
-
-func arrayClosureFactoryReturnAnnotation(ctx rule.RuleContext, tag, declaration *ast.Node) *ast.Node {
-	// tsgo parses Closure's `function(): T` only as the name `function`.
-	// Wrapping it as a type-literal method lets its JSDoc parser read T,
-	// including multiline comments, without implementing a type parser here.
-	text := "/** @type {" + ctx.SourceFile.Text()[tag.TypeExpression().Pos():tag.End()] + "} */ const factory = undefined;"
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/annotation.js", Path: "/annotation.js"}, text, core.ScriptKindJS)
-	annotation := file.Statements.Nodes[0].AsVariableStatement().DeclarationList.AsVariableDeclarationList().Declarations.Nodes[0].Type()
-	if annotation == nil || annotation.Kind != ast.KindTypeLiteral {
-		return nil
-	}
-	members := annotation.AsTypeLiteralNode().Members.Nodes
-	if len(members) != 1 || members[0].Kind != ast.KindMethodSignature || members[0].Name().Text() != "function" {
-		return nil
-	}
-	result := members[0].Type()
-	if result != nil {
-		// Resolve return-type names in the original factory's lexical scope.
-		result.Parent = declaration
-	}
-	return result
-}
-
-func classifyArrayTypeNode(
-	ctx rule.RuleContext,
-	node *ast.Node,
-	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
-	options ArrayReceiverOptions,
-) arrayClass {
-	if node == nil {
-		return arrayClassUnknown
-	}
-	for node.Kind == ast.KindParenthesizedType {
-		node = node.AsParenthesizedTypeNode().Type
-		if node == nil {
+	if ast.IsFunctionLike(callee) || state.options.ReadJSDoc && ast.IsParameterDeclaration(callee) {
+		if state.options.ReadJSDoc && hasContextDependentFactoryReturn(callee) {
 			return arrayClassUnknown
 		}
-	}
-	if node.Kind == ast.KindTypeOperator {
-		typeOperator := node.AsTypeOperatorNode()
-		if typeOperator.Operator != ast.KindReadonlyKeyword {
-			return arrayClassUnknown
-		}
-		return classifyArrayTypeNode(ctx, typeOperator.Type, targetNames, nonTargetNames, visitedSymbols, options)
-	}
-
-	switch node.Kind {
-	case ast.KindArrayType, ast.KindTupleType:
-		return arrayClassTarget
-	case ast.KindNullKeyword, ast.KindUndefinedKeyword:
-		if options.AllowNullishInMixedUnion {
-			return arrayClassNullish
-		}
-		return arrayClassNonTarget
-	case ast.KindLiteralType:
-		if literal := node.AsLiteralTypeNode().Literal; literal.Kind == ast.KindNullKeyword {
-			return classifyArrayTypeNode(ctx, literal, targetNames, nonTargetNames, visitedSymbols, options)
-		}
-		return arrayClassNonTarget
-	case ast.KindUnionType:
-		types := node.AsUnionTypeNode().Types.Nodes
-		classes := make([]arrayClass, 0, len(types))
-		for _, part := range types {
-			classes = append(classes, classifyArrayTypeNode(ctx, part, targetNames, nonTargetNames, visitedSymbols, options))
-		}
-		return combineArrayClassesUnion(classes, options)
-	case ast.KindIntersectionType:
-		types := node.AsIntersectionTypeNode().Types.Nodes
-		classes := make([]arrayClass, 0, len(types))
-		for _, part := range types {
-			classes = append(classes, classifyArrayTypeNode(ctx, part, targetNames, nonTargetNames, visitedSymbols, options))
-		}
-		return combineArrayClassesIntersection(classes)
-	case ast.KindTypeReference:
-		typeName := node.AsTypeReferenceNode().TypeName
-		return classifyArrayTypeReference(ctx, typeName, targetNames, nonTargetNames, visitedSymbols, options)
-	case ast.KindBigIntKeyword, ast.KindBooleanKeyword, ast.KindNeverKeyword,
-		ast.KindNumberKeyword, ast.KindStringKeyword, ast.KindSymbolKeyword,
-		ast.KindVoidKeyword, ast.KindTypeLiteral,
-		ast.KindFunctionType, ast.KindConstructorType:
-		return arrayClassNonTarget
-	default:
-		return arrayClassUnknown
-	}
-}
-
-func classifyArrayTypeReference(
-	ctx rule.RuleContext,
-	typeName *ast.Node,
-	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
-	options ArrayReceiverOptions,
-) arrayClass {
-	if typeName == nil || !ast.IsIdentifier(typeName) {
-		return arrayClassUnknown
-	}
-	name := typeName.AsIdentifier().Text
-	var symbol *ast.Symbol
-	if ctx.Refs != nil {
-		symbol = ctx.Refs.ResolveInFileWithMeaning(
-			typeName, ast.SymbolFlagsType|ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias,
-		)
-	}
-	if symbol == nil {
-		return classifyKnownArrayTypeName(name, targetNames, nonTargetNames)
-	}
-	if visitedSymbols[symbol] {
-		return arrayClassUnknown
-	}
-	visitedSymbols[symbol] = true
-	defer delete(visitedSymbols, symbol)
-
-	for _, declaration := range symbol.Declarations {
-		if declaration == nil {
-			continue
-		}
-		switch declaration.Kind {
-		case ast.KindTypeAliasDeclaration:
-			return classifyArrayTypeNode(
-				ctx, declaration.AsTypeAliasDeclaration().Type, targetNames, nonTargetNames, visitedSymbols, options,
-			)
-		case ast.KindTypeParameter:
-			return classifyArrayTypeNode(
-				ctx, declaration.AsTypeParameterDeclaration().Constraint, targetNames, nonTargetNames, visitedSymbols, options,
-			)
-		case ast.KindInterfaceDeclaration:
-			return classifyArrayInterfaceNode(
-				ctx, declaration, targetNames, nonTargetNames, visitedSymbols, options,
-			)
-		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return classifyArrayClassReference(ctx, declaration, targetNames, nonTargetNames, visitedSymbols, options)
-		case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport:
-			importedName := name
-			if declaration.Kind == ast.KindImportSpecifier {
-				if propertyName := declaration.PropertyName(); propertyName != nil && ast.IsIdentifier(propertyName) {
-					importedName = propertyName.AsIdentifier().Text
-				}
-			}
-			if targetNames.Has(name) || nonTargetNames.Has(name) ||
-				targetNames.Has(importedName) || nonTargetNames.Has(importedName) {
-				return arrayClassNonTarget
-			}
-			return arrayClassUnknown
-		}
+		return ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, callee), arrayTypeOptions(targetNames, nonTargetNames, state.options))
 	}
 	return arrayClassUnknown
 }
 
-func classifyArrayInterfaceNode(
-	ctx rule.RuleContext,
-	node *ast.Node,
-	targetNames, nonTargetNames *utils.Set[string],
-	visitedSymbols map[*ast.Symbol]bool,
-	options ArrayReceiverOptions,
-) arrayClass {
-	declaration := node.AsInterfaceDeclaration()
-	if declaration.HeritageClauses == nil || len(declaration.HeritageClauses.Nodes) == 0 {
-		return arrayClassNonTarget
-	}
-	classes := make([]arrayClass, 0, len(declaration.HeritageClauses.Nodes))
-	for _, clauseNode := range declaration.HeritageClauses.Nodes {
-		clause := clauseNode.AsHeritageClause()
-		if clause == nil || clause.Token != ast.KindExtendsKeyword || clause.Types == nil {
-			continue
-		}
-		for _, heritageNode := range clause.Types.Nodes {
-			heritage := heritageNode.AsTypeReferenceNode()
-			if heritage == nil {
-				classes = append(classes, arrayClassUnknown)
-				continue
-			}
-			classes = append(classes, classifyArrayTypeReference(
-				ctx, heritage.TypeName, targetNames, nonTargetNames, visitedSymbols, options,
-			))
-		}
-	}
-	if len(classes) == 0 {
-		return arrayClassNonTarget
-	}
-	return combineArrayClassesIntersection(classes)
-}
-
-func classifyKnownArrayTypeName(name string, targetNames, nonTargetNames *utils.Set[string]) arrayClass {
-	if targetNames.Has(name) {
-		return arrayClassTarget
-	}
-	if nonTargetNames.Has(name) {
-		return arrayClassNonTarget
-	}
-	return arrayClassUnknown
-}
-
-func classifyArrayClassReference(ctx rule.RuleContext, node *ast.Node, targetNames, nonTargetNames *utils.Set[string], visited map[*ast.Symbol]bool, options ArrayReceiverOptions) arrayClass {
-	node = utils.ESTreeRuntimeExpression(node)
-	if node == nil {
-		return arrayClassUnknown
-	}
-	if ast.IsIdentifier(node) {
-		if ctx.Refs == nil {
-			return classifyKnownArrayTypeName(node.Text(), targetNames, nonTargetNames)
-		}
-		symbol := ctx.Refs.ResolveInFile(node)
-		if symbol == nil {
-			return classifyKnownArrayTypeName(node.Text(), targetNames, nonTargetNames)
-		}
-		if visited[symbol] || len(symbol.Declarations) == 0 {
-			return arrayClassUnknown
-		}
-		visited[symbol] = true
-		defer delete(visited, symbol)
-		declaration := symbol.Declarations[0]
-		if ast.IsVariableDeclaration(declaration) && ast.IsIdentifier(declaration.Name()) && ast.IsVarConst(declaration) {
-			return classifyArrayClassReference(ctx, declaration.AsVariableDeclaration().Initializer, targetNames, nonTargetNames, visited, options)
-		}
-		if ast.IsClassDeclaration(declaration) || ast.IsClassExpression(declaration) {
-			return classifyArrayClassReference(ctx, declaration, targetNames, nonTargetNames, visited, options)
-		}
-		return arrayClassUnknown
-	}
-	if !ast.IsClassDeclaration(node) && !ast.IsClassExpression(node) {
-		return arrayClassUnknown
-	}
-	if !options.CheckClassHeritage {
-		return arrayClassNonTarget
-	}
-	if base := ast.GetClassExtendsHeritageElement(node); base != nil {
-		return classifyArrayClassReference(ctx, base.AsExpressionWithTypeArguments().Expression, targetNames, nonTargetNames, visited, options)
-	}
-	return arrayClassNonTarget
-}
-
-func combineArrayClassesUnion(classes []arrayClass, options ArrayReceiverOptions) arrayClass {
-	if options.AllowNullishInMixedUnion {
-		classes = slices.DeleteFunc(classes, func(class arrayClass) bool { return class == arrayClassNullish })
-	}
-	if options.TreatMixedUnionAsNonTarget && slices.Contains(classes, arrayClassNonTarget) {
-		return arrayClassNonTarget
-	}
-	if len(classes) == 0 {
-		return arrayClassNonTarget
-	}
-	allTarget := true
-	allNonTarget := true
-	for _, class := range classes {
-		allTarget = allTarget && class == arrayClassTarget
-		allNonTarget = allNonTarget && class == arrayClassNonTarget
-	}
-	if allTarget {
-		return arrayClassTarget
-	}
-	if allNonTarget {
-		return arrayClassNonTarget
-	}
-	return arrayClassUnknown
-}
-
-func combineArrayClassesIntersection(classes []arrayClass) arrayClass {
-	allNonTarget := true
-	for _, class := range classes {
-		if class == arrayClassTarget {
-			return arrayClassTarget
-		}
-		allNonTarget = allNonTarget && class == arrayClassNonTarget
-	}
-	if allNonTarget {
-		return arrayClassNonTarget
-	}
-	return arrayClassUnknown
+// Syntax alone cannot use a return annotation to classify the result of an
+// async, generator, or generic function call.
+func hasContextDependentFactoryReturn(node *ast.Node) bool {
+	return node != nil && ast.IsFunctionLike(node) && (isAsyncOrGenerator(node) || len(node.TypeParameters()) != 0)
 }
 
 func isSyntacticArrayNode(node *ast.Node) bool {
@@ -1010,19 +759,24 @@ func isSyntacticNonArrayNode(node *ast.Node) bool {
 // targetTypeNames.has(typeName) ? target : nonTarget, so a name that is not a
 // target is already non-target. Name-based non-target matching belongs to the
 // syntactic path, in classifyKnownArrayTypeName.
-func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames *utils.Set[string], options ArrayReceiverOptions) arrayClass {
+func arrayTypeOptions(targetNames, nonTargetNames *utils.Set[string], options ArrayReceiverOptions) TypeClassifierOptions {
 	var heritage ast.SymbolFlags
 	if options.CheckClassHeritage {
 		heritage = ast.SymbolFlagsClass | ast.SymbolFlagsInterface
 	}
-	return ClassifyType(ctx, t, TypeClassifierOptions{
+	return TypeClassifierOptions{
 		TargetTypeNames:            targetNames,
+		NonTargetTypeNames:         nonTargetNames,
 		HeritageSymbolFlags:        heritage,
 		AllowNullishInMixedUnion:   options.AllowNullishInMixedUnion,
 		TreatMixedUnionAsNonTarget: options.TreatMixedUnionAsNonTarget,
-		IsTargetType: func(t *checker.Type) bool {
-			return targetNames.Has("Array") &&
-				checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
-		},
-	})
+	}
+}
+
+func classifyArrayType(ctx rule.RuleContext, t *checker.Type, targetNames *utils.Set[string], options ArrayReceiverOptions) arrayClass {
+	typeOptions := arrayTypeOptions(targetNames, nil, options)
+	typeOptions.IsTargetType = func(t *checker.Type) bool {
+		return targetNames.Has("Array") && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t)
+	}
+	return ClassifyType(ctx, t, typeOptions)
 }

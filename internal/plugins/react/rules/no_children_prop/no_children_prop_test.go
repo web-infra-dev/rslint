@@ -169,14 +169,14 @@ func TestNoChildrenPropRule(t *testing.T) {
 			Code: `<div children />;`, // not a valid use case but make sure we don't crash
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "nestChildren", Message: msgNestChildren, Line: 1, Column: 6},
+				{MessageId: "nestChildren", Message: "Do not pass children as props. Instead, nest children between the opening and closing tags.", Line: 1, Column: 6},
 			},
 		},
 		{
 			Code: `<div children="Children" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "nestChildren", Message: msgNestChildren, Line: 1, Column: 6},
+				{MessageId: "nestChildren", Message: "Do not pass children as props. Instead, nest children between the opening and closing tags.", Line: 1, Column: 6},
 			},
 		},
 		{
@@ -204,7 +204,7 @@ func TestNoChildrenPropRule(t *testing.T) {
 			Code: `React.createElement("div", {children: "Children"});`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "passChildrenAsArgs", Message: msgPassChildrenAsArgs, Line: 1, Column: 1},
+				{MessageId: "passChildrenAsArgs", Message: "Do not pass children as props. Instead, pass them as additional arguments to React.createElement.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -275,7 +275,7 @@ func TestNoChildrenPropRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"allowFunctions": true},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "nestFunction", Message: msgNestFunction, Line: 1, Column: 1},
+				{MessageId: "nestFunction", Message: "Do not nest a function between the opening and closing tags. Instead, pass it as a prop.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -307,7 +307,7 @@ func TestNoChildrenPropRule(t *testing.T) {
 			Tsx:     true,
 			Options: map[string]interface{}{"allowFunctions": true},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "passFunctionAsArgs", Message: msgPassFunctionAsArgs, Line: 1, Column: 1},
+				{MessageId: "passFunctionAsArgs", Message: "Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.", Line: 1, Column: 1},
 			},
 		},
 		{

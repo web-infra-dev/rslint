@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('valid-title', {} as never, {
+ruleTester.run('valid-title', {
   valid: [
     {
       code: 'test("does something", () => {});',
@@ -34,22 +35,51 @@ ruleTester.run('valid-title', {} as never, {
           message: 'test should not have an empty title',
           line: 1,
           column: 1,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
     {
       code: 'describe(123, () => {});',
-      errors: [{ messageId: 'titleMustBeString', line: 1, column: 10 }],
+      errors: [
+        {
+          messageId: 'titleMustBeString',
+          message: 'Title must be a string',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: 'test(" foo", () => {});',
       output: 'test("foo", () => {});',
-      errors: [{ messageId: 'accidentalSpace', line: 1, column: 6 }],
+      errors: [
+        {
+          messageId: 'accidentalSpace',
+          message: 'should not have leading or trailing spaces',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: 'test("test foo", () => {});',
       output: 'test("foo", () => {});',
-      errors: [{ messageId: 'duplicatePrefix', line: 1, column: 6 }],
+      errors: [
+        {
+          messageId: 'duplicatePrefix',
+          message: 'should not have duplicate prefix',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     // %p is a jest placeholder that Rstest does not expand
     {
@@ -58,23 +88,54 @@ ruleTester.run('valid-title', {} as never, {
         {
           messageId: 'invalidEachSpecifier',
           message: '"%p" is not a valid format specifier',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
     // .for formats its title the same way .each does
     {
       code: 'test.for([])("%z", () => {});',
-      errors: [{ messageId: 'invalidEachSpecifier' }],
+      errors: [
+        {
+          messageId: 'invalidEachSpecifier',
+          message: '"%z" is not a valid format specifier',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: 'test("the correct way", () => {});',
       options: [{ disallowedWords: ['correct'] }],
-      errors: [{ messageId: 'disallowedWord' }],
+      errors: [
+        {
+          messageId: 'disallowedWord',
+          message: '"correct" is not allowed in test titles',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: 'test("nope", () => {});',
       options: [{ mustMatch: '^ok' }],
-      errors: [{ messageId: 'mustMatch', message: 'test should match /^ok/u' }],
+      errors: [
+        {
+          messageId: 'mustMatch',
+          message: 'test should match /^ok/u',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: 'describe("nope", () => {});',
@@ -83,6 +144,10 @@ ruleTester.run('valid-title', {} as never, {
         {
           messageId: 'mustNotMatchCustom',
           message: 'describe titles must be useful',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
         },
       ],
     },
@@ -93,6 +158,10 @@ ruleTester.run('valid-title', {} as never, {
         {
           messageId: 'mustNotMatch',
           message: 'describe should not match /^nope/u',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 16,
         },
       ],
     },
@@ -103,6 +172,10 @@ ruleTester.run('valid-title', {} as never, {
         {
           messageId: 'mustMatchCustom',
           message: 'titles must start with "ok"',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
@@ -111,7 +184,17 @@ ruleTester.run('valid-title', {} as never, {
     {
       code: 'test("test foo", () => {});',
       options: [{ mustMatch: '(unclosed' }],
-      errors: [{ messageId: 'invalidPattern', line: 1, column: 1 }],
+      errors: [
+        {
+          messageId: 'invalidPattern',
+          message:
+            'Invalid regular expression in `mustMatch` option: `(unclosed`: error parsing regexp: missing closing ) in `(unclosed`',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+        },
+      ],
     },
   ],
 });

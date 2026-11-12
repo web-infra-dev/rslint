@@ -13,7 +13,7 @@ import (
 // via package scope.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noNoninteractiveTabindex",
-	Message:   errorMessage,
+	Message:   "`tabIndex` should only be declared on interactive elements.",
 }
 
 // componentsSettings mirrors upstream's
@@ -69,7 +69,7 @@ var allowExpressionValuesFalseOptions = []interface{}{
 // two configurations of the same suite:
 //
 //   - `:strict`       — no options (defaults: tags & roles absent,
-//                       allowExpressionValues falsy)
+//     allowExpressionValues falsy)
 //   - `:recommended`  — the recommended preset's options
 //
 // Both configurations are run as one Go test, with each upstream case

@@ -44,14 +44,14 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Code: `<></>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
 			Code: `<>{}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -59,15 +59,15 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<p>moofoo</p>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 7},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 7},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 7},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 7},
 			},
 		},
 		{
 			Code: `<>{meow}</>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -75,8 +75,8 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<p>{meow}</p>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 4},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 4},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 4},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 4},
 			},
 		},
 		{
@@ -84,7 +84,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<div/>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -98,14 +98,14 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
         <div/>
       `},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 9},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 2, Column: 9},
 			},
 		},
 		{
 			Code: `<Fragment />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
         <Foo />
       `},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 9},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 2, Column: 9},
 			},
 		},
 		{
@@ -136,7 +136,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 9},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 2, Column: 9},
 			},
 		},
 		{
@@ -144,7 +144,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Code: `<Eeee><>foo</></Eeee>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 7},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 7},
 			},
 		},
 		{
@@ -152,8 +152,8 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<div>foo</div>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 6},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 6},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 6},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 6},
 			},
 		},
 		{
@@ -161,7 +161,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<div>{"a"}{"b"}</div>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 6},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 6},
 			},
 		},
 		{
@@ -172,7 +172,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Code: `<div><>{"a"}{"b"}</></div>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 6},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 6},
 			},
 		},
 		{
@@ -190,7 +190,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
           {"a"}{"b"}
         </section>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 5, Column: 11},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 5, Column: 11},
 			},
 		},
 		{
@@ -198,7 +198,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<div>{"a"}{"b"}</div>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 6},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 6},
 			},
 		},
 		{
@@ -219,8 +219,8 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
           git <b>hub</b>
         </section>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 3, Column: 14},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 7, Column: 14},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 3, Column: 14},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 7, Column: 14},
 			},
 		},
 		{
@@ -228,7 +228,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<div>a {""}{""} a</div>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 8},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 8},
 			},
 		},
 		{
@@ -248,8 +248,8 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
         );
       `},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 4, Column: 13},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 4, Column: 13},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 4, Column: 13},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 4, Column: 13},
 			},
 		},
 		{
@@ -259,7 +259,7 @@ func TestJsxNoUselessFragmentUpstream(t *testing.T) {
 			Options: allowExpressions,
 			Output:  []string{`<Foo>{moo}</Foo>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 	})

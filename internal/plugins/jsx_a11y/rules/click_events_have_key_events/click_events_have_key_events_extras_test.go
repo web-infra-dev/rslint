@@ -46,7 +46,7 @@ import (
 // internal/rule_tester/rule_tester.go assertions).
 var expectedErrorAnyPos = rule_tester.InvalidTestCaseError{
 	MessageId: "clickEventsHaveKeyEvents",
-	Message:   errorMessage,
+	Message:   "Visible, non-interactive elements with click handlers must have at least one keyboard listener.",
 }
 
 // polymorphicSettings exercises `settings['jsx-a11y'].polymorphicPropName`.
@@ -406,7 +406,7 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "clickEventsHaveKeyEvents",
-					Message:   errorMessage,
+					Message:   "Visible, non-interactive elements with click handlers must have at least one keyboard listener.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -419,7 +419,7 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "clickEventsHaveKeyEvents",
-					Message:   errorMessage,
+					Message:   "Visible, non-interactive elements with click handlers must have at least one keyboard listener.",
 					Line:      1,
 					Column:    1,
 				}},
@@ -429,8 +429,8 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 				Code: `<><div onClick={fn} /><span onClick={fn} /></>`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "clickEventsHaveKeyEvents", Message: errorMessage, Line: 1, Column: 3},
-					{MessageId: "clickEventsHaveKeyEvents", Message: errorMessage, Line: 1, Column: 23},
+					{MessageId: "clickEventsHaveKeyEvents", Message: "Visible, non-interactive elements with click handlers must have at least one keyboard listener.", Line: 1, Column: 3},
+					{MessageId: "clickEventsHaveKeyEvents", Message: "Visible, non-interactive elements with click handlers must have at least one keyboard listener.", Line: 1, Column: 23},
 				},
 			},
 			// ---- Three-level mix: outer valid (button), middle invalid
@@ -444,7 +444,7 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "clickEventsHaveKeyEvents",
-					Message:   errorMessage,
+					Message:   "Visible, non-interactive elements with click handlers must have at least one keyboard listener.",
 					Line:      2,
 					Column:    3,
 				}},
@@ -627,8 +627,8 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 					`function B() { return <article onClick={fn} />; }`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "clickEventsHaveKeyEvents", Message: errorMessage, Line: 1},
-					{MessageId: "clickEventsHaveKeyEvents", Message: errorMessage, Line: 2},
+					{MessageId: "clickEventsHaveKeyEvents", Message: "Visible, non-interactive elements with click handlers must have at least one keyboard listener.", Line: 1},
+					{MessageId: "clickEventsHaveKeyEvents", Message: "Visible, non-interactive elements with click handlers must have at least one keyboard listener.", Line: 2},
 				},
 			},
 		},

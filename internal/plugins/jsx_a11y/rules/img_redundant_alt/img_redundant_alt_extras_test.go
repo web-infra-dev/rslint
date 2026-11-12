@@ -261,7 +261,7 @@ func TestImgRedundantAltExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "redundantAlt",
-				Message:   errorMessage,
+				Message:   "Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 31,
 			}},
 		},
@@ -271,7 +271,7 @@ func TestImgRedundantAltExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "redundantAlt",
-				Message:   errorMessage,
+				Message:   "Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.",
 				Line:      1, Column: 1, EndLine: 3, EndColumn: 3,
 			}},
 		},
@@ -281,7 +281,7 @@ func TestImgRedundantAltExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "redundantAlt",
-				Message:   errorMessage,
+				Message:   "Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.",
 				Line:      1, Column: 1, EndLine: 1, EndColumn: 29,
 			}},
 		},
@@ -501,7 +501,7 @@ func TestImgRedundantAltExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "redundantAlt",
-				Message:   errorMessage,
+				Message:   "Redundant alt attribute. Screen-readers already announce `img` tags as an image. You don’t need to use the words `image`, `photo,` or `picture` (or any specified custom words) in the alt prop.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 32,
 			}},
 		},

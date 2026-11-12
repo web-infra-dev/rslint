@@ -22,7 +22,7 @@ func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveElementToInteractiveRole",
-				Message:   errorMessage,
+				Message:   "Non-interactive elements should not be assigned interactive roles.",
 				Line:      1, Column: 10, EndLine: 1, EndColumn: 23,
 			}},
 		},
@@ -32,7 +32,7 @@ func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveElementToInteractiveRole",
-				Message:   errorMessage,
+				Message:   "Non-interactive elements should not be assigned interactive roles.",
 				Line:      1, Column: 10, EndLine: 1, EndColumn: 23,
 			}},
 		},
@@ -43,7 +43,7 @@ func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveElementToInteractiveRole",
-				Message:   errorMessage,
+				Message:   "Non-interactive elements should not be assigned interactive roles.",
 				Line:      3, Column: 3, EndLine: 3, EndColumn: 16,
 			}},
 		},
@@ -54,7 +54,7 @@ func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNoninteractiveElementToInteractiveRole",
-				Message:   errorMessage,
+				Message:   "Non-interactive elements should not be assigned interactive roles.",
 				Line:      3, Column: 2, EndLine: 3, EndColumn: 15,
 			}},
 		},
@@ -73,8 +73,8 @@ func TestNoNoninteractiveElementToInteractiveRoleListenerBoundary(t *testing.T) 
 			Code: "<article role=\"button\">\n  <h1 role=\"menuitem\" />\n</article>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage, Line: 1, Column: 10},
-				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage, Line: 2, Column: 7},
+				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles.", Line: 1, Column: 10},
+				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles.", Line: 2, Column: 7},
 			},
 		},
 		// Three-level nesting — outer + middle + inner each report against
@@ -83,9 +83,9 @@ func TestNoNoninteractiveElementToInteractiveRoleListenerBoundary(t *testing.T) 
 			Code: "<article role=\"button\">\n  <h2 role=\"menuitem\">\n    <li role=\"link\" />\n  </h2>\n</article>",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage, Line: 1, Column: 10},
-				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage, Line: 2, Column: 7},
-				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage, Line: 3, Column: 9},
+				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles.", Line: 1, Column: 10},
+				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles.", Line: 2, Column: 7},
+				{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles.", Line: 3, Column: 9},
 			},
 		},
 	})
@@ -133,7 +133,7 @@ func TestNoNoninteractiveElementToInteractiveRoleEdgeShapes(t *testing.T) {
 			{
 				Code:   "<article role={`button`} />",
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Duplicate role attributes — both report. tsgo parses both,
 			// and each listener invocation classifies via the FIRST
@@ -142,8 +142,8 @@ func TestNoNoninteractiveElementToInteractiveRoleEdgeShapes(t *testing.T) {
 				Code: `<article role="button" role="listitem" />`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// Multi-role `role="button img"` — `IsInteractiveRole` takes
@@ -151,7 +151,7 @@ func TestNoNoninteractiveElementToInteractiveRoleEdgeShapes(t *testing.T) {
 			{
 				Code:   `<article role="button img" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -194,27 +194,27 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionParsing(t *testing.T) {
 				Code:    `<ul role="tab" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"menu"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Override on `ul` doesn't help `<article>`.
 			{
 				Code:    `<article role="button" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"menu"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Empty options map — strict semantics.
 			{
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Nil options.
 			{
 				Code:   `<ul role="menu" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -242,7 +242,7 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleExpressionShapes(t *testing
 			{
 				Code:   `<article role={"button"} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `role={("button")}` — single paren wrap. tsgo preserves
 			// ParenthesizedExpression; ESTree flattens. The extractor
@@ -250,20 +250,20 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleExpressionShapes(t *testing
 			{
 				Code:   `<article role={("button")} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Multi-level parens.
 			{
 				Code:   `<article role={(("button"))} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// HTML entity in the raw string — `&#98;` decodes to `b`,
 			// producing "button".
 			{
 				Code:   `<article role="&#98;utton" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -293,38 +293,38 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleStringBoundaries(t *testing
 			{
 				Code:   `<article role="BUTTON" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			{
 				Code:   `<article role="Button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Leading space — split produces `["", "button"]`; second
 			// token wins. Locks in the "single-space split" semantics.
 			{
 				Code:   `<article role=" button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Trailing space — split produces `["button", ""]`; first wins.
 			{
 				Code:   `<article role="button " />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Multiple internal spaces — `["button", "", "img"]`; first
 			// valid token "button" wins.
 			{
 				Code:   `<article role="button  img" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// First invalid, second valid interactive.
 			{
 				Code:   `<article role="xxx button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -360,7 +360,7 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) 
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Option key case mismatch — `getElementType` returns "ul"
 			// (lowercased tag); option key "UL" doesn't match.
@@ -368,7 +368,7 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) 
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"UL": []interface{}{"menu"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Allow-list entry case mismatch — `slices.Contains` is
 			// case-sensitive; lowercased "menu" doesn't match "Menu".
@@ -376,7 +376,7 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) 
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"Menu"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -393,31 +393,31 @@ func TestNoNoninteractiveElementToInteractiveRoleContainerForms(t *testing.T) {
 			{
 				Code:   `<><article role="button" /></>`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Inside a ternary returned from a JsxExpression child.
 			{
 				Code:   `<div>{cond ? <article role="button" /> : null}</div>`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Inside an arrow function body, common in `.map(…)`.
 			{
 				Code:   `const r = items.map(x => <h1 role="button">{x}</h1>);`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Returned from a function declaration body.
 			{
 				Code:   `function R() { return <article role="button">x</article>; }`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Paren-wrapped JSX expression — `({<article … />})` form.
 			{
 				Code:   `const x = (<article role="button" />);`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -450,27 +450,27 @@ func TestNoNoninteractiveElementToInteractiveRoleNonInteractiveGate(t *testing.T
 			{
 				Code:   `<img alt="x" role="button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `<img alt="">` — empty-alt explicit schema entry matches.
 			{
 				Code:   `<img alt="" role="button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `<img>` — no alt, but matches `nonInteractiveElementAXSchemas`
 			// bare `{Name: "img"}` entry → still non-interactive → report.
 			{
 				Code:   `<img role="button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `<form aria-label="…">` — aria-label present → schema entry
 			// matches → non-interactive → report.
 			{
 				Code:   `<form aria-label="Login" role="button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -496,7 +496,7 @@ func TestNoNoninteractiveElementToInteractiveRoleMixedRealWorld(t *testing.T) {
 				Code: `<h1 role="button" onClick={f} aria-label="x" className="hdr" />`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// Spread before role="button" on `<article>` — spread is
@@ -504,20 +504,20 @@ func TestNoNoninteractiveElementToInteractiveRoleMixedRealWorld(t *testing.T) {
 			{
 				Code:   `<article {...rest} role="button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Spread AFTER role="button" — same.
 			{
 				Code:   `<article role="button" {...rest} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Multiple interactive props mixed in — only the `role`
 			// triggers; one report.
 			{
 				Code:   `<table role="menuitem" aria-hidden={false} onClick={f} />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -577,7 +577,7 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListSemantics(t *testing.T
 				Code:    `<ul role="menu" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"foobar"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Multi-role attribute — `getExplicitRole` returns null
 			// (whole-string rolesMap lookup fails on "menu menubar"),
@@ -590,7 +590,7 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListSemantics(t *testing.T
 				Code:    `<ul role="menu menubar" />`,
 				Tsx:     true,
 				Options: map[string]interface{}{"ul": []interface{}{"menu", "menubar"}},
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -644,21 +644,21 @@ func TestNoNoninteractiveElementToInteractiveRolePolymorphicSettings(t *testing.
 				Code:     `<Box as="article" role="button" />`,
 				Tsx:      true,
 				Settings: polySettings,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `<Box as="h1" role="menuitem" />` resolves to h1 (non-interactive).
 			{
 				Code:     `<Box as="h1" role="menuitem" />`,
 				Tsx:      true,
 				Settings: polySettings,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// AllowList includes "Box" → polymorphic resolution applies → reports.
 			{
 				Code:     `<Box as="article" role="button" />`,
 				Tsx:      true,
 				Settings: polySettingsWithAllowList,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Polymorphic resolves to <table> with role="grid" — strict semantics
 			// (without recommended allow-list for table→grid) → reports.
@@ -666,7 +666,7 @@ func TestNoNoninteractiveElementToInteractiveRolePolymorphicSettings(t *testing.
 				Code:     `<Box as="table" role="grid" />`,
 				Tsx:      true,
 				Settings: polySettings,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -735,7 +735,7 @@ func TestNoNoninteractiveElementToInteractiveRoleComponentsMappingEdges(t *testi
 				Code:     `<Article role="button" />`,
 				Tsx:      true,
 				Settings: caseSensitiveMap,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -755,7 +755,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "const C = React.forwardRef((props, ref) => <article role=\"button\" ref={ref} />);",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// React.memo wrapping an arrow.
@@ -763,7 +763,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "const C = React.memo(({children}) => <article role=\"button\">{children}</article>);",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// Class component render method.
@@ -771,7 +771,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "class C extends React.Component { render() { return <article role=\"button\" />; } }",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// Functional component arrow assigned to a typed const.
@@ -779,7 +779,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "const C: React.FC = () => <h1 role=\"menuitem\">x</h1>;",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// Hook callback returning JSX.
@@ -787,7 +787,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "function useThing() { return <ul role=\"menu\" />; }",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// JSX returned from `useMemo` callback.
@@ -795,7 +795,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "const m = React.useMemo(() => <article role=\"button\" />, []);",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// JSX passed as a render prop.
@@ -803,7 +803,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 				Code: "const x = <Parent renderItem={() => <li role=\"tab\" />} />;",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 		})
@@ -840,11 +840,11 @@ func TestNoNoninteractiveElementToInteractiveRoleDeepNesting(t *testing.T) {
 					"</Card>",
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}, // h1
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}, // article
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}, // h2
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}, // ul
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}, // li
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}, // h1
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}, // article
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}, // h2
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}, // ul
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}, // li
 				},
 			},
 			// 6-level deep flat chain — every level reports independently.
@@ -862,10 +862,10 @@ func TestNoNoninteractiveElementToInteractiveRoleDeepNesting(t *testing.T) {
 					"</article>",
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 					// <tr> is interactive (inside table) — no report on tr.
 					// Actually wait: <tr> IS in interactiveElementRoleSchemas
 					// (just `{name: "tr"}` unconditional). So <tr role="button">
@@ -882,9 +882,9 @@ func TestNoNoninteractiveElementToInteractiveRoleDeepNesting(t *testing.T) {
 					"</>",
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 		})
@@ -902,22 +902,22 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 			{
 				Code:   `const x = cond && <article role="button" />;`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// `??` nullish coalescing — the rule fires on the JSX even though
 			// it's only rendered when LHS is nullish.
 			{
 				Code:   `const x = maybe ?? <article role="button" />;`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Ternary with BOTH branches having matching role — 2 reports.
 			{
 				Code: `const x = cond ? <article role="button" /> : <h1 role="menuitem" />;`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// switch case JSX returns.
@@ -931,8 +931,8 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 					"}",
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// `.map()` with multiple sibling props.
@@ -940,7 +940,7 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 				Code: `const xs = items.map((item, i) => <article key={i} className="card" role="button" onClick={item.fn}>{item.label}</article>);`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// `.filter().map()` chain.
@@ -948,14 +948,14 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 				Code: `const xs = items.filter(Boolean).map(item => <li role="link" key={item.id} />);`,
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// IIFE returning JSX.
 			{
 				Code:   `const x = (() => <article role="button" />)();`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// JSX inside try/catch.
 			{
@@ -964,7 +964,7 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 					"  catch { return null; }\n" +
 					"}",
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -1007,14 +1007,14 @@ func TestNoNoninteractiveElementToInteractiveRoleTSXTypeSystemShapes(t *testing.
 			{
 				Code:   `const x = <article role="button" /> as JSX.Element;`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// JSX inside a TS function with return type — rule fires.
 			{
 				Code: "function R(): JSX.Element { return <article role=\"button\" />; }",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// JSX inside a TS interface-typed callback.
@@ -1022,7 +1022,7 @@ func TestNoNoninteractiveElementToInteractiveRoleTSXTypeSystemShapes(t *testing.
 				Code: "const handler: (() => JSX.Element) = () => <h1 role=\"button\" />;",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 			// `<!-- TS namespace import scenario -->` — JSX inside a TS
@@ -1031,7 +1031,7 @@ func TestNoNoninteractiveElementToInteractiveRoleTSXTypeSystemShapes(t *testing.
 				Code: "namespace UI { export const X = <article role=\"button\" />; }",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 		})
@@ -1065,21 +1065,21 @@ func TestNoNoninteractiveElementToInteractiveRoleUnicodeInRoleValue(t *testing.T
 			{
 				Code:   `<article role="button 按钮" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// CJK in role attribute name doesn't matter — the attribute name
 			// is `role` (ASCII), the value is the only thing we read.
 			{
 				Code:   `<article role="link 按钮" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Emoji first, real role second — emoji isn't a real role, "button"
 			// wins as first VALID role.
 			{
 				Code:   `<article role="🔘 button" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }
@@ -1117,29 +1117,29 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListMultiTag(t *testing.T)
 				Code:    `<ul role="menubar" />`,
 				Tsx:     true,
 				Options: multiTagAllowList,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Tag not in allow-list at all — `<h1>` ignored by the allow-list.
 			{
 				Code:    `<h1 role="button" />`,
 				Tsx:     true,
 				Options: multiTagAllowList,
-				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Multiple violations in one element tree — order-independent
 			// reporting.
 			{
 				Code: "<>\n" +
-					"  <ul role=\"menu\" />\n" +     // exempted by allow-list
-					"  <ol role=\"menu\" />\n" +     // NOT in ol's allow-list (which has "menubar")
+					"  <ul role=\"menu\" />\n" + // exempted by allow-list
+					"  <ol role=\"menu\" />\n" + // NOT in ol's allow-list (which has "menubar")
 					"  <li role=\"menuitem\" />\n" + // exempted
 					"  <table role=\"button\" />\n" + // NOT in table's allow-list (which has "grid")
 					"</>",
 				Tsx:     true,
 				Options: multiTagAllowList,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
-					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
+					{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."},
 				},
 			},
 		})
@@ -1182,19 +1182,19 @@ func TestNoNoninteractiveElementToInteractiveRoleExtendedRoleClassification(t *t
 			{
 				Code:   `<article role="doc-backlink" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			{
 				Code:   `<h1 role="doc-glossref" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 			// Toolbar on a non-interactive element — toolbar IS in
 			// interactiveRolesSet (load-bearing) → reports.
 			{
 				Code:   `<article role="toolbar" />`,
 				Tsx:    true,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: errorMessage}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveElementToInteractiveRole", Message: "Non-interactive elements should not be assigned interactive roles."}},
 			},
 		})
 }

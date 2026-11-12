@@ -2,7 +2,7 @@
 // https://github.com/eslint-community/eslint-plugin-n/blob/v18.3.0/tests/lib/rules/no-missing-import.js
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
 
 const caseInsensitive = existsSync(
   fileURLToPath(import.meta.url).replace(
@@ -24,10 +24,11 @@ const fixtureFiles: Record<string, string> = {};
 for (let i = 0; i < entries.length; i += 2)
   fixtureFiles[entries[i]] = entries[i + 1];
 const ruleTester = new RuleTester({
+  plugin: 'node',
   fixtureFiles,
   languageOptions: { sourceType: 'module' },
 });
-ruleTester.run('no-missing-import', null, {
+ruleTester.run('no-missing-import', {
   valid: [
     {
       name: 'upstream valid 1',

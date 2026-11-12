@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-strict-equal', {} as never, {
+ruleTester.run('prefer-strict-equal', {
   valid: [
     { code: 'expect(something).toStrictEqual(somethingElse);' },
     { code: 'expect(something).to.be.a("string");' },
@@ -16,13 +17,14 @@ ruleTester.run('prefer-strict-equal', {} as never, {
         {
           messageId: 'useToStrictEqual',
           message: 'Use `toStrictEqual()` instead',
-          column: 19,
           line: 1,
-          endColumn: 26,
+          column: 19,
           endLine: 1,
+          endColumn: 26,
           suggestions: [
             {
               messageId: 'suggestReplaceWithStrictEqual',
+              desc: 'Replace with `toStrictEqual()`',
               output: 'expect(something).toStrictEqual(somethingElse);',
             },
           ],
@@ -34,13 +36,15 @@ ruleTester.run('prefer-strict-equal', {} as never, {
       errors: [
         {
           messageId: 'useToStrictEqual',
-          column: 19,
+          message: 'Use `toStrictEqual()` instead',
           line: 1,
-          endColumn: 26,
+          column: 19,
           endLine: 1,
+          endColumn: 26,
           suggestions: [
             {
               messageId: 'suggestReplaceWithStrictEqual',
+              desc: 'Replace with `toStrictEqual()`',
               output: 'expect(something).toStrictEqual(somethingElse,);',
             },
           ],
@@ -52,13 +56,15 @@ ruleTester.run('prefer-strict-equal', {} as never, {
       errors: [
         {
           messageId: 'useToStrictEqual',
-          column: 19,
+          message: 'Use `toStrictEqual()` instead',
           line: 1,
-          endColumn: 28,
+          column: 19,
           endLine: 1,
+          endColumn: 28,
           suggestions: [
             {
               messageId: 'suggestReplaceWithStrictEqual',
+              desc: 'Replace with `toStrictEqual()`',
               output: 'expect(something)["toStrictEqual"](somethingElse);',
             },
           ],

@@ -21,6 +21,67 @@ func (staticEvaluator *StaticStringEvaluator) EvalValueIfNoSideEffects(node *ast
 	return staticEvaluator.EvalValue(node)
 }
 
+// IsPrimitiveStaticValue distinguishes JavaScript primitives from the
+// evaluator's private object, array, and regular-expression representations.
+func IsPrimitiveStaticValue(value any) bool {
+	return staticValueKindOf(value) != staticKindUnknown
+}
+
+// Follow constant aliases without treating function calls alone as mutable
+// member reads. Reuse the ordinary static evaluator's member safety policy.
+func (safety *staticControlFlowSafety) hasMutableMember(node *ast.Node) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil || ast.IsTypeNode(node) {
+		return false
+	}
+	if _, ok := safety.passThroughArgument(node); ok {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindClassExpression:
+		return false
+	case ast.KindIdentifier:
+		initializer, symbol, ok := safety.evaluator.resolveIdentifierInitializer(node)
+		if !ok || !ast.IsVarConst(symbol.Declarations[0].Parent) {
+			return false
+		}
+		if safety.visiting[symbol] {
+			return true
+		}
+		safety.visiting[symbol] = true
+		defer delete(safety.visiting, symbol)
+		return safety.hasMutableMember(initializer)
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return !safety.safeMember(node)
+	default:
+		return node.ForEachChild(safety.hasMutableMember)
+	}
+}
+
+// HasNonUndefinedValueIgnoringPropertyMutations mirrors eslint-utils' static
+// fallback for a potentially mutable member. This is evidence for rejecting
+// an incompatible input, never proof that its value can be moved or replaced.
+func (staticEvaluator *StaticStringEvaluator) HasNonUndefinedValueIgnoringPropertyMutations(node *ast.Node) bool {
+	if staticEvaluator == nil || node == nil {
+		return false
+	}
+	safety := staticControlFlowSafety{evaluator: staticEvaluator, visiting: make(map[*ast.Symbol]bool)}
+	if !safety.hasMutableMember(node) {
+		return false
+	}
+	staticEvaluator.ensureReferenceFlags()
+	fallback := NewStaticStringEvaluatorWithReferenceResolver(staticEvaluator.typeChecker, staticEvaluator.sourceFile, staticEvaluator.referenceResolver)
+	fallback.GlobalAccess = staticEvaluator.GlobalAccess
+	fallback.resolveIdentifiers = staticEvaluator.resolveIdentifiers
+	fallback.referenceFlagsComputed = true
+	fallback.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, len(staticEvaluator.referenceFlags))
+	for symbol, flags := range staticEvaluator.referenceFlags {
+		fallback.referenceFlags[symbol] = flags & staticReferenceWrite
+	}
+	value := fallback.evalValue(node)
+	return value.ok && !staticValueUndefined(value.value)
+}
+
 // EvalControlFlowValue mirrors unicorn's getStaticValueForControlFlow: reject
 // side effects and unsupported member reads throughout the expression, but
 // reject mutable bindings only on paths that can actually be evaluated.

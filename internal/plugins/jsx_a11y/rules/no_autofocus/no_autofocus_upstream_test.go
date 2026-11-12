@@ -12,7 +12,7 @@ import (
 // one place. Shared with no_autofocus_extras_test.go.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "noAutoFocus",
-	Message:   errorMessage,
+	Message:   "The autoFocus prop should not be enabled, as it can reduce usability and accessibility for users.",
 }
 
 // ignoreNonDOMOption mirrors upstream's `[{ ignoreNonDOM: true }]` schema —

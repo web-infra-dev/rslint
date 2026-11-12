@@ -17,15 +17,27 @@ type observationExecution struct {
 	deferredTask  *pluginTask
 }
 
+// observationUnitExecution owns one load's private output. Only the merge
+// boundary can assemble its diagnostic groups into an ObservationResult.
+type observationUnitExecution struct {
+	native                nativeObservationUnit
+	pluginKind            pluginObservationKind
+	pluginOutcome         EslintPluginDispatchOutcome
+	fixTexts              fixTextSnapshot
+	deferredTask          *pluginTask
+	programRootIdentities []string
+}
+
 // preparedObservation is the ownership handoff between whole-generation
 // validation and execution. Only actual fix planning retains a source reader;
 // the executor retains neither the producer Generation nor its LintPlan.
 type preparedObservation struct {
-	native              *nativeObservationWork
-	plugin              pluginTask
-	lease               *releaseLease
-	readFixText         sourceTextReader
-	targetSyntaxBlocked bool
+	native                *nativeObservationWork
+	plugin                pluginTask
+	lease                 *releaseLease
+	readFixText           sourceTextReader
+	targetSyntaxBlocked   bool
+	programRootIdentities []string
 }
 
 func prepareObservation(
@@ -127,10 +139,11 @@ func prepareObservation(
 	}
 
 	prepared := preparedObservation{
-		native:              nativeWork,
-		plugin:              pluginWork,
-		lease:               lease,
-		targetSyntaxBlocked: targetSyntaxBlocked,
+		native:                nativeWork,
+		plugin:                pluginWork,
+		lease:                 lease,
+		targetSyntaxBlocked:   targetSyntaxBlocked,
+		programRootIdentities: generation.ProgramRootIdentities,
 	}
 	if planChanges {
 		prepared.readFixText = generation.Target.ReadText
@@ -145,10 +158,9 @@ func executePreparedObservation(
 	snapshot SourceSnapshot,
 	policy ObservationPolicy,
 	dispatcher EslintPluginDispatcher,
-	index int,
 	planChanges bool,
 	stopOnTargetSyntaxErrors bool,
-) (observationExecution, error) {
+) (observationUnitExecution, error) {
 	var err error
 	lease := prepared.lease
 	defer lease.close()
@@ -157,8 +169,8 @@ func executePreparedObservation(
 	pluginWork := prepared.plugin
 	prepared.plugin = pluginTask{}
 	targetSyntaxBlocked := prepared.targetSyntaxBlocked
-	execution := observationExecution{
-		observation: ObservationResult{Index: index},
+	execution := observationUnitExecution{
+		programRootIdentities: prepared.programRootIdentities,
 	}
 	switch policy.Plugin {
 	case PluginConcurrentJoined:
@@ -170,7 +182,7 @@ func executePreparedObservation(
 			execution,
 		)
 		if runErr == nil && planChanges && !targetSyntaxBlocked {
-			diagnostics := execution.fixDiagnostics(policy.PluginFailure)
+			diagnostics := execution.fixableDiagnostics(policy.PluginFailure)
 			execution.fixTexts, runErr = freezeFixTextsForDiagnostics(
 				ctx,
 				prepared.readFixText,
@@ -178,26 +190,26 @@ func executePreparedObservation(
 				diagnostics,
 			)
 		}
-		execution.observation.detachDiagnosticSources()
+		execution.detachDiagnosticSources()
 		lease.close()
 		return execution, joinContextError(runErr, ctx)
 	case PluginAfterNativeJoined:
 		native, nativeErr := runNativeObservation(ctx, nativeWork)
-		execution.observation.Native = native
+		execution.native = native
 		if nativeErr != nil {
-			execution.observation.detachDiagnosticSources()
+			execution.detachDiagnosticSources()
 			lease.close()
 			return execution, nativeErr
 		}
-		if stopOnTargetSyntaxErrors && native.HasTargetSyntaxErrors {
+		if stopOnTargetSyntaxErrors && native.hasTargetSyntaxErrors {
 			pluginWork.fixCandidates = nil
-			execution.observation.detachDiagnosticSources()
+			execution.detachDiagnosticSources()
 			lease.close()
-			execution.observation.pluginKind = pluginObservationNone
+			execution.pluginKind = pluginObservationNone
 			return execution, ctx.Err()
 		}
 		if planChanges {
-			candidateSources, sourceErr := fixSourcesFromDiagnostics(native.Diagnostics)
+			candidateSources, sourceErr := fixSourcesFromDiagnostics(native.diagnostics)
 			if sourceErr != nil {
 				return execution, sourceErr
 			}
@@ -219,7 +231,7 @@ func executePreparedObservation(
 		}
 		pluginWork.fixCandidates = nil
 		prepared.readFixText = nil
-		execution.observation.detachDiagnosticSources()
+		execution.detachDiagnosticSources()
 		// Detached plugin inputs and frozen fix text no longer reference generation
 		// state, so watcher/Program resources are released before a reverse request
 		// can block.
@@ -228,18 +240,17 @@ func executePreparedObservation(
 			return execution, err
 		}
 		if len(pluginWork.inputs) == 0 {
-			execution.observation.pluginKind = pluginObservationNone
+			execution.pluginKind = pluginObservationNone
 			return execution, nil
 		}
 		outcome := pluginWork.runRaw(ctx, dispatcher)
-		execution.observation.pluginKind = pluginObservationJoined
-		execution.observation.pluginOutcome = outcome
-		execution.pluginOutcome = &execution.observation.pluginOutcome
+		execution.pluginKind = pluginObservationJoined
+		execution.pluginOutcome = outcome
 		if err := ctx.Err(); err != nil {
 			return execution, err
 		}
 		if planChanges {
-			diagnostics := execution.fixDiagnostics(policy.PluginFailure)
+			diagnostics := execution.fixableDiagnostics(policy.PluginFailure)
 			execution.fixTexts, err = retainFixTextsForDiagnostics(
 				execution.fixTexts,
 				diagnostics,
@@ -251,8 +262,8 @@ func executePreparedObservation(
 		return execution, nil
 	case pluginProgressiveAfterNative:
 		native, nativeErr := runNativeObservation(ctx, nativeWork)
-		execution.observation.Native = native
-		execution.observation.detachDiagnosticSources()
+		execution.native = native
+		execution.detachDiagnosticSources()
 		lease.close()
 		if nativeErr != nil {
 			return execution, nativeErr
@@ -260,15 +271,15 @@ func executePreparedObservation(
 		if err := ctx.Err(); err != nil {
 			return execution, err
 		}
-		if stopOnTargetSyntaxErrors && native.HasTargetSyntaxErrors {
-			execution.observation.pluginKind = pluginObservationNone
+		if stopOnTargetSyntaxErrors && native.hasTargetSyntaxErrors {
+			execution.pluginKind = pluginObservationNone
 			return execution, nil
 		}
 		if len(pluginWork.inputs) == 0 {
-			execution.observation.pluginKind = pluginObservationNone
+			execution.pluginKind = pluginObservationNone
 			return execution, nil
 		}
-		execution.observation.pluginKind = pluginObservationProgressive
+		execution.pluginKind = pluginObservationProgressive
 		execution.deferredTask = &pluginWork
 		return execution, nil
 	default:
@@ -281,8 +292,8 @@ func executeConcurrentObservation(
 	nativeWork *nativeObservationWork,
 	pluginTask pluginTask,
 	dispatcher EslintPluginDispatcher,
-	execution observationExecution,
-) (observationExecution, error) {
+	execution observationUnitExecution,
+) (observationUnitExecution, error) {
 	var (
 		pluginCh     <-chan EslintPluginDispatchOutcome
 		cancelPlugin context.CancelFunc
@@ -312,18 +323,17 @@ func executeConcurrentObservation(
 	}()
 
 	native, nativeErr := runNativeObservation(ctx, nativeWork)
-	execution.observation.Native = native
+	execution.native = native
 	if nativeErr != nil && cancelPlugin != nil {
 		cancelPlugin()
 	}
 	if pluginCh != nil {
 		outcome := <-pluginCh
 		pluginJoined = true
-		execution.observation.pluginKind = pluginObservationJoined
-		execution.observation.pluginOutcome = outcome
-		execution.pluginOutcome = &execution.observation.pluginOutcome
+		execution.pluginKind = pluginObservationJoined
+		execution.pluginOutcome = outcome
 	} else {
-		execution.observation.pluginKind = pluginObservationNone
+		execution.pluginKind = pluginObservationNone
 	}
 	if cancelPlugin != nil {
 		cancelPlugin()
@@ -340,11 +350,37 @@ func joinContextError(err error, ctx context.Context) error {
 	return errors.Join(err, contextErr)
 }
 
-// Fix validation uses the observation's failure policy without publishing it.
-// Providers keep fix generations coherent because validation spans all targets.
-func (execution observationExecution) fixDiagnostics(failure PluginFailurePolicy) []rule.RuleDiagnostic {
-	observation := execution.observation
-	observation.pluginOutcome = applyPluginFailure(observation.pluginOutcome, failure)
-	diagnostics, _ := observation.CompleteDiagnostics()
+// Fix validation needs only native/plugin reports that carry edits, not the
+// unit's still-unmerged syntax/type groups or a complete observation result.
+func (execution observationUnitExecution) fixableDiagnostics(failure PluginFailurePolicy) []rule.RuleDiagnostic {
+	plugin := applyPluginFailure(execution.pluginOutcome, failure)
+	var diagnostics []rule.RuleDiagnostic
+	for _, group := range [][]rule.RuleDiagnostic{execution.native.diagnostics, plugin.Diagnostics} {
+		for _, diagnostic := range group {
+			if len(diagnostic.Fixes()) > 0 {
+				diagnostics = append(diagnostics, diagnostic)
+			}
+		}
+	}
 	return diagnostics
+}
+
+// detachDiagnosticSources ends diagnostic ownership of compiler ASTs before
+// releasing a unit's lease. Reuse one text projection per source object;
+// distinct generations can share a path.
+func (execution *observationUnitExecution) detachDiagnosticSources() {
+	for _, diagnostics := range [][]rule.RuleDiagnostic{
+		execution.native.syntacticDiagnostics, execution.native.diagnostics, execution.pluginOutcome.Diagnostics,
+	} {
+		for index := range diagnostics {
+			diagnostic := &diagnostics[index]
+			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+		}
+	}
+	for _, diagnostics := range execution.native.typeDiagnostics {
+		for index := range diagnostics {
+			diagnostic := &diagnostics[index].ruleDiagnostic
+			diagnostic.SourceFile = diagnosticTextSource(diagnostic.SourceFile)
+		}
+	}
 }

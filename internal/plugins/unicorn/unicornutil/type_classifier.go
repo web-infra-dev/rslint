@@ -7,16 +7,40 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// TypeClass is Unicorn's three-state view of an expression type. Unknown is
-// deliberately distinct from NonTarget: rules generally keep reporting when
-// a receiver might still be the target type.
+// TypeClass describes whether an expression is the target type. Unknown stays
+// distinct from NonTarget because a receiver may still have the target type.
 type TypeClass uint8
 
 const (
 	TypeUnknown TypeClass = iota
 	TypeTarget
 	TypeNonTarget
+	// TypeNullish is retained in authored annotations when the classifier
+	// ignores nullish branches of a mixed union.
+	TypeNullish
+	// Internal states used when walking authored annotations.
+	typeAny
+	typeCyclic
 )
+
+func combineTypeClassUnion(classes []TypeClass) TypeClass {
+	if len(classes) == 0 {
+		return TypeNonTarget
+	}
+	allTarget := true
+	allNonTarget := true
+	for _, class := range classes {
+		allTarget = allTarget && class == TypeTarget
+		allNonTarget = allNonTarget && class == TypeNonTarget
+	}
+	if allTarget {
+		return TypeTarget
+	}
+	if allNonTarget {
+		return TypeNonTarget
+	}
+	return TypeUnknown
+}
 
 // TypeClassifierOptions configures the shared recursive portion of Unicorn's
 // createTypeCheckers helper. Syntactic target/non-target recognition remains
@@ -29,6 +53,7 @@ type TypeClassifierOptions struct {
 	NonTargetSymbolLessTypeFlags checker.TypeFlags
 	AllowNullishInMixedUnion     bool
 	TreatMixedUnionAsNonTarget   bool
+	PreferKnownAnnotationNames   bool
 }
 
 // ClassifyType mirrors eslint-plugin-unicorn's getTypeScriptType plus the

@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-expect-resolves', {} as never, {
+ruleTester.run('prefer-expect-resolves', {
   valid: [
     { code: 'expect.hasAssertions()' },
     { code: 'await expect().resolves.toBe(true)' },
@@ -42,17 +43,18 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
       `,
       errors: [
         {
-          endColumn: 27,
-          column: 10,
           messageId: 'expectResolves',
+          message: 'Use `expect().resolves` instead',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 35,
           suggestions: [
             {
               messageId: 'suggestExpectResolves',
-              output: `
-        it('passes', async () => {
-          await expect(someValue(),).resolves.toBe(true);
-        });
-      `,
+              desc: 'Replace with an awaited resolves assertion',
+              output:
+                "\n        it('passes', async () => {\n          await expect(someValue(),).resolves.toBe(true);\n        });\n      ",
             },
           ],
         },
@@ -73,7 +75,16 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
           await expect(myPromise).resolves.toBe(true);
         });
       `,
-      errors: [{ endColumn: 25, column: 10, messageId: 'expectResolves' }],
+      errors: [
+        {
+          messageId: 'expectResolves',
+          message: 'Use `expect().resolves` instead',
+          line: 5,
+          column: 18,
+          endLine: 5,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `
@@ -94,7 +105,16 @@ ruleTester.run('prefer-expect-resolves', {} as never, {
           await pleaseExpect(myPromise).resolves.toBe(true);
         });
       `,
-      errors: [{ endColumn: 31, column: 16, messageId: 'expectResolves' }],
+      errors: [
+        {
+          messageId: 'expectResolves',
+          message: 'Use `expect().resolves` instead',
+          line: 7,
+          column: 24,
+          endLine: 7,
+          endColumn: 39,
+        },
+      ],
     },
   ],
 });

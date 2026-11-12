@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('prefer-called-once', {} as never, {
+ruleTester.run('prefer-called-once', {
   valid: [
     { code: `expect(fn).toBeCalledOnce();` },
     { code: `expect(fn).toHaveBeenCalledOnce();` },

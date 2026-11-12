@@ -724,7 +724,7 @@ func TestNoRedundantRolesExtras(t *testing.T) {
 				Code: "<button\n  role=\"button\"\n/>",
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noRedundantRoles", Message: errorMessage("button", "button"), Line: 1, Column: 1},
+					{MessageId: "noRedundantRoles", Message: "The element button has an implicit role of button. Defining this explicitly is redundant and should be avoided.", Line: 1, Column: 1},
 				},
 			},
 
@@ -739,7 +739,7 @@ func TestNoRedundantRolesExtras(t *testing.T) {
 </>`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noRedundantRoles", Message: errorMessage("button", "button"), Line: 3, Column: 3},
+					{MessageId: "noRedundantRoles", Message: "The element button has an implicit role of button. Defining this explicitly is redundant and should be avoided.", Line: 3, Column: 3},
 				},
 			},
 
@@ -755,6 +755,7 @@ func TestNoRedundantRolesExtras(t *testing.T) {
 		},
 	)
 }
+
 // TestNoRedundantRolesRobust covers two surfaces that the upstream test
 // file and our Dimension-1–4 extras don't reach:
 //
@@ -1064,7 +1065,7 @@ func TestNoRedundantRolesRobust(t *testing.T) {
 				Tsx:  true,
 				Settings: map[string]interface{}{
 					"jsx-a11y": map[string]interface{}{
-						"polymorphicPropName": "as",
+						"polymorphicPropName":  "as",
 						"polymorphicAllowList": []interface{}{"Box"},
 					},
 				},
@@ -1189,8 +1190,8 @@ func TestNoRedundantRolesRobust(t *testing.T) {
 			},
 			// ---- Sibling redundant elements — multi-error in one file. ----
 			{
-				Code: `function App() { return (<><button role="button" /><h1 role="heading">t</h1><nav role="navigation"></nav></>); }`,
-				Tsx:  true,
+				Code:    `function App() { return (<><button role="button" /><h1 role="heading">t</h1><nav role="navigation"></nav></>); }`,
+				Tsx:     true,
 				Options: map[string]interface{}{"nav": []interface{}{}}, // disable nav default
 				Errors: []rule_tester.InvalidTestCaseError{
 					invalidErrLine("button", "button", 1),
@@ -1334,7 +1335,7 @@ function B() { return <h1 role="heading">x</h1>; }`,
 />`,
 				Tsx: true,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "noRedundantRoles", Message: errorMessage("button", "button"), Line: 1, Column: 1},
+					{MessageId: "noRedundantRoles", Message: "The element button has an implicit role of button. Defining this explicitly is redundant and should be avoided.", Line: 1, Column: 1},
 				},
 			},
 

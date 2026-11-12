@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-duplicate-hooks', {} as never, {
+ruleTester.run('no-duplicate-hooks', {
   valid: [
     {
       code: `
@@ -35,9 +36,11 @@ ruleTester.run('no-duplicate-hooks', {} as never, {
       errors: [
         {
           messageId: 'noDuplicateHook',
-          data: { hook: 'beforeEach' },
-          line: 3,
-          column: 3,
+          message: 'Duplicate beforeEach in describe block',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 43,
         },
       ],
     },
@@ -51,9 +54,11 @@ ruleTester.run('no-duplicate-hooks', {} as never, {
       errors: [
         {
           messageId: 'noDuplicateHook',
-          data: { hook: 'afterEach' },
-          line: 4,
-          column: 1,
+          message: 'Duplicate afterEach in describe block',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 39,
         },
       ],
     },
@@ -67,9 +72,11 @@ ruleTester.run('no-duplicate-hooks', {} as never, {
       errors: [
         {
           messageId: 'noDuplicateHook',
-          data: { hook: 'beforeAll' },
-          line: 3,
-          column: 3,
+          message: 'Duplicate beforeAll in describe block',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 42,
         },
       ],
     },

@@ -16,7 +16,6 @@ import (
 type typeCheckRequest struct {
 	Programs       []*program.Program
 	SingleThreaded bool
-	OnDiagnostic   DiagnosticHandler
 	ProjectSources bool
 }
 
@@ -34,13 +33,13 @@ type typeCheckRequest struct {
 //
 // Cross-program dedupe: shared declaration files (typical with project
 // references and pulled-in node_modules .d.ts) appear in multiple programs.
-// We dedupe on canonical (filePath, code, pos, end, final message), including
-// message chains and related information.
+// Each collected diagnostic freezes its canonical (filePath, code, pos, end,
+// final message) key, including message chains and related information, for
+// deduplication by the caller.
 //
 // req.Programs is a private slice transferred by lintExecution. Each slot is
 // consumed before dispatch; diagnostics, not Programs, survive the phase.
-// req.OnDiagnostic must be non-nil.
-func runTypeCheckAcrossPrograms(req typeCheckRequest) {
+func runTypeCheckAcrossPrograms(req typeCheckRequest) [][]collectedTypeCheckDiagnostic {
 	collected := make([][]collectedTypeCheckDiagnostic, len(req.Programs))
 	wg := newLintWorkGroup(req.SingleThreaded)
 	for i, prog := range req.Programs {
@@ -58,7 +57,7 @@ func runTypeCheckAcrossPrograms(req typeCheckRequest) {
 
 	// Program diagnostics are computed in parallel above, but survivor choice
 	// follows stable Program input order rather than goroutine completion order.
-	emitDeduplicatedTypeCheckDiagnostics(collected, req.OnDiagnostic)
+	return collected
 }
 
 func emitDeduplicatedTypeCheckDiagnostics(collected [][]collectedTypeCheckDiagnostic, onDiagnostic DiagnosticHandler) {

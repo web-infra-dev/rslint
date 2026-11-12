@@ -1,0 +1,17 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowWithVariables": {
+          "type": "boolean",
+          "description": "Allow the old ID and class APIs with non-literal arguments."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

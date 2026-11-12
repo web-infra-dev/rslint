@@ -12,7 +12,7 @@ import (
 // aria_activedescendant_has_tabindex_extras_test.go via package scope.
 var expectedError = rule_tester.InvalidTestCaseError{
 	MessageId: "tabIndexRequired",
-	Message:   errorMessage,
+	Message:   "An element that manages focus with `aria-activedescendant` must have a tabindex",
 	Line:      1,
 	Column:    1,
 }

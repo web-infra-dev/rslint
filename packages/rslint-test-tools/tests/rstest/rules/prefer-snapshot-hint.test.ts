@@ -1,6 +1,7 @@
-import { RuleTester } from '../rule-tester';
-const ruleTester = new RuleTester();
-ruleTester.run('prefer-snapshot-hint', {} as never, {
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
+const ruleTester = new RuleTester(config);
+ruleTester.run('prefer-snapshot-hint', {
   valid: [
     {
       code: 'expect(something).toStrictEqual(somethingElse);',
@@ -91,12 +92,54 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
     {
       code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  let callback = () => { expect('stale').toMatchSnapshot(); };\n  callback = () => {};\n  test('case', callback);\n  expect('after').toMatchSnapshot();\n};",
       options: ['multi'],
-      errors: 3,
+      errors: [
+        {
+          messageId: 'missingHint',
+          message: 'You should provide a hint for this snapshot',
+          line: 2,
+          column: 20,
+          endLine: 2,
+          endColumn: 35,
+        },
+        {
+          messageId: 'missingHint',
+          message: 'You should provide a hint for this snapshot',
+          line: 3,
+          column: 42,
+          endLine: 3,
+          endColumn: 57,
+        },
+        {
+          messageId: 'missingHint',
+          message: 'You should provide a hint for this snapshot',
+          line: 6,
+          column: 19,
+          endLine: 6,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: "const outer = () => {\n  expect('before').toMatchSnapshot();\n  { const callback = () => expect('one').toMatchSnapshot(); test('one', callback); }\n  { const callback = () => expect('two').toMatchSnapshot(); test('two', callback); }\n  expect('after').toMatchSnapshot();\n};",
       options: ['multi'],
-      errors: 2,
+      errors: [
+        {
+          messageId: 'missingHint',
+          message: 'You should provide a hint for this snapshot',
+          line: 2,
+          column: 20,
+          endLine: 2,
+          endColumn: 35,
+        },
+        {
+          messageId: 'missingHint',
+          message: 'You should provide a hint for this snapshot',
+          line: 5,
+          column: 19,
+          endLine: 5,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: "it('is true', () => {\n      expect(1).toMatchSnapshot();\n      expect(2).toMatchSnapshot();\n       });\n     ",
@@ -104,13 +147,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 17,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 17,
+          endLine: 2,
+          endColumn: 32,
         },
         {
           messageId: 'missingHint',
-          column: 17,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
     },
@@ -120,13 +169,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 47,
         },
       ],
     },
@@ -136,13 +191,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 47,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 34,
         },
       ],
     },
@@ -152,13 +213,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 34,
         },
       ],
     },
@@ -168,13 +235,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 18,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 33,
         },
         {
           messageId: 'missingHint',
-          column: 17,
+          message: 'You should provide a hint for this snapshot',
           line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 32,
         },
       ],
     },
@@ -184,13 +257,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 20,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 20,
+          endLine: 2,
+          endColumn: 35,
         },
         {
           messageId: 'missingHint',
-          column: 20,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 35,
         },
       ],
     },
@@ -200,8 +279,11 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
       ],
     },
@@ -211,8 +293,11 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
       ],
     },
@@ -222,8 +307,11 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 34,
         },
       ],
     },
@@ -233,13 +321,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 34,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 34,
         },
       ],
     },
@@ -249,13 +343,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 34,
         },
       ],
     },
@@ -265,13 +365,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 34,
         },
         {
           messageId: 'missingHint',
-          column: 19,
+          message: 'You should provide a hint for this snapshot',
           line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 34,
         },
       ],
     },
@@ -281,13 +387,19 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 18,
+          message: 'You should provide a hint for this snapshot',
           line: 7,
+          column: 18,
+          endLine: 7,
+          endColumn: 33,
         },
         {
           messageId: 'missingHint',
-          column: 18,
+          message: 'You should provide a hint for this snapshot',
           line: 8,
+          column: 18,
+          endLine: 8,
+          endColumn: 33,
         },
       ],
     },
@@ -297,8 +409,11 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 18,
+          message: 'You should provide a hint for this snapshot',
           line: 7,
+          column: 18,
+          endLine: 7,
+          endColumn: 33,
         },
       ],
     },
@@ -308,8 +423,11 @@ ruleTester.run('prefer-snapshot-hint', {} as never, {
       errors: [
         {
           messageId: 'missingHint',
-          column: 18,
+          message: 'You should provide a hint for this snapshot',
           line: 9,
+          column: 18,
+          endLine: 9,
+          endColumn: 33,
         },
       ],
     },

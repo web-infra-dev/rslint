@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-conditional-in-test', {} as never, {
+ruleTester.run('no-conditional-in-test', {
   valid: [
     { code: 'const x = y ? 1 : 0' },
     {
@@ -100,7 +101,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           expect(bar ? foo : baz).toBe(boo);
         })
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 10 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `
@@ -110,7 +120,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           };
         });
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 3, column: 12 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 4,
+          column: 20,
+          endLine: 4,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `
@@ -120,7 +139,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           }
         })
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 3 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 11,
+          endLine: 5,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -130,7 +158,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           })
         })
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 3, column: 5 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: `
@@ -138,7 +175,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           if ('bar') {}
         })
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 3 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
@@ -148,7 +194,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           })
         })
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 3, column: 5 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: `
@@ -158,7 +213,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 3 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 11,
+          endLine: 5,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -167,7 +231,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
         })
       `,
       options: [{ allowOptionalChaining: false }],
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 17 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 25,
+          endLine: 3,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `
@@ -176,7 +249,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
         })
       `,
       options: [{ allowOptionalChaining: false }],
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 3 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
@@ -185,7 +267,16 @@ ruleTester.run('no-conditional-in-test', {} as never, {
         })
       `,
       options: [{ allowOptionalChaining: false }],
-      errors: [{ messageId: 'conditionalInTest', line: 2, column: 3 }],
+      errors: [
+        {
+          messageId: 'conditionalInTest',
+          message: 'Avoid having conditionals in tests',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
     },
   ],
 });

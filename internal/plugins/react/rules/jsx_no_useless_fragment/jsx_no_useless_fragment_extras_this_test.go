@@ -28,7 +28,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Code: "/** @jsx this.h */\n<this.Fragment>{value}</this.Fragment>;",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 2, Column: 1},
 			},
 		},
 		{
@@ -36,7 +36,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:      true,
 			Settings: fragmentSettings("this", ""),
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1, EndLine: 1, EndColumn: 39},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1, EndLine: 1, EndColumn: 39},
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:      true,
 			Settings: fragmentSettings("", "this"),
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		// The member property remains an Identifier in tsgo; supporting the
@@ -54,7 +54,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:      true,
 			Settings: fragmentSettings("this", "this"),
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 		{
@@ -62,7 +62,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:      true,
 			Settings: fragmentSettings("", "this"),
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 1},
 			},
 		},
 
@@ -71,7 +71,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Code: "#!/usr/bin/env node @jsx this.h\n<this.Fragment>{value}</this.Fragment>;",
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 2, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 2, Column: 1},
 			},
 		},
 		{
@@ -79,7 +79,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:      true,
 			Settings: fragmentSettings("Baz", ""),
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 3, Column: 1},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 3, Column: 1},
 			},
 		},
 
@@ -90,7 +90,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Code: `<this.Widget><>foo</></this.Widget>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 14},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 14},
 			},
 		},
 		{
@@ -98,7 +98,7 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<this><A/><B/></this>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 7, EndLine: 1, EndColumn: 20},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 7, EndLine: 1, EndColumn: 20},
 			},
 		},
 		{
@@ -106,8 +106,8 @@ func TestJsxNoUselessFragmentExtrasThis(t *testing.T) {
 			Tsx:    true,
 			Output: []string{`<this>foo</this>`},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "NeedsMoreChildren", Message: needsMoreChildrenDescription, Line: 1, Column: 7},
-				{MessageId: "ChildOfHtmlElement", Message: childOfHtmlElementDescription, Line: 1, Column: 7},
+				{MessageId: "NeedsMoreChildren", Message: "Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.", Line: 1, Column: 7},
+				{MessageId: "ChildOfHtmlElement", Message: "Passing a fragment to an HTML element is useless.", Line: 1, Column: 7},
 			},
 		},
 	})

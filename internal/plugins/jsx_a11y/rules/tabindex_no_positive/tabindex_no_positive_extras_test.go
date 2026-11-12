@@ -616,7 +616,7 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "tabIndexNoPositive",
-				Message:   errorMessage,
+				Message:   "Avoid positive integer values for tabIndex.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 18,
 			}},
 		},
@@ -626,7 +626,7 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "tabIndexNoPositive",
-				Message:   errorMessage,
+				Message:   "Avoid positive integer values for tabIndex.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 18,
 			}},
 		},
@@ -636,7 +636,7 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "tabIndexNoPositive",
-				Message:   errorMessage,
+				Message:   "Avoid positive integer values for tabIndex.",
 				Line:      2, Column: 3, EndLine: 4, EndColumn: 4,
 			}},
 		},
@@ -646,7 +646,7 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "tabIndexNoPositive",
-				Message:   errorMessage,
+				Message:   "Avoid positive integer values for tabIndex.",
 				Line:      1, Column: 21, EndLine: 1, EndColumn: 33,
 			}},
 		},
@@ -656,7 +656,7 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "tabIndexNoPositive",
-				Message:   errorMessage,
+				Message:   "Avoid positive integer values for tabIndex.",
 				Line:      1, Column: 6, EndLine: 1, EndColumn: 14,
 			}},
 		},

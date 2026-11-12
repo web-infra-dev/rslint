@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 //go:embed no_namespace.schema.json
@@ -94,10 +95,13 @@ var NoNamespaceRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// ReportRange avoids ReportNode's scanner allocation while
-				// preserving its trivia-trimmed, whole-declaration range.
+				// ESTree represents `export` as a wrapper, outside the namespace.
+				start := scanner.SkipTrivia(ctx.SourceFile.Text(), node.Pos())
+				if token, ok := utils.TokenAtOrAfter(ctx.SourceFile, start); ok && token.Kind == ast.KindExportKeyword {
+					start = scanner.SkipTrivia(ctx.SourceFile.Text(), token.End)
+				}
 				ctx.ReportRange(
-					node.Loc.WithPos(scanner.SkipTrivia(ctx.SourceFile.Text(), node.Pos())),
+					node.Loc.WithPos(start),
 					noNamespaceMessage,
 				)
 			},

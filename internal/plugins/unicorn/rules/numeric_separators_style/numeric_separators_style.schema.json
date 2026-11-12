@@ -1,0 +1,102 @@
+{
+  "type": "array",
+  "items": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "binary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "onlyIfContainsSeparator": {
+              "type": "boolean",
+              "description": "Whether to only enforce the style if the number already contains a separator."
+            },
+            "minimumDigits": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The minimum number of digits before separators are enforced."
+            },
+            "groupLength": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The number of digits in each group."
+            }
+          }
+        },
+        "octal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "onlyIfContainsSeparator": {
+              "type": "boolean",
+              "description": "Whether to only enforce the style if the number already contains a separator."
+            },
+            "minimumDigits": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The minimum number of digits before separators are enforced."
+            },
+            "groupLength": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The number of digits in each group."
+            }
+          }
+        },
+        "hexadecimal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "onlyIfContainsSeparator": {
+              "type": "boolean",
+              "description": "Whether to only enforce the style if the number already contains a separator."
+            },
+            "minimumDigits": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The minimum number of digits before separators are enforced."
+            },
+            "groupLength": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The number of digits in each group."
+            }
+          }
+        },
+        "number": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "onlyIfContainsSeparator": {
+              "type": "boolean",
+              "description": "Whether to only enforce the style if the number already contains a separator."
+            },
+            "minimumDigits": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The minimum number of digits before separators are enforced."
+            },
+            "groupLength": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The number of digits in each group."
+            },
+            "fractionGroupLength": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The number of digits in each group after the decimal point. Defaults to no grouping."
+            }
+          }
+        },
+        "onlyIfContainsSeparator": {
+          "type": "boolean",
+          "description": "Whether to only enforce the style if the number already contains a separator."
+        }
+      }
+    }
+  ],
+  "minItems": 0,
+  "maxItems": 1
+}

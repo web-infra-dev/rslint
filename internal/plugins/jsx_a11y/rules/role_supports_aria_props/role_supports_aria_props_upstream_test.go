@@ -86,7 +86,7 @@ func generatedCases() ([]rule_tester.ValidTestCase, []rule_tester.InvalidTestCas
 				Tsx:  true,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "role-supports-aria-props",
-					Message:   errorMessage(prop, role, "div", false),
+					Message:   "The attribute " + prop + " is not supported by the role " + role + ".",
 					Line:      1, Column: 1,
 				}},
 			})
@@ -480,7 +480,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "link", "a", true),
+				Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -489,7 +489,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "link", "area", true),
+				Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element area.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -498,7 +498,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "link", "link", true),
+				Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element link.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -507,7 +507,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "img", "img", true),
+				Message:   "The attribute aria-checked is not supported by the role img. This role is implicit on the element img.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -516,7 +516,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "toolbar", "menu", true),
+				Message:   "The attribute aria-checked is not supported by the role toolbar. This role is implicit on the element menu.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -525,7 +525,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "complementary", "aside", true),
+				Message:   "The attribute aria-checked is not supported by the role complementary. This role is implicit on the element aside.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -534,7 +534,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "list", "ul", true),
+				Message:   "The attribute aria-expanded is not supported by the role list. This role is implicit on the element ul.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -543,7 +543,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "group", "details", true),
+				Message:   "The attribute aria-expanded is not supported by the role group. This role is implicit on the element details.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -552,7 +552,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "dialog", "dialog", true),
+				Message:   "The attribute aria-expanded is not supported by the role dialog. This role is implicit on the element dialog.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -561,7 +561,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "complementary", "aside", true),
+				Message:   "The attribute aria-expanded is not supported by the role complementary. This role is implicit on the element aside.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -570,7 +570,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "article", "article", true),
+				Message:   "The attribute aria-expanded is not supported by the role article. This role is implicit on the element article.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -579,7 +579,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "document", "body", true),
+				Message:   "The attribute aria-expanded is not supported by the role document. This role is implicit on the element body.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -588,7 +588,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "listitem", "li", true),
+				Message:   "The attribute aria-expanded is not supported by the role listitem. This role is implicit on the element li.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -597,7 +597,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "navigation", "nav", true),
+				Message:   "The attribute aria-expanded is not supported by the role navigation. This role is implicit on the element nav.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -606,7 +606,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "list", "ol", true),
+				Message:   "The attribute aria-expanded is not supported by the role list. This role is implicit on the element ol.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -615,7 +615,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "status", "output", true),
+				Message:   "The attribute aria-expanded is not supported by the role status. This role is implicit on the element output.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -624,7 +624,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "region", "section", true),
+				Message:   "The attribute aria-expanded is not supported by the role region. This role is implicit on the element section.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -633,7 +633,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "rowgroup", "tbody", true),
+				Message:   "The attribute aria-expanded is not supported by the role rowgroup. This role is implicit on the element tbody.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -642,7 +642,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "rowgroup", "tfoot", true),
+				Message:   "The attribute aria-expanded is not supported by the role rowgroup. This role is implicit on the element tfoot.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -651,7 +651,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "rowgroup", "thead", true),
+				Message:   "The attribute aria-expanded is not supported by the role rowgroup. This role is implicit on the element thead.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -660,7 +660,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "radio", "input", true),
+				Message:   "The attribute aria-invalid is not supported by the role radio. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -669,7 +669,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-selected", "radio", "input", true),
+				Message:   "The attribute aria-selected is not supported by the role radio. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -678,7 +678,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-haspopup", "radio", "input", true),
+				Message:   "The attribute aria-haspopup is not supported by the role radio. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -687,7 +687,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-haspopup", "checkbox", "input", true),
+				Message:   "The attribute aria-haspopup is not supported by the role checkbox. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -696,7 +696,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "button", "input", true),
+				Message:   "The attribute aria-invalid is not supported by the role button. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -705,7 +705,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "button", "input", true),
+				Message:   "The attribute aria-invalid is not supported by the role button. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -714,7 +714,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "button", "input", true),
+				Message:   "The attribute aria-invalid is not supported by the role button. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -723,7 +723,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "button", "input", true),
+				Message:   "The attribute aria-invalid is not supported by the role button. This role is implicit on the element input.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -732,7 +732,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "menuitem", "menuitem", true),
+				Message:   "The attribute aria-invalid is not supported by the role menuitem. This role is implicit on the element menuitem.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -741,7 +741,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-selected", "menuitemradio", "menuitem", true),
+				Message:   "The attribute aria-selected is not supported by the role menuitemradio. This role is implicit on the element menuitem.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -750,7 +750,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-haspopup", "toolbar", "menu", true),
+				Message:   "The attribute aria-haspopup is not supported by the role toolbar. This role is implicit on the element menu.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -759,7 +759,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "toolbar", "menu", true),
+				Message:   "The attribute aria-invalid is not supported by the role toolbar. This role is implicit on the element menu.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -768,7 +768,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-expanded", "toolbar", "menu", true),
+				Message:   "The attribute aria-expanded is not supported by the role toolbar. This role is implicit on the element menu.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -777,7 +777,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "link", "link", true),
+				Message:   "The attribute aria-invalid is not supported by the role link. This role is implicit on the element link.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -786,7 +786,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "link", "area", true),
+				Message:   "The attribute aria-invalid is not supported by the role link. This role is implicit on the element area.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -795,7 +795,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-invalid", "link", "a", true),
+				Message:   "The attribute aria-invalid is not supported by the role link. This role is implicit on the element a.",
 				Line:      1, Column: 1,
 			}},
 		},
@@ -807,7 +807,7 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 			Settings: componentsSettings,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "role-supports-aria-props",
-				Message:   errorMessage("aria-checked", "link", "a", true),
+				Message:   "The attribute aria-checked is not supported by the role link. This role is implicit on the element a.",
 				Line:      1, Column: 1,
 			}},
 		},

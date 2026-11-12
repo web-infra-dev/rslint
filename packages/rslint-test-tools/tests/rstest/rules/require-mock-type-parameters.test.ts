@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('require-mock-type-parameters', {} as never, {
+ruleTester.run('require-mock-type-parameters', {
   valid: [
     { code: `rs.fn<(...args: any[]) => any>()` },
     { code: `rs.fn<(arg1: string, arg2: boolean) => string>()` },
@@ -23,6 +24,7 @@ ruleTester.run('require-mock-type-parameters', {} as never, {
       errors: [
         {
           messageId: 'missingTypeParameter',
+          message: "'fn' is called without a type parameter.",
           line: 1,
           column: 4,
           endLine: 1,
@@ -35,6 +37,7 @@ ruleTester.run('require-mock-type-parameters', {} as never, {
       errors: [
         {
           messageId: 'missingTypeParameter',
+          message: "'fn' is called without a type parameter.",
           line: 1,
           column: 4,
           endLine: 1,
@@ -48,6 +51,7 @@ ruleTester.run('require-mock-type-parameters', {} as never, {
       errors: [
         {
           messageId: 'missingTypeParameter',
+          message: "'importActual' is called without a type parameter.",
           line: 1,
           column: 4,
           endLine: 1,
@@ -61,6 +65,7 @@ ruleTester.run('require-mock-type-parameters', {} as never, {
       errors: [
         {
           messageId: 'missingTypeParameter',
+          message: "'importMock' is called without a type parameter.",
           line: 1,
           column: 4,
           endLine: 1,

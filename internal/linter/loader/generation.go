@@ -21,8 +21,11 @@ func GenerationLoads(
 	result := make([]linter.GenerationLoad, len(loads))
 	for index, load := range loads {
 		checkers := 0
-		if load.Options != nil && load.Options.Checkers != nil {
-			checkers = max(1, *load.Options.Checkers)
+		if load.Options != nil {
+			checkers = 4 // Preserve the compiler's default pool, including zero-target Programs.
+			if load.Options.Checkers != nil {
+				checkers = max(1, *load.Options.Checkers)
+			}
 		}
 		result[index] = linter.GenerationLoad{
 			TargetCount:  load.TargetCount,
