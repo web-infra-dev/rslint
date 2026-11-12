@@ -2,15 +2,17 @@ package no_unnecessary_string_trim
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// hasNonStringJSDocReceiver checks explicit JSDoc types that rule out a string
-// even when a receiver annotation is nullable or a factory uses Closure syntax.
+// hasNonStringJSDocReceiver checks nullable and Closure-style annotations on
+// receivers or factory return types.
 func hasNonStringJSDocReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 	if !ast.IsInJSFile(receiver) {
 		return false
@@ -37,7 +39,119 @@ func hasNonStringJSDocReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 		return false
 	}
 	annotation, _ := unicornutil.ValueTypeAnnotation(ctx, declaration)
-	return nonStringJSDocType(annotation)
+	return nonStringJSDocType(annotation) || hasClosureCallableValue(ctx, declaration, annotation)
+}
+
+func hasClosureCallableValue(ctx rule.RuleContext, declaration, annotation *ast.Node) bool {
+	source := ctx.SourceFile.Text()
+	if ast.IsVariableDeclaration(declaration) {
+		return isClosureCallableType(source, annotation, "")
+	}
+	parameter := declaration.Name()
+	if !ast.IsIdentifier(parameter) {
+		return false
+	}
+	name := parameter.Text()
+	for host := declaration.Parent; host != nil; host = ast.GetNextJSDocCommentLocation(host) {
+		for _, doc := range host.JSDoc(ctx.SourceFile) {
+			tags := doc.AsJSDoc().Tags
+			if tags == nil {
+				continue
+			}
+			for _, tag := range tags.Nodes {
+				if !ast.IsJSDocParameterTag(tag) || tag.TypeExpression() == nil || !ast.IsIdentifier(tag.Name()) {
+					continue
+				}
+				switch tag.Name().Text() {
+				case name:
+					return isClosureCallableType(source[:tag.End()], tag.TypeExpression().Type(), "")
+				case "":
+					// A truncated type-first tag can lose the parameter name.
+					if isClosureCallableType(source[:tag.End()], tag.TypeExpression().Type(), name) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func isClosureCallableType(source string, annotation *ast.Node, trailingName string) bool {
+	// tsgo can stop reading the annotation at "function". Read the rest far
+	// enough to distinguish a callable value from a union that includes strings.
+	if !utils.IsJSDocSyntaxNode(annotation) {
+		return false
+	}
+	groups := 0
+unwrap:
+	for annotation != nil {
+		switch annotation.Kind {
+		case ast.KindParenthesizedType:
+			groups++
+		case ast.KindJSDocNullableType, ast.KindJSDocOptionalType, ast.KindJSDocNonNullableType:
+		default:
+			break unwrap
+		}
+		annotation = annotation.Type()
+	}
+	if !ast.IsTypeReferenceNode(annotation) {
+		return false
+	}
+	name := annotation.AsTypeReferenceNode().TypeName
+	if !ast.IsIdentifier(name) || name.Text() != "function" {
+		return false
+	}
+	tail, _, _ := strings.Cut(source[annotation.End():], "*/")
+	scan := scanner.NewScanner()
+	scan.SetText(tail)
+	scan.SetSkipJSDocLeadingAsterisks(true)
+	if scan.Scan() != ast.KindOpenParenToken {
+		return false
+	}
+	depth := 1
+	for depth > 0 {
+		switch scan.Scan() {
+		case ast.KindEndOfFile:
+			return false
+		case ast.KindOpenParenToken:
+			depth++
+		case ast.KindCloseParenToken:
+			depth--
+		}
+	}
+	token := scan.Scan()
+	if token == ast.KindColonToken {
+		// The return type extends to the enclosing group or annotation.
+		for token = scan.Scan(); token != ast.KindEndOfFile; token = scan.Scan() {
+			if depth == 0 && (token == ast.KindCloseParenToken || token == ast.KindCloseBraceToken) {
+				break
+			}
+			switch token {
+			case ast.KindOpenParenToken, ast.KindOpenBraceToken:
+				depth++
+			case ast.KindCloseParenToken, ast.KindCloseBraceToken:
+				depth--
+			}
+		}
+	}
+	for groups > 0 && token == ast.KindCloseParenToken {
+		groups--
+		token = scan.Scan()
+	}
+	if token == ast.KindEqualsToken {
+		token = scan.Scan()
+	}
+	if groups != 0 || token != ast.KindCloseBraceToken {
+		return false
+	}
+	if trailingName != "" {
+		if scan.Scan() == ast.KindOpenBracketToken {
+			scan.Scan()
+		}
+		return scan.TokenValue() == trailingName
+	}
+	return true
 }
 
 func nonStringJSDocType(node *ast.Node) bool {

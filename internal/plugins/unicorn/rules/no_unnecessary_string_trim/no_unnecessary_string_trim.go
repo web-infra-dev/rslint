@@ -76,7 +76,7 @@ var NoUnnecessaryStringTrimRule = rule.Rule{
 				}
 				if unicornutil.IsKnownNonStringWithAnnotations(ctx, trim.Object) ||
 					isStaticNonString(ctx.SourceFile, getEvaluator(), receiver) ||
-					hasNonStringJSDocReceiver(ctx, receiver) {
+					hasNonStringReceiver(ctx, getEvaluator(), receiver) {
 					return
 				}
 				ctx.ReportNodeWithDeferredFixes(trim.Property, message, func() []rule.RuleFix {
@@ -138,13 +138,14 @@ func isZodStringCall(ctx rule.RuleContext, node *ast.Node) bool {
 		return false
 	}
 	for _, binding := range symbol.Declarations {
+		declaration := binding
 		if direct {
 			if binding.Kind != ast.KindImportSpecifier || binding.PropertyNameOrName().Text() != "string" {
 				continue
 			}
 		} else {
 			switch binding.Kind {
-			case ast.KindImportClause, ast.KindNamespaceImport:
+			case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
 			case ast.KindImportSpecifier:
 				if name := binding.PropertyNameOrName().Text(); name != "z" && name != "default" {
 					continue
@@ -156,7 +157,10 @@ func isZodStringCall(ctx rule.RuleContext, node *ast.Node) bool {
 		if ast.IsTypeOnlyImportDeclaration(binding) {
 			continue
 		}
-		if declaration := ast.FindAncestorKind(binding, ast.KindImportDeclaration); declaration != nil {
+		if !ast.IsImportEqualsDeclaration(binding) {
+			declaration = ast.FindAncestorKind(binding, ast.KindImportDeclaration)
+		}
+		if declaration != nil {
 			if source := ast.GetExternalModuleName(declaration); source != nil && ast.IsStringLiteral(source) && source.Text() == "zod" {
 				return true
 			}
