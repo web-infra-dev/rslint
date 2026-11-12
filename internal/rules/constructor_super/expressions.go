@@ -15,7 +15,7 @@ func (a *analyzer) expression(n *ast.Node, s paths) paths {
 	}
 	if utils.IsFunctionLikeContainer(n) {
 		if name := n.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-			return a.expression(name.Expression(), s)
+			return a.computedName(name, s)
 		}
 		return s
 	}
@@ -26,7 +26,18 @@ func (a *analyzer) expression(n *ast.Node, s paths) paths {
 		s = a.expression(superClass(n), s)
 		for _, member := range n.Members() {
 			if name := member.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-				s = a.expression(name.Expression(), s)
+				s = a.computedName(name, s)
+			}
+		}
+		// Computed names are evaluated before any static initialization.
+		for _, member := range n.Members() {
+			if s == 0 {
+				break
+			}
+			if member.Kind == ast.KindClassStaticBlockDeclaration {
+				s = a.staticInitialization(member.AsClassStaticBlockDeclaration().Body, s)
+			} else if member.Kind == ast.KindPropertyDeclaration && ast.IsStatic(member) {
+				s = a.staticInitialization(member.AsPropertyDeclaration().Initializer, s)
 			}
 		}
 		return s
@@ -92,7 +103,7 @@ func (a *analyzer) expression(n *ast.Node, s paths) paths {
 	case ast.KindObjectLiteralExpression:
 		for _, p := range n.AsObjectLiteralExpression().Properties.Nodes {
 			if name := p.Name(); name != nil && name.Kind == ast.KindComputedPropertyName {
-				s = a.expression(name.Expression(), s)
+				s = a.computedName(name, s)
 			}
 			switch p.Kind {
 			case ast.KindPropertyAssignment:
@@ -141,14 +152,72 @@ func (a *analyzer) expression(n *ast.Node, s paths) paths {
 			a.mayThrow(s)
 		}
 		return s
+	case ast.KindTemplateExpression:
+		return a.template(n, s, true)
 	case ast.KindTaggedTemplateExpression:
 		t := n.AsTaggedTemplateExpression()
 		s = a.expression(t.Tag, s)
-		s = a.expression(t.Template, s)
+		s = a.template(t.Template, s, false)
 		a.mayThrow(s)
 		return s
 	}
 	n.ForEachChild(func(child *ast.Node) bool { s = a.expression(child, s); return false })
+	return s
+}
+
+// Static code has its own this/super and completion context. Only its
+// escaping exceptions and normal completion affect the enclosing constructor.
+func (a *analyzer) staticInitialization(n *ast.Node, s paths) paths {
+	if n == nil {
+		return s
+	}
+	local := analyzer{possible: true}
+	out, implicit := local.capture(n, uncalled)
+	if out.thrown|implicit != 0 {
+		a.mayThrow(s)
+	}
+	if out.normal == 0 {
+		return 0
+	}
+	return s
+}
+
+func (a *analyzer) computedName(n *ast.Node, s paths) paths {
+	s = a.expression(n.Expression(), s)
+	a.coercion(n.Expression(), s)
+	return s
+}
+
+// Both ToString and ToPropertyKey can invoke user code on unknown values.
+// Known primitive values need no such exception edge; their evaluation effects
+// have already been recorded. Symbols are unknown here and remain conservative.
+func (a *analyzer) coercion(n *ast.Node, s paths) {
+	v := valueFact(n)
+	if v.undefined {
+		return
+	}
+	if v.node != nil {
+		switch v.node.Kind {
+		case ast.KindNullKeyword, ast.KindNumericLiteral, ast.KindBigIntLiteral,
+			ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
+			ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindTypeOfExpression:
+			return
+		}
+	}
+	a.mayThrow(s)
+}
+
+func (a *analyzer) template(n *ast.Node, s paths, coerce bool) paths {
+	if n.Kind != ast.KindTemplateExpression {
+		return s
+	}
+	for _, span := range n.AsTemplateExpression().TemplateSpans.Nodes {
+		expr := span.AsTemplateSpan().Expression
+		s = a.expression(expr, s)
+		if coerce {
+			a.coercion(expr, s)
+		}
+	}
 	return s
 }
 

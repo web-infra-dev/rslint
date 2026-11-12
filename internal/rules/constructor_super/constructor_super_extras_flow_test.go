@@ -12,6 +12,19 @@ import (
 func TestConstructorSuperExecutionRegressions(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ConstructorSuperRule,
 		[]rule_tester.ValidTestCase{
+			// Class-definition effects and safe conversion controls.
+			{Code: "class A extends B { constructor() { try { class C { value = fail(); static value = 0; } return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { const C = class { static value = 0; }; return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static {} static value; static method() { fail(); } } return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static { try { throw 0; } catch {} } } return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static value = () => fail(); } return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static { throw 0; } } } catch { super(); } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static value = fail(); } return {}; } catch { super(); } } }"},
+			{Code: "class A extends B { constructor() { try { `${(super(), 0)}`; } catch { super(); } } }"},
+			{Code: "class A extends B { constructor() { try { ({[(super(), 0)]: 0}); } catch { super(); } } }"},
+			{Code: "class A extends B { constructor() { try { ({[0]: super()}); } catch { super(); } } }"},
+			{Code: "class A extends B { constructor() { try { `${0}${true}${null}${void 0}${1n}`; return {}; } catch { return; } } }"},
+			{Code: "class A extends B { constructor() { try { class C { static value = 0; [super()]() {} } } catch { return {}; } } }"},
 			{Code: "class A extends B { constructor() { return super(); } }"},
 			{Code: "class A extends B { constructor() { return (super()); } }"},
 			{Code: "class A extends B { constructor() { return condition ? super() : {}; } }"},
@@ -56,6 +69,46 @@ func TestConstructorSuperExecutionRegressions(t *testing.T) {
 			{Code: "class A extends B { static x=maybeThrow(); constructor(){try{super();}catch{super();}} }"},
 		},
 		[]rule_tester.InvalidTestCase{
+			// Escaping static exceptions and conversions after a successful call.
+			{Code: "class A extends B { constructor() { try { class C { static value = fail(); } return {}; } catch {} } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingSome", Message: "Lacked a call of 'super()' in some code paths.", Line: 1, Column: 21, EndLine: 1, EndColumn: 101},
+			}},
+			{Code: "class A extends B { constructor() { try { const C = class { static value = fail(); }; return {}; } catch {} } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingSome", Message: "Lacked a call of 'super()' in some code paths.", Line: 1, Column: 21, EndLine: 1, EndColumn: 110},
+			}},
+			{Code: "class A extends B { constructor() { try { class C { static { fail(); } } return {}; } catch {} } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingSome", Message: "Lacked a call of 'super()' in some code paths.", Line: 1, Column: 21, EndLine: 1, EndColumn: 97},
+			}},
+			{Code: "class A extends B { constructor() { try { class C { static { throw 0; } } return {}; } catch {} } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingAll", Message: "Expected to call 'super()'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 98},
+			}},
+			{Code: "class A extends B { constructor() { try { class C { static { try { throw 0; } finally {} } } return {}; } catch {} } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingAll", Message: "Expected to call 'super()'.", Line: 1, Column: 21, EndLine: 1, EndColumn: 117},
+			}},
+			{Code: "class A extends B { constructor() { super(); try { class C { static value = fail(); } } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 97, EndLine: 1, EndColumn: 104},
+			}},
+			{Code: "class A extends B { constructor() { try { class C { static value = fail(); [super()]() {} } } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 103, EndLine: 1, EndColumn: 110},
+			}},
+			{Code: "class B { toString() { throw new Error(\"coercion failed\"); } } class A extends B { constructor() { try { `${super()}`; } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 130, EndLine: 1, EndColumn: 137},
+			}},
+			{Code: "class A extends B { constructor() { try { ({[super()]: 0}); } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 71, EndLine: 1, EndColumn: 78},
+			}},
+			{Code: "class A extends B { constructor() { try { ({[super()]() {}}); } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 73, EndLine: 1, EndColumn: 80},
+			}},
+			{Code: "class A extends B { constructor() { try { class C { [super()]() {} } } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 80, EndLine: 1, EndColumn: 87},
+			}},
+			{Code: "class A extends B { constructor() { try { `${super()}${0}`; } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 71, EndLine: 1, EndColumn: 78},
+			}},
+			{Code: "class A extends B { constructor() { try { tag`${super()}`; } catch { super(); } } }", Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "duplicate", Message: "Unexpected duplicate 'super()'.", Line: 1, Column: 70, EndLine: 1, EndColumn: 77},
+			}},
 			{Code: "class A extends B { constructor() { for(const {x=super()} of []){break;} } }", Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "missingSome", Message: "Lacked a call of 'super()' in some code paths.", Line: 1, Column: 21, EndLine: 1, EndColumn: 75},
 			}},
