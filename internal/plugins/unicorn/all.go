@@ -3,6 +3,7 @@ package unicorn_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/better_dom_traversing"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_assert"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_template_literal_escape"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
@@ -138,6 +139,7 @@ func GetAllRules() []rule.Rule {
 		prefer_optional_catch_binding.PreferOptionalCatchBindingRule,
 		better_dom_traversing.BetterDomTraversingRule,
 		catch_error_name.CatchErrorNameRule,
+		consistent_assert.ConsistentAssertRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,

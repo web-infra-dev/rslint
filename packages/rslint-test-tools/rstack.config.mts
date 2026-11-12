@@ -850,6 +850,7 @@ const ecosystemTests = {
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/better-dom-traversing.test.ts',
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-assert.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-template-literal-escape.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-tuple-labels.test.ts',
