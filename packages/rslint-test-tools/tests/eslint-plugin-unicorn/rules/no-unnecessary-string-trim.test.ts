@@ -50,6 +50,10 @@ tester.run('no-unnecessary-string-trim', {
       code: 'import {z} from "zod"; (<unknown>z.string()).trim().startsWith("-");',
       filename: 'file.ts',
     },
+    // Rslint skips these upstream invalid cases to preserve valid Zod schemas.
+    'import z from "zod"; z.string().trim().startsWith("-")',
+    'import {z} from "zod"; z["string"]().trim().startsWith("-")',
+    'import {z} from "zod"; z.string("argument").trim().startsWith("-")',
     'foo.trimStart().startsWith("-")',
     'foo.trimEnd().endsWith("-")',
     'foo.trim().includes("-")',
@@ -152,24 +156,6 @@ tester.run('no-unnecessary-string-trim', {
       'trimStart',
       1,
       40,
-    ),
-    invalid(
-      'import z from "zod"; z.string().trim().startsWith("-")',
-      'trimStart',
-      1,
-      33,
-    ),
-    invalid(
-      'import {z} from "zod"; z["string"]().trim().startsWith("-")',
-      'trimStart',
-      1,
-      38,
-    ),
-    invalid(
-      'import {z} from "zod"; z.string("argument").trim().startsWith("-")',
-      'trimStart',
-      1,
-      45,
     ),
     invalid(
       'import {z} from "zod"; z.number().trim().startsWith("-")',

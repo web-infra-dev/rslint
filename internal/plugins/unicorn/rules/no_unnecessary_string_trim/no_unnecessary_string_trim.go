@@ -74,7 +74,9 @@ var NoUnnecessaryStringTrimRule = rule.Rule{
 						return
 					}
 				}
-				if unicornutil.IsKnownNonStringWithAnnotations(ctx, trim.Object) || isStaticNonString(ctx.SourceFile, getEvaluator(), receiver) {
+				if unicornutil.IsKnownNonStringWithAnnotations(ctx, trim.Object) ||
+					isStaticNonString(ctx.SourceFile, getEvaluator(), receiver) ||
+					hasNonStringJSDocReceiver(ctx, receiver) {
 					return
 				}
 				ctx.ReportNodeWithDeferredFixes(trim.Property, message, func() []rule.RuleFix {
@@ -114,31 +116,42 @@ func isStaticNonString(file *ast.SourceFile, evaluator *utils.StaticStringEvalua
 }
 
 func isZodStringCall(ctx rule.RuleContext, node *ast.Node) bool {
-	zeroArguments := 0
-	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
-		Method: "string", ArgumentsLength: &zeroArguments,
-	})
-	if !ok {
+	if !ast.IsCallExpression(node) {
 		return false
 	}
-	object := utils.ESTreeRuntimeExpression(call.Object)
-	if !ast.IsIdentifier(object) {
+	callee := utils.ESTreeCallCallee(node.Expression())
+	if callee == nil {
 		return false
+	}
+	callee = ast.SkipOuterExpressions(callee, ast.OEKAll)
+	reference := callee
+	direct := ast.IsIdentifier(callee)
+	if !direct {
+		if name, ok := utils.AccessExpressionStaticName(callee); !ok || name != "string" {
+			return false
+		}
+		reference = ast.SkipOuterExpressions(utils.AccessExpressionObject(callee), ast.OEKAll)
 	}
 	// Resolve the runtime binding so a same-named TS type cannot hide a Zod import.
-	symbol := ctx.Refs.ResolveInFile(object)
+	symbol := ctx.Refs.ResolveInFile(reference)
 	if symbol == nil {
 		return false
 	}
 	for _, binding := range symbol.Declarations {
-		switch binding.Kind {
-		case ast.KindImportSpecifier:
-			if binding.PropertyNameOrName().Text() != "z" {
+		if direct {
+			if binding.Kind != ast.KindImportSpecifier || binding.PropertyNameOrName().Text() != "string" {
 				continue
 			}
-		case ast.KindNamespaceImport:
-		default:
-			continue
+		} else {
+			switch binding.Kind {
+			case ast.KindImportClause, ast.KindNamespaceImport:
+			case ast.KindImportSpecifier:
+				if name := binding.PropertyNameOrName().Text(); name != "z" && name != "default" {
+					continue
+				}
+			default:
+				continue
+			}
 		}
 		if ast.IsTypeOnlyImportDeclaration(binding) {
 			continue

@@ -10,8 +10,7 @@ A second argument can make the other side of the string observable. So can
 trailing whitespace in a prefix or leading whitespace in a suffix. The rule
 also skips optional chaining on the call chain, `trim()` calls with arguments,
 and search values whose primitive string form cannot be determined statically.
-It skips `z.string()` for runtime named `z` imports and namespace imports from
-`zod`.
+It skips `trim()` directly after a Zod string constructor call from `zod`.
 
 Examples of **incorrect** code for this rule
 
@@ -34,6 +33,11 @@ value.trim().startsWith('foo ');
 This rule has no options.
 
 ## Differences from upstream
+
+Rslint skips Zod string constructors called through a default import, a named
+`string` import, bracket access such as `z['string']()`, or with constructor
+options. In these cases, Unicorn v79.0.0 can suggest replacing `trim()` with
+`trimStart()` or `trimEnd()`, which would throw when building the schema.
 
 With a local type alias named `z`, Unicorn v79.0.0 offers a `trimStart()`
 autofix for the schema below. Rslint skips the call because `z.string()`
