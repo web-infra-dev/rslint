@@ -101,25 +101,41 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					parentNode := symbol.ValueDeclaration.Parent
+					parentNode := param.Parent
 					if !ast.IsFunctionExpression(parentNode) && !ast.IsArrowFunction(parentNode) {
 						return
 					}
 
 					params := parentNode.Parameters()
-					if len(params) < 2 || params[1] != param {
+					if len(params) < 2 {
 						return
 					}
 
-					for {
+					rejectParam := params[1].AsParameterDeclaration()
+					// Upstream only tracks an identifier parameter, not an assignment
+					// pattern, rest element, or destructuring pattern.
+					if !ast.IsIdentifier(rejectParam.Name()) || rejectParam.Initializer != nil || rejectParam.DotDotDotToken != nil {
+						return
+					}
+					// The resolved call symbol identifies this executor's parameter,
+					// but TypeScript can give duplicate parameters separate symbols.
+					// Within that same executor, equal parameter names share a JS
+					// binding even when ValueDeclaration selects the first parameter.
+					if !ast.IsIdentifier(param.Name()) || param.Name().Text() != rejectParam.Name().Text() {
+						return
+					}
+
+					executor := parentNode
+					parentNode = parentNode.Parent
+					for parentNode != nil && ast.IsParenthesizedExpression(parentNode) {
 						parentNode = parentNode.Parent
-						if ast.IsParenthesizedExpression(parentNode) {
-							continue
-						}
-						if !ast.IsNewExpression(parentNode) {
-							return
-						}
-						break
+					}
+					if parentNode == nil || !ast.IsNewExpression(parentNode) {
+						return
+					}
+					arguments := parentNode.AsNewExpression().Arguments
+					if arguments == nil || len(arguments.Nodes) == 0 || ast.SkipParentheses(arguments.Nodes[0]) != executor {
+						return
 					}
 
 					if !utils.IsPromiseConstructorLike(ctx.Program(), ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(parentNode.Expression())) {
