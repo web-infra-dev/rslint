@@ -1,3 +1,4 @@
+// cspell:ignore jsxfrag jsxruntime jsximportsource
 package no_unused_vars
 
 import (
@@ -7,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -1811,7 +1813,12 @@ func binderReferenceSymbolWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *
 	if node == nil || !ast.IsIdentifier(node) {
 		return nil
 	}
-	name := node.Text()
+	return binderSymbolByName(node, node.Text(), meaning)
+}
+
+// binderSymbolByName also resolves implicit references at authored JSX nodes,
+// without inserting synthetic identifiers into the source AST.
+func binderSymbolByName(node *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
 	matchesMeaning := func(symbol *ast.Symbol) bool {
 		return symbol != nil && symbol.Flags&meaning != 0
 	}
@@ -1839,6 +1846,80 @@ func binderReferenceSymbolWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *
 		}
 	}
 	return nil
+}
+
+type jsxFactoryNames struct {
+	factory  string
+	fragment string
+}
+
+// classicJsxFactories reads the transform inputs without requiring a checker.
+// Preserve-mode files need an explicit classic runtime, factory, or pragma;
+// merely having JSX does not make an otherwise-unused React binding used.
+func classicJsxFactories(ctx rule.RuleContext) jsxFactoryNames {
+	if ctx.SourceFile.SubtreeFacts()&ast.SubtreeContainsJsx == 0 {
+		return jsxFactoryNames{}
+	}
+	options := &core.CompilerOptions{}
+	if ctx.Program() != nil {
+		options = ctx.Program().Options()
+	}
+	file := ctx.SourceFile
+	pragma := func(name string) string {
+		return ast.GetPragmaArgument(ast.GetPragmaFromSourceFile(file, name), "factory")
+	}
+	reactSettings, _ := ctx.Settings["react"].(map[string]interface{})
+	setting := func(name string) string {
+		value, _ := reactSettings[name].(string)
+		return value
+	}
+	factoryPragma, fragmentPragma := pragma("jsx"), pragma("jsxfrag")
+	factorySetting, fragmentSetting := setting("pragma"), setting("fragment")
+
+	// Resolve an explicit runtime before using factory declarations to infer
+	// classic JSX. A stale factory never overrides an explicit automatic runtime.
+	// File pragmas override settings; settings override the project's transform.
+	runtime := pragma("jsxruntime")
+	if runtime != "classic" && runtime != "automatic" {
+		switch {
+		case pragma("jsximportsource") != "":
+			runtime = "automatic"
+		case setting("runtime") == "classic" || setting("runtime") == "automatic":
+			runtime = setting("runtime")
+		case ast.GetJSXImplicitImportBase(options, file) != "":
+			runtime = "automatic"
+		case options.Jsx == core.JsxEmitReact:
+			runtime = "classic"
+		case factoryPragma != "" || fragmentPragma != "" ||
+			factorySetting != "" || fragmentSetting != "" ||
+			options.JsxFactory != "" || options.JsxFragmentFactory != "" || options.ReactNamespace != "":
+			runtime = "classic"
+		}
+	}
+	if runtime != "classic" {
+		return jsxFactoryNames{}
+	}
+
+	namespace := options.ReactNamespace
+	if namespace == "" {
+		namespace = "React"
+	}
+	rootName := func(names ...string) string {
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			if entity := parser.ParseIsolatedEntityName(name); entity != nil {
+				return ast.GetFirstIdentifier(entity).Text()
+			}
+			return ""
+		}
+		return ""
+	}
+	return jsxFactoryNames{
+		factory:  rootName(factoryPragma, factorySetting, options.JsxFactory, namespace+".createElement"),
+		fragment: rootName(fragmentPragma, fragmentSetting, options.JsxFragmentFactory, namespace+".Fragment"),
+	}
 }
 
 // collectLocalExportTargets adds the exact local symbols consumed by one named
@@ -1893,13 +1974,23 @@ func collectLocalExportTargets(refs *rule.RefStore, node *ast.Node, targets map[
 //   - localExportTargets: local symbols consumed by named export declarations
 //   - globalRefsByName: references to tracked inline-global names that are not
 //     shadowed by a local declaration
-func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, localExportTargets map[*ast.Symbol]bool, globalRefsByName map[string][]*ast.Node) {
+func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node, writeRefs map[*ast.Symbol][]*ast.Node, localExportTargets map[*ast.Symbol]bool, globalRefsByName map[string][]*ast.Node, jsxFactories jsxFactoryNames) {
 	sf := sourceFile.AsSourceFile()
 	addUsage := func(sym *ast.Symbol, node *ast.Node) {
 		if sym == nil {
 			return
 		}
 		usages[sym] = append(usages[sym], node)
+	}
+	markJsxFactoryUsed := func(node *ast.Node, name string) {
+		if name == "" {
+			return
+		}
+		sym := binderSymbolByName(node, name, ast.SymbolFlagsValue|ast.SymbolFlagsAlias)
+		addUsage(sym, node)
+		if _, tracked := globalRefsByName[name]; tracked && (sym == nil || !utils.IsSymbolDeclaredInFile(sym, sf)) {
+			globalRefsByName[name] = append(globalRefsByName[name], node)
+		}
 	}
 
 	var walk func(*ast.Node)
@@ -1908,6 +1999,15 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 			return
 		}
 		collectLocalExportTargets(refs, node, localExportTargets)
+		switch node.Kind {
+		case ast.KindJsxOpeningElement, ast.KindJsxSelfClosingElement:
+			markJsxFactoryUsed(node, jsxFactories.factory)
+		case ast.KindJsxOpeningFragment:
+			markJsxFactoryUsed(node, jsxFactories.factory)
+			if jsxFactories.fragment != jsxFactories.factory {
+				markJsxFactoryUsed(node, jsxFactories.fragment)
+			}
+		}
 
 		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
 			sym := binderReferenceSymbol(node)
@@ -2257,13 +2357,14 @@ func newRule() rule.Rule {
 				reporter:          reporter,
 			}
 			collected := false
+			jsxFactories := classicJsxFactories(ctx)
 
 			seenWithoutBodyFuncSymbols := make(map[*ast.Symbol]bool)
 
 			ensureCollected := func(node *ast.Node) {
 				if !collected {
 					sourceFile := ast.GetSourceFileOfNode(node)
-					collectSymbolUsages(ctx.Refs, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName)
+					collectSymbolUsages(ctx.Refs, sourceFile.AsNode(), ac.allUsages, ac.writeRefs, ac.localExportTargets, ac.globalRefsByName, jsxFactories)
 					collected = true
 				}
 			}

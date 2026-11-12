@@ -37,6 +37,51 @@ variable scope. When it is safe to do so, the diagnostic includes a suggestion
 that removes the unused declaration, parameter, destructuring element, class,
 function, or import.
 
+## JSX factory references
+
+Classic JSX implicitly reads its factory even when the source contains no
+explicit reference to it. With `jsx: "react"` in the selected TypeScript or
+JavaScript project, this example uses the `React` import:
+
+```jsx
+import React from 'react';
+
+export const Example = () => <div />;
+```
+
+The rule resolves JSX configuration in this order, using only explicitly
+provided values:
+
+1. File pragmas: `@jsxRuntime`, `@jsx`, and `@jsxFrag`.
+2. Rslint settings: `settings.react.runtime`, `settings.react.pragma`, and
+   `settings.react.fragment`.
+3. Project compiler options: `jsx`, `jsxFactory`, and `jsxFragmentFactory`.
+4. Default factories: `React.createElement` and `React.Fragment` (or the
+   project's legacy `reactNamespace`).
+
+Runtime is resolved first. An explicit `settings.react.runtime: "classic"`
+overrides a project's `react-jsx` / `react-jsxdev` mode; `"automatic"` overrides
+`jsx: "react"`. A file's `@jsxRuntime` overrides both. A file `@jsxImportSource`
+also selects automatic JSX, unless that file explicitly selects classic JSX;
+project `jsxImportSource` supplies automatic JSX when no file or settings runtime
+has been selected.
+
+With an automatic runtime, classic factory bindings are not marked as used,
+even when factory settings or pragmas remain configured. With no explicit
+runtime, a factory or fragment declaration can select classic JSX, including
+`settings.react.pragma` or `settings.react.fragment` alone. Preserve-mode files
+without any runtime or factory declaration retain ordinary unused-variable
+checks.
+
+For classic JSX, resolve factory and fragment independently using the order
+above. An omitted, empty, or non-string setting does not replace the project's
+factory. Each implicit reference resolves in the JSX expression's lexical
+scope, including parameter defaults and shadowed bindings. A fragment factory
+is read only when a shorthand fragment occurs.
+
+File pragmas follow TypeScript's leading block-comment syntax. Native
+`react/jsx-uses-react` is a no-op; enabling it alone does not select the runtime.
+
 ## Options
 
 The rule accepts either `"all"` or `"local"` as a shorthand for `vars`, or one
