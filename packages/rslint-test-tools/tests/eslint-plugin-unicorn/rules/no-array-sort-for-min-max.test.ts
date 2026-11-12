@@ -461,7 +461,7 @@ test('the suggested code evaluates the receiver once and leaves the array in its
       );
       expect([...suggested.values]).toEqual(values);
       expect([...original.values]).toEqual(
-        method === 'min' ? values.toSorted((a, b) => a - b) : values,
+        method === 'min' ? [...values].sort((a, b) => a - b) : values,
       );
     }
   }
