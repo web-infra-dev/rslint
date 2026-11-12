@@ -3,9 +3,13 @@ package no_late_event_control_test
 import (
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_late_event_control"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoLateEventControlExtras(t *testing.T) {
@@ -58,6 +62,10 @@ const submit = event => event.preventDefault();`},
 async function submit(event) {
 	await save();
 	event.preventDefault();
+}`},
+			// Generator calls evaluate default parameters synchronously.
+			{FileName: "file.js", Code: `async function* submit(event, { result = event.preventDefault() } = {}) {
+	yield result;
 }`},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -118,6 +126,23 @@ const listeners = {
 				callError("in-generator", "event.stopPropagation()", 7, 3, 7, 26),
 				callError("in-nested-function", "event.preventDefault()", 8, 16, 8, 38),
 			),
+			// Static fields and computed names run during class evaluation.
+			invalidCall("file.js", `function handle(event) {
+	return class Deferred {
+		static value = event.stopPropagation();
+		[event.stopImmediatePropagation()] = event.preventDefault();
+	};
+}`,
+				callError("in-nested-function", "event.preventDefault()", 4, 40, 4, 62),
+			),
+			// A generator body and a callback created in its defaults can run later.
+			invalidCall("file.js", `function* handle(event, value = event.preventDefault(), later = () => event.stopPropagation()) {
+	event.stopImmediatePropagation();
+	yield later;
+}`,
+				callError("in-nested-function", "event.stopPropagation()", 1, 71, 1, 94),
+				callError("in-generator", "event.stopImmediatePropagation()", 2, 2, 2, 34),
+			),
 			// An async JSX event handler.
 			invalidCall("file.jsx", `const form = <button onClick={async e => {
 	await save();
@@ -164,6 +189,73 @@ async function submit(input: Identity<MouseEvent>) {
 	input.preventDefault();
 }`,
 				callError("after-suspension", "input.preventDefault()", 4, 2, 4, 24),
+			),
+		},
+	)
+}
+
+func TestNoLateEventControlIntersections(t *testing.T) {
+	root := fixtures.GetRootDir()
+	types, err := txtarfs.MustParseFile(t, "testdata/intersection_types.txtar").ReadFile("types.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{tspath.ResolvePath(root.Dir, "types.ts"): string(types)})
+	rule_tester.RunRuleTester(root, "tsconfig.json", t, &no_late_event_control.NoLateEventControlRule,
+		[]rule_tester.ValidTestCase{
+			{FileName: "file.ts", Code: `import type { Opaque } from "./types";
+async function handle(input: MouseEvent & Opaque) {
+	await save();
+	input.preventDefault();
+}`},
+			{FileName: "file.ts", Code: `import type { Opaque } from "./types";
+type Input = MouseEvent & Opaque;
+async function handle(input: Input) {
+	await save();
+	input.preventDefault();
+}`},
+			{FileName: "file.ts", Code: `async function handle<T>(input: (MouseEvent & T) | KeyboardEvent) {
+	await save();
+	input.preventDefault();
+}`},
+		},
+		[]rule_tester.InvalidTestCase{
+			invalidCall("file.ts", `import type { Tag } from "./types";
+async function handle(input: MouseEvent & Tag) {
+	await save();
+	input.preventDefault();
+}`,
+				callError("after-suspension", "input.preventDefault()", 4, 2, 4, 24),
+			),
+		},
+	)
+}
+
+func TestNoLateEventControlIntersectionsWithoutTypeInformation(t *testing.T) {
+	testRule := no_late_event_control.NoLateEventControlRule
+	run := testRule.Run
+	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return run(ctx, options)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule,
+		[]rule_tester.ValidTestCase{
+			{FileName: "file.ts", Code: `async function handle(input: (MouseEvent & unknown) | KeyboardEvent) {
+	await save();
+	input.preventDefault();
+}`},
+			{FileName: "file.ts", Code: `type Input<T> = MouseEvent & T;
+async function handle(input: Input<unknown>) {
+	await save();
+	input.preventDefault();
+}`},
+		},
+		[]rule_tester.InvalidTestCase{
+			invalidCall("file.ts", `async function handle(input: MouseEvent & { tag: string }) {
+	await save();
+	input.preventDefault();
+}`,
+				callError("after-suspension", "input.preventDefault()", 3, 2, 3, 24),
 			),
 		},
 	)

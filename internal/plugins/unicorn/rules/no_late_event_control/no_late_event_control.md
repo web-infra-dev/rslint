@@ -44,8 +44,8 @@ element.addEventListener("click", (event) => {
 ## Limitations
 
 - The rule reports calls inside nested functions, including callbacks that
-  run synchronously. It also reports calls in generator handlers, whose
-  bodies run when the iterator advances.
+  run synchronously. It also reports calls in generator handler bodies, which
+  run when the iterator advances.
 - The rule treats an earlier `await` or `yield` as a suspension even when
   the suspension and the call are in mutually exclusive branches. It also
   checks repeated parts of loops that can suspend.
@@ -58,6 +58,14 @@ Rslint recognizes event types passed through a local generic alias even
 without TypeScript project information. For example, if `type Identity<T> = T`,
 a parameter declared as `input: Identity<MouseEvent>` is still checked for
 late calls. Upstream needs project information to report that case.
+
+Rslint reports calls in instance field initializers because those run when
+an instance is created. Static fields and computed names are checked in the
+surrounding handler because they run during class evaluation.
+
+Generator parameter defaults run synchronously when the handler is called,
+so Rslint allows direct event-control calls there. It reports calls in the
+generator body and callbacks that capture the event.
 
 ## Original documentation
 

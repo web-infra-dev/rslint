@@ -4,6 +4,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -126,6 +127,19 @@ var eventTypes = unicornutil.TypeClassifierOptions{
 	HeritageSymbolFlags: ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
 }
 
+// Count event types as known non-targets to detect unresolved members that
+// would otherwise be masked by an event in an intersection.
+var knownTypeMembers = unicornutil.TypeClassifierOptions{
+	NonTargetTypeNames:  eventTypeNames,
+	HeritageSymbolFlags: eventTypes.HeritageSymbolFlags,
+	ClassifyTypeImport: func(moduleName, exportName string) unicornutil.TypeClass {
+		if classifyEventTypeImport(moduleName, exportName) == unicornutil.TypeUnknown {
+			return unicornutil.TypeUnknown
+		}
+		return unicornutil.TypeNonTarget
+	},
+}
+
 func classifyEventTypeImport(moduleName, exportName string) unicornutil.TypeClass {
 	if moduleName == "react" {
 		if reactEventTypeNames.Has(exportName) {
@@ -141,15 +155,43 @@ func classifyEventTypeImport(moduleName, exportName string) unicornutil.TypeClas
 
 func isEventParameter(ctx rule.RuleContext, parameter, binding *ast.Node) bool {
 	class := unicornutil.TypeUnknown
+	var annotation *ast.Node
 	if binding == parameter.Name() {
-		annotation, _ := unicornutil.ValueTypeAnnotation(ctx, parameter)
+		annotation, _ = unicornutil.ValueTypeAnnotation(ctx, parameter)
 		if annotation != nil {
-			class = unicornutil.ClassifyTypeAnnotation(ctx, annotation, eventTypes)
+			class = classifyEventAnnotation(ctx, annotation)
 		}
 	}
-	if class == unicornutil.TypeUnknown && ctx.TypeChecker != nil {
-		class = unicornutil.ClassifyType(ctx, ctx.TypeChecker.GetTypeAtLocation(binding), eventTypes)
+	if ctx.TypeChecker != nil {
+		switch {
+		case class == unicornutil.TypeUnknown:
+			class = classifyEventType(ctx, ctx.TypeChecker.GetTypeAtLocation(binding))
+		case class == unicornutil.TypeTarget && !utils.IsJSDocSyntaxNode(annotation):
+			// An alias can hide an any type that only TypeScript can resolve.
+			resolved := ctx.TypeChecker.GetTypeAtLocation(annotation)
+			if utils.IsTypeAnyType(resolved) && !utils.IsIntrinsicErrorType(resolved) {
+				class = unicornutil.TypeUnknown
+			}
+		}
 	}
 	return class == unicornutil.TypeTarget ||
 		(class == unicornutil.TypeUnknown && eventParameterName.MatchString(binding.Text()))
+}
+
+func classifyEventAnnotation(ctx rule.RuleContext, annotation *ast.Node) unicornutil.TypeClass {
+	class := unicornutil.ClassifyTypeAnnotation(ctx, annotation, eventTypes)
+	if class == unicornutil.TypeTarget &&
+		unicornutil.ClassifyTypeAnnotation(ctx, annotation, knownTypeMembers) == unicornutil.TypeUnknown {
+		return unicornutil.TypeUnknown
+	}
+	return class
+}
+
+func classifyEventType(ctx rule.RuleContext, typ *checker.Type) unicornutil.TypeClass {
+	class := unicornutil.ClassifyType(ctx, typ, eventTypes)
+	if class == unicornutil.TypeTarget &&
+		unicornutil.ClassifyType(ctx, typ, unicornutil.TypeClassifierOptions{}) == unicornutil.TypeUnknown {
+		return unicornutil.TypeUnknown
+	}
+	return class
 }

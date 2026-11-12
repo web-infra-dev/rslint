@@ -26,7 +26,7 @@ type handlerTiming struct {
 }
 
 func (timing *handlerTiming) markSuspended(node *ast.Node) {
-	if handler := enclosingFunction(node); handler != nil {
+	if handler, _ := enclosingExecutionContext(node); handler != nil {
 		if timing.suspended == nil {
 			timing.suspended = make(map[*ast.Node]bool)
 		}
@@ -35,12 +35,16 @@ func (timing *handlerTiming) markSuspended(node *ast.Node) {
 }
 
 func (timing *handlerTiming) lateCall(node, handler *ast.Node) rule.RuleMessage {
-	if enclosingFunction(node) != handler {
+	context, child := enclosingExecutionContext(node)
+	if context != handler {
 		return inNestedFunction
 	}
 	flags := ast.GetFunctionFlags(handler)
 	if flags&ast.FunctionFlagsGenerator != 0 {
-		return inGenerator
+		if child == handler.Body() {
+			return inGenerator
+		}
+		return rule.RuleMessage{}
 	}
 	if timing.suspended[handler] || flags&ast.FunctionFlagsAsync != 0 && timing.isInsideSuspendingLoop(node, handler) {
 		return afterSuspension
@@ -48,18 +52,23 @@ func (timing *handlerTiming) lateCall(node, handler *ast.Node) rule.RuleMessage 
 	return rule.RuleMessage{}
 }
 
-func enclosingFunction(node *ast.Node) *ast.Node {
+func enclosingExecutionContext(node *ast.Node) (*ast.Node, *ast.Node) {
 	for child, parent := node, node.Parent; parent != nil; child, parent = parent, parent.Parent {
-		if ast.IsFunctionLikeDeclaration(parent) && !isEvaluatedOutsideFunction(parent, child) {
-			return parent
+		if startsExecutionContext(parent, child) {
+			return parent, child
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-// A method's computed name and decorators are evaluated in the enclosing code.
-func isEvaluatedOutsideFunction(function, child *ast.Node) bool {
-	return child == function.Name() || ast.IsDecorator(child)
+func startsExecutionContext(parent, child *ast.Node) bool {
+	if ast.IsFunctionLikeDeclaration(parent) {
+		// Method names and decorators run during object or class evaluation.
+		return child != parent.Name() && !ast.IsDecorator(child)
+	}
+	// Instance fields run at construction. The field name and static fields
+	// run during class evaluation.
+	return ast.IsPropertyDeclaration(parent) && child == parent.Initializer() && !ast.IsStatic(parent)
 }
 
 func (timing *handlerTiming) isInsideSuspendingLoop(node, handler *ast.Node) bool {
@@ -103,9 +112,9 @@ func containsSuspension(node *ast.Node) bool {
 			return true
 		}
 	}
-	if ast.IsFunctionLikeDeclaration(node) {
+	if ast.IsFunctionLikeDeclaration(node) || ast.IsPropertyDeclaration(node) {
 		return node.ForEachChild(func(child *ast.Node) bool {
-			return isEvaluatedOutsideFunction(node, child) && containsSuspension(child)
+			return !startsExecutionContext(node, child) && containsSuspension(child)
 		})
 	}
 	return node.ForEachChild(containsSuspension)
