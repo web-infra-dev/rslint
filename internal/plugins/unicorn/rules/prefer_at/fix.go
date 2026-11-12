@@ -64,7 +64,7 @@ func indexFixes(ctx rule.RuleContext, node, length *ast.Node) []rule.RuleFix {
 		return nil
 	}
 	fixes = append(fixes, rule.RuleFixReplaceRange(open.Range(), replacement), rule.RuleFixReplaceRange(closeBracket.Range(), ")"))
-	if inUnparenthesizedConstructorCallee(node) {
+	if unicornutil.IsInUnparenthesizedConstructorCallee(node) {
 		fixes = append(fixes, rule.RuleFixInsertBefore(source, node, "("), rule.RuleFixInsertAfter(node, ")"))
 	}
 	return fixes

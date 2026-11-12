@@ -52,6 +52,7 @@ type TypeClassifierOptions struct {
 	HeritageSymbolFlags          ast.SymbolFlags
 	NonTargetSymbolLessTypeFlags checker.TypeFlags
 	AllowNullishInMixedUnion     bool
+	TreatMixedUnionAsTarget      bool
 	TreatMixedUnionAsNonTarget   bool
 	PreferKnownAnnotationNames   bool
 }
@@ -128,7 +129,11 @@ func classifyUnion(ctx rule.RuleContext, parts []*checker.Type, options TypeClas
 			utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
 			continue
 		}
-		classes = append(classes, ClassifyType(ctx, part, options))
+		class := ClassifyType(ctx, part, options)
+		if options.TreatMixedUnionAsTarget && class == TypeTarget {
+			return TypeTarget
+		}
+		classes = append(classes, class)
 	}
 	if len(classes) == 0 {
 		return TypeNonTarget

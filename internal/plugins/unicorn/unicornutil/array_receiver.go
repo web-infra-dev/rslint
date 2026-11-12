@@ -29,6 +29,18 @@ func IsKnownNonIndexedCollection(ctx rule.RuleContext, node *ast.Node) bool {
 	return classifyArrayReceiver(ctx, node, indexedCollectionTargets, knownNonIndexedCollectionNames) == arrayClassNonTarget
 }
 
+// IsKnownBigIntTypedArray reports whether a receiver is known to have a
+// BigInt typed array among its possible types.
+func IsKnownBigIntTypedArray(ctx rule.RuleContext, node *ast.Node) bool {
+	return classifyArrayReceiverWithOptions(ctx, node, bigIntTypedArrayTargets, nil, ArrayReceiverOptions{
+		CheckArrayProducers:        true,
+		CheckClassHeritage:         true,
+		ReadJSDoc:                  true,
+		preferKnownAnnotationNames: true,
+		treatMixedUnionAsTarget:    true,
+	}) == arrayClassTarget
+}
+
 // ArrayReceiverOptions controls the upstream opt-in receiver policies. The
 // zero value preserves the existing class and union policies.
 type ArrayReceiverOptions struct {
@@ -38,6 +50,8 @@ type ArrayReceiverOptions struct {
 	CheckClassSyntax           bool
 	ReadJSDoc                  bool
 	TreatMixedUnionAsNonTarget bool
+	preferKnownAnnotationNames bool
+	treatMixedUnionAsTarget    bool
 }
 
 // IsKnownNonIndexedCollectionWithOptions applies rule-specific receiver
@@ -85,6 +99,7 @@ const (
 )
 
 var arrayTargets = utils.NewSetFromItems("Array", "ReadonlyArray")
+var bigIntTypedArrayTargets = utils.NewSetFromItems("BigInt64Array", "BigUint64Array")
 
 var indexedCollectionTargets = func() *utils.Set[string] {
 	s := utils.NewSetFromItems("Array", "ReadonlyArray")
@@ -271,11 +286,12 @@ func classifyArrayReceiverInner(
 	// eslint-utils can fold them; upstream keeps those shapes unknown. In
 	// source-only files, calls take the guarded path below so tsgo's ambient
 	// return types cannot classify arbitrary user calls.
-	if !state.useTypeInformation && ast.IsCallExpression(node) {
+	classifyArrays := targetNames.Has("Array")
+	if classifyArrays && !state.useTypeInformation && ast.IsCallExpression(node) {
 		if class := classifySourceOnlyStaticCall(ctx, node); class != arrayClassUnknown {
 			return class
 		}
-	} else if !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
+	} else if classifyArrays && !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
 		// Keep source-only evaluation bounded. The shared evaluator is recursive;
 		// repeatedly folding the same adversarial const chain here would otherwise
 		// be both more permissive than eslint-utils and quadratic in practice.
@@ -295,7 +311,7 @@ func classifyArrayReceiverInner(
 			return class
 		}
 	}
-	if isSyntacticArrayNode(node) {
+	if classifyArrays && isSyntacticArrayNode(node) {
 		return arrayClassTarget
 	}
 	if isSyntacticTargetConstructor(node, targetNames) {
@@ -312,7 +328,7 @@ func classifyArrayReceiverInner(
 				return arrayClassNonTarget
 			}
 		case "keys", "values", "entries", "getOwnPropertyNames", "getOwnPropertySymbols":
-			if state.options.CheckArrayProducers && NodeMatchesPath(call.Object, "Object") {
+			if state.options.CheckArrayProducers && classifyArrays && NodeMatchesPath(call.Object, "Object") {
 				return arrayClassTarget
 			}
 		case "copyWithin", "fill", "reverse", "sort", "toReversed", "toSorted", "toSpliced", "with":
@@ -609,7 +625,7 @@ func classifyArrayIdentifier(
 			return class
 		}
 	}
-	if state.options.CheckArrayProducers && utils.IsRestParameterDeclaration(declaration) && ast.IsIdentifier(declaration.Name()) &&
+	if state.options.CheckArrayProducers && targetNames.Has("Array") && utils.IsRestParameterDeclaration(declaration) && ast.IsIdentifier(declaration.Name()) &&
 		!slices.ContainsFunc(ctx.Refs.References(symbol), utils.IsWriteReference) {
 		return arrayClassTarget
 	}
@@ -737,7 +753,7 @@ func isSyntacticTargetConstructor(node *ast.Node, targetNames *utils.Set[string]
 		return false
 	}
 	name := callee.AsIdentifier().Text
-	return name == "Array" || targetNames.Has(name) && knownNonArrayNames.Has(name)
+	return targetNames.Has(name) && (name == "Array" || knownNonArrayNames.Has(name))
 }
 
 func isSyntacticNonArrayNode(node *ast.Node) bool {
@@ -770,6 +786,8 @@ func arrayTypeOptions(targetNames, nonTargetNames *utils.Set[string], options Ar
 		HeritageSymbolFlags:        heritage,
 		AllowNullishInMixedUnion:   options.AllowNullishInMixedUnion,
 		TreatMixedUnionAsNonTarget: options.TreatMixedUnionAsNonTarget,
+		PreferKnownAnnotationNames: options.preferKnownAnnotationNames,
+		TreatMixedUnionAsTarget:    options.treatMixedUnionAsTarget,
 	}
 }
 

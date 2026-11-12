@@ -364,6 +364,9 @@ func includeNullishSourceType(class TypeClass, options TypeClassifierOptions) Ty
 }
 
 func combineSourceTypeUnion(classes []TypeClass, options TypeClassifierOptions) TypeClass {
+	if options.TreatMixedUnionAsTarget && slices.Contains(classes, TypeTarget) {
+		return TypeTarget
+	}
 	if slices.Contains(classes, typeAny) {
 		return typeAny
 	}
