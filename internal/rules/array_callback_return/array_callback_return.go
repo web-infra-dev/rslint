@@ -166,12 +166,15 @@ func callbackSuggestions(ctx rule.RuleContext, fn, expr *ast.Node, concise bool,
 		anchorEnd = fn.AsArrowFunction().EqualsGreaterThanToken.End()
 		bodyStart := scanner.SkipTrivia(ctx.SourceFile.Text(), anchorEnd)
 		prefix, suffix := "{", "}"
-		// Function/class expressions become declarations at statement start.
+		// A function/class at the left edge becomes a declaration at statement
+		// start, even when it is the callee, receiver, or operand of a larger
+		// expression. GetLeftmostExpression stops at authored parentheses.
 		// A bare "use strict" string becomes a directive, which can also make
 		// a non-simple parameter list illegal. Keep those bodies in expression
 		// context, reusing any parentheses already present in the source.
+		leftmost := ast.GetLeftmostExpression(expr, false)
 		if !ast.IsParenthesizedExpression(expr.Parent) &&
-			(expr.Kind == ast.KindFunctionExpression || expr.Kind == ast.KindClassExpression ||
+			(leftmost.Kind == ast.KindFunctionExpression || leftmost.Kind == ast.KindClassExpression ||
 				(expr.Kind == ast.KindStringLiteral && expr.Text() == "use strict")) {
 			prefix, suffix = "{(", ")}"
 		}

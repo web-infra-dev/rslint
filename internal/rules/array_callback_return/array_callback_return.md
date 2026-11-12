@@ -55,7 +55,7 @@ With `checkForEach: true`, an expression-bodied arrow callback offers a suggesti
 
 ## Differences from upstream
 
-ESLint v9.39.1 can produce invalid code when `wrapBraces` turns a function or class expression into an anonymous declaration, or a `"use strict"` string into a directive with a non-simple parameter list. Rslint preserves expression context by adding parentheses for these bodies and reuses existing parentheses. For example, `() => function () {}` becomes `() => {(function () {})}`, and `(x = 0) => "use strict"` becomes `(x = 0) => {("use strict")}`.
+ESLint v9.39.1 can produce invalid code when `wrapBraces` turns a function or class expression into an anonymous declaration, or a `"use strict"` string into a directive with a non-simple parameter list. Rslint preserves expression context by adding parentheses for these bodies and reuses existing parentheses. This also covers composite expressions whose leftmost expression is a function or class, such as `() => function () {}()` and `() => class {}.name`. For example, `() => function () {}()` becomes `() => {(function () {}())}`, and `(x = 0) => "use strict"` becomes `(x = 0) => {("use strict")}`.
 
 ## Original Documentation
 
