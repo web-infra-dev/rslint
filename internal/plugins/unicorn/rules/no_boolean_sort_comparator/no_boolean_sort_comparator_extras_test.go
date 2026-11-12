@@ -56,6 +56,34 @@ func TestNoBooleanSortComparatorEdges(t *testing.T) {
 	})
 }
 
+func TestNoBooleanSortComparatorSubtractionSafety(t *testing.T) {
+	t.Run("type constraints", func(t *testing.T) {
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_boolean_sort_comparator.NoBooleanSortComparatorRule, nil, []rule_tester.InvalidTestCase{
+			invalidComparator("function f<T extends bigint>(rows: T[]) { return rows.sort((a, b) => a > b); }", "case.ts", 1, 60, 1, 75),
+			invalidComparator("function f<T extends string>(rows: T[]) { return rows.sort((a, b) => a > b); }", "case.ts", 1, 60, 1, 75),
+			invalidComparator("function f<T extends number | bigint>(rows: T[]) { return rows.sort((a, b) => a > b); }", "case.ts", 1, 69, 1, 84),
+			invalidComparator("function f<T extends number>(rows: T[]) { return rows.sort((a, b) => a > b); }", "case.ts", 1, 60, 1, 75,
+				"function f<T extends number>(rows: T[]) { return rows.sort((a, b) => a - b); }"),
+		})
+	})
+	t.Run("without type information", func(t *testing.T) {
+		testedRule := no_boolean_sort_comparator.NoBooleanSortComparatorRule
+		testedRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			ctx.TypeChecker = nil
+			return no_boolean_sort_comparator.NoBooleanSortComparatorRule.Run(ctx, options)
+		}
+		rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule, nil, []rule_tester.InvalidTestCase{
+			invalidComparator("[-2n, -1n].sort((a, b) => a > b);", "case.js", 1, 17, 1, 32),
+			invalidComparator("BigInt64Array.of(1n, 2n).sort((a, b) => a > b);", "case.js", 1, 31, 1, 46),
+			invalidComparator("BigUint64Array['from']([1n, 2n]).toSorted((a, b) => a > b);", "case.js", 1, 43, 1, 58),
+			invalidComparator("Int32Array.of(1, 2).sort((a, b) => a > b);", "case.js", 1, 26, 1, 41,
+				"Int32Array.of(1, 2).sort((a, b) => a - b);"),
+			invalidComparator("function f(BigInt64Array) { return BigInt64Array.of(1, 2).sort((a, b) => a > b); }", "case.js", 1, 64, 1, 79,
+				"function f(BigInt64Array) { return BigInt64Array.of(1, 2).sort((a, b) => a - b); }"),
+		})
+	})
+}
+
 func TestNoBooleanSortComparatorEditDemand(t *testing.T) {
 	const code = "rows.sort((a, b) => a > b); rows.sort((a, b) => a === b);"
 	program, file, err := rule_tester.NewProgramHelper(fixtures.GetRootDir()).CreateTestProgram(code, "case.js", "tsconfig.json")

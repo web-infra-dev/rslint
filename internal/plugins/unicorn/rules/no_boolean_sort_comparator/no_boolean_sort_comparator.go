@@ -145,8 +145,8 @@ func comparatorSuggestion(ctx rule.RuleContext, comparator, result, receiver *as
 func hasStringOrBigIntOperand(ctx rule.RuleContext, left, right, receiver *ast.Node) bool {
 	if types := ctx.TypeChecker; types != nil {
 		const nonNumeric = checker.TypeFlagsStringLike | checker.TypeFlagsBigIntLike
-		if utils.IsTypeFlagSetWithUnion(types.GetTypeAtLocation(left), nonNumeric) ||
-			utils.IsTypeFlagSetWithUnion(types.GetTypeAtLocation(right), nonNumeric) {
+		if utils.IsTypeFlagSetWithUnion(utils.GetConstrainedTypeAtLocation(types, left), nonNumeric) ||
+			utils.IsTypeFlagSetWithUnion(utils.GetConstrainedTypeAtLocation(types, right), nonNumeric) {
 			return true
 		}
 	}
@@ -160,16 +160,34 @@ func hasStringOrBigIntOperand(ctx rule.RuleContext, left, right, receiver *ast.N
 	if ast.IsArrayLiteralExpression(receiver) {
 		return slices.ContainsFunc(receiver.Elements(), func(element *ast.Node) bool {
 			element = utils.ESTreeRuntimeExpression(element)
-			return element != nil && (ast.IsStringLiteralLike(element) || ast.IsTemplateExpression(element) || ast.IsBigIntLiteral(element))
+			if element == nil {
+				return false
+			}
+			if ast.IsPrefixUnaryExpression(element) {
+				unary := element.AsPrefixUnaryExpression()
+				operand := utils.ESTreeRuntimeExpression(unary.Operand)
+				return unary.Operator == ast.KindMinusToken && operand != nil && ast.IsBigIntLiteral(operand)
+			}
+			return ast.IsStringLiteralLike(element) || ast.IsTemplateExpression(element) || ast.IsBigIntLiteral(element)
 		})
 	}
-	if ast.IsNewExpression(receiver) {
-		constructor := utils.ESTreeCallCallee(receiver.Expression())
-		return constructor != nil && ast.IsIdentifier(constructor) &&
-			(constructor.Text() == "BigInt64Array" || constructor.Text() == "BigUint64Array") &&
-			unicornutil.IsGlobalReference(ctx, constructor)
+	if !ast.IsNewExpression(receiver) && !ast.IsCallExpression(receiver) {
+		return false
 	}
-	return false
+	constructor := utils.ESTreeCallCallee(receiver.Expression())
+	if ast.IsCallExpression(receiver) {
+		if constructor == nil || !ast.IsAccessExpression(constructor) {
+			return false
+		}
+		method, _ := utils.AccessExpressionStaticName(constructor)
+		if method != "from" && method != "of" {
+			return false
+		}
+		constructor = utils.ESTreeRuntimeExpression(constructor.Expression())
+	}
+	return constructor != nil && ast.IsIdentifier(constructor) &&
+		(constructor.Text() == "BigInt64Array" || constructor.Text() == "BigUint64Array") &&
+		unicornutil.IsGlobalReference(ctx, constructor)
 }
 
 func mirrorParameters(left, right, first, second *ast.Node) bool {

@@ -39,9 +39,11 @@ This rule has no options.
 ## Differences from upstream
 
 rslint withholds the subtraction suggestion when it recognizes a string or
-BigInt operand. For example, `new BigInt64Array(2).sort((a, b) => a > b)`
-still produces a diagnostic. Use `localeCompare()` for strings. For BigInts,
-return a number with `a < b ? -1 : a > b ? 1 : 0`.
+BigInt operand, including through a generic constraint such as `T extends bigint`.
+For example, `[-2n, -1n].sort((a, b) => a > b)` and
+`BigInt64Array.of(1n, 2n).sort((a, b) => a > b)` still produce diagnostics.
+Use `localeCompare()` for strings. For BigInts, return a number with
+`a < b ? -1 : a > b ? 1 : 0`.
 
 rslint also withholds the suggestion if converting the comparator to an arrow
 would change what its `this`, `arguments`, or function name refers to, or if the
