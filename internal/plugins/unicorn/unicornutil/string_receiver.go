@@ -28,6 +28,15 @@ func IsKnownNonStringSyntax(ctx rule.RuleContext, node *ast.Node) bool {
 	}) == TypeNonTarget
 }
 
+// IsKnownNonStringWithAnnotations follows authored TypeScript and JSDoc
+// annotations through local calls, assignments, and logical expressions.
+func IsKnownNonStringWithAnnotations(ctx rule.RuleContext, node *ast.Node) bool {
+	return classifyStringReceiver(ctx, node, &stringReceiverWalkState{
+		visiting: make(map[*ast.Symbol]bool), memo: make(map[*ast.Symbol]TypeClass),
+		callReturnTypes: true, includeJSDoc: true, followResultTypes: true,
+	}) == TypeNonTarget
+}
+
 // IsKnownNonStringType reports whether the checker alone proves that node is
 // not string-like. Rules that require type information and intentionally do
 // not follow Unicorn's syntax classifier use this narrower helper.
@@ -46,7 +55,9 @@ type stringReceiverWalkState struct {
 	steps    int
 	// The source-only regex classifier also follows authored call returns.
 	// Legacy syntactic classifiers retain their precedence for String calls.
-	callReturnTypes bool
+	callReturnTypes   bool
+	includeJSDoc      bool
+	followResultTypes bool
 }
 
 type stringTypeWalkState struct {
@@ -70,7 +81,11 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 	if node == nil || state.depth >= maxStringReceiverDepth || state.steps >= maxStringReceiverSteps {
 		return TypeUnknown
 	}
-	node = ast.SkipParentheses(node)
+	if state.includeJSDoc {
+		node = utils.ESTreeRuntimeExpression(node)
+	} else {
+		node = ast.SkipParentheses(node)
+	}
 	if node == nil {
 		return TypeUnknown
 	}
@@ -86,7 +101,7 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 	// An informative assertion wins. `any` and `unknown` fall through to the
 	// wrapped expression, matching upstream's getTypeFromExpression.
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if class := classifyStringTypeNode(ctx, node.Type()); class != TypeUnknown {
+		if class := classifyStringTypeSyntax(ctx, node.Type(), newStringTypeWalkState(), state.includeJSDoc); class != TypeUnknown {
 			return class
 		}
 		return classifyStringReceiver(ctx, node.Expression(), state)
@@ -110,10 +125,22 @@ func classifyStringReceiver(ctx rule.RuleContext, node *ast.Node, state *stringR
 			return class
 		}
 	}
-	if ast.IsBinaryExpression(node) &&
-		node.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
-		if class := classifyStringReceiver(ctx, node.AsBinaryExpression().Right, state); class != TypeUnknown {
-			return class
+	if ast.IsBinaryExpression(node) {
+		binary := node.AsBinaryExpression()
+		operator := binary.OperatorToken.Kind
+		if operator == ast.KindCommaToken || (state.followResultTypes && operator == ast.KindEqualsToken) {
+			if class := classifyStringReceiver(ctx, binary.Right, state); class != TypeUnknown {
+				return class
+			}
+		}
+		if state.followResultTypes && (operator == ast.KindAmpersandAmpersandToken || operator == ast.KindBarBarToken || operator == ast.KindQuestionQuestionToken) {
+			class := combineTypeClassUnion([]TypeClass{
+				classifyStringReceiver(ctx, binary.Left, state),
+				classifyStringReceiver(ctx, binary.Right, state),
+			})
+			if class != TypeUnknown {
+				return class
+			}
 		}
 	}
 	if state.callReturnTypes && ast.IsCallExpression(node) && !ast.IsOptionalChain(node) {
@@ -155,9 +182,15 @@ func classifyStringIdentifier(ctx rule.RuleContext, node *ast.Node, state *strin
 	if declaration == nil {
 		return TypeUnknown
 	}
-	if class := classifyStringTypeNode(ctx, stringBindingTypeAnnotation(declaration)); class != TypeUnknown {
-		state.memo[symbol] = class
-		return class
+	if ast.IsVariableDeclaration(declaration) || ast.IsParameterDeclaration(declaration) {
+		annotation := declaration.Type()
+		if state.includeJSDoc {
+			annotation, _ = ValueTypeAnnotation(ctx, declaration)
+		}
+		if class := classifyStringTypeSyntax(ctx, annotation, newStringTypeWalkState(), state.includeJSDoc); class != TypeUnknown {
+			state.memo[symbol] = class
+			return class
+		}
 	}
 	if !ast.IsVariableDeclaration(declaration) {
 		return TypeUnknown
@@ -174,25 +207,6 @@ func classifyStringIdentifier(ctx rule.RuleContext, node *ast.Node, state *strin
 	class := classifyStringReceiver(ctx, variable.Initializer, state)
 	state.memo[symbol] = class
 	return class
-}
-
-func stringBindingTypeAnnotation(declaration *ast.Node) *ast.Node {
-	if declaration == nil {
-		return nil
-	}
-	switch declaration.Kind {
-	case ast.KindVariableDeclaration, ast.KindParameter:
-		return declaration.Type()
-	default:
-		return nil
-	}
-}
-
-func classifyStringTypeNode(
-	ctx rule.RuleContext,
-	node *ast.Node,
-) TypeClass {
-	return classifyStringTypeSyntax(ctx, node, newStringTypeWalkState(), false)
 }
 
 // The positive string proof also accepts the same TS-shaped nodes parsed from
