@@ -2,16 +2,19 @@ package array_callback_return
 
 import (
 	_ "embed"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
 //go:embed array_callback_return.schema.json
 var schemaJSON []byte
 
-// Options for array-callback-return rule
 type Options struct {
 	AllowImplicit bool `json:"allowImplicit"`
 	CheckForEach  bool `json:"checkForEach"`
@@ -19,328 +22,223 @@ type Options struct {
 }
 
 func parseOptions(options []any) Options {
-	opts := Options{
-		AllowImplicit: false,
-		CheckForEach:  false,
-		AllowVoid:     false,
-	}
-
-	if len(options) == 0 {
-		return opts
-	}
-
-	optsMap, _ := options[0].(map[string]any)
-	if v, ok := optsMap["allowImplicit"].(bool); ok {
-		opts.AllowImplicit = v
-	}
-	if v, ok := optsMap["checkForEach"].(bool); ok {
-		opts.CheckForEach = v
-	}
-	if v, ok := optsMap["allowVoid"].(bool); ok {
-		opts.AllowVoid = v
+	var opts Options
+	if len(options) != 0 {
+		values, _ := options[0].(map[string]any)
+		opts.AllowImplicit, _ = values["allowImplicit"].(bool)
+		opts.CheckForEach, _ = values["checkForEach"].(bool)
+		opts.AllowVoid, _ = values["allowVoid"].(bool)
 	}
 	return opts
 }
 
-// Message builders
-func buildExpectedReturnValue(methodName string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "expectedReturnValue",
-		Description: "Array.prototype." + methodName + "() expects a return value from arrow function.",
-	}
-}
-
-func buildExpectedInside(methodName string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "expectedInside",
-		Description: "Array.prototype." + methodName + "() expects a value to be returned at the end of arrow function.",
-	}
-}
-
-func buildExpectedNoReturnValue(methodName string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "expectedNoReturnValue",
-		Description: "Array.prototype." + methodName + "() expects no useless return value from arrow function.",
-	}
-}
-
-func buildExpectedAtEnd(methodName string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "expectedAtEnd",
-		Description: "Array.prototype." + methodName + "() expects a return value at the end of function.",
-	}
-}
-
-// Target array methods that require return values
 var targetMethods = map[string]bool{
-	"every":         true,
-	"filter":        true,
-	"find":          true,
-	"findIndex":     true,
-	"findLast":      true,
-	"findLastIndex": true,
-	"flatMap":       true,
-	"map":           true,
-	"reduce":        true,
-	"reduceRight":   true,
-	"some":          true,
-	"sort":          true,
-	"toSorted":      true,
-	// from is handled separately
+	"every": true, "filter": true, "find": true, "findIndex": true,
+	"findLast": true, "findLastIndex": true, "flatMap": true, "forEach": true,
+	"map": true, "reduce": true, "reduceRight": true, "some": true,
+	"sort": true, "toSorted": true,
 }
 
-// Methods that should not have return values
-var forEachMethod = "forEach"
-
-// isTargetMethod checks if the method is a target array method
-func isTargetMethod(name string) bool {
-	return targetMethods[name]
-}
-
-// isForEachMethod checks if the method is forEach
-func isForEachMethod(name string) bool {
-	return name == forEachMethod
-}
-
-// getMethodName extracts the method name from a CallExpression
-func getMethodName(node *ast.Node) string {
-	if node == nil || node.Kind != ast.KindCallExpression {
+// memberName implements the syntax-only property lookup used by ESLint. In
+// particular, a computed identifier or interpolated template stays unknown.
+func memberName(node *ast.Node) string {
+	if node == nil {
 		return ""
 	}
-
-	expr := node.Expression()
-	if expr == nil {
-		return ""
-	}
-
-	// Handle PropertyAccessExpression (e.g., arr.map)
-	if expr.Kind == ast.KindPropertyAccessExpression {
-		name := expr.Name()
-		if name != nil && name.Kind == ast.KindIdentifier {
+	node = ast.SkipParentheses(node)
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		if name := node.Name(); name != nil {
 			return name.Text()
 		}
+	case ast.KindElementAccessExpression:
+		property := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+		if property != nil && (property.Kind == ast.KindStringLiteral || property.Kind == ast.KindNoSubstitutionTemplateLiteral) {
+			return property.Text()
+		}
 	}
-
 	return ""
 }
 
-// isArrayFromCall checks if this is Array.from()
-func isArrayFromCall(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindCallExpression {
+func isArrayFrom(callee *ast.Node) bool {
+	callee = ast.SkipParentheses(callee)
+	if memberName(callee) != "from" {
 		return false
 	}
-
-	expr := node.Expression()
-	if expr == nil || expr.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-
-	obj := expr.Expression()
-	if obj == nil || obj.Kind != ast.KindIdentifier || obj.Text() != "Array" {
-		return false
-	}
-
-	name := expr.Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return false
-	}
-
-	return name.Text() == "from"
+	object := ast.SkipParentheses(callee.Expression())
+	// Upstream intentionally recognizes any identifier ending in Array, even
+	// shadowed/custom constructors, rather than querying a type or global binding.
+	return object != nil && object.Kind == ast.KindIdentifier && strings.HasSuffix(object.Text(), "Array")
 }
 
-// isFunctionNode checks if a node is a function
-func isFunctionNode(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	return node.Kind == ast.KindFunctionDeclaration ||
-		node.Kind == ast.KindFunctionExpression ||
-		node.Kind == ast.KindArrowFunction ||
-		node.Kind == ast.KindMethodDeclaration
-}
-
-// isGeneratorOrAsyncFunction checks if a node is a generator or async function
-func isGeneratorOrAsyncFunction(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// Check if it has async modifier
-	modifiers := node.Modifiers()
-	if modifiers != nil {
-		for _, mod := range modifiers.Nodes {
-			if mod != nil && mod.Kind == ast.KindAsyncKeyword {
-				return true
+// arrayMethodName follows the callback's destination through the same wrappers
+// as upstream. A function returned by an immediately invoked function can be
+// the callback; an IIFE itself and unrelated argument positions cannot.
+func arrayMethodName(node *ast.Node) string {
+	for current := node; current != nil && current.Parent != nil; {
+		parent := current.Parent
+		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			current = parent
+		case ast.KindBinaryExpression:
+			switch parent.AsBinaryExpression().OperatorToken.Kind {
+			case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
+				current = parent
+			default:
+				return ""
 			}
+		case ast.KindConditionalExpression:
+			current = parent
+		case ast.KindReturnStatement:
+			var fn *ast.Node
+			for ancestor := parent.Parent; ancestor != nil; ancestor = ancestor.Parent {
+				if ast.IsFunctionLikeOrClassStaticBlockDeclaration(ancestor) {
+					fn = ancestor
+					break
+				}
+			}
+			if fn == nil {
+				return ""
+			}
+			wrapper := utils.OutermostParenthesizedExpression(fn)
+			call := wrapper.Parent
+			if call == nil || call.Kind != ast.KindCallExpression || call.Expression() != wrapper {
+				return ""
+			}
+			current = call
+		case ast.KindCallExpression:
+			args := parent.Arguments()
+			if isArrayFrom(parent.Expression()) && len(args) >= 2 && args[1] == current {
+				return "from"
+			}
+			method := memberName(parent.Expression())
+			if targetMethods[method] && len(args) >= 1 && args[0] == current {
+				return method
+			}
+			return ""
+		default:
+			return ""
 		}
 	}
-
-	// Check for generator function (function*)
-	if containsYield(node.Body()) {
-		return true
-	}
-
-	return false
+	return ""
 }
 
-// containsYield recursively checks if a node contains a yield expression
-func containsYield(node *ast.Node) bool {
-	if node == nil {
-		return false
+func callbackMessage(id, method string, fn *ast.Node) rule.RuleMessage {
+	fullName := "Array.prototype." + method
+	if method == "from" {
+		fullName = "Array.from"
 	}
-	if node.Kind == ast.KindYieldExpression {
-		return true
+	name := utils.GetFunctionNameWithKindCore(fn)
+	description := fullName + "() expects a return value from " + name + "."
+	switch id {
+	case "expectedAtEnd":
+		description = fullName + "() expects a value to be returned at the end of " + name + "."
+	case "expectedNoReturnValue":
+		description = fullName + "() expects no useless return value from " + name + "."
 	}
-	// Recursively check children
-	found := false
-	node.ForEachChild(func(child *ast.Node) bool {
-		if containsYield(child) {
-			found = true
-			return true // Stop iteration
-		}
-		return false // Continue iteration
-	})
-	return found
+	return rule.RuleMessage{Id: id, Description: description, Data: map[string]string{"name": name, "arrayMethodName": fullName}}
 }
 
-// isVoidExpression checks if an expression is a void expression
-func isVoidExpression(node *ast.Node) bool {
-	if node == nil {
-		return false
+var wrapBracesMessage = rule.RuleMessage{Id: "wrapBraces", Description: "Wrap the expression in `{}`."}
+var prependVoidMessage = rule.RuleMessage{Id: "prependVoid", Description: "Prepend `void` to the expression."}
+
+func prependVoidFixes(ctx rule.RuleContext, expr *ast.Node, anchorEnd int, afterReturn bool) []rule.RuleFix {
+	firstToken := scanner.SkipTrivia(ctx.SourceFile.Text(), anchorEnd)
+	requiresParens := utils.EslintLikePrecedence(expr) < 16 && !ast.IsParenthesizedExpression(expr.Parent)
+	text := "void "
+	if afterReturn && firstToken == anchorEnd {
+		text = " " + text
 	}
-	return node.Kind == ast.KindVoidExpression
+	if requiresParens {
+		text += "("
+	}
+	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(core.NewTextRange(firstToken, firstToken), text)}
+	if requiresParens {
+		fixes = append(fixes, rule.RuleFixInsertAfter(expr, ")"))
+	}
+	return fixes
 }
 
-// checkCallbackReturn validates that a callback has proper return statements
-func checkCallbackReturn(ctx rule.RuleContext, funcNode *ast.Node, methodName string, opts Options, checkForEach bool) {
-	if funcNode == nil {
+func callbackSuggestions(ctx rule.RuleContext, fn, expr *ast.Node, concise bool, allowVoid bool) []rule.RuleSuggestion {
+	var suggestions []rule.RuleSuggestion
+	anchorEnd := 0
+	if concise {
+		anchorEnd = fn.AsArrowFunction().EqualsGreaterThanToken.End()
+		bodyStart := scanner.SkipTrivia(ctx.SourceFile.Text(), anchorEnd)
+		suggestions = append(suggestions, rule.RuleSuggestion{Message: wrapBracesMessage, FixesArr: []rule.RuleFix{
+			rule.RuleFixReplaceRange(core.NewTextRange(bodyStart, bodyStart), "{"),
+			rule.RuleFixInsertAfter(fn, "}"),
+		}})
+	} else {
+		// The expression may have several parenthesized wrappers. The enclosing
+		// return still supplies the token before all of them.
+		statement := utils.OutermostParenthesizedExpression(expr).Parent
+		anchorEnd = utils.TrimNodeTextRange(ctx.SourceFile, statement).Pos() + len("return")
+	}
+	if allowVoid {
+		suggestions = append(suggestions, rule.RuleSuggestion{Message: prependVoidMessage, FixesArr: prependVoidFixes(ctx, expr, anchorEnd, !concise)})
+	}
+	return suggestions
+}
+
+func checkCallback(ctx rule.RuleContext, fn *ast.Node, opts Options) {
+	flags := ast.GetFunctionFlags(fn)
+	if flags&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0 {
 		return
 	}
-
-	// Skip generator and async functions - they have different control flow semantics
-	if isGeneratorOrAsyncFunction(funcNode) {
+	method := arrayMethodName(fn)
+	if method == "" || (method == "forEach" && !opts.CheckForEach) {
 		return
 	}
-
-	body := funcNode.Body()
+	body := fn.Body()
 	if body == nil {
 		return
 	}
-
-	// For arrow functions with expression bodies, check if it's an implicit return
-	if funcNode.Kind == ast.KindArrowFunction {
-		// Expression body (no braces) - always returns the expression value
-		if body.Kind != ast.KindBlock {
-			if checkForEach {
-				// forEach shouldn't return values, but expression bodies always do
-				// unless it's a void expression
-				if opts.AllowVoid && isVoidExpression(body) {
-					return
-				}
-				ctx.ReportNode(funcNode, buildExpectedNoReturnValue(methodName))
-			}
-			// For other methods, expression bodies always return, which is good
-			return
-		}
-	}
-
-	analysis := utils.AnalyzeFunctionReturns(funcNode)
-
-	if checkForEach {
-		// forEach callbacks should not return values
-		if analysis.HasReturnWithValue {
-			ctx.ReportNode(funcNode, buildExpectedNoReturnValue(methodName))
+	if body.Kind != ast.KindBlock {
+		expr := ast.SkipParentheses(body)
+		if method == "forEach" && (!opts.AllowVoid || expr.Kind != ast.KindVoidExpression) {
+			ctx.ReportRangeWithDeferredSuggestions(utils.GetFunctionHeadLoc(ctx.SourceFile, fn), callbackMessage("expectedNoReturnValue", method, fn), func() []rule.RuleSuggestion {
+				return callbackSuggestions(ctx, fn, expr, true, opts.AllowVoid)
+			})
 		}
 		return
 	}
-
-	// When allowImplicit is false, empty returns (return;) don't count as valid returns.
-	// When allowImplicit is true, empty returns are acceptable.
-	hasNoReturns := !analysis.HasReturnWithValue && (!opts.AllowImplicit || !analysis.HasEmptyReturn)
-	var allPathsReturn bool
-	if opts.AllowImplicit {
-		allPathsReturn = !analysis.EndReachable && (analysis.HasReturnWithValue || analysis.HasEmptyReturn)
-	} else {
-		// Without allowImplicit, all return statements must have values.
-		// Mixed return-with-value + empty-return is invalid (e.g., if (a) return 1; else return;)
-		allPathsReturn = !analysis.EndReachable && analysis.HasReturnWithValue && !analysis.HasEmptyReturn
-	}
-
-	if hasNoReturns {
-		if funcNode.Kind == ast.KindArrowFunction {
-			ctx.ReportNode(funcNode, buildExpectedReturnValue(methodName))
-		} else {
-			ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
+	hasReturn := false
+	ast.ForEachReturnStatement(body, func(statement *ast.Node) bool {
+		hasReturn = true
+		expr := statement.Expression()
+		if expr != nil {
+			expr = ast.SkipParentheses(expr)
 		}
-	} else if !allPathsReturn {
-		if funcNode.Kind == ast.KindArrowFunction {
-			ctx.ReportNode(funcNode, buildExpectedInside(methodName))
-		} else {
-			ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
+		if method == "forEach" {
+			if expr != nil && (!opts.AllowVoid || expr.Kind != ast.KindVoidExpression) {
+				ctx.ReportNodeWithDeferredSuggestions(statement, callbackMessage("expectedNoReturnValue", method, fn), func() []rule.RuleSuggestion {
+					if !opts.AllowVoid {
+						return nil
+					}
+					return callbackSuggestions(ctx, fn, expr, false, true)
+				})
+			}
+		} else if !opts.AllowImplicit && expr == nil {
+			ctx.ReportNode(statement, callbackMessage("expectedReturnValue", method, fn))
 		}
+		return false
+	})
+	if method != "forEach" && cfg.Build(fn, cfg.Hooks[struct{}]{}).EndReachable {
+		id := "expectedInside"
+		if hasReturn {
+			id = "expectedAtEnd"
+		}
+		ctx.ReportRange(utils.GetFunctionHeadLoc(ctx.SourceFile, fn), callbackMessage(id, method, fn))
 	}
 }
 
-// ArrayCallbackReturnRule enforces return statements in callbacks of array methods
 var ArrayCallbackReturnRule = rule.Rule{
 	Name:   "array-callback-return",
 	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
-
-		return rule.RuleListeners{
-			ast.KindCallExpression: func(node *ast.Node) {
-				methodName := getMethodName(node)
-				isArrayFrom := false
-
-				// Check if it's Array.from (needs special handling)
-				if isArrayFromCall(node) {
-					methodName = "from"
-					isArrayFrom = true
-				}
-
-				// Check if we have a method name
-				if methodName == "" {
-					return
-				}
-
-				// Check if it's a target method
-				isTarget := isTargetMethod(methodName)
-				isForEach := opts.CheckForEach && isForEachMethod(methodName)
-
-				if !isTarget && !isForEach && !isArrayFrom {
-					return
-				}
-
-				// Get the callback argument
-				args := node.Arguments()
-				if len(args) == 0 {
-					return
-				}
-
-				var callbackArg *ast.Node
-				if isArrayFrom {
-					// Array.from(arr, callback) - callback is second argument
-					if len(args) >= 2 {
-						callbackArg = args[1]
-					}
-				} else {
-					// For other methods, callback is first argument
-					callbackArg = args[0]
-				}
-
-				if callbackArg == nil {
-					return
-				}
-
-				// Check if the argument is a function
-				if !isFunctionNode(callbackArg) {
-					return
-				}
-
-				// Check the callback
-				checkCallbackReturn(ctx, callbackArg, methodName, opts, isForEach)
-			},
-		}
+		check := func(node *ast.Node) { checkCallback(ctx, node, opts) }
+		return rule.RuleListeners{ast.KindFunctionExpression: check, ast.KindArrowFunction: check}
 	},
 }
