@@ -39,6 +39,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_instanceof_builtins"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_character_comparison"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_file_input_accept"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_lonely_if"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
@@ -171,6 +172,7 @@ func GetAllRules() []rule.Rule {
 		no_instanceof_builtins.NoInstanceofBuiltinsRule,
 		no_invalid_character_comparison.NoInvalidCharacterComparisonRule,
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
+		no_invalid_file_input_accept.NoInvalidFileInputAcceptRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
 		no_lonely_if.NoLonelyIfRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
