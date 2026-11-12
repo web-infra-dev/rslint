@@ -43,6 +43,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_fetch_options"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_file_input_accept"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_invalid_remove_event_listener"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_late_event_control"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_lonely_if"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_magic_array_flat_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_mismatched_map_key"
@@ -181,6 +182,7 @@ func GetAllRules() []rule.Rule {
 		no_invalid_fetch_options.NoInvalidFetchOptionsRule,
 		no_invalid_file_input_accept.NoInvalidFileInputAcceptRule,
 		no_invalid_remove_event_listener.NoInvalidRemoveEventListenerRule,
+		no_late_event_control.NoLateEventControlRule,
 		no_lonely_if.NoLonelyIfRule,
 		no_magic_array_flat_depth.NoMagicArrayFlatDepthRule,
 		no_mismatched_map_key.NoMismatchedMapKeyRule,

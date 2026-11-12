@@ -562,6 +562,7 @@ rsquo
 rstack
 rstackjs
 rstest
+rtcdtmf
 ruleopts
 rustc
 rustup

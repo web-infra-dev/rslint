@@ -136,7 +136,13 @@ func classifyTypeReference(
 	walk *typeAnnotationWalk,
 	options TypeClassifierOptions,
 ) TypeClass {
-	if typeName == nil || !ast.IsIdentifier(typeName) {
+	if typeName == nil {
+		return TypeUnknown
+	}
+	if !ast.IsIdentifier(typeName) {
+		if options.ClassifyTypeImport != nil && ast.IsQualifiedName(typeName) {
+			return classifyQualifiedTypeImport(ctx, typeName.AsQualifiedName(), options.ClassifyTypeImport)
+		}
 		return TypeUnknown
 	}
 	name := typeName.AsIdentifier().Text
@@ -237,8 +243,13 @@ func classifyTypeDeclaration(ctx rule.RuleContext, symbol *ast.Symbol, name stri
 		case ast.KindImportClause, ast.KindImportSpecifier, ast.KindNamespaceImport:
 			importedName := name
 			if declaration.Kind == ast.KindImportSpecifier {
-				if propertyName := declaration.PropertyName(); propertyName != nil && ast.IsIdentifier(propertyName) {
-					importedName = propertyName.AsIdentifier().Text
+				if propertyName := declaration.PropertyName(); propertyName != nil && (ast.IsIdentifier(propertyName) || options.ClassifyTypeImport != nil) {
+					importedName = propertyName.Text()
+				}
+				if options.ClassifyTypeImport != nil {
+					if class := classifyTypeImport(declaration, importedName, options.ClassifyTypeImport); class != TypeUnknown {
+						return class
+					}
 				}
 			}
 			if classifyKnownTypeName(name, options) != TypeUnknown ||
@@ -246,6 +257,30 @@ func classifyTypeDeclaration(ctx rule.RuleContext, symbol *ast.Symbol, name stri
 				return TypeNonTarget
 			}
 			return TypeUnknown
+		}
+	}
+	return TypeUnknown
+}
+
+func classifyQualifiedTypeImport(ctx rule.RuleContext, name *ast.QualifiedName, classify func(string, string) TypeClass) TypeClass {
+	if !ast.IsIdentifier(name.Left) {
+		return TypeUnknown
+	}
+	symbol := ctx.Refs.ResolveInFileWithMeaning(name.Left, ast.SymbolFlagsNamespace|ast.SymbolFlagsAlias)
+	if symbol != nil {
+		for _, declaration := range symbol.Declarations {
+			if declaration.Kind == ast.KindNamespaceImport || declaration.Kind == ast.KindImportClause {
+				return classifyTypeImport(declaration, name.Right.Text(), classify)
+			}
+		}
+	}
+	return TypeUnknown
+}
+
+func classifyTypeImport(declaration *ast.Node, exportName string, classify func(string, string) TypeClass) TypeClass {
+	if importNode := ast.FindAncestorKind(declaration, ast.KindImportDeclaration); importNode != nil {
+		if module := importNode.AsImportDeclaration().ModuleSpecifier; module != nil && ast.IsStringLiteral(module) {
+			return classify(module.Text(), exportName)
 		}
 	}
 	return TypeUnknown

@@ -55,6 +55,8 @@ type TypeClassifierOptions struct {
 	TreatMixedUnionAsTarget      bool
 	TreatMixedUnionAsNonTarget   bool
 	PreferKnownAnnotationNames   bool
+	// ClassifyTypeImport recognizes named imports and members of namespace or default imports in annotations.
+	ClassifyTypeImport func(moduleName, exportName string) TypeClass
 }
 
 // ClassifyType mirrors eslint-plugin-unicorn's getTypeScriptType plus the
