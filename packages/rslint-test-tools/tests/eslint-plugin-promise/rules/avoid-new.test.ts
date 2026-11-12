@@ -1,10 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const errorMessage = 'Avoid creating new promises.';
-
-ruleTester.run('avoid-new', {} as never, {
+ruleTester.run('avoid-new', {
   valid: [
     { code: 'Promise.resolve()' },
     { code: 'Promise.reject()' },
@@ -17,15 +16,42 @@ ruleTester.run('avoid-new', {} as never, {
   invalid: [
     {
       code: 'var x = new Promise(function (x, y) {})',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidNew',
+          message: 'Avoid creating new promises.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: 'new Promise()',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidNew',
+          message: 'Avoid creating new promises.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: 'Thing(new Promise(() => {}))',
-      errors: [{ message: errorMessage }],
+      errors: [
+        {
+          messageId: 'avoidNew',
+          message: 'Avoid creating new promises.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
   ],
 });

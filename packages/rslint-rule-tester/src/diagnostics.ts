@@ -43,6 +43,7 @@ export function checkDiagnostic(
 ): void {
   const at = `errors[${index}]`;
   assert.equal(diagnostic.ruleName, context.ruleName, `${at} rule name`);
+  assert.equal(diagnostic.severity, 'error', `${at}.severity`);
   const message =
     typeof expected.message === 'function'
       ? expected.message(context.root.replaceAll('\\', '/'))

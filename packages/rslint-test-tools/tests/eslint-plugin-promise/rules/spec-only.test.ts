@@ -1,10 +1,10 @@
 // Upstream: eslint-plugin-promise v7.3.0 (__tests__/spec-only.js and docs/rules/spec-only.md).
-// Exact diagnostic IDs/ranges and absence of edits are asserted in the Go suite.
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('spec-only', {} as never, {
+ruleTester.run('spec-only', {
   valid: [
     { code: 'Promise.resolve()' },
     { code: 'Promise.reject()' },
@@ -34,15 +34,42 @@ ruleTester.run('spec-only', {} as never, {
   invalid: [
     {
       code: 'Promise.done()',
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: 'Promise.something()',
-      errors: [{ message: "Avoid using non-standard 'Promise.something'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.something'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: 'new Promise.done()',
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: `
@@ -51,7 +78,16 @@ ruleTester.run('spec-only', {} as never, {
           return Promise.done(a)
         }
       `,
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: `
@@ -59,20 +95,56 @@ ruleTester.run('spec-only', {} as never, {
           getA(Promise.done)
         }
       `,
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: 'var done = Promise.prototype.done',
-      errors: [{ message: "Avoid using non-standard 'Promise.prototype'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.prototype'",
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: 'Promise["done"];',
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       // Pinned documentation: invalid example.
       code: "const x = Promise.done('bad')",
-      errors: [{ message: "Avoid using non-standard 'Promise.done'" }],
+      errors: [
+        {
+          messageId: 'avoidNonStandard',
+          message: "Avoid using non-standard 'Promise.done'",
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
   ],
 });

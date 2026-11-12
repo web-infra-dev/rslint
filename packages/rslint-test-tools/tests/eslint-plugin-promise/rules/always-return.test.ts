@@ -1,10 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const message = 'Each then() should return a value or throw';
-
-ruleTester.run('always-return', {} as never, {
+ruleTester.run('always-return', {
   valid: [
     { code: 'hey.then(x => x)' },
     { code: 'hey.then(x => ({}))' },
@@ -175,45 +174,182 @@ ruleTester.run('always-return', {} as never, {
   ],
 
   invalid: [
-    { code: 'hey.then(x => {})', errors: [{ message }] },
-    { code: 'hey.then(function() { })', errors: [{ message }] },
-    { code: 'hey.then(function() { }).then(x)', errors: [{ message }] },
+    {
+      code: 'hey.then(x => {})',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: 'hey.then(function() { })',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: 'hey.then(function() { }).then(x)',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
     {
       code: 'hey.then(function() { }).then(function() { })',
-      errors: [{ message }, { message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 24,
+        },
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { return; }).then(function() { })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { doSomethingWicked(); })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { if (x) { return x; } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { if (x) { return x; } else { }})',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { if (x) { } else { return x; }})',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { if (x) { process.chdir(); } else { return x; }})',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 70,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { if (x) { return you.then(function() { return x; }); } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 78,
+        },
+      ],
     },
-    { code: 'hey.then( x => { x ? x.id : null })', errors: [{ message }] },
+    {
+      code: 'hey.then( x => { x ? x.id : null })',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
     {
       code: 'hey.then(function(x) { x ? x.id : null })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
     },
     {
       code: `(function() {
@@ -226,7 +362,16 @@ ruleTester.run('always-return', {} as never, {
           })
         })
       })()`,
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 2,
+          column: 25,
+          endLine: 9,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: `hey.then(({x, y}) => {
@@ -234,7 +379,16 @@ ruleTester.run('always-return', {} as never, {
           throw new Error(x || y)
         }
       })`,
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 5,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: `hey.then(({x, y}) => {
@@ -242,92 +396,284 @@ ruleTester.run('always-return', {} as never, {
           return x
         }
       })`,
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 5,
+          endColumn: 8,
+        },
+      ],
     },
     {
       code: `hey
         .then(function(x) { console.log(x) /* missing return here */ })
         .then(function(y) { console.log(y) /* no error here */ })`,
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 71,
+        },
+      ],
     },
     {
       code: 'const foo = hey.then(function(x) {});',
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `function foo() {
         return hey.then(function(x) {});
       }`,
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 2,
+          column: 25,
+          endLine: 2,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: `async function foo() {
         return await hey.then(x => { console.log(x) })
       }`,
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 2,
+          column: 31,
+          endLine: 2,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'const foo = hey?.then(x => { console.log(x) })',
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
     },
     {
       code: 'const foo = (42, hey.then(x => { console.log(x) }))',
       options: [{ ignoreLastCallback: true }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 50,
+        },
+      ],
     },
-    { code: 'hey.then(x => { invalid = x })', errors: [{ message }] },
-    { code: "hey.then(x => { invalid['x'] = x })", errors: [{ message }] },
-    { code: 'hey.then(x => { const value = x })', errors: [{ message }] },
+    {
+      code: 'hey.then(x => { invalid = x })',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
+    {
+      code: "hey.then(x => { invalid['x'] = x })",
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      code: 'hey.then(x => { const value = x })',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
     {
       code: 'hey.then(x => { notWindow[x] = x })',
       options: [{ ignoreAssignmentVariable: ['window'] }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: "hey.then(x => { notWindow['x'] = x })",
       options: [{ ignoreAssignmentVariable: ['window'] }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: "hey.then(x => { windows['x'] = x })",
       options: [{ ignoreAssignmentVariable: ['window'] }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'hey.then(x => { x() })',
       options: [{ ignoreAssignmentVariable: ['window'] }],
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
       code: 'hey.then(x => { process.exitCode = 1 })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
 
     // switch where a case conditionally breaks out before its return (review fix)
     {
       code: 'hey.then(function(x) { switch (x) { case 1: if (y) break; return "a"; default: return "b"; } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 95,
+        },
+      ],
     },
     {
       code: 'hey.then(function(x) { switch (x) { case 1: { if (y) break; } return "a"; default: return "b"; } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 99,
+        },
+      ],
     },
     // compound assignment to a non-ignored variable is still reported
-    { code: 'hey.then(x => { notGlobal.a += x })', errors: [{ message }] },
+    {
+      code: 'hey.then(x => { notGlobal.a += x })',
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
 
     // try/catch: catch reachable because the try block may throw
     {
       code: 'hey.then(function() { try { return foo() } catch (e) { log(e) } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
     {
       code: 'hey.then(function() { try { foo(); return 1 } catch (e) { log(e) } })',
-      errors: [{ message }],
+      errors: [
+        {
+          messageId: 'thenShouldReturnOrThrow',
+          message: 'Each then() should return a value or throw',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 69,
+        },
+      ],
     },
   ],
 });

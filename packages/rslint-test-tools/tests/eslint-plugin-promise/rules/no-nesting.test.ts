@@ -1,10 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const avoidNestingMessage = 'Avoid nesting promises.';
-
-ruleTester.run('no-nesting', {} as never, {
+ruleTester.run('no-nesting', {
   valid: [
     // resolve and reject are sometimes okay
     { code: 'Promise.resolve(4).then(function(x) { return x })' },
@@ -53,35 +52,107 @@ ruleTester.run('no-nesting', {} as never, {
   invalid: [
     {
       code: 'doThing().then(function() { a.then() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: 'doThing().then(function() { b.catch() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: 'doThing().then(function() { return a.then() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 38,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: 'doThing().then(function() { return b.catch() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 38,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => { a.then() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => { b.catch() })',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => a.then())',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => b.catch())',
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
     },
     // references vars in closure
     {
@@ -90,7 +161,16 @@ ruleTester.run('no-nesting', {} as never, {
         .then(a => getB(a)
           .then(b => getC(b))
         )`,
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `
@@ -100,7 +180,16 @@ ruleTester.run('no-nesting', {} as never, {
             .then(c => getD(a, c))
           )
         )`,
-      errors: [{ message: avoidNestingMessage }],
+      errors: [
+        {
+          messageId: 'avoidNesting',
+          message: 'Avoid nesting promises.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 18,
+        },
+      ],
     },
   ],
 });

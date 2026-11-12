@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('no-multiple-resolved', {} as never, {
+ruleTester.run('no-multiple-resolved', {
   valid: [
     // if-else mutual exclusion
     {
@@ -34,8 +35,13 @@ ruleTester.run('no-multiple-resolved', {} as never, {
       })`,
       errors: [
         {
+          messageId: '',
           message:
             'Promise should not be resolved multiple times. Promise is already resolved on line 2.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
     },
@@ -47,8 +53,13 @@ ruleTester.run('no-multiple-resolved', {} as never, {
       })`,
       errors: [
         {
+          messageId: '',
           message:
             'Promise should not be resolved multiple times. Promise is potentially resolved on line 2.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
     },
@@ -60,8 +71,13 @@ ruleTester.run('no-multiple-resolved', {} as never, {
       })`,
       errors: [
         {
+          messageId: '',
           message:
             'Promise should not be resolved multiple times. Promise is potentially resolved on line 2.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
     },

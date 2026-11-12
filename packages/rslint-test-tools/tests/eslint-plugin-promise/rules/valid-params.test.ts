@@ -1,8 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-ruleTester.run('valid-params', {} as never, {
+ruleTester.run('valid-params', {
   valid: [
     // valid Promise.resolve()
     { code: 'Promise.resolve()' },
@@ -87,8 +88,13 @@ ruleTester.run('valid-params', {} as never, {
       code: 'Promise.resolve(1, 2)',
       errors: [
         {
+          messageId: 'requireOneOptionalArgument',
           message:
             'Promise.resolve() requires 0 or 1 arguments, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -96,8 +102,13 @@ ruleTester.run('valid-params', {} as never, {
       code: 'Promise.resolve({}, function() {}, 1, 2, 3)',
       errors: [
         {
+          messageId: 'requireOneOptionalArgument',
           message:
             'Promise.resolve() requires 0 or 1 arguments, but received 5',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
         },
       ],
     },
@@ -107,7 +118,12 @@ ruleTester.run('valid-params', {} as never, {
       code: 'Promise.reject(1, 2, 3)',
       errors: [
         {
+          messageId: 'requireOneOptionalArgument',
           message: 'Promise.reject() requires 0 or 1 arguments, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -115,7 +131,12 @@ ruleTester.run('valid-params', {} as never, {
       code: 'Promise.reject({}, function() {}, 1, 2)',
       errors: [
         {
+          messageId: 'requireOneOptionalArgument',
           message: 'Promise.reject() requires 0 or 1 arguments, but received 4',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
         },
       ],
     },
@@ -124,13 +145,27 @@ ruleTester.run('valid-params', {} as never, {
     {
       code: 'Promise.race(1, 2)',
       errors: [
-        { message: 'Promise.race() requires 1 argument, but received 2' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.race() requires 1 argument, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
       code: 'Promise.race({}, function() {}, 1, 2, 3)',
       errors: [
-        { message: 'Promise.race() requires 1 argument, but received 5' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.race() requires 1 argument, but received 5',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 41,
+        },
       ],
     },
 
@@ -138,39 +173,81 @@ ruleTester.run('valid-params', {} as never, {
     {
       code: 'Promise.all(1, 2, 3)',
       errors: [
-        { message: 'Promise.all() requires 1 argument, but received 3' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.all() requires 1 argument, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: 'Promise.all({}, function() {}, 1, 2)',
       errors: [
-        { message: 'Promise.all() requires 1 argument, but received 4' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.all() requires 1 argument, but received 4',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
       ],
     },
     // invalid Promise.allSettled()
     {
       code: 'Promise.allSettled(1, 2, 3)',
       errors: [
-        { message: 'Promise.allSettled() requires 1 argument, but received 3' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.allSettled() requires 1 argument, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     {
       code: 'Promise.allSettled({}, function() {}, 1, 2)',
       errors: [
-        { message: 'Promise.allSettled() requires 1 argument, but received 4' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.allSettled() requires 1 argument, but received 4',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+        },
       ],
     },
     // invalid Promise.any()
     {
       code: 'Promise.any(1, 2, 3)',
       errors: [
-        { message: 'Promise.any() requires 1 argument, but received 3' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.any() requires 1 argument, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: 'Promise.any({}, function() {}, 1, 2)',
       errors: [
-        { message: 'Promise.any() requires 1 argument, but received 4' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.any() requires 1 argument, but received 4',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+        },
       ],
     },
 
@@ -178,25 +255,53 @@ ruleTester.run('valid-params', {} as never, {
     {
       code: 'somePromise().then()',
       errors: [
-        { message: 'Promise.then() requires 1 or 2 arguments, but received 0' },
+        {
+          messageId: 'requireTwoOptionalArguments',
+          message: 'Promise.then() requires 1 or 2 arguments, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: 'somePromise().then(() => {}, () => {}, () => {})',
       errors: [
-        { message: 'Promise.then() requires 1 or 2 arguments, but received 3' },
+        {
+          messageId: 'requireTwoOptionalArguments',
+          message: 'Promise.then() requires 1 or 2 arguments, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 49,
+        },
       ],
     },
     {
       code: 'promiseReference.then()',
       errors: [
-        { message: 'Promise.then() requires 1 or 2 arguments, but received 0' },
+        {
+          messageId: 'requireTwoOptionalArguments',
+          message: 'Promise.then() requires 1 or 2 arguments, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: 'promiseReference.then(() => {}, () => {}, () => {})',
       errors: [
-        { message: 'Promise.then() requires 1 or 2 arguments, but received 3' },
+        {
+          messageId: 'requireTwoOptionalArguments',
+          message: 'Promise.then() requires 1 or 2 arguments, but received 3',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 52,
+        },
       ],
     },
 
@@ -204,25 +309,53 @@ ruleTester.run('valid-params', {} as never, {
     {
       code: 'somePromise().catch()',
       errors: [
-        { message: 'Promise.catch() requires 1 argument, but received 0' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.catch() requires 1 argument, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: 'somePromise().catch(() => {}, () => {})',
       errors: [
-        { message: 'Promise.catch() requires 1 argument, but received 2' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.catch() requires 1 argument, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 40,
+        },
       ],
     },
     {
       code: 'promiseReference.catch()',
       errors: [
-        { message: 'Promise.catch() requires 1 argument, but received 0' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.catch() requires 1 argument, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
     {
       code: 'promiseReference.catch(() => {}, () => {})',
       errors: [
-        { message: 'Promise.catch() requires 1 argument, but received 2' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.catch() requires 1 argument, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+        },
       ],
     },
 
@@ -230,25 +363,53 @@ ruleTester.run('valid-params', {} as never, {
     {
       code: 'somePromise().finally()',
       errors: [
-        { message: 'Promise.finally() requires 1 argument, but received 0' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.finally() requires 1 argument, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: 'somePromise().finally(() => {}, () => {})',
       errors: [
-        { message: 'Promise.finally() requires 1 argument, but received 2' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.finally() requires 1 argument, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+        },
       ],
     },
     {
       code: 'promiseReference.finally()',
       errors: [
-        { message: 'Promise.finally() requires 1 argument, but received 0' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.finally() requires 1 argument, but received 0',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
       ],
     },
     {
       code: 'promiseReference.finally(() => {}, () => {})',
       errors: [
-        { message: 'Promise.finally() requires 1 argument, but received 2' },
+        {
+          messageId: 'requireOneArgument',
+          message: 'Promise.finally() requires 1 argument, but received 2',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 45,
+        },
       ],
     },
   ],

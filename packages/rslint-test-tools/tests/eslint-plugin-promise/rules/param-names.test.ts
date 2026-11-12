@@ -1,13 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const messageForResolve =
-  'Promise constructor parameters must be named to match "^_?resolve$"';
-const messageForReject =
-  'Promise constructor parameters must be named to match "^_?reject$"';
-
-ruleTester.run('param-names', {} as never, {
+ruleTester.run('param-names', {
   valid: [
     // ESLint upstream
     { code: 'new Promise(function(resolve, reject) {})' },
@@ -100,31 +96,99 @@ ruleTester.run('param-names', {} as never, {
     // ESLint upstream
     {
       code: 'new Promise(function(reject, resolve) {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 28,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'new Promise(function(resolve, rej) {})',
-      errors: [{ message: messageForReject }],
+      errors: [
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: 'new Promise(yes => {})',
-      errors: [{ message: messageForResolve }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: 'new Promise((yes, no) => {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 17,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: 'new Promise(function(resolve, reject) {})',
       options: [{ resolvePattern: '^yes$', rejectPattern: '^no$' }],
       errors: [
         {
+          messageId: 'resolveParamNames',
           message:
             'Promise constructor parameters must be named to match "^yes$"',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 29,
         },
         {
+          messageId: 'rejectParamNames',
           message:
             'Promise constructor parameters must be named to match "^no$"',
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 37,
         },
       ],
     },
@@ -132,23 +196,90 @@ ruleTester.run('param-names', {} as never, {
     // Single underscore is NOT acceptable under default pattern
     {
       code: 'new Promise(function(_, reject) {})',
-      errors: [{ message: messageForResolve }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
 
     // Parenthesized Promise identifier
     {
       code: 'new (Promise)(function(ok, fail) {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 26,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
     },
 
     // Async executor
     {
       code: 'new Promise(async function(ok, fail) {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 30,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: 'new Promise(async (ok, fail) => {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 22,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
     },
 
     // Partial options
@@ -157,20 +288,46 @@ ruleTester.run('param-names', {} as never, {
       options: [{ resolvePattern: '^yes$' }],
       errors: [
         {
+          messageId: 'resolveParamNames',
           message:
             'Promise constructor parameters must be named to match "^yes$"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 16,
         },
-        { message: messageForReject },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
     {
       code: 'new Promise((resolveX, yes) => {})',
       options: [{ rejectPattern: '^no$' }],
       errors: [
-        { message: messageForResolve },
         {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 22,
+        },
+        {
+          messageId: 'rejectParamNames',
           message:
             'Promise constructor parameters must be named to match "^no$"',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
     },
@@ -181,8 +338,13 @@ ruleTester.run('param-names', {} as never, {
       options: [{ resolvePattern: '^\\w+resolve$' }],
       errors: [
         {
+          messageId: 'resolveParamNames',
           message:
             'Promise constructor parameters must be named to match "^\\w+resolve$"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
@@ -193,8 +355,13 @@ ruleTester.run('param-names', {} as never, {
       options: [{ resolvePattern: '(?<!_)resolve' }],
       errors: [
         {
+          messageId: 'resolveParamNames',
           message:
             'Promise constructor parameters must be named to match "(?<!_)resolve"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -202,25 +369,101 @@ ruleTester.run('param-names', {} as never, {
     // TS generic type argument: still reports bad names
     {
       code: 'new Promise<number>((ok, fail) => {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 24,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
     },
 
     // 3+ params: only first two checked
     {
       code: 'new Promise((ok, fail, also_wrong) => {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
 
     // Named function expression
     {
       code: 'new Promise(function named(ok, fail) {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 30,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
 
     // TS `this` parameter is stripped; bad names in real params still reported
     {
       code: 'new Promise<void>(function(this: any, ok, fail) {})',
-      errors: [{ message: messageForResolve }, { message: messageForReject }],
+      errors: [
+        {
+          messageId: 'resolveParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?resolve$"',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 41,
+        },
+        {
+          messageId: 'rejectParamNames',
+          message:
+            'Promise constructor parameters must be named to match "^_?reject$"',
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 47,
+        },
+      ],
     },
   ],
 });

@@ -1,11 +1,9 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester(config);
 
-const rejectMessage = 'Expected throw instead of Promise.reject';
-const resolveMessage = 'Avoid wrapping return values in Promise.resolve';
-
-ruleTester.run('no-return-wrap', {} as never, {
+ruleTester.run('no-return-wrap', {
   valid: [
     // ESLint upstream
     { code: 'Promise.resolve(4).then(function(x) { return x })' },
@@ -88,43 +86,141 @@ ruleTester.run('no-return-wrap', {} as never, {
     // ESLint upstream
     {
       code: 'doThing().then(function() { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'doThing().then(null, function() { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: 'doThing().catch(function() { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'doThing().then(function() { return Promise.reject(4) })',
-      errors: [{ message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
     },
     {
       code: 'doThing().then(null, function() { return Promise.reject(4) })',
-      errors: [{ message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
     },
     {
       code: 'doThing().catch(function() { return Promise.reject(4) })',
-      errors: [{ message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
     },
     {
       code: 'doThing().then(function(x) { if (x>1) { return Promise.resolve(4) } else { throw "bad" } })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 66,
+        },
+      ],
     },
     {
       code: 'doThing().then(function(x) { if (x>1) { return Promise.reject(4) } })',
-      errors: [{ message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 65,
+        },
+      ],
     },
     {
       code: 'doThing().then(null, function() { if (true && false) { return Promise.resolve() } })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 80,
+        },
+      ],
     },
     {
       code: 'doThing().catch(function(x) {if (x) { return Promise.resolve(4) } else { return Promise.reject() } })',
-      errors: [{ message: resolveMessage }, { message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 64,
+        },
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 74,
+          endLine: 1,
+          endColumn: 97,
+        },
+      ],
     },
     {
       code: `
@@ -134,7 +230,16 @@ ruleTester.run('no-return-wrap', {} as never, {
         })
         return
       })`,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `
@@ -144,7 +249,16 @@ ruleTester.run('no-return-wrap', {} as never, {
         })
         return
       })`,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `
@@ -155,7 +269,16 @@ ruleTester.run('no-return-wrap', {} as never, {
           })
         })
       })`,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: `
@@ -169,7 +292,16 @@ ruleTester.run('no-return-wrap', {} as never, {
           })
         })
       })`,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 8,
+          column: 13,
+          endLine: 8,
+          endColumn: 38,
+        },
+      ],
     },
     {
       code: `
@@ -181,7 +313,16 @@ ruleTester.run('no-return-wrap', {} as never, {
         },
       }
       `,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: `
@@ -191,19 +332,55 @@ ruleTester.run('no-return-wrap', {} as never, {
         })
       );
       `,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: 'doThing().then((function() { return Promise.resolve(4) }).bind(this))',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'doThing().then((function() { return Promise.resolve(4) }).bind(this).bind(this))',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 55,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
     },
     {
       code: `
@@ -213,25 +390,70 @@ ruleTester.run('no-return-wrap', {} as never, {
         })
       }
       `,
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 42,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => Promise.resolve(4))',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
     },
     {
       code: 'doThing().then(() => Promise.reject(4))',
-      errors: [{ message: rejectMessage }],
+      errors: [
+        {
+          messageId: 'reject',
+          message: 'Expected throw instead of Promise.reject',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
     },
 
     // Additional upstream semantic branches.
     {
       code: 'Promise.all(xs).then(function() { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 60,
+        },
+      ],
     },
     {
       code: 'Promise.withResolvers().then(function() { return Promise.resolve(4) })',
-      errors: [{ message: resolveMessage }],
+      errors: [
+        {
+          messageId: 'resolve',
+          message: 'Avoid wrapping return values in Promise.resolve',
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 68,
+        },
+      ],
     },
   ],
 });
