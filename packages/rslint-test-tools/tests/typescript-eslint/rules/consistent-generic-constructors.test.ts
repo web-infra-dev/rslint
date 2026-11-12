@@ -1,8 +1,15 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+// Upstream: @typescript-eslint/eslint-plugin v8.46.3.
+// All 38 valid and 34 invalid cases preserve their input, options and output.
+// Full diagnostic positions/messages were verified with that exact version.
+import { RuleTester } from '@rslint/rule-tester';
 
+const noFormat = (strings: TemplateStringsArray, ...values: unknown[]) =>
+  String.raw({ raw: strings }, ...values);
 
-
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({
+  plugin: '@typescript-eslint',
+  filename: 'input.ts',
+});
 
 ruleTester.run('consistent-generic-constructors', {
   valid: [
@@ -163,6 +170,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 33,
+          suggestions: [],
         },
       ],
       output: 'const a = new Foo<string>();',
@@ -172,6 +186,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 41,
+          suggestions: [],
         },
       ],
       output: 'const a = new Map<string, number>();',
@@ -181,6 +202,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 42,
+          suggestions: [],
         },
       ],
       output: `const a = new Map<string, number>();`,
@@ -190,6 +218,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 43,
+          suggestions: [],
         },
       ],
       output: `const a = new Map< string, number >();`,
@@ -199,6 +234,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 42,
+          suggestions: [],
         },
       ],
       output: `const a = new Map<string, number> ();`,
@@ -208,6 +250,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 31,
+          suggestions: [],
         },
       ],
       output: `const a = new Foo<number>();`,
@@ -217,6 +266,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 61,
+          suggestions: [],
         },
       ],
       output: `const a = new Foo/* comment *//* another */<string>();`,
@@ -226,6 +282,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 61,
+          suggestions: [],
         },
       ],
       output: `const a = new Foo/* comment */<string> /* another */();`,
@@ -235,6 +298,13 @@ function a([a = new Foo<string>()]) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 1,
+          column: 7,
+          endLine: 3,
+          endColumn: 4,
+          suggestions: [],
         },
       ],
       output: `const a = new \n Foo<string> \n ();`,
@@ -248,6 +318,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 30,
+          suggestions: [],
         },
       ],
       output: `
@@ -265,6 +342,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 32,
+          suggestions: [],
         },
       ],
       output: `
@@ -282,6 +366,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 39,
+          suggestions: [],
         },
       ],
       output: `
@@ -299,6 +390,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -317,6 +415,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 41,
+          suggestions: [],
         },
       ],
       output: `
@@ -332,6 +437,13 @@ function foo(a: Foo<string> = new Foo()) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 40,
+          suggestions: [],
         },
       ],
       output: `
@@ -345,6 +457,13 @@ function foo({ a }: Foo<string> = new Foo()) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 44,
+          suggestions: [],
         },
       ],
       output: `
@@ -358,6 +477,13 @@ function foo([a]: Foo<string> = new Foo()) {}
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 42,
+          suggestions: [],
         },
       ],
       output: `
@@ -373,6 +499,13 @@ class A {
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 41,
+          suggestions: [],
         },
       ],
       output: `
@@ -388,6 +521,13 @@ const a = function (a: Foo<string> = new Foo()) {};
       errors: [
         {
           messageId: 'preferConstructor',
+          message:
+            'The generic type arguments should be specified as part of the constructor type arguments.',
+          line: 2,
+          column: 21,
+          endLine: 2,
+          endColumn: 47,
+          suggestions: [],
         },
       ],
       output: `
@@ -399,6 +539,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 28,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -409,6 +556,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 36,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -419,6 +573,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -429,6 +590,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -439,6 +607,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 3,
+          endColumn: 4,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -449,6 +624,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 56,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -459,6 +641,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 64,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -473,6 +662,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 25,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -491,6 +687,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 27,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -509,6 +712,13 @@ class Foo {
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 31,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -525,6 +735,13 @@ function foo(a = new Foo<string>()) {}
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 35,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -539,6 +756,13 @@ function foo({ a } = new Foo<string>()) {}
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 39,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -553,6 +777,13 @@ function foo([a] = new Foo<string>()) {}
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 37,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -569,6 +800,13 @@ class A {
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 36,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
@@ -585,6 +823,13 @@ const a = function (a = new Foo<string>()) {};
       errors: [
         {
           messageId: 'preferTypeAnnotation',
+          message:
+            'The generic type arguments should be specified as part of the type annotation.',
+          line: 2,
+          column: 21,
+          endLine: 2,
+          endColumn: 42,
+          suggestions: [],
         },
       ],
       options: ['type-annotation'],
