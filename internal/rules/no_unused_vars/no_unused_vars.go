@@ -1701,6 +1701,28 @@ func referenceIsInFunctionSignature(node *ast.Node, function *ast.Node) bool {
 	return body == nil || !ast.IsNodeDescendantOf(node, body)
 }
 
+// Computed names and decorators execute outside the method's parameter/body
+// environment. child is the ancestor immediately below function, so nested
+// functions inside those expressions still participate in the scope walk.
+func referenceIsOutsideFunctionScope(node, child, function *ast.Node) bool {
+	if !ast.IsFunctionLike(function) {
+		return false
+	}
+	if child == function.Name() || child.Kind == ast.KindDecorator {
+		return true
+	}
+	if child.Kind == ast.KindParameter {
+		if modifiers := child.Modifiers(); modifiers != nil {
+			for _, modifier := range modifiers.Nodes {
+				if modifier.Kind == ast.KindDecorator && ast.IsNodeDescendantOf(node, modifier) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func symbolIsVisibleInFunctionSignature(symbol *ast.Symbol, function *ast.Node) bool {
 	if symbol == nil {
 		return false
@@ -1776,7 +1798,10 @@ func binderReferenceSymbol(node *ast.Node) *ast.Symbol {
 		return nil
 	}
 	name := node.Text()
-	for current := node.Parent; current != nil; current = current.Parent {
+	for child, current := node, node.Parent; current != nil; child, current = current, current.Parent {
+		if referenceIsOutsideFunctionScope(node, child, current) {
+			continue
+		}
 		if symbol := enumMemberSymbol(current, name); symbol != nil {
 			return symbol
 		}
@@ -1820,9 +1845,15 @@ func binderReferenceSymbolWithMeaning(node *ast.Node, meaning ast.SymbolFlags) *
 // without inserting synthetic identifiers into the source AST.
 func binderSymbolByName(node *ast.Node, name string, meaning ast.SymbolFlags) *ast.Symbol {
 	matchesMeaning := func(symbol *ast.Symbol) bool {
-		return symbol != nil && symbol.Flags&meaning != 0
+		// Exported values have a local ExportValue marker and a separate export
+		// symbol carrying their declaration-space flags. Match both, but retain
+		// the local symbol used by declarations and the reference index.
+		return symbol != nil && symbol.CombinedLocalAndExportSymbolFlags()&meaning != 0
 	}
-	for current := node.Parent; current != nil; current = current.Parent {
+	for child, current := node, node.Parent; current != nil; child, current = current, current.Parent {
+		if referenceIsOutsideFunctionScope(node, child, current) {
+			continue
+		}
 		if symbol := enumMemberSymbol(current, name); matchesMeaning(symbol) {
 			return symbol
 		}

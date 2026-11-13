@@ -594,7 +594,7 @@ consume(outer);
 }
 
 func TestNoUnusedVarsProjectAndGapFilesMatch(t *testing.T) {
-	tests := []struct {
+	type testCase struct {
 		name           string
 		extension      string
 		code           string
@@ -607,7 +607,9 @@ func TestNoUnusedVarsProjectAndGapFilesMatch(t *testing.T) {
 		settings       map[string]interface{}
 		options        []any
 		wantMessageIDs []string
-	}{
+		wantRanges     []core.TextRange
+	}
+	tests := []testCase{
 		{
 			name:      "nested block and parameter scopes",
 			extension: ".js",
@@ -1032,6 +1034,23 @@ import React from 'react'; export const Example = () => <div />;`,
 		},
 
 		{
+			name: "JSX skips namespace exported type alias", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react';
+export namespace N {
+  export type React = {};
+  export const View = () => <div />;
+}`,
+		},
+		{
+			name: "JSX skips namespace exported interface", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react';
+export namespace N {
+  export interface React {};
+  export const View = () => <div />;
+}`,
+		},
+
+		{
 			name:      "import attribute key",
 			extension: ".ts",
 			code: `const type = 1;
@@ -1039,6 +1058,204 @@ import data from "./data.json" with { type: "json" };
 consume(data);`,
 			wantNames: []string{"type"},
 		},
+	}
+
+	// Pair implicit references with ordinary calls at the same source location.
+	// Exact binding ranges distinguish identically named imports and parameters.
+	scopeCases := []struct {
+		name            string
+		code            string
+		factory         string
+		fragment        string
+		jsx             string
+		call            string
+		reportedBinding string
+		reportedName    string
+		options         []any
+		messageID       string
+	}{
+		{
+			name: "namespace exported variable",
+			code: `import React from 'react';
+export namespace N {
+  export const React = { createElement: create };
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "namespace exported function", factory: "h", call: `h("div", null)`,
+			code: `import { h } from 'ui';
+export namespace N {
+  export function h() { return null; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "h } from", reportedName: "h",
+		},
+		{
+			name: "namespace exported class",
+			code: `import React from 'react';
+export namespace N {
+  export class React { static createElement = create; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "namespace exported namespace",
+			code: `import React from 'react';
+export namespace N {
+  export namespace React { export const createElement = create; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+
+		{
+			name: "exported factory retains local symbol", factory: "h", call: `h("div", null)`,
+			code: `export namespace N {
+  export const h = create;
+  export const View = () => <div />;
+}`,
+			reportedBinding: "h = create", reportedName: "h",
+			options:   []any{map[string]any{"varsIgnorePattern": "^h$", "reportUsedIgnorePattern": true}},
+			messageID: "usedIgnoredVar",
+		},
+
+		{
+			name: "namespace exported fragment", factory: "h", fragment: "F", jsx: "<></>", call: "h(F, null)",
+			code: `import { h, F } from 'ui';
+export namespace N {
+  export const F = fragment;
+  export const View = () => <></>;
+}`,
+			reportedBinding: "F } from", reportedName: "F",
+		},
+		{
+			name: "local factory counts as used", factory: "h", call: `h("div", null)`,
+			code: `export namespace N {
+  const h = create;
+  export const View = () => <div />;
+}`,
+		},
+		{
+			name:            "object computed name",
+			code:            `export const obj = { [String(<div />)](React) {} };`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "object computed name with outer import",
+			code: `import React from 'react';
+export const obj = { [String(<div />)](React) {} };`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "class computed method",
+			code: `import React from 'react';
+export class C { [String(<div />)](React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "computed setter",
+			code: `import React from 'react';
+export const obj = { set [String(<div />)](React) {} };`,
+			// Setter parameters are exempt; the outer import must still be used.
+		},
+		{
+			name:            "method decorator",
+			code:            `export class C { @decorate(<div />) method(React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "method decorator with outer import",
+			code: `import React from 'react';
+export class C { @decorate(<div />) method(React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "parameter decorator",
+			code: `import React from 'react';
+export class C { method(@decorate(<div />) React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "constructor parameter decorator",
+			code: `import React from 'react';
+export class C { constructor(@decorate(<div />) React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "computed name containing local function",
+			code: `import React from 'react';
+export const obj = { [String(((React) => <div />)(factory))](React) { return React; } };`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "decorator containing local function",
+			code: `import React from 'react';
+export class C { @decorate(((React) => <div />)(factory)) method(React) { return React; } }`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "computed name retains enclosing function scope",
+			code: `import React from 'react';
+export function make(React) { return { [String(<div />)](React) { return React; } }; }`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "computed custom fragment", factory: "h", fragment: "F", jsx: "<></>", call: "h(F, null)",
+			code: `import { h, F } from 'ui';
+export const obj = { [String(<></>)](F) {} };`,
+			reportedBinding: "F) {}", reportedName: "F",
+		},
+		{
+			name: "decorated custom factory", factory: "h", call: `h("div", null)`,
+			code: `import { h } from 'ui';
+export class C { @decorate(<div />) method(h) {} }`,
+			reportedBinding: "h) {}", reportedName: "h",
+		},
+		{
+			name: "method default uses parameter factory",
+			code: `import React from 'react';
+export const obj = { method(React, view = <div />) { return view; } };`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "method default skips body factory",
+			code: `import React from 'react';
+export const obj = { method(view = <div />) { const React = factory; return view; } };`,
+			reportedBinding: "React = factory", reportedName: "React",
+		},
+	}
+	for _, scopeCase := range scopeCases {
+		jsx, call := scopeCase.jsx, scopeCase.call
+		if jsx == "" {
+			jsx = "<div />"
+		}
+		if call == "" {
+			call = `React.createElement("div", null)`
+		}
+		for _, implicit := range []bool{true, false} {
+			code, mode := scopeCase.code, "implicit"
+			if !implicit {
+				code, mode = strings.ReplaceAll(code, jsx, call), "explicit"
+			}
+			test := testCase{name: "scope regression/" + scopeCase.name + "/" + mode,
+				extension: ".tsx", code: code, jsx: core.JsxEmitReact,
+				factory: scopeCase.factory, fragment: scopeCase.fragment, options: scopeCase.options}
+			if scopeCase.messageID != "" {
+				test.wantMessageIDs = []string{scopeCase.messageID}
+			}
+			if scopeCase.reportedBinding != "" {
+				if strings.Count(code, scopeCase.reportedBinding) != 1 {
+					t.Fatalf("ambiguous expected binding in %s", test.name)
+				}
+				start := strings.Index(code, scopeCase.reportedBinding)
+				test.wantNames = []string{scopeCase.reportedName}
+				test.wantRanges = []core.TextRange{core.NewTextRange(start, start+len(scopeCase.reportedName))}
+			}
+			tests = append(tests, test)
+		}
 	}
 
 	type observedDiagnostic struct {
@@ -1146,6 +1363,13 @@ consume(data);`,
 			}
 			if strings.Join(names, ",") != strings.Join(test.wantNames, ",") {
 				t.Fatalf("unused names = %v, want %v", names, test.wantNames)
+			}
+			if test.wantRanges != nil {
+				for index, diagnostic := range gapDiagnostics {
+					if diagnostic.rangeValue != test.wantRanges[index] {
+						t.Fatalf("diagnostic %d range = %v, want %v", index, diagnostic.rangeValue, test.wantRanges[index])
+					}
+				}
 			}
 			if test.wantMessageIDs != nil {
 				var ids []string
