@@ -15,7 +15,8 @@ func (b *Builder[E]) expr(node *ast.Node) {
 	switch node.Kind {
 	case ast.KindIdentifier:
 		b.read(node)
-		if isThrowableIdentifier(node) {
+		if isThrowableIdentifier(node) &&
+			(b.branches == nil || b.branches.SafeRead == nil || len(b.tryStack) != 0 && !b.branches.SafeRead(node)) {
 			b.firstThrowableFork()
 		}
 
@@ -35,6 +36,9 @@ func (b *Builder[E]) expr(node *ast.Node) {
 			return
 		}
 		b.expr(unary.Operand)
+		if b.branches != nil && unary.Operator != ast.KindExclamationToken {
+			b.possibleExpressionThrow(node)
+		}
 
 	case ast.KindPostfixUnaryExpression:
 		b.updateExpression(node.AsPostfixUnaryExpression().Operand)
@@ -51,6 +55,9 @@ func (b *Builder[E]) expr(node *ast.Node) {
 		b.classLike(node)
 
 	default:
+		if b.branches != nil && ast.IsTypeNode(node) && ast.IsPartOfTypeNode(node) {
+			return
+		}
 		if IsRoot(node) {
 			b.nestedFunction(node)
 			return
@@ -59,6 +66,13 @@ func (b *Builder[E]) expr(node *ast.Node) {
 			b.visitUnknown(child)
 			return false
 		})
+		if b.branches != nil {
+			switch node.Kind {
+			case ast.KindAwaitExpression, ast.KindSpreadElement, ast.KindSpreadAssignment,
+				ast.KindTemplateExpression, ast.KindComputedPropertyName, ast.KindDeleteExpression:
+				b.possibleExpressionThrow(node)
+			}
+		}
 	}
 }
 
@@ -71,6 +85,15 @@ func (b *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
 	if node == nil {
 		b.link(b.cur, whenTrue)
 		b.link(b.cur, whenFalse)
+		return
+	}
+
+	if truthy, known := b.truthiness(node); known {
+		if truthy {
+			b.link(b.cur, whenTrue)
+		} else {
+			b.link(b.cur, whenFalse)
+		}
 		return
 	}
 
@@ -107,6 +130,15 @@ func (b *Builder[E]) condition(node *ast.Node, whenTrue, whenFalse *Block[E]) {
 		}
 		if b.hooks.Expression != nil {
 			b.hooks.Expression(b, node)
+		}
+		if evaluateRight, known := b.logicalRightOperand(operator, binary.Left); known {
+			if evaluateRight {
+				b.condition(binary.Right, whenTrue, whenFalse)
+			} else {
+				b.link(b.cur, whenTrue)
+				b.link(b.cur, whenFalse)
+			}
+			return
 		}
 		right := b.newBlock()
 		switch operator {
@@ -167,6 +199,12 @@ func (b *Builder[E]) binaryExpression(node *ast.Node) {
 	case operator == ast.KindAmpersandAmpersandToken ||
 		operator == ast.KindBarBarToken ||
 		operator == ast.KindQuestionQuestionToken:
+		if evaluateRight, known := b.logicalRightOperand(operator, binary.Left); known {
+			if evaluateRight {
+				b.expr(binary.Right)
+			}
+			return
+		}
 		b.expr(binary.Left)
 		join := b.newBlock()
 		b.link(b.cur, join)
@@ -211,11 +249,26 @@ func (b *Builder[E]) binaryExpression(node *ast.Node) {
 	default:
 		b.expr(binary.Left)
 		b.expr(binary.Right)
+		if b.branches != nil {
+			switch operator {
+			case ast.KindCommaToken, ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+			default:
+				b.possibleExpressionThrow(node)
+			}
+		}
 	}
 }
 
 func (b *Builder[E]) conditionalExpression(node *ast.Node) {
 	cond := node.AsConditionalExpression()
+	if truthy, known := b.truthiness(cond.Condition); known {
+		if truthy {
+			b.expr(cond.WhenTrue)
+		} else {
+			b.expr(cond.WhenFalse)
+		}
+		return
+	}
 	b.expr(cond.Condition)
 	testEnd := b.cur
 	join := b.newBlock()
@@ -237,6 +290,9 @@ func (b *Builder[E]) conditionalExpression(node *ast.Node) {
 
 func (b *Builder[E]) updateExpression(operand *ast.Node) {
 	b.patternReads(operand)
+	if b.branches != nil {
+		b.firstThrowableFork()
+	}
 	b.patternWrites(operand)
 }
 
@@ -259,6 +315,14 @@ func (b *Builder[E]) accessOrCall(node *ast.Node) {
 		b.expr(access.ArgumentExpression)
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
+		if b.branches != nil && b.branches.TerminalCall != nil && b.cur.Reachable &&
+			!ast.IsOptionalChain(node) && b.branches.TerminalCall(node) {
+			for _, arg := range node.Arguments() {
+				b.expr(arg)
+			}
+			b.makeUnreachable()
+			return
+		}
 		b.expr(call.Expression)
 		b.forkOptionalChain(node)
 		b.typeArguments(node)
@@ -348,11 +412,27 @@ func (b *Builder[E]) classLike(node *ast.Node) {
 			for _, typeNode := range heritage.Types.Nodes {
 				b.expr(typeNode)
 			}
+			if b.branches != nil && heritage.Token == ast.KindExtendsKeyword {
+				b.firstThrowableFork()
+			}
 		}
 	}
 	if class.Members != nil {
 		for _, member := range class.Members.Nodes {
 			b.memberHeader(member)
+		}
+		if b.branches != nil {
+			// All computed names are evaluated before any static initializer.
+			for _, member := range class.Members.Nodes {
+				switch member.Kind {
+				case ast.KindClassStaticBlockDeclaration:
+					b.statement(member.AsClassStaticBlockDeclaration().Body)
+				case ast.KindPropertyDeclaration:
+					if ast.HasStaticModifier(member) {
+						b.expr(member.Initializer())
+					}
+				}
+			}
 		}
 	}
 }
@@ -373,6 +453,9 @@ func (b *Builder[E]) memberHeader(node *ast.Node) {
 	name := node.Name()
 	if name != nil && name.Kind == ast.KindComputedPropertyName {
 		b.expr(name.AsComputedPropertyName().Expression)
+		if b.branches != nil {
+			b.possibleExpressionThrow(name)
+		}
 	}
 	switch node.Kind {
 	case ast.KindPropertyDeclaration:
