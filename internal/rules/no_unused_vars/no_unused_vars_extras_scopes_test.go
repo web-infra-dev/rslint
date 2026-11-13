@@ -594,12 +594,22 @@ consume(outer);
 }
 
 func TestNoUnusedVarsProjectAndGapFilesMatch(t *testing.T) {
-	tests := []struct {
-		name      string
-		extension string
-		code      string
-		wantNames []string
-	}{
+	type testCase struct {
+		name           string
+		extension      string
+		code           string
+		wantNames      []string
+		jsx            core.JsxEmit
+		factory        string
+		fragment       string
+		importSource   string
+		namespace      string
+		settings       map[string]interface{}
+		options        []any
+		wantMessageIDs []string
+		wantRanges     []core.TextRange
+	}
+	tests := []testCase{
 		{
 			name:      "nested block and parameter scopes",
 			extension: ".js",
@@ -790,6 +800,257 @@ consume(view);`,
 			wantNames: []string{"div", "title"},
 		},
 		{
+			name: "classic JSX React import", extension: ".jsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "classic JSX paired element", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react'; export const Example = () => <div></div>;`,
+		},
+		{
+			name: "classic JSX fragment", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react'; export const Example = () => <></>;`,
+		},
+		{
+			name: "classic runtime setting without transform", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code:     `import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "classic runtime without JSX", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react'; export const Example = () => null;`, wantNames: []string{"React"},
+		},
+		{
+			name: "preserve JSX without classic configuration", extension: ".tsx",
+			code: `import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "automatic JSX React import", extension: ".tsx", jsx: core.JsxEmitReactJSX,
+			code: `import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "automatic development JSX fragment", extension: ".tsx", jsx: core.JsxEmitReactJSXDev,
+			code: `import React from 'react'; export const Example = () => <></>;`, wantNames: []string{"React"},
+		},
+		{
+			name: "classic setting overrides automatic runtime", extension: ".jsx", jsx: core.JsxEmitReactJSX,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code:     `import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "automatic runtime setting", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "automatic"}},
+			code:     `import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "custom JSX factory and fragment", extension: ".tsx", jsx: core.JsxEmitReact,
+			factory: "h", fragment: "Fragment",
+			code:      `import React from 'react'; import { h, Fragment } from 'preact'; export const Example = () => <></>;`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "fragment factory requires a fragment", extension: ".tsx", jsx: core.JsxEmitReact,
+			factory: "h", fragment: "Fragment",
+			code: `import { h, Fragment } from 'preact'; export const Example = () => <div />;`, wantNames: []string{"Fragment"},
+		},
+		{
+			name: "qualified JSX factories", extension: ".tsx", jsx: core.JsxEmitReact,
+			factory: "UI.createElement", fragment: "UI.Fragment",
+			code: `import * as UI from 'ui'; export const Example = () => <></>;`,
+		},
+		{
+			name: "qualified factory only reads its root binding", extension: ".tsx", jsx: core.JsxEmitReact,
+			factory:   "UI.createElement",
+			code:      `import * as UI from 'ui'; const createElement = 1; export const Example = () => <div />;`,
+			wantNames: []string{"createElement"},
+		},
+		{
+			name: "JSX pragma overrides compiler factory", extension: ".tsx", jsx: core.JsxEmitReact,
+			factory: "other", fragment: "OtherFragment",
+			code: `/** @jsx h */
+/** @jsxFrag Fragment */
+import { h, Fragment, other, OtherFragment } from 'ui'; export const Example = () => <></>;`,
+			wantNames: []string{"other", "OtherFragment"},
+		},
+		{
+			name: "classic pragma overrides automatic transform", extension: ".tsx", jsx: core.JsxEmitReactJSX,
+			code: `/** @jsxRuntime classic */
+import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "automatic pragma overrides classic transform", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `/** @jsxRuntime automatic */
+import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "pragma selects factory in preserve mode", extension: ".tsx",
+			code: `/** @jsx h */
+import { h } from 'preact'; export const Example = () => <div />;`,
+		},
+		{
+			name: "settings select custom pragma", extension: ".jsx",
+			settings:  map[string]interface{}{"react": map[string]interface{}{"runtime": "classic", "pragma": "h"}},
+			code:      `import React from 'react'; import { h } from 'preact'; export const Example = () => <div />;`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "JSX factory shadowed by parameter", extension: ".tsx", jsx: core.JsxEmitReact,
+			code:      `import React from 'react'; export function Example(React) { return <div />; }`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "JSX factory in separate scopes", extension: ".tsx", jsx: core.JsxEmitReact,
+			code:      `import React from 'react'; export function Example() { return <div />; } export function Other(React) { return null; }`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "JSX parameter initializer scope", extension: ".tsx", jsx: core.JsxEmitReact,
+			code:      `import React from 'react'; export function Example(view = <div />) { const React = {}; return view; }`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "JSX value factory skips type-only shadow", extension: ".tsx", jsx: core.JsxEmitReact,
+			code:      `import React from 'react'; export function Example() { type React = {}; return <div />; }`,
+			wantNames: []string{"React"},
+		},
+		{
+			name: "JSX factory inline global", extension: ".jsx", jsx: core.JsxEmitReact,
+			code: `/* global React */ export const Example = () => <div />;`,
+		},
+		{
+			name: "JSX used ignored factory", extension: ".tsx", jsx: core.JsxEmitReact,
+			code:           `import React from 'react'; export const Example = () => <div />;`,
+			options:        []any{map[string]any{"varsIgnorePattern": "^React$", "reportUsedIgnorePattern": true}},
+			wantNames:      []string{"React"},
+			wantMessageIDs: []string{"usedIgnoredVar"},
+		},
+		{
+			name: "automatic setting overrides classic runtime", extension: ".jsx", jsx: core.JsxEmitReact,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "automatic"}},
+			code:     `import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "classic pragma overrides automatic setting", extension: ".jsx", jsx: core.JsxEmitReactJSX,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "automatic"}},
+			code: `/** @jsxRuntime classic */
+import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "automatic pragma overrides classic setting", extension: ".jsx", jsx: core.JsxEmitReact,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code: `/** @jsxRuntime automatic */
+import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "settings factory alone implies classic", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h"}},
+			code:     `import { h } from 'preact'; export const Example = () => <div />;`,
+		},
+		{
+			name: "settings fragment alone implies classic", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"fragment": "F"}},
+			code:     `import React, { F } from 'react'; export const Example = () => <></>;`,
+		},
+		{
+			name: "settings factory and fragment override compiler", extension: ".jsx", jsx: core.JsxEmitReact,
+			factory: "other", fragment: "OtherFragment",
+			settings:  map[string]interface{}{"react": map[string]interface{}{"pragma": "h", "fragment": "F"}},
+			code:      `import { h, F, other, OtherFragment } from 'ui'; export const Example = () => <></>;`,
+			wantNames: []string{"other", "OtherFragment"},
+		},
+		{
+			name: "file factories override settings and compiler", extension: ".jsx", jsx: core.JsxEmitReact,
+			factory: "compiler", fragment: "CompilerFragment",
+			settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "settings", "fragment": "SettingsFragment"}},
+			code: `/** @jsx h */
+/** @jsxFrag F */
+import { h, F, settings, SettingsFragment, compiler, CompilerFragment } from 'ui'; export const Example = () => <></>;`,
+			wantNames: []string{"settings", "SettingsFragment", "compiler", "CompilerFragment"},
+		},
+		{
+			name: "settings fragment only used for fragments", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h", "fragment": "F"}},
+			code:     `import { h, F } from 'ui'; export const Example = () => <div />;`, wantNames: []string{"F"},
+		},
+		{
+			name: "empty settings fall back to compiler factories", extension: ".jsx", jsx: core.JsxEmitReact,
+			factory: "h", fragment: "F",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "", "pragma": "", "fragment": ""}},
+			code:     `import { h, F } from 'ui'; export const Example = () => <></>;`,
+		},
+		{
+			name: "non-string settings fall back to compiler factories", extension: ".jsx", jsx: core.JsxEmitReact,
+			factory: "h", fragment: "F",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": false, "pragma": false, "fragment": false}},
+			code:     `import { h, F } from 'ui'; export const Example = () => <></>;`,
+		},
+		{
+			name: "settings runtime does not reset compiler factories", extension: ".jsx", jsx: core.JsxEmitReactJSX,
+			factory: "h", fragment: "F",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code:     `import { h, F } from 'ui'; export const Example = () => <></>;`,
+		},
+		{
+			name: "automatic setting ignores stale factories", extension: ".jsx", jsx: core.JsxEmitReact,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "automatic", "pragma": "h", "fragment": "F"}},
+			code: `/** @jsx h */
+/** @jsxFrag F */
+import { h, F } from 'ui'; export const Example = () => <></>;`, wantNames: []string{"h", "F"},
+		},
+		{
+			name: "automatic compiler ignores settings factory without runtime", extension: ".jsx", jsx: core.JsxEmitReactJSX,
+			settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h", "fragment": "F"}},
+			code:     `import { h, F } from 'ui'; export const Example = () => <></>;`, wantNames: []string{"h", "F"},
+		},
+		{
+			name: "file import source overrides classic settings", extension: ".jsx", jsx: core.JsxEmitReact,
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code: `/** @jsxImportSource preact */
+import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "classic file runtime overrides file import source", extension: ".jsx", jsx: core.JsxEmitReactJSX,
+			code: `/** @jsxImportSource preact */
+/** @jsxRuntime classic */
+import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "classic settings override compiler import source", extension: ".jsx", importSource: "preact",
+			settings: map[string]interface{}{"react": map[string]interface{}{"runtime": "classic"}},
+			code:     `import React from 'react'; export const Example = () => <div />;`,
+		},
+		{
+			name: "compiler import source selects automatic", extension: ".jsx", importSource: "preact",
+			code: `import React from 'react'; export const Example = () => <div />;`, wantNames: []string{"React"},
+		},
+		{
+			name: "compiler namespace fallback", extension: ".jsx", jsx: core.JsxEmitReact, namespace: "UI",
+			code: `import * as UI from 'ui'; export const Example = () => <></>;`,
+		},
+		{
+			name: "settings fragment respects parameter shadow", extension: ".jsx",
+			settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "h", "fragment": "F"}},
+			code:     `import { h, F } from 'ui'; export function Example(F) { return <></>; }`, wantNames: []string{"F"},
+		},
+
+		{
+			name: "JSX skips namespace exported type alias", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react';
+export namespace N {
+  export type React = {};
+  export const View = () => <div />;
+}`,
+		},
+		{
+			name: "JSX skips namespace exported interface", extension: ".tsx", jsx: core.JsxEmitReact,
+			code: `import React from 'react';
+export namespace N {
+  export interface React {};
+  export const View = () => <div />;
+}`,
+		},
+
+		{
 			name:      "import attribute key",
 			extension: ".ts",
 			code: `const type = 1;
@@ -797,6 +1058,204 @@ import data from "./data.json" with { type: "json" };
 consume(data);`,
 			wantNames: []string{"type"},
 		},
+	}
+
+	// Pair implicit references with ordinary calls at the same source location.
+	// Exact binding ranges distinguish identically named imports and parameters.
+	scopeCases := []struct {
+		name            string
+		code            string
+		factory         string
+		fragment        string
+		jsx             string
+		call            string
+		reportedBinding string
+		reportedName    string
+		options         []any
+		messageID       string
+	}{
+		{
+			name: "namespace exported variable",
+			code: `import React from 'react';
+export namespace N {
+  export const React = { createElement: create };
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "namespace exported function", factory: "h", call: `h("div", null)`,
+			code: `import { h } from 'ui';
+export namespace N {
+  export function h() { return null; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "h } from", reportedName: "h",
+		},
+		{
+			name: "namespace exported class",
+			code: `import React from 'react';
+export namespace N {
+  export class React { static createElement = create; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "namespace exported namespace",
+			code: `import React from 'react';
+export namespace N {
+  export namespace React { export const createElement = create; }
+  export const View = () => <div />;
+}`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+
+		{
+			name: "exported factory retains local symbol", factory: "h", call: `h("div", null)`,
+			code: `export namespace N {
+  export const h = create;
+  export const View = () => <div />;
+}`,
+			reportedBinding: "h = create", reportedName: "h",
+			options:   []any{map[string]any{"varsIgnorePattern": "^h$", "reportUsedIgnorePattern": true}},
+			messageID: "usedIgnoredVar",
+		},
+
+		{
+			name: "namespace exported fragment", factory: "h", fragment: "F", jsx: "<></>", call: "h(F, null)",
+			code: `import { h, F } from 'ui';
+export namespace N {
+  export const F = fragment;
+  export const View = () => <></>;
+}`,
+			reportedBinding: "F } from", reportedName: "F",
+		},
+		{
+			name: "local factory counts as used", factory: "h", call: `h("div", null)`,
+			code: `export namespace N {
+  const h = create;
+  export const View = () => <div />;
+}`,
+		},
+		{
+			name:            "object computed name",
+			code:            `export const obj = { [String(<div />)](React) {} };`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "object computed name with outer import",
+			code: `import React from 'react';
+export const obj = { [String(<div />)](React) {} };`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "class computed method",
+			code: `import React from 'react';
+export class C { [String(<div />)](React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "computed setter",
+			code: `import React from 'react';
+export const obj = { set [String(<div />)](React) {} };`,
+			// Setter parameters are exempt; the outer import must still be used.
+		},
+		{
+			name:            "method decorator",
+			code:            `export class C { @decorate(<div />) method(React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "method decorator with outer import",
+			code: `import React from 'react';
+export class C { @decorate(<div />) method(React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "parameter decorator",
+			code: `import React from 'react';
+export class C { method(@decorate(<div />) React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "constructor parameter decorator",
+			code: `import React from 'react';
+export class C { constructor(@decorate(<div />) React) {} }`,
+			reportedBinding: "React) {}", reportedName: "React",
+		},
+		{
+			name: "computed name containing local function",
+			code: `import React from 'react';
+export const obj = { [String(((React) => <div />)(factory))](React) { return React; } };`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "decorator containing local function",
+			code: `import React from 'react';
+export class C { @decorate(((React) => <div />)(factory)) method(React) { return React; } }`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "computed name retains enclosing function scope",
+			code: `import React from 'react';
+export function make(React) { return { [String(<div />)](React) { return React; } }; }`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "computed custom fragment", factory: "h", fragment: "F", jsx: "<></>", call: "h(F, null)",
+			code: `import { h, F } from 'ui';
+export const obj = { [String(<></>)](F) {} };`,
+			reportedBinding: "F) {}", reportedName: "F",
+		},
+		{
+			name: "decorated custom factory", factory: "h", call: `h("div", null)`,
+			code: `import { h } from 'ui';
+export class C { @decorate(<div />) method(h) {} }`,
+			reportedBinding: "h) {}", reportedName: "h",
+		},
+		{
+			name: "method default uses parameter factory",
+			code: `import React from 'react';
+export const obj = { method(React, view = <div />) { return view; } };`,
+			reportedBinding: "React from", reportedName: "React",
+		},
+		{
+			name: "method default skips body factory",
+			code: `import React from 'react';
+export const obj = { method(view = <div />) { const React = factory; return view; } };`,
+			reportedBinding: "React = factory", reportedName: "React",
+		},
+	}
+	for _, scopeCase := range scopeCases {
+		jsx, call := scopeCase.jsx, scopeCase.call
+		if jsx == "" {
+			jsx = "<div />"
+		}
+		if call == "" {
+			call = `React.createElement("div", null)`
+		}
+		for _, implicit := range []bool{true, false} {
+			code, mode := scopeCase.code, "implicit"
+			if !implicit {
+				code, mode = strings.ReplaceAll(code, jsx, call), "explicit"
+			}
+			test := testCase{name: "scope regression/" + scopeCase.name + "/" + mode,
+				extension: ".tsx", code: code, jsx: core.JsxEmitReact,
+				factory: scopeCase.factory, fragment: scopeCase.fragment, options: scopeCase.options}
+			if scopeCase.messageID != "" {
+				test.wantMessageIDs = []string{scopeCase.messageID}
+			}
+			if scopeCase.reportedBinding != "" {
+				if strings.Count(code, scopeCase.reportedBinding) != 1 {
+					t.Fatalf("ambiguous expected binding in %s", test.name)
+				}
+				start := strings.Index(code, scopeCase.reportedBinding)
+				test.wantNames = []string{scopeCase.reportedName}
+				test.wantRanges = []core.TextRange{core.NewTextRange(start, start+len(scopeCase.reportedName))}
+			}
+			tests = append(tests, test)
+		}
 	}
 
 	type observedDiagnostic struct {
@@ -820,14 +1279,22 @@ consume(data);`,
 				t.Helper()
 				fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 				host := utils.CreateCompilerHost(tmpDir, fs)
-				program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+				compilerOptions := &core.CompilerOptions{
 					AllowJs:      core.TSTrue,
 					CheckJs:      core.TSTrue,
 					Jsx:          core.JsxEmitPreserve,
 					Module:       core.ModuleKindESNext,
 					SkipLibCheck: core.TSTrue,
 					Target:       core.ScriptTargetESNext,
-				}, []string{filePath}, host)
+				}
+				if test.jsx != core.JsxEmitNone {
+					compilerOptions.Jsx = test.jsx
+				}
+				compilerOptions.JsxFactory = test.factory
+				compilerOptions.JsxFragmentFactory = test.fragment
+				compilerOptions.JsxImportSource = test.importSource
+				compilerOptions.ReactNamespace = test.namespace
+				program, err := utils.CreateProgramFromOptionsLenient(true, compilerOptions, []string{filePath}, host)
 				if err != nil {
 					t.Fatalf("create program: %v", err)
 				}
@@ -848,14 +1315,15 @@ consume(data);`,
 							return nil
 						}
 						return []rule.ConfiguredRule{{
-							Name:     NoUnusedVarsRule.Name,
-							Severity: rule.SeverityError,
+							Name:        NoUnusedVarsRule.Name,
+							Severity:    rule.SeverityError,
+							Environment: &rule.RuleEnvironment{Settings: test.settings},
 							Run: func(ctx rule.RuleContext) rule.RuleListeners {
 								ruleRan = true
 								if (ctx.TypeChecker != nil) != expectChecker {
 									t.Errorf("TypeChecker presence = %t, want %t", ctx.TypeChecker != nil, expectChecker)
 								}
-								return NoUnusedVarsRule.Run(ctx, nil)
+								return NoUnusedVarsRule.Run(ctx, test.options)
 							},
 						}}
 					},
@@ -895,6 +1363,22 @@ consume(data);`,
 			}
 			if strings.Join(names, ",") != strings.Join(test.wantNames, ",") {
 				t.Fatalf("unused names = %v, want %v", names, test.wantNames)
+			}
+			if test.wantRanges != nil {
+				for index, diagnostic := range gapDiagnostics {
+					if diagnostic.rangeValue != test.wantRanges[index] {
+						t.Fatalf("diagnostic %d range = %v, want %v", index, diagnostic.rangeValue, test.wantRanges[index])
+					}
+				}
+			}
+			if test.wantMessageIDs != nil {
+				var ids []string
+				for _, diagnostic := range gapDiagnostics {
+					ids = append(ids, diagnostic.messageID)
+				}
+				if strings.Join(ids, ",") != strings.Join(test.wantMessageIDs, ",") {
+					t.Fatalf("message IDs = %v, want %v", ids, test.wantMessageIDs)
+				}
 			}
 		})
 	}
