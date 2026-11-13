@@ -17,9 +17,9 @@ import (
 func TestNoUselessElseCaughtExceptions(t *testing.T) {
 	// Keep these alternatives fixable in shape so a false positive also
 	// exposes the unsafe rewrite.
+	const branchStart = "function run(flag, value) {\n  if (flag) {\n"
 	branch := func(body string) string {
-		return "function run(flag, value) {\n" +
-			"  if (flag) {\n" + body + "\n  } else {\n    fallback();\n  }\n}"
+		return branchStart + body + "\n  } else {\n    fallback();\n  }\n}"
 	}
 	valid := []rule_tester.ValidTestCase{
 		{FileName: "case.js", Code: branch("    try { `${value}${process.exit()}`; } catch {}")},
@@ -33,6 +33,11 @@ func TestNoUselessElseCaughtExceptions(t *testing.T) {
 		{FileName: "case.js", Code: branch("    inner: {\n      try { `${value}${process.exit()}`; } finally { break inner; }\n    }")},
 		{FileName: "case.js", Code: branch("    try { ({} = value); return; } catch {}")},
 		{FileName: "case.js", Code: branch("    try { ([] = value); return; } catch {}")},
+		{FileName: "case.js", Code: branch("    class C { static { try { ({} = null); process.exit(); } catch {} } }")},
+		{FileName: "case.js", Code: branch("    class C { static { try { ([] = null); process.exit(); } catch {} } }")},
+		{FileName: "case.js", Code: branch("    class C { static { { try { ({} = null); process.exit(); } catch {} } } }")},
+		{FileName: "case.js", Code: branch("    class C { static stop() { process.exit(); } }")},
+		{FileName: "case.js", Code: branch("    class C { static { const stop = () => { process.exit(); }; } }")},
 		{FileName: "case.js", Code: branch("    try { try { throw null; } catch ({}) { return; } } catch {}")},
 		{FileName: "case.js", Code: branch("    try { for (const key in value) { return true; } return false; } catch {}")},
 		{FileName: "case.js", Code: `class C extends Object {
@@ -73,6 +78,17 @@ func TestNoUselessElseCaughtExceptions(t *testing.T) {
 }`},
 	}
 	var invalid []rule_tester.InvalidTestCase
+	for _, body := range []string{
+		"    class C { static { try { ({} = null); process.exit(); } catch { process.exit(); } } }",
+		"    class C { static { try { const stop = () => { ([] = null); }; process.exit(); } catch {} } }",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			FileName: "case.js",
+			Code:     branch(body),
+			Errors:   []rule_tester.InvalidTestCaseError{elseAt(4, 5)},
+			Output:   []string{branchStart + body + "\n  }\n  fallback();\n}"},
+		})
+	}
 	const loop = "function run(flag, value) {\n  outer: while (flag) {\n    if (flag) {\n"
 	const end = "\n  }\n}"
 	for _, handler := range []string{

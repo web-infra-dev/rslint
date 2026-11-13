@@ -34,7 +34,8 @@ func (a *exitAnalysis) withUnmodeledExceptions(consequent *ast.Node) *ast.Node {
 	}
 	visitor := ast.NewNodeVisitor(nil, factory, ast.NodeVisitorHooks{})
 	visitor.Visit = func(node *ast.Node) *ast.Node {
-		if ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) {
+		// Static blocks execute as part of class evaluation.
+		if ast.IsFunctionLike(node) {
 			return node
 		}
 		updated := node.VisitEachChild(visitor)
@@ -59,8 +60,7 @@ func (a *exitAnalysis) withUnmodeledExceptions(consequent *ast.Node) *ast.Node {
 }
 
 func containsTryStatement(node *ast.Node) bool {
-	return ast.IsTryStatement(node) ||
-		!ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) && node.ForEachChild(containsTryStatement)
+	return ast.IsTryStatement(node) || !ast.IsFunctionLike(node) && node.ForEachChild(containsTryStatement)
 }
 
 func (a *exitAnalysis) mayThrowOutsideGraph(node *ast.Node) bool {
