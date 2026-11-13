@@ -52,6 +52,18 @@ export interface ValidTestCase extends Omit<TestCase, 'errors' | 'output'> {
   output?: never;
 }
 
+/** Builds a complete case after the tester has created its fixture root. */
+export interface FixtureTestCase<T extends ValidTestCase | TestCase> {
+  name?: string;
+  /** Known at registration time; skipped cases never call create. */
+  skip?: string;
+  create(root: string): Omit<T, 'name' | 'skip'> & {
+    name?: never;
+    skip?: never;
+    create?: never;
+  };
+}
+
 export interface RuleTesterConfig {
   /** Plugin name and rule-name prefix. Omit or leave empty for ESLint core rules. */
   plugin?: string;

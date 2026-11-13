@@ -1,955 +1,1682 @@
-// Upstream: https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/extensions.js
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import {
-  RuleTester as ImportRuleTester,
-  type ValidTestCase,
-  type InvalidTestCase,
-} from '../rule-tester.js';
-
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-extensions-'));
-const archive = fs.readFileSync(
-  path.resolve(
-    import.meta.dirname,
-    '../../../../../internal/plugins/import/rules/extensions/testdata/upstream.txtar',
+import { checkSkip } from '../../../../rslint-rule-tester/src/cases.ts';
+import { test } from 'rstack/test';
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(
+  fixtureConfig(
+    'internal/plugins/import/rules/extensions/testdata/upstream.txtar',
   ),
-  'utf8',
-);
-const chunks = archive.split(/^-- (.+) --\r?$/m);
-if (chunks.length < 3) throw new Error('Missing extensions fixtures');
-for (let i = 1; i < chunks.length; i += 2) {
-  const file = path.join(root, chunks[i]);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, chunks[i + 1].replace(/^\r?\n/, ''));
-}
-afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
-const rule = null as never;
-const parsers = { TS_OLD: 'old' };
-const getTSParsers = () => ['typescript'];
-const testFilePath = (name: string) => path.join(root, 'files', name);
-const test = <T extends ValidTestCase>(item: T): T => ({
-  filename: testFilePath('input.ts'),
-  ...item,
-});
-
-class RuleTester {
-  constructor(private config: { settings?: Record<string, unknown> } = {}) {}
-  run(
-    name: string,
-    _rule: never,
-    cases: { valid: ValidTestCase[]; invalid: InvalidTestCase[] },
-  ) {
-    const supported = (item: ValidTestCase) =>
-      item.settings?.['import/resolver'] !== 'webpack';
-    const adapt = <T extends ValidTestCase>(item: T): T => ({
-      ...item,
-      settings: { ...this.config.settings, ...item.settings },
-    });
-    describe(name, () => {
-      for (const item of [...cases.valid, ...cases.invalid].filter(
-        (item) => !supported(item),
-      )) {
-        it.skip(
-          'Webpack resolver requires a JavaScript plugin: ' + item.code,
-          () => {},
-        );
-      }
-      new ImportRuleTester().run('extensions', rule, {
-        valid: cases.valid.filter(supported).map(adapt),
-        invalid: cases.invalid.filter(supported).map(adapt),
-      });
-    });
-  }
-}
-
-const ruleTester = new RuleTester();
-const ruleTesterWithTypeScriptImports = new RuleTester({
-  settings: {
-    'import/resolver': {
-      typescript: {
-        alwaysTryTypes: true,
-      },
-    },
-  },
-});
-
-ruleTester.run('extensions', rule, {
+).run('extensions', {
   valid: [
-    test({ code: 'import a from "@/a"' }),
-    test({ code: 'import a from "a"' }),
-    test({ code: 'import dot from "./file.with.dot"' }),
-    test({
-      code: 'import a from "a/index.js"',
-      options: ['always'],
-    }),
-    test({
-      code: 'import dot from "./file.with.dot.js"',
-      options: ['always'],
-    }),
-    test({
-      code: [
-        'import a from "a"',
-        'import packageConfig from "./package.json"',
-      ].join('\n'),
-      options: [{ json: 'always', js: 'never' }],
-    }),
-    test({
-      code: [
-        'import lib from "./bar"',
-        'import component from "./bar.jsx"',
-        'import data from "./bar.json"',
-      ].join('\n'),
-      options: ['never'],
-      settings: { 'import/resolve': { extensions: ['.js', '.jsx', '.json'] } },
-    }),
-
-    test({
-      code: [
-        'import bar from "./bar"',
-        'import barjson from "./bar.json"',
-        'import barhbs from "./bar.hbs"',
-      ].join('\n'),
-      options: ['always', { js: 'never', jsx: 'never' }],
-      settings: {
-        'import/resolve': { extensions: ['.js', '.jsx', '.json', '.hbs'] },
-      },
-    }),
-
-    test({
-      code: ['import bar from "./bar.js"', 'import pack from "./package"'].join(
-        '\n',
-      ),
-      options: ['never', { js: 'always', json: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.js', '.json'] } },
-    }),
-
-    // unresolved (#271/#295)
-    test({ code: 'import path from "path"' }),
-    test({ code: 'import path from "path"', options: ['never'] }),
-    test({ code: 'import path from "path"', options: ['always'] }),
-    test({ code: 'import thing from "./fake-file.js"', options: ['always'] }),
-    test({ code: 'import thing from "non-package"', options: ['never'] }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component.jsx'
-        import express from 'express'
-      `,
-      options: ['ignorePackages'],
-    }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component.jsx'
-        import express from 'express'
-      `,
-      options: ['always', { ignorePackages: true }],
-    }),
-
-    test({
-      code: `
-        import foo from './foo'
-        import bar from './bar'
-        import Component from './Component'
-        import express from 'express'
-      `,
-      options: ['never', { ignorePackages: true }],
-    }),
-
-    test({
-      code: 'import exceljs from "exceljs"',
-      options: ['always', { js: 'never', jsx: 'never' }],
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      settings: {
-        'import/resolver': {
-          node: { extensions: ['.js', '.jsx', '.json'] },
-          webpack: { config: 'webpack.empty.config.js' },
+    {
+      name: 'extensions / run 0 valid 0',
+      code: 'import a from "@/a"',
+      filename: 'files/input.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
         },
       },
-    }),
-
-    // export (#964)
-    test({
-      code: ['export { foo } from "./foo.js"', 'let bar; export { bar }'].join(
-        '\n',
-      ),
-      options: ['always'],
-    }),
-    test({
-      code: ['export { foo } from "./foo"', 'let bar; export { bar }'].join(
-        '\n',
-      ),
-      options: ['never'],
-    }),
-
-    // Root packages should be ignored and they are names not files
-    test({
-      code: [
-        'import lib from "pkg.js"',
-        'import lib2 from "pgk/package"',
-        'import lib3 from "@name/pkg.js"',
-      ].join('\n'),
-      options: ['never'],
-    }),
-
-    // Query strings.
-    test({
-      code: 'import bare from "./foo?a=True.ext"',
-      options: ['never'],
-    }),
-    test({
-      code: 'import bare from "./foo.js?a=True"',
-      options: ['always'],
-    }),
-
-    test({
-      code: [
-        'import lib from "pkg"',
-        'import lib2 from "pgk/package.js"',
-        'import lib3 from "@name/pkg"',
-      ].join('\n'),
-      options: ['always'],
-    }),
-  ],
-
-  invalid: [
-    test({
+    },
+    {
+      name: 'extensions / run 0 valid 1',
+      code: 'import a from "a"',
+      filename: 'files/input.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 2',
+      code: 'import dot from "./file.with.dot"',
+      filename: 'files/input.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 3',
       code: 'import a from "a/index.js"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 4',
+      code: 'import dot from "./file.with.dot.js"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 5',
+      code: 'import a from "a"\nimport packageConfig from "./package.json"',
+      filename: 'files/input.ts',
+      options: [
+        {
+          json: 'always',
+          js: 'never',
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 6',
+      code: 'import lib from "./bar"\nimport component from "./bar.jsx"\nimport data from "./bar.json"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 7',
+      code: 'import bar from "./bar"\nimport barjson from "./bar.json"\nimport barhbs from "./bar.hbs"',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json', '.hbs'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 8',
+      code: 'import bar from "./bar.js"\nimport pack from "./package"',
+      filename: 'files/input.ts',
+      options: [
+        'never',
+        {
+          js: 'always',
+          json: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 9',
+      code: 'import path from "path"',
+      filename: 'files/input.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 10',
+      code: 'import path from "path"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 11',
+      code: 'import path from "path"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 12',
+      code: 'import thing from "./fake-file.js"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 13',
+      code: 'import thing from "non-package"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 14',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component.jsx'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
+      options: ['ignorePackages'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 15',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component.jsx'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 16',
+      code: "\n        import foo from './foo'\n        import bar from './bar'\n        import Component from './Component'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
+      options: [
+        'never',
+        {
+          ignorePackages: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 17',
+      code: 'import exceljs from "exceljs"',
+      filename: 'files/internal-modules/plugins/plugin.js',
+      options: [
+        'always',
+        {
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          node: {
+            extensions: ['.js', '.jsx', '.json'],
+          },
+          webpack: {
+            config: 'webpack.empty.config.js',
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 18',
+      code: 'export { foo } from "./foo.js"\nlet bar; export { bar }',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 19',
+      code: 'export { foo } from "./foo"\nlet bar; export { bar }',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 20',
+      code: 'import lib from "pkg.js"\nimport lib2 from "pgk/package"\nimport lib3 from "@name/pkg.js"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 21',
+      code: 'import bare from "./foo?a=True.ext"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 22',
+      code: 'import bare from "./foo.js?a=True"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'extensions / run 0 valid 23',
+      code: 'import lib from "pkg"\nimport lib2 from "pgk/package.js"\nimport lib3 from "@name/pkg"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 valid 0 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'import type T from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 valid 1 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'export type { MyType } from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 valid 0 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'import type { MyType } from "./typescript-declare.ts";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 valid 1 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'export type { MyType } from "./typescript-declare.ts";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 valid 2 [upstream parser metadata: {"parser":"typescript"}]',
+      code: "\n              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';\n\n              import { $instances } from 'rootverse+debug:src.ts';\n              import { $exists } from 'rootverse+bfe:src/symbols.ts';\n\n              import type { Entries } from 'type-fest';\n            ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+          checkTypeImports: true,
+          pathGroupOverrides: [
+            {
+              pattern: 'multiverse{*,*/**}',
+              action: 'enforce',
+            },
+          ],
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 valid 3 [upstream parser metadata: {"parser":"typescript"}]',
+      code: "\n              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';\n\n              import { $instances } from 'rootverse+debug:src.ts';\n              import { $exists } from 'rootverse+bfe:src/symbols.ts';\n\n              import type { Entries } from 'type-fest';\n            ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+          checkTypeImports: true,
+          pathGroupOverrides: [
+            {
+              pattern: 'rootverse{*,*/**}',
+              action: 'enforce',
+            },
+          ],
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 valid 4 [upstream parser metadata: {"parser":"typescript"}]',
+      code: "\n              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';\n\n              import { $instances } from 'rootverse+debug:src';\n              import { $exists } from 'rootverse+bfe:src/symbols';\n\n              import type { Entries } from 'type-fest';\n            ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+          checkTypeImports: true,
+          pathGroupOverrides: [
+            {
+              pattern: 'multiverse{*,*/**}',
+              action: 'enforce',
+            },
+            {
+              pattern: 'rootverse{*,*/**}',
+              action: 'ignore',
+            },
+          ],
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+  ],
+  invalid: [
+    {
+      name: 'extensions / run 0 invalid 0',
+      code: 'import a from "a/index.js"',
+      filename: 'files/input.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "a/index.js"',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 1',
       code: 'import dot from "./file.with.dot"',
+      filename: 'files/input.ts',
       options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension "js" for "./file.with.dot"',
           line: 1,
           column: 17,
+          endLine: 1,
+          endColumn: 34,
         },
       ],
-    }),
-    test({
-      code: [
-        'import a from "a/index.js"',
-        'import packageConfig from "./package"',
-      ].join('\n'),
-      options: [{ json: 'always', js: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.js', '.json'] } },
+    },
+    {
+      name: 'extensions / run 0 invalid 2',
+      code: 'import a from "a/index.js"\nimport packageConfig from "./package"',
+      filename: 'files/input.ts',
+      options: [
+        {
+          json: 'always',
+          js: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "a/index.js"',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 27,
         },
         {
+          messageId: '',
           message: 'Missing file extension "json" for "./package"',
           line: 2,
           column: 27,
+          endLine: 2,
+          endColumn: 38,
         },
       ],
-    }),
-    test({
-      code: [
-        'import lib from "./bar.js"',
-        'import component from "./bar.jsx"',
-        'import data from "./bar.json"',
-      ].join('\n'),
+    },
+    {
+      name: 'extensions / run 0 invalid 3',
+      code: 'import lib from "./bar.js"\nimport component from "./bar.jsx"\nimport data from "./bar.json"',
+      filename: 'files/input.ts',
       options: ['never'],
-      settings: { 'import/resolve': { extensions: ['.js', '.jsx', '.json'] } },
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./bar.js"',
           line: 1,
           column: 17,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
-    }),
-    test({
-      code: [
-        'import lib from "./bar.js"',
-        'import component from "./bar.jsx"',
-        'import data from "./bar.json"',
-      ].join('\n'),
-      options: [{ json: 'always', js: 'never', jsx: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.js', '.jsx', '.json'] } },
+    },
+    {
+      name: 'extensions / run 0 invalid 4',
+      code: 'import lib from "./bar.js"\nimport component from "./bar.jsx"\nimport data from "./bar.json"',
+      filename: 'files/input.ts',
+      options: [
+        {
+          json: 'always',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./bar.js"',
           line: 1,
           column: 17,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
-    }),
-    // extension resolve order (#583/#965)
-    test({
-      code: [
-        'import component from "./bar.jsx"',
-        'import data from "./bar.json"',
-      ].join('\n'),
-      options: [{ json: 'always', js: 'never', jsx: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.jsx', '.json', '.js'] } },
+    },
+    {
+      name: 'extensions / run 0 invalid 5',
+      code: 'import component from "./bar.jsx"\nimport data from "./bar.json"',
+      filename: 'files/input.ts',
+      options: [
+        {
+          json: 'always',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.jsx', '.json', '.js'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "jsx" for "./bar.jsx"',
           line: 1,
           column: 23,
+          endLine: 1,
+          endColumn: 34,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 6',
       code: 'import "./bar.coffee"',
+      filename: 'files/input.ts',
+      options: [
+        'never',
+        {
+          js: 'always',
+          jsx: 'always',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.coffee', '.js'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message:
             'Unexpected use of file extension "coffee" for "./bar.coffee"',
           line: 1,
           column: 8,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
-      options: ['never', { js: 'always', jsx: 'always' }],
-      settings: { 'import/resolve': { extensions: ['.coffee', '.js'] } },
-    }),
-
-    test({
-      code: [
-        'import barjs from "./bar.js"',
-        'import barjson from "./bar.json"',
-        'import barnone from "./bar"',
-      ].join('\n'),
-      options: ['always', { json: 'always', js: 'never', jsx: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.js', '.jsx', '.json'] } },
+    },
+    {
+      name: 'extensions / run 0 invalid 7',
+      code: 'import barjs from "./bar.js"\nimport barjson from "./bar.json"\nimport barnone from "./bar"',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          json: 'always',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./bar.js"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
-    }),
-
-    test({
-      code: ['import barjs from "."', 'import barjs2 from ".."'].join('\n'),
+    },
+    {
+      name: 'extensions / run 0 invalid 8',
+      code: 'import barjs from "."\nimport barjs2 from ".."',
+      filename: 'files/input.ts',
       options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension "js" for "."',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 22,
         },
         {
+          messageId: '',
           message: 'Missing file extension "js" for ".."',
           line: 2,
           column: 20,
+          endLine: 2,
+          endColumn: 24,
         },
       ],
-    }),
-
-    test({
-      code: [
-        'import barjs from "./bar.js"',
-        'import barjson from "./bar.json"',
-        'import barnone from "./bar"',
-      ].join('\n'),
-      options: ['never', { json: 'always', js: 'never', jsx: 'never' }],
-      settings: { 'import/resolve': { extensions: ['.js', '.jsx', '.json'] } },
+    },
+    {
+      name: 'extensions / run 0 invalid 9',
+      code: 'import barjs from "./bar.js"\nimport barjson from "./bar.json"\nimport barnone from "./bar"',
+      filename: 'files/input.ts',
+      options: [
+        'never',
+        {
+          json: 'always',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolve': {
+          extensions: ['.js', '.jsx', '.json'],
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./bar.js"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
-    }),
-
-    // unresolved (#271/#295)
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 10',
       code: 'import thing from "./fake-file.js"',
+      filename: 'files/input.ts',
       options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./fake-file.js"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 35,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 11',
       code: 'import thing from "non-package/test"',
+      filename: 'files/input.ts',
       options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for "non-package/test"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 37,
         },
       ],
-    }),
-
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 12',
       code: 'import thing from "@name/pkg/test"',
+      filename: 'files/input.ts',
       options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for "@name/pkg/test"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 35,
         },
       ],
-    }),
-
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 13',
       code: 'import thing from "@name/pkg/test.js"',
+      filename: 'files/input.ts',
       options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message:
             'Unexpected use of file extension "js" for "@name/pkg/test.js"',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 38,
         },
       ],
-    }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component'
-        import baz from 'foo/baz'
-        import baw from '@scoped/baw/import'
-        import chart from '@/configs/chart'
-        import express from 'express'
-      `,
-      options: ['always', { ignorePackages: true }],
+    },
+    {
+      name: 'extensions / run 0 invalid 14',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component'\n        import baz from 'foo/baz'\n        import baw from '@scoped/baw/import'\n        import chart from '@/configs/chart'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for "./Component"',
           line: 4,
           column: 31,
+          endLine: 4,
+          endColumn: 44,
         },
         {
+          messageId: '',
           message: 'Missing file extension for "@/configs/chart"',
           line: 7,
           column: 27,
+          endLine: 7,
+          endColumn: 44,
         },
       ],
-    }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component'
-        import baz from 'foo/baz'
-        import baw from '@scoped/baw/import'
-        import chart from '@/configs/chart'
-        import express from 'express'
-      `,
+    },
+    {
+      name: 'extensions / run 0 invalid 15',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component'\n        import baz from 'foo/baz'\n        import baw from '@scoped/baw/import'\n        import chart from '@/configs/chart'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
       options: ['ignorePackages'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for "./Component"',
           line: 4,
           column: 31,
+          endLine: 4,
+          endColumn: 44,
         },
         {
+          messageId: '',
           message: 'Missing file extension for "@/configs/chart"',
           line: 7,
           column: 27,
+          endLine: 7,
+          endColumn: 44,
         },
       ],
-    }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component.jsx'
-        import express from 'express'
-      `,
+    },
+    {
+      name: 'extensions / run 0 invalid 16',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component.jsx'\n        import express from 'express'\n      ",
+      filename: 'files/input.ts',
+      options: [
+        'never',
+        {
+          ignorePackages: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./foo.js"',
           line: 2,
           column: 25,
+          endLine: 2,
+          endColumn: 35,
         },
         {
+          messageId: '',
           message:
             'Unexpected use of file extension "jsx" for "./Component.jsx"',
           line: 4,
           column: 31,
+          endLine: 4,
+          endColumn: 48,
         },
       ],
-      options: ['never', { ignorePackages: true }],
-    }),
-
-    test({
-      code: `
-        import foo from './foo.js'
-        import bar from './bar.json'
-        import Component from './Component.jsx'
-      `,
+    },
+    {
+      name: 'extensions / run 0 invalid 17',
+      code: "\n        import foo from './foo.js'\n        import bar from './bar.json'\n        import Component from './Component.jsx'\n      ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          pattern: {
+            jsx: 'never',
+          },
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message:
             'Unexpected use of file extension "jsx" for "./Component.jsx"',
           line: 4,
           column: 31,
+          endLine: 4,
+          endColumn: 48,
         },
       ],
-      options: ['always', { pattern: { jsx: 'never' } }],
-    }),
-
-    // export (#964)
-    test({
-      code: ['export { foo } from "./foo"', 'let bar; export { bar }'].join(
-        '\n',
-      ),
+    },
+    {
+      name: 'extensions / run 0 invalid 18',
+      code: 'export { foo } from "./foo"\nlet bar; export { bar }',
+      filename: 'files/input.ts',
       options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for "./foo"',
           line: 1,
           column: 21,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-    }),
-    test({
-      code: ['export { foo } from "./foo.js"', 'let bar; export { bar }'].join(
-        '\n',
-      ),
+    },
+    {
+      name: 'extensions / run 0 invalid 19',
+      code: 'export { foo } from "./foo.js"\nlet bar; export { bar }',
+      filename: 'files/input.ts',
       options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Unexpected use of file extension "js" for "./foo.js"',
           line: 1,
           column: 21,
+          endLine: 1,
+          endColumn: 31,
         },
       ],
-    }),
-
-    // Query strings.
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 20',
       code: 'import withExtension from "./foo.js?a=True"',
+      filename: 'files/input.ts',
       options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message:
             'Unexpected use of file extension "js" for "./foo.js?a=True"',
           line: 1,
           column: 27,
+          endLine: 1,
+          endColumn: 44,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'extensions / run 0 invalid 21',
       code: 'import withoutExtension from "./foo?a=True.ext"',
+      filename: 'files/input.ts',
       options: ['always'],
-      errors: [
-        {
-          message: 'Missing file extension for "./foo?a=True.ext"',
-          line: 1,
-          column: 30,
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
         },
-      ],
-    }),
-    // require (#1230)
-    test({
-      code: ['const { foo } = require("./foo")', 'export { foo }'].join('\n'),
-      options: ['always'],
-      errors: [
-        {
-          message: 'Missing file extension for "./foo"',
-          line: 1,
-          column: 25,
-        },
-      ],
-    }),
-    test({
-      code: ['const { foo } = require("./foo.js")', 'export { foo }'].join(
-        '\n',
-      ),
-      options: ['never'],
-      errors: [
-        {
-          message: 'Unexpected use of file extension "js" for "./foo.js"',
-          line: 1,
-          column: 25,
-        },
-      ],
-    }),
-
-    // export { } from
-    test({
-      code: 'export { foo } from "./foo"',
-      options: ['always'],
-      errors: [
-        {
-          message: 'Missing file extension for "./foo"',
-          line: 1,
-          column: 21,
-        },
-      ],
-    }),
-    test({
-      code: `
-        import foo from "@/ImNotAScopedModule";
-        import chart from '@/configs/chart';
-      `,
-      options: ['always'],
-      errors: [
-        {
-          message: 'Missing file extension for "@/ImNotAScopedModule"',
-          line: 2,
-        },
-        {
-          message: 'Missing file extension for "@/configs/chart"',
-          line: 3,
-        },
-      ],
-    }),
-    test({
-      code: 'export { foo } from "./foo.js"',
-      options: ['never'],
-      errors: [
-        {
-          message: 'Unexpected use of file extension "js" for "./foo.js"',
-          line: 1,
-          column: 21,
-        },
-      ],
-    }),
-
-    // export * from
-    test({
-      code: 'export * from "./foo"',
-      options: ['always'],
-      errors: [
-        {
-          message: 'Missing file extension for "./foo"',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'export * from "./foo.js"',
-      options: ['never'],
-      errors: [
-        {
-          message: 'Unexpected use of file extension "js" for "./foo.js"',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import foo from "@/ImNotAScopedModule.js"',
-      options: ['never'],
-      errors: [
-        {
-          message:
-            'Unexpected use of file extension "js" for "@/ImNotAScopedModule.js"',
-          line: 1,
-        },
-      ],
-    }),
-    test({
-      code: `
-        import _ from 'lodash';
-        import m from '@test-scope/some-module/index.js';
-
-        import bar from './bar';
-      `,
-      options: ['never'],
-      settings: {
-        'import/resolver': 'webpack',
-        'import/external-module-folders': ['node_modules', 'symlinked-module'],
       },
       errors: [
         {
-          message:
-            'Unexpected use of file extension "js" for "@test-scope/some-module/index.js"',
-          line: 3,
+          messageId: '',
+          message: 'Missing file extension for "./foo?a=True.ext"',
+          line: 1,
+          column: 30,
+          endLine: 1,
+          endColumn: 48,
         },
       ],
-    }),
-
-    // TODO: properly ignore packages resolved via relative imports
-    test({
-      code: ['import * as test from "."'].join('\n'),
-      filename: testFilePath('./internal-modules/test.js'),
-      options: ['ignorePackages'],
+    },
+    {
+      name: 'extensions / run 0 invalid 22',
+      code: 'const { foo } = require("./foo")\nexport { foo }',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
+          message: 'Missing file extension for "./foo"',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 23',
+      code: 'const { foo } = require("./foo.js")\nexport { foo }',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected use of file extension "js" for "./foo.js"',
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 24',
+      code: 'export { foo } from "./foo"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./foo"',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 25',
+      code: '\n        import foo from "@/ImNotAScopedModule";\n        import chart from \'@/configs/chart\';\n      ',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "@/ImNotAScopedModule"',
+          line: 2,
+          column: 25,
+          endLine: 2,
+          endColumn: 47,
+        },
+        {
+          messageId: '',
+          message: 'Missing file extension for "@/configs/chart"',
+          line: 3,
+          column: 27,
+          endLine: 3,
+          endColumn: 44,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 26',
+      code: 'export { foo } from "./foo.js"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected use of file extension "js" for "./foo.js"',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 27',
+      code: 'export * from "./foo"',
+      filename: 'files/input.ts',
+      options: ['always'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./foo"',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 28',
+      code: 'export * from "./foo.js"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected use of file extension "js" for "./foo.js"',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 29',
+      code: 'import foo from "@/ImNotAScopedModule.js"',
+      filename: 'files/input.ts',
+      options: ['never'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            'Unexpected use of file extension "js" for "@/ImNotAScopedModule.js"',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
+    },
+    {
+      name: 'extensions / run 0 invalid 31',
+      code: 'import * as test from "."',
+      filename: 'files/internal-modules/test.js',
+      options: ['ignorePackages'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
           message: 'Missing file extension for "."',
           line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 26,
         },
       ],
-    }),
-    // TODO: properly ignore packages resolved via relative imports
-    test({
-      code: ['import * as test from ".."'].join('\n'),
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
+    },
+    {
+      name: 'extensions / run 0 invalid 32',
+      code: 'import * as test from ".."',
+      filename: 'files/internal-modules/plugins/plugin.js',
       options: ['ignorePackages'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Missing file extension for ".."',
           line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 27,
         },
       ],
-    }),
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 invalid 0 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'import T from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./typescript-declare"',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 invalid 1 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'export { MyType } from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./typescript-declare"',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 46,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 invalid 2 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'import type T from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./typescript-declare"',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 42,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: extensions ignore type-only / run 1 invalid 3 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'export type { MyType } from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ts: 'never',
+          tsx: 'never',
+          js: 'never',
+          jsx: 'never',
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': 'node',
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "./typescript-declare"',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 invalid 0 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'import type { MyType } from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension "ts" for "./typescript-declare"',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 invalid 1 [upstream parser metadata: {"parser":"typescript"}]',
+      code: 'export type { MyType } from "./typescript-declare";',
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          checkTypeImports: true,
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension "ts" for "./typescript-declare"',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 51,
+        },
+      ],
+    },
+    {
+      name: 'TypeScript / typescript: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set / run 2 invalid 2 [upstream parser metadata: {"parser":"typescript"}]',
+      code: "\n              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';\n\n              import { $instances } from 'rootverse+debug:src';\n              import { $exists } from 'rootverse+bfe:src/symbols';\n\n              import type { Entries } from 'type-fest';\n            ",
+      filename: 'files/input.ts',
+      options: [
+        'always',
+        {
+          ignorePackages: true,
+          checkTypeImports: true,
+          pathGroupOverrides: [
+            {
+              pattern: 'rootverse{*,*/**}',
+              action: 'enforce',
+            },
+            {
+              pattern: 'universe{*,*/**}',
+              action: 'ignore',
+            },
+          ],
+        },
+      ],
+      settings: {
+        'import/resolver': {
+          typescript: {
+            alwaysTryTypes: true,
+          },
+        },
+      },
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Missing file extension for "rootverse+debug:src"',
+          line: 4,
+          column: 42,
+          endLine: 4,
+          endColumn: 63,
+        },
+        {
+          messageId: '',
+          message: 'Missing file extension for "rootverse+bfe:src/symbols"',
+          line: 5,
+          column: 39,
+          endLine: 5,
+          endColumn: 66,
+        },
+      ],
+    },
   ],
 });
 
-describe('TypeScript', () => {
-  getTSParsers()
-    // Type-only imports were added in TypeScript ESTree 2.23.0
-    .filter((parser) => parser !== parsers.TS_OLD)
-    .forEach((parser) => {
-      // Upstream runs this group with its default node resolver.
-      ruleTester.run(`${parser}: extensions ignore type-only`, rule, {
-        valid: [
-          test({
-            code: 'import type T from "./typescript-declare";',
-            options: [
-              'always',
-              { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-          test({
-            code: 'export type { MyType } from "./typescript-declare";',
-            options: [
-              'always',
-              { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-        ],
-        invalid: [
-          test({
-            code: 'import T from "./typescript-declare";',
-            errors: ['Missing file extension for "./typescript-declare"'],
-            options: [
-              'always',
-              { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-          test({
-            code: 'export { MyType } from "./typescript-declare";',
-            errors: ['Missing file extension for "./typescript-declare"'],
-            options: [
-              'always',
-              { ts: 'never', tsx: 'never', js: 'never', jsx: 'never' },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-          test({
-            code: 'import type T from "./typescript-declare";',
-            errors: ['Missing file extension for "./typescript-declare"'],
-            options: [
-              'always',
-              {
-                ts: 'never',
-                tsx: 'never',
-                js: 'never',
-                jsx: 'never',
-                checkTypeImports: true,
-              },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-          test({
-            code: 'export type { MyType } from "./typescript-declare";',
-            errors: ['Missing file extension for "./typescript-declare"'],
-            options: [
-              'always',
-              {
-                ts: 'never',
-                tsx: 'never',
-                js: 'never',
-                jsx: 'never',
-                checkTypeImports: true,
-              },
-            ],
-            parser,
-            settings: { 'import/resolver': 'node' },
-          }),
-        ],
-      });
-      ruleTesterWithTypeScriptImports.run(
-        `${parser}: (with TS resolver) extensions are enforced for type imports/export when checkTypeImports is set`,
-        rule,
-        {
-          valid: [
-            test({
-              code: 'import type { MyType } from "./typescript-declare.ts";',
-              options: ['always', { checkTypeImports: true }],
-              parser,
-            }),
-            test({
-              code: 'export type { MyType } from "./typescript-declare.ts";',
-              options: ['always', { checkTypeImports: true }],
-              parser,
-            }),
-
-            // pathGroupOverrides: no patterns match good bespoke specifiers
-            test({
-              code: `
-              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';
-
-              import { $instances } from 'rootverse+debug:src.ts';
-              import { $exists } from 'rootverse+bfe:src/symbols.ts';
-
-              import type { Entries } from 'type-fest';
-            `,
-              parser,
-              options: [
-                'always',
-                {
-                  ignorePackages: true,
-                  checkTypeImports: true,
-                  pathGroupOverrides: [
-                    {
-                      pattern: 'multiverse{*,*/**}',
-                      action: 'enforce',
-                    },
-                  ],
-                },
-              ],
-            }),
-            // pathGroupOverrides: an enforce pattern matches good bespoke specifiers
-            test({
-              code: `
-              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';
-
-              import { $instances } from 'rootverse+debug:src.ts';
-              import { $exists } from 'rootverse+bfe:src/symbols.ts';
-
-              import type { Entries } from 'type-fest';
-            `,
-              parser,
-              options: [
-                'always',
-                {
-                  ignorePackages: true,
-                  checkTypeImports: true,
-                  pathGroupOverrides: [
-                    {
-                      pattern: 'rootverse{*,*/**}',
-                      action: 'enforce',
-                    },
-                  ],
-                },
-              ],
-            }),
-            // pathGroupOverrides: an ignore pattern matches bad bespoke specifiers
-            test({
-              code: `
-              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';
-
-              import { $instances } from 'rootverse+debug:src';
-              import { $exists } from 'rootverse+bfe:src/symbols';
-
-              import type { Entries } from 'type-fest';
-            `,
-              parser,
-              options: [
-                'always',
-                {
-                  ignorePackages: true,
-                  checkTypeImports: true,
-                  pathGroupOverrides: [
-                    {
-                      pattern: 'multiverse{*,*/**}',
-                      action: 'enforce',
-                    },
-                    {
-                      pattern: 'rootverse{*,*/**}',
-                      action: 'ignore',
-                    },
-                  ],
-                },
-              ],
-            }),
-          ],
-          invalid: [
-            test({
-              code: 'import type { MyType } from "./typescript-declare";',
-              errors: [
-                'Missing file extension "ts" for "./typescript-declare"',
-              ],
-              options: ['always', { checkTypeImports: true }],
-              parser,
-            }),
-            test({
-              code: 'export type { MyType } from "./typescript-declare";',
-              errors: [
-                'Missing file extension "ts" for "./typescript-declare"',
-              ],
-              options: ['always', { checkTypeImports: true }],
-              parser,
-            }),
-
-            // pathGroupOverrides: an enforce pattern matches bad bespoke specifiers
-            test({
-              code: `
-              import { ErrorMessage as UpstreamErrorMessage } from '@black-flag/core/util';
-
-              import { $instances } from 'rootverse+debug:src';
-              import { $exists } from 'rootverse+bfe:src/symbols';
-
-              import type { Entries } from 'type-fest';
-            `,
-              parser,
-              options: [
-                'always',
-                {
-                  ignorePackages: true,
-                  checkTypeImports: true,
-                  pathGroupOverrides: [
-                    {
-                      pattern: 'rootverse{*,*/**}',
-                      action: 'enforce',
-                    },
-                    {
-                      pattern: 'universe{*,*/**}',
-                      action: 'ignore',
-                    },
-                  ],
-                },
-              ],
-              errors: [
-                {
-                  message: 'Missing file extension for "rootverse+debug:src"',
-                  line: 4,
-                },
-                {
-                  message:
-                    'Missing file extension for "rootverse+bfe:src/symbols"',
-                  line: 5,
-                },
-              ],
-            }),
-          ],
-        },
-      );
-    });
-});
+// Preserved upstream inputs/assertions, not executable native expectations.
+const skippedInvalidCases = [
+  {
+    name: 'extensions / run 0 invalid 30',
+    code: "\n        import _ from 'lodash';\n        import m from '@test-scope/some-module/index.js';\n\n        import bar from './bar';\n      ",
+    filename: 'files/input.ts',
+    options: ['never'],
+    settings: {
+      'import/resolver': 'webpack',
+      'import/external-module-folders': ['node_modules', 'symlinked-module'],
+    },
+    languageOptions: {
+      parserOptions: {
+        project: false,
+        projectService: false,
+      },
+    },
+    skip: 'The case requires a webpack JavaScript resolver; the native Import runtime supports Node and TypeScript resolvers.',
+    errors: [
+      {
+        message:
+          'Unexpected use of file extension "js" for "@test-scope/some-module/index.js"',
+        line: 3,
+      },
+    ],
+  },
+];
+for (const item of skippedInvalidCases) {
+  checkSkip(item);
+  test.skip(`invalid ${item.name}: ${item.skip}`, () => {});
+}
