@@ -2,6 +2,7 @@ package no_confusing_void_expression
 
 import (
 	_ "embed"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
@@ -118,8 +119,12 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 						if n.Left == node {
 							return nil
 						}
-						// TODO(port): ts-eslint handles sequence expressions incorrectly as well, so ignoring for now
-						// continue
+						// tsgo nests comma operators; ESTree flattens an unparenthesized
+						// sequence. Only its final expression is a value position.
+						outer := parent.Parent
+						if ast.IsBinaryExpression(outer) && outer.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken && outer.AsBinaryExpression().Left == parent {
+							return nil
+						}
 					}
 				case ast.KindExpressionStatement:
 					// e.g. `{ console.log("foo"); }`
@@ -144,8 +149,6 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 						// this is valid with an appropriate option
 						return nil
 					}
-					// TODO
-					// case ast.KindNonNullExpression, ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindCallExpression:
 				}
 				break
 			}
@@ -246,10 +249,8 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 				body := invalidAncestor.Body()
 				if !ast.IsBlock(body) && canFix(body) {
 					withoutParens := ast.SkipParentheses(body)
-					fixes = []rule.RuleFix{
-						rule.RuleFixReplaceRange(body.Loc.WithEnd(withoutParens.Pos()), "{ "),
-						rule.RuleFixReplaceRange(body.Loc.WithPos(withoutParens.End()), "; }"),
-					}
+					fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, body,
+						"{ "+utils.TrimmedNodeText(ctx.SourceFile, withoutParens)+"; }")}
 				}
 
 				ctx.ReportNodeWithFixes(node, buildInvalidVoidExprArrowMessage(), fixes...)
@@ -270,40 +271,29 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
+				expr := invalidAncestor.AsReturnStatement().Expression
+				// ESTree excludes grouping parentheses from the return argument.
+				expr = ast.SkipParentheses(expr)
+				replacement := utils.TrimmedNodeText(ctx.SourceFile, expr) + ";"
+				token := scanner.ScanTokenAtPosition(ctx.SourceFile, expr.Pos())
+				if token == ast.KindOpenParenToken || token == ast.KindOpenBracketToken || token == ast.KindBacktickToken {
+					replacement = ";" + replacement
+				}
+
 				if isFinalReturn(invalidAncestor) {
-					expr := invalidAncestor.AsReturnStatement().Expression
 					var fixes []rule.RuleFix
 					if canFix(expr) {
-						replaceText := ""
-						nextToken := scanner.ScanTokenAtPosition(ctx.SourceFile, expr.Pos())
-						if nextToken == ast.KindOpenParenToken || nextToken == ast.KindOpenBracketToken || nextToken == ast.KindBacktickToken {
-							replaceText = ";"
-						}
-						returnToken := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, invalidAncestor.Pos())
-						fixes = append(fixes, rule.RuleFixReplaceRange(returnToken, replaceText))
+						fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, invalidAncestor, replacement)}
 					}
-
 					ctx.ReportNodeWithFixes(node, buildInvalidVoidExprReturnLastMessage(), fixes...)
 					return
 				}
 
-				var fixes []rule.RuleFix
-				replaceText := ""
-				nextToken := scanner.ScanTokenAtPosition(ctx.SourceFile, invalidAncestor.AsReturnStatement().Expression.Pos())
-				if nextToken == ast.KindOpenParenToken || nextToken == ast.KindOpenBracketToken || nextToken == ast.KindBacktickToken {
-					replaceText = ";"
-				}
-				returnToken := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, invalidAncestor.Pos())
-				fixes = append(fixes, rule.RuleFixReplaceRange(returnToken, replaceText), rule.RuleFixInsertAfter(invalidAncestor, "; return;"))
-
+				replacement += " return;"
 				if !ast.IsBlock(invalidAncestor.Parent) {
-					// e.g. `if (cond) return console.error();`
-					// add braces if not inside a block
-					fixes = append(fixes,
-						rule.RuleFixInsertBefore(ctx.SourceFile, invalidAncestor, "{ "),
-						rule.RuleFixInsertAfter(invalidAncestor, " }"),
-					)
+					replacement = "{ " + replacement + " }"
 				}
+				fixes := []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, invalidAncestor, replacement)}
 				ctx.ReportNodeWithFixes(node, buildInvalidVoidExprReturnMessage(), fixes...)
 				return
 			}
