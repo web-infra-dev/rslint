@@ -30,8 +30,8 @@ array.push(item);
 array.length = 0;
 ```
 
-Removing the no-op `array.splice(index, 0)` is also valid when its index has
-no side effects.
+The rule recognizes non-array receivers documented with JSDoc annotations
+such as `@param`, `@type`, and `@returns`.
 
 ## Options
 
@@ -43,11 +43,18 @@ Rslint skips calls such as `array.splice(...[0, 1], 0)` because a spread in
 the first argument can provide the delete count. Unicorn v79.0.0 can report
 and remove this call even though it removes the first element.
 
-Rslint keeps the diagnostic and withholds autofixes that would drop a known
-getter read, such as removing `queue.items.splice(index, 0)` when
-`queue.items` is a getter. It also withholds removal for a BigInt literal
-index, which throws during conversion, and for object literals used as
-indices, which can run conversion methods.
+Rslint keeps the diagnostic when it cannot safely remove a call such as
+`array.splice(index, 0)`. An index with an unknown value may call
+`valueOf()` or throw during conversion. A getter read inside an expression,
+such as `array.splice(options.index + 1, 0)`, is also preserved.
+
+Rslint withholds the `push()` autofix for `array.splice(array.length, 0, ...items)`
+when iteration might run user code. An iterator that appends to `array`
+can change where the inserted items end up.
+
+When removing a no-op call directly before a string statement in a script
+or function body, Rslint leaves a semicolon to keep strings such as
+`"use strict"` from becoming directives.
 
 Rslint leaves calls such as `array.items.splice((array?.items).length - 1, 1)`
 alone because the optional chain can affect how the length is evaluated.

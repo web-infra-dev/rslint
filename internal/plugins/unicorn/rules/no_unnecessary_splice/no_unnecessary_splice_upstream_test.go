@@ -72,14 +72,15 @@ func TestNoUnnecessarySpliceUpstream(t *testing.T) {
 	// JavaScript snapshot cases.
 	addCases("input.js", []upstreamCase{
 		{"no-op", 7, "array.splice();", new("")},
-		{"no-op", 7, "array.splice(index, 0);", new("")},
-		{"no-op", 7, "array.splice(index, -1);", new("")},
-		{"no-op", 7, "array.splice(index, +0);", new("")},
+		// An unknown index could run conversion code or throw.
+		{"no-op", 7, "array.splice(index, 0);", nil},
+		{"no-op", 7, "array.splice(index, -1);", nil},
+		{"no-op", 7, "array.splice(index, +0);", nil},
 		{"shift", 7, "array.splice(0, 1);", new("array.shift();")},
 		{"shift", 7, "array.splice(+0, +1);", new("array.shift();")},
 		{"shift", 7, "array.splice(0, - -1);", new("array.shift();")},
 		{"shift", 7, "array.splice(- -0, 1);", new("array.shift();")},
-		{"no-op", 7, "array.splice(index, - -0);", new("")},
+		{"no-op", 7, "array.splice(index, - -0);", nil},
 		{"unshift", 7, "array.splice(0, 0, element);", new("array.unshift(element);")},
 		{"unshift", 7, "array.splice(0, 0, element, ...moreElements);", new("array.unshift(element, ...moreElements);")},
 		{"unshift", 7, "array.splice(0, 0, ...elements);", new("array.unshift(...elements);")},
@@ -87,8 +88,9 @@ func TestNoUnnecessarySpliceUpstream(t *testing.T) {
 		{"pop", 7, "array.splice(array.length - +1, +1);", new("array.pop();")},
 		{"pop", 14, "object.array.splice(object.array.length - 1, 1);", new("object.array.pop();")},
 		{"push", 7, "array.splice(array.length, 0, element);", new("array.push(element);")},
-		{"push", 7, "array.splice(array.length, 0, element, ...moreElements);", new("array.push(element, ...moreElements);")},
-		{"push", 7, "array.splice(array.length, 0, ...elements);", new("array.push(...elements);")},
+		// An unknown iterator could mutate the receiver during insertion.
+		{"push", 7, "array.splice(array.length, 0, element, ...moreElements);", nil},
+		{"push", 7, "array.splice(array.length, 0, ...elements);", nil},
 		{"push", 14, "object.array.splice(object.array.length, 0, element);", new("object.array.push(element);")},
 		{"empty", 7, "array.splice(0);", new("array.length = 0;")},
 		{"empty", 14, "object.array.splice(0);", new("object.array.length = 0;")},

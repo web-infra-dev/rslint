@@ -1,10 +1,12 @@
 package no_unnecessary_splice
 
 import (
+	"math"
 	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -21,12 +23,12 @@ func spliceFixes(ctx rule.RuleContext, call unicornutil.DotMethodCall, replaceme
 	}
 	if replacement == "push" && slices.ContainsFunc(call.Call.Arguments()[2:], func(arg *ast.Node) bool {
 		// splice reads length before evaluating the inserted values.
-		return effects.HasSideEffect(arg, false) || readsKnownGetter(ctx, effects, arg)
+		return hasSpliceSideEffect(ctx, effects, arg)
 	}) {
 		return nil
 	}
 	if (replacement == "pop" || replacement == "push" || replacement == "empty" && len(call.Call.Arguments()) == 2) &&
-		(effects.HasSideEffect(call.Object, false) || readsKnownGetter(ctx, effects, call.Object)) {
+		hasSpliceSideEffect(ctx, effects, call.Object) {
 		// The length argument evaluates the receiver a second time.
 		return nil
 	}
@@ -70,12 +72,15 @@ func removeNoOp(ctx rule.RuleContext, call unicornutil.DotMethodCall, effects *u
 	if len(comments) > 0 && (comments[0].Pos() < span.End() || utils.IsSameLine(source, span.End(), comments[0].Pos())) {
 		return nil
 	}
-	if effects.HasSideEffect(call.Object, false) || readsKnownGetter(ctx, effects, call.Object) {
+	if hasSpliceSideEffect(ctx, effects, call.Object) {
 		return nil
 	}
 	if args := call.Call.Arguments(); len(args) > 0 &&
-		(effects.HasSideEffect(args[0], false) || readsKnownGetter(ctx, effects, args[0]) || hasObservableIndexConversion(args[0])) {
+		(hasSpliceSideEffect(ctx, effects, args[0]) || !hasSafeIndexConversion(effects, args[0])) {
 		return nil
+	}
+	if precedesDirective(statement) {
+		return []rule.RuleFix{rule.RuleFixReplaceRange(span, ";")}
 	}
 	// Retain a boundary even if a separate fix also removes the next statement.
 	if previous, ok := utils.TokenBeforePosition(source, span.Pos()); ok &&
@@ -85,25 +90,85 @@ func removeNoOp(ctx rule.RuleContext, call unicornutil.DotMethodCall, effects *u
 	return []rule.RuleFix{rule.RuleFixRemoveRange(unicornutil.StatementRemovalRange(source, span))}
 }
 
-// An object used as a splice index can run user code when converted to a
-// number. BigInt conversion throws even when deleteCount is zero.
-func hasObservableIndexConversion(node *ast.Node) bool {
-	switch ast.SkipOuterExpressions(node, expressionWrappers).Kind {
-	case ast.KindObjectLiteralExpression, ast.KindBigIntLiteral:
+// The last removed call before a string must keep the directive prologue
+// closed, even when earlier calls in the same statement list are removed.
+func precedesDirective(statement *ast.Node) bool {
+	container := statement.Parent
+	if container.Kind != ast.KindSourceFile && !ast.IsFunctionLikeDeclaration(container.Parent) {
+		return false
+	}
+	statements := container.Statements()
+	index := ast.IndexOfNode(statements, statement)
+	return index >= 0 && index+1 < len(statements) && ast.IsPrologueDirective(statements[index+1])
+}
+
+// Objects can run conversion methods and BigInt or Symbol indices throw.
+// Only remove a call when the index can be converted without those effects.
+func hasSafeIndexConversion(effects *utils.StaticStringEvaluator, node *ast.Node) bool {
+	node = ast.SkipOuterExpressions(node, expressionWrappers)
+	switch node.Kind {
+	case ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		return !math.IsNaN(staticNumber(node))
+	case ast.KindIdentifier:
+		// A stable binding's initializer has already been evaluated. Folding a
+		// compound index directly could miss evaluation, as in `(+1n, 0)`.
+	default:
+		return false
+	}
+	value, known := effects.EvalControlFlowValue(node)
+	if !known {
+		return false
+	}
+	switch value.(type) {
+	case jsnum.Number, string, bool:
 		return true
 	}
 	return false
 }
 
-func readsKnownGetter(ctx rule.RuleContext, effects *utils.StaticStringEvaluator, node *ast.Node) bool {
-	node = ast.SkipOuterExpressions(node, expressionWrappers)
-	if !ast.IsAccessExpression(node) {
+func hasSpliceSideEffect(ctx rule.RuleContext, effects *utils.StaticStringEvaluator, node *ast.Node) bool {
+	return effects.HasSideEffect(node, false) || hasImplicitSpliceEffect(ctx, effects, node)
+}
+
+// HasSideEffect handles explicit evaluation. Check getter reads and iterator
+// execution as well, since either can mutate the array during argument evaluation.
+func hasImplicitSpliceEffect(ctx rule.RuleContext, effects *utils.StaticStringEvaluator, node *ast.Node) bool {
+	if node == nil || ast.IsPartOfTypeNode(node) {
 		return false
 	}
-	if readsKnownGetter(ctx, effects, node.Expression()) ||
-		ast.IsElementAccessExpression(node) && readsKnownGetter(ctx, effects, node.AsElementAccessExpression().ArgumentExpression) {
+	node = ast.SkipOuterExpressions(node, expressionWrappers)
+	switch node.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+		return false
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		// Only a computed name is evaluated when creating a method.
+		return hasImplicitSpliceEffect(ctx, effects, node.Name())
+	case ast.KindPropertyDeclaration:
+		if !ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
+			return hasImplicitSpliceEffect(ctx, effects, node.Name())
+		}
+	case ast.KindSpreadAssignment, ast.KindJsxSpreadAttribute:
 		return true
+	case ast.KindSpreadElement:
+		iterable := ast.SkipOuterExpressions(node.Expression(), expressionWrappers)
+		// A fresh, dense array or a string literal has no custom iterator of
+		// its own. HasSideEffect already checks for iterator prototype writes.
+		if !ast.IsStringLiteralLike(iterable) &&
+			(!ast.IsArrayLiteralExpression(iterable) || slices.ContainsFunc(iterable.Elements(), ast.IsOmittedExpression)) {
+			return true
+		}
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		if readsKnownGetter(ctx, effects, node) {
+			return true
+		}
 	}
+	return node.ForEachChild(func(child *ast.Node) bool { return hasImplicitSpliceEffect(ctx, effects, child) })
+}
+
+func readsKnownGetter(ctx rule.RuleContext, effects *utils.StaticStringEvaluator, node *ast.Node) bool {
 	if ctx.TypeChecker == nil {
 		return readsObjectLiteralGetter(effects, node)
 	}

@@ -62,14 +62,15 @@ const mutationCases: SpliceCase[] = [
 const invalid: SpliceCase[] = [
   // JavaScript snapshot cases.
   ['no-op', 7, 'array.splice();', ''],
-  ['no-op', 7, 'array.splice(index, 0);', ''],
-  ['no-op', 7, 'array.splice(index, -1);', ''],
-  ['no-op', 7, 'array.splice(index, +0);', ''],
+  // An unknown index could run conversion code or throw.
+  ['no-op', 7, 'array.splice(index, 0);'],
+  ['no-op', 7, 'array.splice(index, -1);'],
+  ['no-op', 7, 'array.splice(index, +0);'],
   ['shift', 7, 'array.splice(0, 1);', 'array.shift();'],
   ['shift', 7, 'array.splice(+0, +1);', 'array.shift();'],
   ['shift', 7, 'array.splice(0, - -1);', 'array.shift();'],
   ['shift', 7, 'array.splice(- -0, 1);', 'array.shift();'],
-  ['no-op', 7, 'array.splice(index, - -0);', ''],
+  ['no-op', 7, 'array.splice(index, - -0);'],
   ['unshift', 7, 'array.splice(0, 0, element);', 'array.unshift(element);'],
   [
     'unshift',
@@ -97,18 +98,9 @@ const invalid: SpliceCase[] = [
     'array.splice(array.length, 0, element);',
     'array.push(element);',
   ],
-  [
-    'push',
-    7,
-    'array.splice(array.length, 0, element, ...moreElements);',
-    'array.push(element, ...moreElements);',
-  ],
-  [
-    'push',
-    7,
-    'array.splice(array.length, 0, ...elements);',
-    'array.push(...elements);',
-  ],
+  // An unknown iterator could mutate the receiver during insertion.
+  ['push', 7, 'array.splice(array.length, 0, element, ...moreElements);'],
+  ['push', 7, 'array.splice(array.length, 0, ...elements);'],
   [
     'push',
     14,

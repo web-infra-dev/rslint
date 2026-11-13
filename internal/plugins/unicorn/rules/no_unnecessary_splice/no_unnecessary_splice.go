@@ -31,7 +31,7 @@ var NoUnnecessarySpliceRule = rule.Rule{
 				return
 			}
 			replacement := spliceReplacement(call.Object, node.Arguments())
-			if replacement == "" || unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, call.Object) {
+			if replacement == "" || shouldSkipReceiver(ctx, call.Object) {
 				return
 			}
 			if replacement == "empty" && !isSpliceValueDiscarded(node) {
@@ -44,11 +44,27 @@ var NoUnnecessarySpliceRule = rule.Rule{
 				}
 				if effects == nil {
 					effects = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+					effects.GlobalAccess = ctx.Globals.Access
 				}
 				return spliceFixes(ctx, call, replacement, effects)
 			})
 		}}
 	},
+}
+
+func shouldSkipReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
+	if !ast.IsInJSFile(receiver) {
+		return unicornutil.ShouldSkipKnownNonArrayReceiver(ctx, receiver)
+	}
+	// Keep Unicorn's diagnostics for receivers written directly as literals.
+	node := utils.ESTreeRuntimeExpression(receiver)
+	switch node.Kind {
+	case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindFunctionExpression,
+		ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
+		return false
+	}
+	return !utils.IsESTreeLiteralKind(node.Kind) &&
+		unicornutil.IsKnownNonIndexedCollectionWithOptions(ctx, receiver, unicornutil.ArrayReceiverOptions{ReadJSDoc: true})
 }
 
 const expressionWrappers = ast.OEKParentheses | ast.OEKAssertions | ast.OEKExpressionsWithTypeArguments
