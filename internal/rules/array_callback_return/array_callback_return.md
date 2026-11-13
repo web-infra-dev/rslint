@@ -2,7 +2,9 @@
 
 ## Rule Details
 
-Enforces `return` statements in callbacks of array methods such as `map`, `filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `every`, `some`, `reduce`, `reduceRight`, `flatMap`, `sort`, `toSorted`, and `Array.from`. Callbacks for these methods must return a value; otherwise, the code likely contains a mistake.
+Enforces `return` statements in callbacks of array methods such as `map`, `filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `every`, `some`, `reduce`, `reduceRight`, `flatMap`, `sort`, `toSorted`, and `Array.from`. Callbacks for these methods must return a value; otherwise, the code likely contains a mistake. The same checks apply to typed array methods. Async and generator callbacks are exempt.
+
+The rule recognizes static computed method names, such as `items["map"]`, and callbacks selected by logical or conditional expressions or returned from immediately invoked functions. It checks methods with these names even when the receiver is not an array.
 
 ### Options
 
@@ -46,6 +48,14 @@ var bools = [1, 2, 3].filter(function (x) {
 // with checkForEach: true and allowVoid: true
 [1, 2, 3].forEach((x) => void bar(x));
 ```
+
+## Suggestions
+
+With `checkForEach: true`, an expression-bodied arrow callback offers a suggestion to wrap its expression in braces. With `allowVoid: true`, returned expressions also offer a suggestion to prepend `void`. Suggestions are applied individually; the rule does not automatically fix code.
+
+## Differences from upstream
+
+ESLint v9.39.1 can produce invalid code when `wrapBraces` turns a function or class expression into an anonymous declaration, or a `"use strict"` string into a directive with a non-simple parameter list. Rslint preserves expression context by adding parentheses for these bodies and reuses existing parentheses. This also covers composite expressions whose leftmost expression is a function or class, such as `() => function () {}()` and `() => class {}.name`. For example, `() => function () {}()` becomes `() => {(function () {}())}`, and `(x = 0) => "use strict"` becomes `(x = 0) => {("use strict")}`.
 
 ## Original Documentation
 

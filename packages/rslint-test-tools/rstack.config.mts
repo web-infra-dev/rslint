@@ -80,6 +80,7 @@ const ecosystemTests = {
     './tests/eslint/rules/no-template-curly-in-string.test.ts',
     './tests/eslint/heritage-members.test.ts',
     './tests/eslint/rules/accessor-pairs.test.ts',
+    './tests/eslint/rules/array-callback-return.test.ts',
     './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/block-scoped-var.test.ts',
     './tests/eslint/rules/camelcase.test.ts',
