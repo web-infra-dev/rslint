@@ -13,6 +13,10 @@ type LanguageOptions struct {
 	// value has ESLint's default module semantics; file-specific defaults are
 	// resolved before the options reach a RuleContext.
 	SourceType string `json:"sourceType"`
+	// GlobalReturn mirrors parserOptions.ecmaFeatures.globalReturn. ESLint then
+	// wraps top-level code in a function scope, so top-level declarations are
+	// not global. Only rules that depend on that scope shape consult it.
+	GlobalReturn bool `json:"globalReturn"`
 }
 
 // IsValidSourceType reports whether value is one of ESLint's accepted source
