@@ -78,6 +78,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unreadable_new_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_unsafe_string_replacement"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_continue"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_else"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_error_capture_stack_trace"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_fallback_in_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_length_check"
@@ -224,6 +225,7 @@ func GetAllRules() []rule.Rule {
 		no_unreadable_new_expression.NoUnreadableNewExpressionRule,
 		no_unsafe_string_replacement.NoUnsafeStringReplacementRule,
 		no_useless_continue.NoUselessContinueRule,
+		no_useless_else.NoUselessElseRule,
 		no_useless_error_capture_stack_trace.NoUselessErrorCaptureStackTraceRule,
 		no_useless_fallback_in_spread.NoUselessFallbackInSpreadRule,
 		no_useless_length_check.NoUselessLengthCheckRule,

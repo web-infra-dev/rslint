@@ -107,6 +107,10 @@ func (b *Builder[E]) variableDeclarationList(list *ast.Node) {
 	}
 	for _, decl := range declList.Declarations.Nodes {
 		b.variableDeclaration(decl)
+		if b.branches != nil && list.Flags&ast.NodeFlagsBlockScoped != 0 &&
+			(ast.IsVarUsing(list) || ast.IsVarAwaitUsing(list)) {
+			b.firstThrowableFork()
+		}
 	}
 }
 
@@ -126,6 +130,9 @@ func (b *Builder[E]) variableDeclaration(node *ast.Node) {
 		// Run-time evaluation order: the initializer produces the value
 		// first, then the pattern binds element by element.
 		b.expr(decl.Initializer)
+		if b.branches != nil {
+			b.firstThrowableFork()
+		}
 		b.patternBind(name)
 		return
 	}
@@ -141,6 +148,7 @@ func (b *Builder[E]) variableDeclaration(node *ast.Node) {
 
 func (b *Builder[E]) ifStatement(node *ast.Node) {
 	stmt := node.AsIfStatement()
+	visitConsequent := b.branches != nil && b.branches.IfConsequent != nil && b.cur.Reachable
 	after := b.newBlock()
 	thenEntry := b.newBlock()
 	elseEntry := after
@@ -151,6 +159,9 @@ func (b *Builder[E]) ifStatement(node *ast.Node) {
 
 	b.enter(thenEntry)
 	b.statement(stmt.ThenStatement)
+	if visitConsequent {
+		b.branches.IfConsequent(node, thenEntry.Reachable, b.cur.Reachable)
+	}
 	b.link(b.cur, after)
 
 	if stmt.ElseStatement != nil {
@@ -201,6 +212,11 @@ func (b *Builder[E]) doStatement(node *ast.Node) {
 	b.popJump()
 
 	b.enter(test)
+	if b.branches != nil {
+		b.condition(stmt.Expression, body, after)
+		b.enter(after)
+		return
+	}
 	b.expr(stmt.Expression)
 	b.loop(node)
 	b.link(b.cur, body)
@@ -273,6 +289,9 @@ func (b *Builder[E]) forStatement(node *ast.Node) {
 func (b *Builder[E]) forInOfStatement(node *ast.Node) {
 	stmt := node.AsForInOrOfStatement()
 	b.expr(stmt.Expression)
+	if b.branches != nil && node.Kind == ast.KindForOfStatement {
+		b.firstThrowableFork()
+	}
 
 	head := b.newBlock()
 	b.link(b.cur, head)
@@ -341,6 +360,12 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 	for i, clause := range clauses {
 		if clause.Kind == ast.KindDefaultClause {
 			defaultIndex = i
+			if b.branches != nil {
+				// ESLint's branch-exit check keeps a possible default path
+				// when a subsequent case test itself ends execution.
+				dispatchFrom[i] = testCur
+				dispatchEdge[i] = b.linkWithCycleBarrier(testCur, bodies[i], false)
+			}
 			continue
 		}
 		if firstCaseIndex == -1 {
@@ -356,8 +381,10 @@ func (b *Builder[E]) switchStatement(node *ast.Node) {
 		testCur = b.cur
 	}
 	if defaultIndex >= 0 {
-		dispatchFrom[defaultIndex] = testCur
-		dispatchEdge[defaultIndex] = b.linkWithCycleBarrier(testCur, bodies[defaultIndex], false)
+		if b.branches == nil {
+			dispatchFrom[defaultIndex] = testCur
+			dispatchEdge[defaultIndex] = b.linkWithCycleBarrier(testCur, bodies[defaultIndex], false)
+		}
 	} else {
 		b.link(testCur, after)
 	}
@@ -453,6 +480,9 @@ func (b *Builder[E]) tryStatement(node *ast.Node) {
 		b.enter(frame.finallyEntry)
 		b.statement(stmt.FinallyBlock)
 		if b.cur.Reachable {
+			for _, jump := range frame.pendingJumps {
+				b.reachJump(jump.destination, jump.tryDepth)
+			}
 			// A `return` inside this `try`/`catch` still needs to run every
 			// enclosing `finally` on its way out, not just this one — so this
 			// second copy's own abrupt exit must keep propagating outward.
@@ -489,7 +519,7 @@ func (b *Builder[E]) labeledStatement(node *ast.Node) {
 		return
 	}
 	after := b.newBlock()
-	b.jumps = append(b.jumps, jumpTarget[E]{labels: []string{stmt.Label.Text()}, breakTo: after})
+	b.jumps = append(b.jumps, jumpTarget[E]{labels: []string{stmt.Label.Text()}, breakTo: after, tryDepth: len(b.tryStack)})
 	b.statement(stmt.Statement)
 	b.popJump()
 	b.link(b.cur, after)
@@ -497,7 +527,7 @@ func (b *Builder[E]) labeledStatement(node *ast.Node) {
 }
 
 func (b *Builder[E]) pushJump(node *ast.Node, breakTo, continueTo *Block[E], loop *ast.Node) {
-	b.jumps = append(b.jumps, jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, loop: loop, breakable: true})
+	b.jumps = append(b.jumps, jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, loop: loop, breakable: true, tryDepth: len(b.tryStack)})
 }
 
 func (b *Builder[E]) popJump() {
@@ -522,8 +552,16 @@ func (b *Builder[E]) makeBreak(label *ast.Node) {
 			continue
 		}
 		b.jumps[i].broken = true
-		b.link(b.cur, target.breakTo)
-		break
+		if b.branches != nil {
+			b.reachJump(target.breakTo, target.tryDepth)
+		} else {
+			b.link(b.cur, target.breakTo)
+		}
+		b.makeUnreachable()
+		return
+	}
+	if b.branches != nil {
+		b.reachJump(nil, 0)
 	}
 	b.makeUnreachable()
 }
@@ -543,9 +581,18 @@ func (b *Builder[E]) makeContinue(label *ast.Node) {
 		}
 		if name == "" || slices.Contains(target.labels, name) {
 			b.loop(target.loop)
-			b.link(b.cur, target.continueTo)
-			break
+			if b.branches != nil {
+				b.reachJump(target.continueTo, target.tryDepth)
+			} else {
+				b.link(b.cur, target.continueTo)
+			}
+			b.makeUnreachable()
+			return
 		}
+	}
+	if b.branches != nil {
+		// This jump leaves the isolated statement being analyzed.
+		b.reachJump(nil, 0)
 	}
 	b.makeUnreachable()
 }

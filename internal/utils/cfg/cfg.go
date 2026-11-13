@@ -128,6 +128,7 @@ type tryFrame[E any] struct {
 	thrownAny    bool
 	implicit     []*Block[E]
 	returnedAny  bool
+	pendingJumps []pendingJump[E]
 }
 
 // jumpTarget is one `break`/`continue` destination. continueTo is nil for
@@ -147,14 +148,22 @@ type jumpTarget[E any] struct {
 	loop       *ast.Node
 	breakable  bool
 	broken     bool
+	tryDepth   int
+}
+
+type pendingJump[E any] struct {
+	destination *Block[E]
+	tryDepth    int
 }
 
 // Builder lays out a graph. Consumers only see it through their Hooks, where
 // Current and Emit are the operations that matter.
 type Builder[E any] struct {
-	hooks Hooks[E]
+	hooks    Hooks[E]
+	branches *BranchAnalysis
 
 	blocks      []*Block[E]
+	blockCount  int
 	cur         *Block[E]
 	finals      []*Block[E]
 	thrown      []*Block[E]
@@ -167,11 +176,29 @@ type Builder[E any] struct {
 
 // Build lays out the control-flow graph of one code path root.
 func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
-	b := &Builder[E]{hooks: hooks, blocks: make([]*Block[E], 0, blockChunkSize)}
+	b := newBuilder(hooks, nil)
+	b.visitRoot(root)
+	endReachable := b.cur.Reachable
+	if endReachable {
+		b.markFinal(b.cur)
+	}
+	return &Graph[E]{
+		Blocks:       b.blocks,
+		FinalBlocks:  b.finals,
+		ThrownBlocks: b.thrown,
+		EndReachable: endReachable,
+	}
+}
+
+func newBuilder[E any](hooks Hooks[E], branches *BranchAnalysis) *Builder[E] {
+	b := &Builder[E]{hooks: hooks, branches: branches}
 	b.cur = b.newBlock()
 	b.cur.hasIncoming = true
 	b.cur.Reachable = true
+	return b
+}
 
+func (b *Builder[E]) visitRoot(root *ast.Node) {
 	switch root.Kind {
 	case ast.KindSourceFile:
 		b.statements(root.AsSourceFile().Statements)
@@ -196,17 +223,6 @@ func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
 				b.expr(body)
 			}
 		}
-	}
-
-	endReachable := b.cur.Reachable
-	if endReachable {
-		b.markFinal(b.cur)
-	}
-	return &Graph[E]{
-		Blocks:       b.blocks,
-		FinalBlocks:  b.finals,
-		ThrownBlocks: b.thrown,
-		EndReachable: endReachable,
 	}
 }
 
@@ -240,19 +256,22 @@ func (b *Builder[E]) Emit(e E) (*Block[E], int) {
 }
 
 func (b *Builder[E]) newBlock() *Block[E] {
-	index := len(b.blocks)
+	index := b.blockCount
+	b.blockCount++
 	chunkIndex := index / blockChunkSize
 	if chunkIndex == len(b.blockChunks) {
 		b.blockChunks = append(b.blockChunks, new(blockChunk[E]))
 	}
 	blk := &b.blockChunks[chunkIndex][index%blockChunkSize]
 	blk.index = int32(index)
-	b.blocks = append(b.blocks, blk)
+	if b.branches == nil {
+		b.blocks = append(b.blocks, blk)
+	}
 	return blk
 }
 
 func (b *Builder[E]) markFinal(blk *Block[E]) {
-	if blk == nil || !blk.Reachable || blk.final {
+	if b.branches != nil || blk == nil || !blk.Reachable || blk.final {
 		return
 	}
 	blk.final = true
@@ -260,7 +279,7 @@ func (b *Builder[E]) markFinal(blk *Block[E]) {
 }
 
 func (b *Builder[E]) markThrown(blk *Block[E]) {
-	if blk == nil || !blk.Reachable || blk.thrown {
+	if b.branches != nil || blk == nil || !blk.Reachable || blk.thrown {
 		return
 	}
 	blk.thrown = true
@@ -275,12 +294,17 @@ func (b *Builder[E]) linkWithCycleBarrier(from, to *Block[E], barrier bool) int 
 	if from == nil || to == nil {
 		return -1
 	}
-	index := len(from.Successors)
-	b.appendSuccessor(from, to)
-	b.setCycleBarrier(from, index, barrier)
 	if from.Reachable {
 		to.hasIncoming = true
 	}
+	if b.branches != nil {
+		// Branch analysis reads reachability while laying out the graph and
+		// never walks its successors or inspects cycle barriers afterwards.
+		return -1
+	}
+	index := len(from.Successors)
+	b.appendSuccessor(from, to)
+	b.setCycleBarrier(from, index, barrier)
 	return index
 }
 
@@ -325,9 +349,11 @@ func (b *Builder[E]) enter(blk *Block[E]) {
 // block is never entered: its reachability is settled here, as false.
 func (b *Builder[E]) makeUnreachable() {
 	next := b.newBlock()
-	b.appendSuccessor(b.cur, next)
-	if b.cur.cycleBarrier != nil {
-		b.cur.cycleBarrier = append(b.cur.cycleBarrier, false)
+	if b.branches == nil {
+		b.appendSuccessor(b.cur, next)
+		if b.cur.cycleBarrier != nil {
+			b.cur.cycleBarrier = append(b.cur.cycleBarrier, false)
+		}
 	}
 	b.cur = next
 }
@@ -416,7 +442,7 @@ func (b *Builder[E]) firstThrowableFork() {
 		return
 	}
 	f.thrownForked = true
-	if f.position == posCatch && f.hasFinally {
+	if f.position == posCatch && f.hasFinally && b.branches == nil {
 		// ESLint merges an implicit exception from a catch body into the
 		// catch's ordinary finally continuation. An explicit throw still uses
 		// the abrupt layout through makeThrow.
