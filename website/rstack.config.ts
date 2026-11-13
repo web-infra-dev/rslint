@@ -54,6 +54,9 @@ define.doc({
   },
   plugins: [pluginRuleManifest(), pluginFontOpenSans()],
   builderConfig: {
+    output: {
+      module: true,
+    },
     tools: {
       rspack(config) {
         config.ignoreWarnings = [
