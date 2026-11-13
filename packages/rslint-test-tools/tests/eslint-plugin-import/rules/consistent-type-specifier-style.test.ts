@@ -1,7 +1,9 @@
+// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/consistent-type-specifier-style.js
+// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/consistent-type-specifier-style.md
+// Includes the upstream regression for issue #2753.
 import { RuleTester, type TestCase } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 // Skipped cases retain their upstream records; re-enabling them also requires complete expectations.
 new RuleTester(config).run('consistent-type-specifier-style', {
   valid: [
@@ -193,7 +195,7 @@ new RuleTester(config).run('consistent-type-specifier-style', {
       options: ['prefer-top-level'],
     },
     {
-      name: 'Documentation example 4 (Flow syntax unsupported by tsgo)',
+      name: 'Documentation example 4',
       code: "import type Foo, {Bar} from 'Foo';",
       options: ['prefer-top-level'],
     },
@@ -636,7 +638,7 @@ import type {Bar} from 'Foo';`,
       output: "import  {type Foo} from 'Foo';",
     },
     {
-      name: 'Documentation example 5 (Flow syntax unsupported by tsgo)',
+      name: 'Documentation example 5',
       code: "import type Foo, {Bar} from 'Foo';",
       options: ['prefer-inline'],
       errors: [

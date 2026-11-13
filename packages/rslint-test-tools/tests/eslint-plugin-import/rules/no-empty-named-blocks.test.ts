@@ -1,43 +1,60 @@
+// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/no-empty-named-blocks.js
+// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-empty-named-blocks.md
 import { RuleTester, type TestCase } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
+function suggestionCases(
+  codes: string[],
+  output = "import 'mod';",
+  name?: string,
+): TestCase[] {
+  return codes.map((code) => ({
+    code,
+    ...(name ? { name } : {}),
+    errors: [
+      {
+        messageId: '',
+        message: 'Unexpected empty named import block',
+        line: 1,
+        column: 1,
+        endLine: 1,
+        endColumn: code.length + 1,
+        suggestions: [
+          { messageId: '', desc: 'Remove unused import', output: '' },
+          { messageId: '', desc: 'Remove empty import block', output },
+        ],
+      },
+    ],
+  }));
+}
+
 // Skipped cases retain their upstream records; re-enabling them also requires complete expectations.
 new RuleTester(config).run('no-empty-named-blocks', {
   valid: [
-    {
-      code: "import 'mod';",
-    },
-    {
-      code: "import Default from 'mod';",
-    },
-    {
-      code: "import { Named } from 'mod';",
-    },
-    {
-      code: "import Default, { Named } from 'mod';",
-    },
-    {
-      code: "import * as Namespace from 'mod';",
-    },
-    {
-      code: "import type Default from 'mod';",
-    },
-    {
-      code: "import type { Named } from 'mod';",
-    },
-    {
-      code: "import type Default, { Named } from 'mod';",
-    },
-    {
-      code: "import type * as Namespace from 'mod';",
-    },
-    {
-      code: "\n        module.exports = {\n          rules: {\n            'keyword-spacing': ['error', {overrides: {}}],\n          }\n        };\n      ",
-    },
-    {
-      code: "\n        import { DESCRIPTORS, NODE } from '../helpers/constants';\n        // ...\n        import { timeLimitedPromise } from '../helpers/helpers';\n        // ...\n        import { DESCRIPTORS2 } from '../helpers/constants';\n      ",
-    },
+    "import 'mod';",
+    "import Default from 'mod';",
+    "import { Named } from 'mod';",
+    "import Default, { Named } from 'mod';",
+    "import * as Namespace from 'mod';",
+    // TypeScript.
+    "import type Default from 'mod';",
+    "import type { Named } from 'mod';",
+    "import type Default, { Named } from 'mod';",
+    "import type * as Namespace from 'mod';",
+    `
+        module.exports = {
+          rules: {
+            'keyword-spacing': ['error', {overrides: {}}],
+          }
+        };
+      `,
+    `
+        import { DESCRIPTORS, NODE } from '../helpers/constants';
+        // ...
+        import { timeLimitedPromise } from '../helpers/helpers';
+        // ...
+        import { DESCRIPTORS2 } from '../helpers/constants';
+      `,
     {
       name: 'documentation examples',
       code: "import { mod } from 'mod'",
@@ -86,206 +103,18 @@ new RuleTester(config).run('no-empty-named-blocks', {
       ],
       output: "import Default from 'mod';",
     },
-    {
-      code: "import {} from 'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 22,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import{}from'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 19,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import {} from'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 21,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import {}from 'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 21,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import type {} from 'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 27,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import type {}from 'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 26,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import type{}from 'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 25,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: "import type {}from'mod';",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 25,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod';",
-            },
-          ],
-        },
-      ],
-    },
+    ...suggestionCases([
+      "import {} from 'mod';",
+      "import{}from'mod';",
+      "import {} from'mod';",
+      "import {}from 'mod';",
+    ]),
+    ...suggestionCases([
+      "import type {} from 'mod';",
+      "import type {}from 'mod';",
+      "import type{}from 'mod';",
+      "import type {}from'mod';",
+    ]),
     {
       code: "import type Default, {} from 'mod';",
       errors: [
@@ -300,58 +129,11 @@ new RuleTester(config).run('no-empty-named-blocks', {
       ],
       output: "import type Default from 'mod';",
     },
-    {
-      name: 'documentation examples',
-      code: "import {} from 'mod'",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 21,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod'",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'documentation examples',
-      code: "import type {} from 'mod'",
-      errors: [
-        {
-          messageId: '',
-          message: 'Unexpected empty named import block',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 26,
-          suggestions: [
-            {
-              messageId: '',
-              desc: 'Remove unused import',
-              output: '',
-            },
-            {
-              messageId: '',
-              desc: 'Remove empty import block',
-              output: "import 'mod'",
-            },
-          ],
-        },
-      ],
-    },
+    ...suggestionCases(
+      ["import {} from 'mod'", "import type {} from 'mod'"],
+      "import 'mod'",
+      'documentation examples',
+    ),
     {
       name: 'documentation examples',
       code: "import Default, {} from 'mod'",

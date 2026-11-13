@@ -1,51 +1,27 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 new RuleTester(config).run('prefer-named-capture-group', {
   valid: [
-    {
-      code: '/normal_regex/',
-    },
-    {
-      code: '/(?:[0-9]{4})/',
-    },
-    {
-      code: '/(?<year>[0-9]{4})/',
-    },
-    {
-      code: '/\\u{1F680}/u',
-    },
-    {
-      code: 'new RegExp()',
-    },
-    {
-      code: 'new RegExp(foo)',
-    },
-    {
-      code: "new RegExp('')",
-    },
-    {
-      code: "new RegExp('(?<year>[0-9]{4})')",
-    },
-    {
-      code: 'RegExp()',
-    },
-    {
-      code: 'RegExp(foo)',
-    },
-    {
-      code: "RegExp('')",
-    },
-    {
-      code: "RegExp('(?<year>[0-9]{4})')",
-    },
-    {
-      code: "RegExp('(')",
-    },
-    {
-      code: "RegExp('\\\\u{1F680}', 'u')",
-    },
+    '/normal_regex/',
+    '/(?:[0-9]{4})/',
+    '/(?<year>[0-9]{4})/',
+    '/\\u{1F680}/u',
+    'new RegExp()',
+    'new RegExp(foo)',
+    "new RegExp('')",
+    "new RegExp('(?<year>[0-9]{4})')",
+    'RegExp()',
+    'RegExp(foo)',
+    "RegExp('')",
+    "RegExp('(?<year>[0-9]{4})')",
+    // invalid regexp should be ignored
+    "RegExp('(')",
+    "RegExp('\\\\u{1F680}', 'u')",
+    // Mirrors upstream ecmaVersion 6 / 2017 cases: globalThis doesn't exist as a
+    // global before ES2020, so globalThis.RegExp isn't tracked. The JS test
+    // harness doesn't expose a per-case ecmaVersion override; the Go upstream
+    // suite (prefer_named_capture_group_upstream_test.go) covers these directly.
     {
       code: "new globalThis.RegExp('([0-9]{4})')",
       languageOptions: {
@@ -64,39 +40,29 @@ new RuleTester(config).run('prefer-named-capture-group', {
         ecmaVersion: 2017,
       },
     },
-    {
-      code: 'new globalThis.RegExp()',
-    },
-    {
-      code: 'new globalThis.RegExp(foo)',
-    },
-    {
-      code: 'globalThis.RegExp(foo)',
-    },
-    {
-      code: '\n                var globalThis = bar;\n                globalThis.RegExp(foo);\n                ',
-    },
-    {
-      code: '\n                function foo () {\n                    var globalThis = bar;\n                    new globalThis.RegExp(baz);\n                }\n                ',
-    },
-    {
-      code: "new RegExp('(?<c>[[A--B]])', 'v')",
-    },
-    {
-      code: "new RegExp('([\\\\q])', 'v')",
-    },
-    {
-      code: '/(?i:foo)bar/',
-    },
-    {
-      code: "new RegExp('(?i:foo)bar')",
-    },
-    {
-      code: '/(?-i:foo)bar/',
-    },
-    {
-      code: "new RegExp('(?-i:foo)bar')",
-    },
+    'new globalThis.RegExp()',
+    'new globalThis.RegExp(foo)',
+    'globalThis.RegExp(foo)',
+    `
+                var globalThis = bar;
+                globalThis.RegExp(foo);
+                `,
+    `
+                function foo () {
+                    var globalThis = bar;
+                    new globalThis.RegExp(baz);
+                }
+                `,
+    // ES2024
+    "new RegExp('(?<c>[[A--B]])', 'v')",
+    // Checks that the 'v' flag is understood: without it `([\\q])` would be a
+    // valid (unnamed-capturing-group) regex; with 'v' it's a SyntaxError.
+    "new RegExp('([\\\\q])', 'v')",
+    // ES2025
+    '/(?i:foo)bar/',
+    "new RegExp('(?i:foo)bar')",
+    '/(?-i:foo)bar/',
+    "new RegExp('(?-i:foo)bar')",
   ],
   invalid: [
     {
@@ -727,7 +693,10 @@ c)d\`)`,
       ],
     },
     {
-      code: "\n                function foo() { var globalThis = bar; }\n                new globalThis.RegExp('([0-9]{4})');\n            ",
+      code: `
+                function foo() { var globalThis = bar; }
+                new globalThis.RegExp('([0-9]{4})');
+            `,
       errors: [
         {
           messageId: 'required',
@@ -741,19 +710,24 @@ c)d\`)`,
             {
               messageId: 'addGroupName',
               desc: 'Add name to capture group.',
-              output:
-                "\n                function foo() { var globalThis = bar; }\n                new globalThis.RegExp('(?<temp1>[0-9]{4})');\n            ",
+              output: `
+                function foo() { var globalThis = bar; }
+                new globalThis.RegExp('(?<temp1>[0-9]{4})');
+            `,
             },
             {
               messageId: 'addNonCapture',
               desc: 'Convert group to non-capturing.',
-              output:
-                "\n                function foo() { var globalThis = bar; }\n                new globalThis.RegExp('(?:[0-9]{4})');\n            ",
+              output: `
+                function foo() { var globalThis = bar; }
+                new globalThis.RegExp('(?:[0-9]{4})');
+            `,
             },
           ],
         },
       ],
     },
+    // ES2024
     {
       code: "new RegExp('([[A--B]])', 'v')",
       errors: [

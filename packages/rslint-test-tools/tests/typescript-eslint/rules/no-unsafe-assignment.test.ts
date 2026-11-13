@@ -1,322 +1,129 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
-new RuleTester(config).run('no-unsafe-assignment', {
+new RuleTester({
+  ...config,
+  languageOptions: {
+    ...config.languageOptions,
+    parserOptions: {
+      ...config.languageOptions?.parserOptions,
+      project: './tsconfig.noImplicitThis.json',
+    },
+  },
+}).run('no-unsafe-assignment', {
   valid: [
+    'const x = 1;',
+    'const x: number = 1;',
+    `
+const x = 1,
+  y = 1;
+    `,
+    'let x;',
+    `
+let x = 1,
+  y;
+    `,
+    'function foo(a = 1) {}',
+    `
+class Foo {
+  constructor(private a = 1) {}
+}
+    `,
+    `
+class Foo {
+  private a = 1;
+}
+    `,
+    `
+class Foo {
+  accessor a = 1;
+}
+    `,
+    'const x: Set<string> = new Set();',
+    'const x: Set<string> = new Set<string>();',
+    'const [x] = [1];',
+    'const [x, y] = [1, 2] as number[];',
+    'const [x, ...y] = [1, 2, 3, 4, 5];',
+    'const [x, ...y] = [1];',
+    'const [{ ...x }] = [{ x: 1 }] as [{ x: any }];',
+    'function foo(x = 1) {}',
+    'function foo([x] = [1]) {}',
+    'function foo([x, ...y] = [1, 2, 3, 4, 5]) {}',
+    'function foo([x, ...y] = [1]) {}',
+    // this is not checked, because there's no annotation to compare it with
+    'const x = new Set<any>();',
+    'const x = { y: 1 };',
+    // Invalid TypeScript syntax; typescript-go exposes its error type to the rule.
+    'const x = { y = 1 };',
+    'const x = { y(){} };',
+    'const x: { y: number } = { y: 1 };',
+    'const x = [...[1, 2, 3]];',
+    'const [{ [`x${1}`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
+    `
+type T = [string, T[]];
+const test: T = ['string', []] as T;
+    `,
     {
-      code: "const x = 1;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: number = 1;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\nconst x = 1,\n  y = 1;\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "let x;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\nlet x = 1,\n  y;\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "function foo(a = 1) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\nclass Foo {\n  constructor(private a = 1) {}\n}\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\nclass Foo {\n  private a = 1;\n}\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\nclass Foo {\n  accessor a = 1;\n}\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: Set<string> = new Set();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: Set<string> = new Set<string>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [x] = [1];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [x, y] = [1, 2] as number[];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [x, ...y] = [1, 2, 3, 4, 5];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [x, ...y] = [1];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [{ ...x }] = [{ x: 1 }] as [{ x: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "function foo(x = 1) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "function foo([x] = [1]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "function foo([x, ...y] = [1, 2, 3, 4, 5]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "function foo([x, ...y] = [1]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x = new Set<any>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x = { y: 1 };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x = { y = 1 };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x = { y(){} };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: { y: number } = { y: 1 };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x = [...[1, 2, 3]];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const [{ [`x${1}`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\ntype T = [string, T[]];\nconst test: T = ['string', []] as T;\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\ntype Props = { a: string };\ndeclare function Foo(props: Props): never;\n<Foo a={'foo'} />;\n      ",
+      code: `
+type Props = { a: string };
+declare function Foo(props: Props): never;
+<Foo a={'foo'} />;
+      `,
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
             jsx: true,
           },
-          project: "./tsconfig.noImplicitThis.json",
         },
       },
-      filename: "react.tsx",
+      filename: 'react.tsx',
     },
     {
-      code: "\ndeclare function Foo(props: { a: string }): never;\n<Foo a=\"foo\" />;\n      ",
+      code: `
+declare function Foo(props: { a: string }): never;
+<Foo a="foo" />;
+      `,
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
             jsx: true,
           },
-          project: "./tsconfig.noImplicitThis.json",
         },
       },
-      filename: "react.tsx",
+      filename: 'react.tsx',
     },
     {
-      code: "\ndeclare function Foo(props: { a: string }): never;\n<Foo a={} />;\n      ",
+      code: `
+declare function Foo(props: { a: string }): never;
+<Foo a={} />;
+      `,
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
             jsx: true,
           },
-          project: "./tsconfig.noImplicitThis.json",
         },
       },
-      filename: "react.tsx",
+      filename: 'react.tsx',
     },
-    {
-      code: "const x: unknown = y as any;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: unknown[] = y as any[];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: Set<unknown> = y as Set<any>;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "const x: Map<string, string> = new Map();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
-    {
-      code: "\ntype Foo = { bar: unknown };\nconst bar: any = 1;\nconst foo: Foo = { bar };\n    ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
-    },
+    'const x: unknown = y as any;',
+    'const x: unknown[] = y as any[];',
+    'const x: Set<unknown> = y as Set<any>;',
+    // https://github.com/typescript-eslint/typescript-eslint/issues/2109
+    'const x: Map<string, string> = new Map();',
+    `
+type Foo = { bar: unknown };
+const bar: any = 1;
+const foo: Foo = { bar };
+    `,
   ],
   invalid: [
     {
-      code: "const x = 1 as any;",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x = 1 as any;',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -325,16 +132,14 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst x = 1 as any,\n  y = 1;\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const x = 1 as any,
+  y = 1;
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 2,
           column: 7,
           endLine: 2,
@@ -343,16 +148,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo(a = 1 as any) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo(a = 1 as any) {}',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 1,
           column: 14,
           endLine: 1,
@@ -361,16 +161,15 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nclass Foo {\n  constructor(private a = 1 as any) {}\n}\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+class Foo {
+  constructor(private a = 1 as any) {}
+}
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 3,
           column: 15,
           endLine: 3,
@@ -379,16 +178,15 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nclass Foo {\n  private a = 1 as any;\n}\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+class Foo {
+  private a = 1 as any;
+}
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 3,
           column: 3,
           endLine: 3,
@@ -397,16 +195,15 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nclass Foo {\n  accessor a = 1 as any;\n}\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+class Foo {
+  accessor a = 1 as any;
+}
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 3,
           column: 3,
           endLine: 3,
@@ -415,16 +212,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst [x] = spooky;\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const [x] = spooky;
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an error typed value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
           line: 2,
           column: 7,
           endLine: 2,
@@ -433,16 +227,14 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst [[[x]]] = [spooky];\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const [[[x]]] = [spooky];
+      `,
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an error typed value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an error typed value.',
           line: 2,
           column: 8,
           endLine: 2,
@@ -451,24 +243,24 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst {\n  x: { y: z },\n} = { x: spooky };\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const {
+  x: { y: z },
+} = { x: spooky };
+      `,
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an error typed value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an error typed value.',
           line: 3,
           column: 6,
           endLine: 3,
           endColumn: 14,
         },
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an error typed value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
           line: 4,
           column: 7,
           endLine: 4,
@@ -477,16 +269,15 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nlet value: number;\n\nvalue = spooky;\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+let value: number;
+
+value = spooky;
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an error typed value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
           line: 4,
           column: 1,
           endLine: 4,
@@ -495,16 +286,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst [x] = 1 as any;\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const [x] = 1 as any;
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 2,
           column: 7,
           endLine: 2,
@@ -513,16 +301,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst [x] = [] as any[];\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const [x] = [] as any[];
+      `,
       errors: [
         {
-          messageId: "unsafeArrayPattern",
-          message: "Unsafe array destructuring of an `any` array value.",
+          messageId: 'unsafeArrayPattern',
+          message: 'Unsafe array destructuring of an `any` array value.',
           line: 2,
           column: 7,
           endLine: 2,
@@ -531,16 +316,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x: Set<string> = new Set<any>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x: Set<string> = new Set<any>();',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -549,16 +330,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x: Map<string, string> = new Map<string, any>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x: Map<string, string> = new Map<string, any>();',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -567,16 +344,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x: Set<string[]> = new Set<any[]>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x: Set<string[]> = new Set<any[]>();',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `Set<any[]>` to a variable of type `Set<string[]>`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<any[]>` to a variable of type `Set<string[]>`.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -585,16 +358,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>();",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>();',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -603,16 +372,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const [x] = [1] as [any];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const [x] = [1] as [any];',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 8,
           endLine: 1,
@@ -621,16 +386,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo([x] = [1] as [any]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo([x] = [1] as [any]) {}',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 15,
           endLine: 1,
@@ -639,16 +400,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "[x] = [1] as [any];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '[x] = [1] as [any];',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 2,
           endLine: 1,
@@ -657,16 +414,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const [[[[x]]]] = [[[[1 as any]]]];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const [[[[x]]]] = [[[[1 as any]]]];',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 11,
           endLine: 1,
@@ -675,16 +428,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo([[[[x]]]] = [[[[1 as any]]]]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo([[[[x]]]] = [[[[1 as any]]]]) {}',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 18,
           endLine: 1,
@@ -693,16 +442,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "[[[[x]]]] = [[[[1 as any]]]];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '[[[[x]]]] = [[[[1 as any]]]];',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 5,
           endLine: 1,
@@ -711,16 +456,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const [[[[x]]]] = [1 as any];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const [[[[x]]]] = [1 as any];',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 8,
           endLine: 1,
@@ -729,16 +470,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo([[[[x]]]] = [1 as any]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo([[[[x]]]] = [1 as any]) {}',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 15,
           endLine: 1,
@@ -747,16 +484,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const [{ x }] = [{ x: 1 }] as [{ x: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const [{ x }] = [{ x: 1 }] as [{ x: any }];',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 10,
           endLine: 1,
@@ -765,16 +498,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo([{ x }] = [{ x: 1 }] as [{ x: any }]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo([{ x }] = [{ x: 1 }] as [{ x: any }]) {}',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 17,
           endLine: 1,
@@ -783,16 +512,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "[{ x }] = [{ x: 1 }] as [{ x: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '[{ x }] = [{ x: 1 }] as [{ x: any }];',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 4,
           endLine: 1,
@@ -802,15 +527,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
     },
     {
       code: "const [{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 17,
           endLine: 1,
@@ -820,15 +541,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
     },
     {
       code: "function foo([{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 24,
           endLine: 1,
@@ -838,15 +555,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
     },
     {
       code: "[{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 11,
           endLine: 1,
@@ -855,16 +568,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const [{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const [{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 17,
           endLine: 1,
@@ -873,16 +582,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo([{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }]) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo([{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }]) {}',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 24,
           endLine: 1,
@@ -891,16 +596,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "[{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '[{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 11,
           endLine: 1,
@@ -908,17 +609,14 @@ new RuleTester(config).run('no-unsafe-assignment', {
         },
       ],
     },
+    // TS treats the assignment pattern weirdly in this case
     {
-      code: "[[[[x]]]] = [1 as any];",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '[[[[x]]]] = [1 as any];',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `[any]` to a variable of type `[[[[any]]]]`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `[any]` to a variable of type `[[[[any]]]]`.',
           line: 1,
           column: 1,
           endLine: 1,
@@ -927,16 +625,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst x = [...(1 as any)];\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const x = [...(1 as any)];
+      `,
       errors: [
         {
-          messageId: "unsafeArraySpread",
-          message: "Unsafe spread of an `any` value in an array.",
+          messageId: 'unsafeArraySpread',
+          message: 'Unsafe spread of an `any` value in an array.',
           line: 2,
           column: 12,
           endLine: 2,
@@ -945,16 +640,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst x = [...([] as any[])];\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const x = [...([] as any[])];
+      `,
       errors: [
         {
-          messageId: "unsafeArraySpread",
-          message: "Unsafe spread of an `any` value in an array.",
+          messageId: 'unsafeArraySpread',
+          message: 'Unsafe spread of an `any` value in an array.',
           line: 2,
           column: 12,
           endLine: 2,
@@ -963,16 +655,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const { x } = { x: 1 } as { x: any };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const { x } = { x: 1 } as { x: any };',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 9,
           endLine: 1,
@@ -981,16 +669,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo({ x } = { x: 1 } as { x: any }) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo({ x } = { x: 1 } as { x: any }) {}',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 16,
           endLine: 1,
@@ -999,16 +683,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "({ x } = { x: 1 } as { x: any });",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '({ x } = { x: 1 } as { x: any });',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 4,
           endLine: 1,
@@ -1017,16 +697,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const { x: y } = { x: 1 } as { x: any };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const { x: y } = { x: 1 } as { x: any };',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 12,
           endLine: 1,
@@ -1035,16 +711,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo({ x: y } = { x: 1 } as { x: any }) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo({ x: y } = { x: 1 } as { x: any }) {}',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 19,
           endLine: 1,
@@ -1053,16 +725,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "({ x: y } = { x: 1 } as { x: any });",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: '({ x: y } = { x: 1 } as { x: any });',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -1071,16 +739,16 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst {\n  x: { y },\n} = { x: { y: 1 } } as { x: { y: any } };\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const {
+  x: { y },
+} = { x: { y: 1 } } as { x: { y: any } };
+      `,
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 3,
           column: 8,
           endLine: 3,
@@ -1089,16 +757,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo({ x: { y } } = { x: { y: 1 } } as { x: { y: any } }) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo({ x: { y } } = { x: { y: 1 } } as { x: { y: any } }) {}',
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 1,
           column: 21,
           endLine: 1,
@@ -1107,16 +771,16 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\n({\n  x: { y },\n} = { x: { y: 1 } } as { x: { y: any } });\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+({
+  x: { y },
+} = { x: { y: 1 } } as { x: { y: any } });
+      `,
       errors: [
         {
-          messageId: "unsafeObjectPattern",
-          message: "Unsafe object destructuring of a property with an `any` value.",
+          messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
           line: 3,
           column: 8,
           endLine: 3,
@@ -1125,16 +789,16 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nconst {\n  x: [y],\n} = { x: { y: 1 } } as { x: [any] };\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+const {
+  x: [y],
+} = { x: { y: 1 } } as { x: [any] };
+      `,
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 3,
           column: 7,
           endLine: 3,
@@ -1143,16 +807,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "function foo({ x: [y] } = { x: { y: 1 } } as { x: [any] }) {}",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'function foo({ x: [y] } = { x: { y: 1 } } as { x: [any] }) {}',
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 1,
           column: 20,
           endLine: 1,
@@ -1161,16 +821,16 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\n({\n  x: [y],\n} = { x: { y: 1 } } as { x: [any] });\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+({
+  x: [y],
+} = { x: { y: 1 } } as { x: [any] });
+      `,
       errors: [
         {
-          messageId: "unsafeArrayPatternFromTuple",
-          message: "Unsafe array destructuring of a tuple element with an `any` value.",
+          messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
           line: 3,
           column: 7,
           endLine: 3,
@@ -1179,16 +839,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x = { y: 1 as any };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x = { y: 1 as any };',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 1,
           column: 13,
           endLine: 1,
@@ -1197,16 +852,11 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x = { y: { z: 1 as any } };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x = { y: { z: 1 as any } };',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 1,
           column: 18,
           endLine: 1,
@@ -1215,16 +865,12 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "const x: { y: Set<Set<Set<string>>> } = { y: new Set<Set<Set<any>>>() };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x: { y: Set<Set<Set<string>>> } = { y: new Set<Set<Set<any>>>() };',
       errors: [
         {
-          messageId: "unsafeAssignment",
-          message: "Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+          messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.',
           line: 1,
           column: 43,
           endLine: 1,
@@ -1232,17 +878,13 @@ new RuleTester(config).run('no-unsafe-assignment', {
         },
       ],
     },
+    // spreading an any widens the object type to any
     {
-      code: "const x = { ...(1 as any) };",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: 'const x = { ...(1 as any) };',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 1,
           column: 7,
           endLine: 1,
@@ -1251,20 +893,23 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\ntype Props = { a: string };\ndeclare function Foo(props: Props): never;\n<Foo a={1 as any} />;\n      ",
+      code: `
+type Props = { a: string };
+declare function Foo(props: Props): never;
+<Foo a={1 as any} />;
+      `,
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
             jsx: true,
           },
-          project: "./tsconfig.noImplicitThis.json",
         },
       },
-      filename: "react.tsx",
+      filename: 'react.tsx',
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 4,
           column: 9,
           endLine: 4,
@@ -1273,16 +918,16 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\nfunction foo() {\n  const bar = this;\n}\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+function foo() {
+  const bar = this;
+}
+      `,
       errors: [
         {
-          messageId: "anyAssignmentThis",
-          message: "Unsafe assignment of an `any` value. `this` is typed as `any`.\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
+          messageId: 'anyAssignmentThis',
+          message:
+            'Unsafe assignment of an `any` value. `this` is typed as `any`.\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.',
           line: 3,
           column: 9,
           endLine: 3,
@@ -1291,16 +936,14 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\ntype T = [string, T[]];\nconst test: T = ['string', []] as any;\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+type T = [string, T[]];
+const test: T = ['string', []] as any;
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 3,
           column: 7,
           endLine: 3,
@@ -1309,16 +952,15 @@ new RuleTester(config).run('no-unsafe-assignment', {
       ],
     },
     {
-      code: "\ntype Foo = { bar: number };\nconst bar: any = 1;\nconst foo: Foo = { bar };\n      ",
-      languageOptions: {
-        parserOptions: {
-          project: "./tsconfig.noImplicitThis.json",
-        },
-      },
+      code: `
+type Foo = { bar: number };
+const bar: any = 1;
+const foo: Foo = { bar };
+      `,
       errors: [
         {
-          messageId: "anyAssignment",
-          message: "Unsafe assignment of an `any` value.",
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
           line: 4,
           column: 20,
           endLine: 4,

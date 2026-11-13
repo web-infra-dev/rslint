@@ -1,30 +1,15 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 new RuleTester(config).run('no-unused-expressions', {
   valid: [
-    {
-      code: 'function f(){}',
-    },
-    {
-      code: 'a = b',
-    },
-    {
-      code: 'new a',
-    },
-    {
-      code: '{}',
-    },
-    {
-      code: 'f(); g()',
-    },
-    {
-      code: 'i++',
-    },
-    {
-      code: 'a()',
-    },
+    'function f(){}',
+    'a = b',
+    'new a',
+    '{}',
+    'f(); g()',
+    'i++',
+    'a()',
     {
       code: 'a && a()',
       options: [
@@ -58,39 +43,18 @@ new RuleTester(config).run('no-unused-expressions', {
         },
       ],
     },
-    {
-      code: 'delete foo.bar',
-    },
-    {
-      code: 'void new C',
-    },
-    {
-      code: '"use strict";',
-    },
-    {
-      code: '"directive one"; "directive two"; f();',
-    },
-    {
-      code: 'function foo() {"use strict"; return true; }',
-    },
-    {
-      code: 'var foo = () => {"use strict"; return true; }',
-    },
-    {
-      code: 'function foo() {"directive one"; "directive two"; f(); }',
-    },
-    {
-      code: 'function foo() { var foo = "use strict"; return true; }',
-    },
-    {
-      code: 'function* foo(){ yield 0; }',
-    },
-    {
-      code: 'async function foo() { await 5; }',
-    },
-    {
-      code: 'async function foo() { await foo.bar; }',
-    },
+    'delete foo.bar',
+    'void new C',
+    // JSX upstream cases live in Go tests because this JS harness uses virtual.ts.
+    '"use strict";',
+    '"directive one"; "directive two"; f();',
+    'function foo() {"use strict"; return true; }',
+    'var foo = () => {"use strict"; return true; }',
+    'function foo() {"directive one"; "directive two"; f(); }',
+    'function foo() { var foo = "use strict"; return true; }',
+    'function* foo(){ yield 0; }',
+    'async function foo() { await 5; }',
+    'async function foo() { await foo.bar; }',
     {
       code: 'async function foo() { bar && await baz; }',
       options: [
@@ -123,15 +87,9 @@ new RuleTester(config).run('no-unused-expressions', {
         },
       ],
     },
-    {
-      code: 'import("foo")',
-    },
-    {
-      code: 'func?.("foo")',
-    },
-    {
-      code: 'obj?.foo("bar")',
-    },
+    'import("foo")',
+    'func?.("foo")',
+    'obj?.foo("bar")',
     {
       code: '"use strict";',
       options: [
@@ -164,54 +122,30 @@ new RuleTester(config).run('no-unused-expressions', {
         },
       ],
     },
-    {
-      code: 'test.age?.toLocaleString();',
-    },
-    {
-      code: 'let a = (a?.b).c;',
-    },
-    {
-      code: "let b = a?.['b'];",
-    },
-    {
-      code: 'let c = one[2]?.[3][4];',
-    },
-    {
-      code: 'one[2]?.[3][4]?.();',
-    },
-    {
-      code: "a?.['b']?.c();",
-    },
-    {
-      code: `module Foo {
+    'test.age?.toLocaleString();',
+    'let a = (a?.b).c;',
+    "let b = a?.['b'];",
+    'let c = one[2]?.[3][4];',
+    'one[2]?.[3][4]?.();',
+    "a?.['b']?.c();",
+    `module Foo {
   'use strict';
 }`,
-    },
-    {
-      code: `namespace Foo {
+    `namespace Foo {
   'use strict';
 
   export class Foo {}
   export class Bar {}
 }`,
-    },
-    {
-      code: `function foo() {
+    `function foo() {
   'use strict';
 
   return null;
 }`,
-    },
-    {
-      code: "import('./foo');",
-    },
-    {
-      code: "import('./foo').then(() => {});",
-    },
-    {
-      code: `class Foo<T> {}
+    "import('./foo');",
+    "import('./foo').then(() => {});",
+    `class Foo<T> {}
 new Foo<string>();`,
-    },
     {
       code: 'foo && foo?.();',
       options: [
@@ -742,6 +676,7 @@ new Foo<string>();`,
         },
       ],
     },
+    // JSX upstream invalid cases live in Go tests.
     {
       code: "class C { static { 'use strict'; } }",
       errors: [

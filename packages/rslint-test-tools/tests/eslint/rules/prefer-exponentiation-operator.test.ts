@@ -1,69 +1,31 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 new RuleTester(config).run('prefer-exponentiation-operator', {
   valid: [
-    {
-      code: 'Object.pow(a, b)',
-    },
-    {
-      code: 'Math.max(a, b)',
-    },
-    {
-      code: 'Math',
-    },
-    {
-      code: 'Math(a, b)',
-    },
-    {
-      code: 'pow',
-    },
-    {
-      code: 'pow(a, b)',
-    },
-    {
-      code: 'Math.pow',
-    },
-    {
-      code: 'Math.Pow(a, b)',
-    },
-    {
-      code: 'math.pow(a, b)',
-    },
-    {
-      code: 'foo.Math.pow(a, b)',
-    },
-    {
-      code: 'new Math.pow(a, b)',
-    },
-    {
-      code: 'Math[pow](a, b)',
-    },
-    {
-      code: 'globalThis.Object.pow(a, b)',
-    },
-    {
-      code: 'globalThis.Math.max(a, b)',
-    },
-    {
-      code: '/* globals Math:off*/ Math.pow(a, b)',
-    },
-    {
-      code: 'let Math; Math.pow(a, b);',
-    },
-    {
-      code: 'if (foo) { const Math = 1; Math.pow(a, b); }',
-    },
-    {
-      code: 'var x = function Math() { Math.pow(a, b); }',
-    },
-    {
-      code: 'function foo(Math) { Math.pow(a, b); }',
-    },
-    {
-      code: 'function foo() { Math.pow(a, b); var Math; }',
-    },
+    // not Math.pow()
+    'Object.pow(a, b)',
+    'Math.max(a, b)',
+    'Math',
+    'Math(a, b)',
+    'pow',
+    'pow(a, b)',
+    'Math.pow',
+    'Math.Pow(a, b)',
+    'math.pow(a, b)',
+    'foo.Math.pow(a, b)',
+    'new Math.pow(a, b)',
+    'Math[pow](a, b)',
+    'globalThis.Object.pow(a, b)',
+    'globalThis.Math.max(a, b)',
+    // not the global Math
+    '/* globals Math:off*/ Math.pow(a, b)',
+    'let Math; Math.pow(a, b);',
+    'if (foo) { const Math = 1; Math.pow(a, b); }',
+    'var x = function Math() { Math.pow(a, b); }',
+    'function foo(Math) { Math.pow(a, b); }',
+    'function foo() { Math.pow(a, b); var Math; }',
+    // Mirrors upstream ecmaVersion 2019 / 6 / 2017 cases; rslint does not expose ecmaVersion-specific globalThis availability.
     {
       code: 'globalThis.Math.pow(a, b)',
       languageOptions: {
@@ -82,12 +44,11 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
         ecmaVersion: 2017,
       },
     },
-    {
-      code: '\n      var globalThis = bar;\n      globalThis.Math.pow(a, b)\n    ',
-    },
-    {
-      code: 'class C { #pow; foo() { Math.#pow(a, b); } }',
-    },
+    `
+      var globalThis = bar;
+      globalThis.Math.pow(a, b)
+    `,
+    'class C { #pow; foo() { Math.#pow(a, b); } }',
   ],
   invalid: [
     {
@@ -147,7 +108,9 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       output: 'a**b',
     },
     {
-      code: 'var x=Math\n.  pow( a, \n b )',
+      code: `var x=Math
+.  pow( a,\x20
+ b )`,
       errors: [
         {
           messageId: 'useExponentiation',
@@ -188,6 +151,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a**b',
     },
+    // able to catch some workarounds
     {
       code: 'Math[`pow`](a, b)',
       errors: [
@@ -230,6 +194,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a**b',
     },
+    // non-expression parents that don't require parens
     {
       code: 'var x = Math.pow(a, b);',
       errors: [
@@ -328,6 +293,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '`${a**b}`',
     },
+    // non-expression parents that do require parens
     {
       code: 'class C extends Math.pow(a, b) {}',
       errors: [
@@ -342,6 +308,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'class C extends (a**b) {}',
     },
+    // parents with a higher precedence
     {
       code: '+ Math.pow(a, b)',
       errors: [
@@ -468,6 +435,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '(class extends (a**b) {})',
     },
+    // already parenthesised, shouldn't insert extra parens
     {
       code: '+(Math.pow(a, b))',
       errors: [
@@ -524,6 +492,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'class C extends (a**b) {}',
     },
+    // parents with a higher precedence, but the expression's role doesn't require parens
     {
       code: 'f(Math.pow(a, b))',
       errors: [
@@ -664,6 +633,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '[foo, a**b, bar]',
     },
+    // parents with a lower precedence
     {
       code: 'a * Math.pow(b, c)',
       errors: [
@@ -832,6 +802,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a, b**c, d',
     },
+    // '**' is right-associative, that applies to both parent and child nodes
     {
       code: 'a ** Math.pow(b, c)',
       errors: [
@@ -902,6 +873,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a ** ((b ** c)**d ** e) ** f',
     },
+    // doesn't remove already existing unnecessary parens around the whole expression
     {
       code: '(Math.pow(a, b))',
       errors: [
@@ -958,6 +930,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '`${(a**b)}`',
     },
+    // base and exponent with a higher precedence
     {
       code: 'Math.pow(2, 3)',
       errors: [
@@ -1084,6 +1057,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '--a**b--',
     },
+    // doesn't preserve unnecessary parens around base and exponent
     {
       code: 'Math.pow((a), (b))',
       errors: [
@@ -1168,6 +1142,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a**b()',
     },
+    // unary expressions are exception by the language
     {
       code: 'Math.pow(+a, b)',
       errors: [
@@ -1280,6 +1255,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'async () => a**await b',
     },
+    // base and exponent with a lower precedence
     {
       code: 'Math.pow(a * b, c)',
       errors: [
@@ -1448,6 +1424,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '(a + b)**(c + d)',
     },
+    // token adjacency
     {
       code: 'a+Math.pow(b, c)+d',
       errors: [
@@ -1691,6 +1668,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '(a**b)**c**d',
     },
+    // no autofix branches still report
     {
       code: 'Math.pow()',
       errors: [
@@ -1795,6 +1773,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
         },
       ],
     },
+    // comments
     {
       code: '/* comment */Math.pow(a, b)',
       errors: [
@@ -1987,6 +1966,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       output: `a**b// comment
 ;`,
     },
+    // Optional chaining
     {
       code: 'Math.pow?.(a, b)',
       errors: [
@@ -2057,6 +2037,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: 'a**b',
     },
+    // https://github.com/eslint/eslint/issues/17173
     {
       code: 'Math.pow(a, b as any)',
       errors: [
@@ -2099,6 +2080,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '(a**b) as any',
     },
+    // https://github.com/eslint/eslint/issues/20987
     {
       code: 'Math.pow({a:1}.a, 2);',
       errors: [
@@ -2309,6 +2291,7 @@ new RuleTester(config).run('prefer-exponentiation-operator', {
       ],
       output: '(class{static x=2}.x + 100)**4;',
     },
+    // preceding semicolon
     {
       code: `foo
 Math.pow(a + b, c)`,

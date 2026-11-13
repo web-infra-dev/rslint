@@ -1,9 +1,11 @@
+// Upstream tests and documentation: eslint-plugin-unicorn v79.0.0.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-module.js
 import { describe } from 'rstack/test';
 import { RuleTester } from '@rslint/rule-tester';
 
-// eslint-plugin-unicorn v79.0.0 upstream and documentation cases.
 const ruleTester = new RuleTester({
   plugin: 'unicorn',
+  filename: 'upstream.js',
   languageOptions: {
     globals: {
       exports: 'readonly',
@@ -22,37 +24,17 @@ const ruleTester = new RuleTester({
 describe('Strict mode', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const foo = "use strict";',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: '("use strict")',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: '"use strong";',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'eval("\'use strict\'; var x = 42; x;");',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'new Function("\'use strict\'; var x = 42; return x;");',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      'const foo = "use strict";',
+      '("use strict")',
+      '"use strong";',
+      'eval("\'use strict\'; var x = 42; x;");',
+      'new Function("\'use strict\'; var x = 42; return x;");',
     ],
     invalid: [
       {
-        code: "'use strict';\n\nconsole.log(1);",
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `'use strict';
+
+console.log(1);`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -72,9 +54,9 @@ describe('Strict mode', () => {
         ],
       },
       {
-        code: '"use strict";\n\nconsole.log(1);',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `"use strict";
+
+console.log(1);`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -94,9 +76,10 @@ describe('Strict mode', () => {
         ],
       },
       {
-        code: 'function foo () {\n\t"use strict";\n\tconsole.log(1);\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function foo () {
+	"use strict";
+	console.log(1);
+}`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -109,16 +92,19 @@ describe('Strict mode', () => {
               {
                 messageId: 'suggestion/use-strict-directive',
                 desc: 'Remove "use strict" directive.',
-                output: 'function foo () {\n\tconsole.log(1);\n}',
+                output: `function foo () {
+	console.log(1);
+}`,
               },
             ],
           },
         ],
       },
       {
-        code: "'use strict';\n\nconsole.log(1);",
+        code: `'use strict';
+
+console.log(1);`,
         filename: 'example.mjs',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -136,19 +122,20 @@ describe('Strict mode', () => {
   });
 });
 
+// rslint already parses top-level returns without Espree's
+// ecmaFeatures.globalReturn parser flag.
 describe('Global return', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'function a() {\n\treturn;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      `function a() {
+	return;
+}`,
     ],
     invalid: [
       {
-        code: 'if (foo) {\n\treturn;\n}',
-        filename: 'upstream.js',
+        code: `if (foo) {
+	return;
+}`,
         languageOptions: {
           sourceType: 'script',
         },
@@ -171,32 +158,16 @@ describe('Global return', () => {
 describe('__dirname and __filename', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const __filename = 1;\nconst foo = __filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const __dirname = 1;\nconst foo = __dirname;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'import {__filename as filename} from "foo.mjs"',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const foo = 1;export {foo as __dirname}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      `const __filename = 1;
+const foo = __filename;`,
+      `const __dirname = 1;
+const foo = __dirname;`,
+      'import {__filename as filename} from "foo.mjs"',
+      'const foo = 1;export {foo as __dirname}',
     ],
     invalid: [
       {
         code: 'const dirname = __dirname;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -223,8 +194,6 @@ describe('__dirname and __filename', () => {
       },
       {
         code: 'const dirname = __filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -250,8 +219,6 @@ describe('__dirname and __filename', () => {
       },
       {
         code: 'const foo = { __dirname};',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -278,8 +245,6 @@ describe('__dirname and __filename', () => {
       },
       {
         code: 'const foo = {__filename, };',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -306,8 +271,6 @@ describe('__dirname and __filename', () => {
       },
       {
         code: 'if (__dirname.startsWith("/project/src/")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -335,8 +298,6 @@ describe('__dirname and __filename', () => {
       },
       {
         code: 'if (__filename.endsWith(".js")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -368,27 +329,21 @@ describe('__dirname and __filename', () => {
 describe('require', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'import {createRequire} from \'module\';\nconst require = createRequire(import.meta.url);\nconst foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const require = function require(require, id) {\n\treturn require(id);\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const require = class A {\n\trequire(require) {\n\t\treturn require(id);\n\t}\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      `import {createRequire} from 'module';
+const require = createRequire(import.meta.url);
+const foo = require("foo");`,
+      `const require = function require(require, id) {
+	return require(id);
+}`,
+      `const require = class A {
+	require(require) {
+		return require(id);
+	}
+}`,
     ],
     invalid: [
       {
         code: 'require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -409,8 +364,6 @@ describe('require', () => {
       },
       {
         code: "require('foo');",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -431,8 +384,6 @@ describe('require', () => {
       },
       {
         code: 'require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -453,8 +404,6 @@ describe('require', () => {
       },
       {
         code: '((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -475,8 +424,6 @@ describe('require', () => {
       },
       {
         code: '(( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -497,8 +444,6 @@ describe('require', () => {
       },
       {
         code: 'const foo=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -519,8 +464,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require.resolve("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -534,9 +477,9 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const foo\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -557,8 +500,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -579,8 +520,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -601,8 +540,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -623,8 +560,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -645,8 +580,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -666,9 +599,9 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const {foo}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -689,8 +622,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -711,8 +642,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -733,8 +662,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -755,8 +682,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -777,8 +702,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo: foo}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -798,9 +721,9 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const {foo: foo}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo: foo}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -821,8 +744,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -843,8 +764,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo: foo} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -865,8 +784,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo: foo} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -887,8 +804,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo: foo} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -909,8 +824,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo:bar}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -930,9 +843,9 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const {foo:bar}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo:bar}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -953,8 +866,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo:bar} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -975,8 +886,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo:bar} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -997,8 +906,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo:bar} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1019,8 +926,6 @@ describe('require', () => {
       },
       {
         code: 'const {foo:bar} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1041,8 +946,6 @@ describe('require', () => {
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1063,9 +966,13 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const {\n\ta   :foo,\n\tb:   bar,\n\tdefault   :   baz,\n}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {
+	a   :foo,
+	b:   bar,
+	default   :   baz,
+}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1078,8 +985,11 @@ describe('require', () => {
               {
                 messageId: 'suggestion/import',
                 desc: 'Switch to `import`.',
-                output:
-                  'import {\n\ta as foo,\n\tb as bar,\n\tdefault as baz,\n} from "foo";',
+                output: `import {
+	a as foo,
+	b as bar,
+	default as baz,
+} from "foo";`,
               },
             ],
           },
@@ -1087,8 +997,6 @@ describe('require', () => {
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1110,8 +1018,6 @@ describe('require', () => {
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1133,8 +1039,6 @@ describe('require', () => {
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1156,8 +1060,6 @@ describe('require', () => {
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1179,8 +1081,6 @@ describe('require', () => {
       },
       {
         code: 'const {} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1201,8 +1101,6 @@ describe('require', () => {
       },
       {
         code: 'const{   }=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1222,9 +1120,8 @@ describe('require', () => {
         ],
       },
       {
-        code: 'const r = require;\nconst foo = r("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const r = require;
+const foo = r("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1239,8 +1136,6 @@ describe('require', () => {
       },
       {
         code: 'new require("foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1255,8 +1150,6 @@ describe('require', () => {
       },
       {
         code: 'require("foo", extraArgument)',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1271,8 +1164,6 @@ describe('require', () => {
       },
       {
         code: 'const a = require()',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1287,8 +1178,6 @@ describe('require', () => {
       },
       {
         code: 'require(..."foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1303,8 +1192,6 @@ describe('require', () => {
       },
       {
         code: 'require("../" + "file.js")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1319,8 +1206,6 @@ describe('require', () => {
       },
       {
         code: 'require(file)',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1335,8 +1220,6 @@ describe('require', () => {
       },
       {
         code: 'a = require("foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1351,8 +1234,6 @@ describe('require', () => {
       },
       {
         code: 'function a(a = require("foo")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1367,8 +1248,6 @@ describe('require', () => {
       },
       {
         code: 'let foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1383,8 +1262,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require("foo"), bar = require("bar");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1408,8 +1285,6 @@ describe('require', () => {
       },
       {
         code: 'const {[foo]: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1424,8 +1299,6 @@ describe('require', () => {
       },
       {
         code: 'const {["foo"]: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1440,8 +1313,6 @@ describe('require', () => {
       },
       {
         code: 'if (foo) require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1456,8 +1327,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require`foo`;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1471,9 +1340,9 @@ describe('require', () => {
         ],
       },
       {
-        code: 'function loadModule() {\n\treturn require("foo");\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function loadModule() {
+	return require("foo");
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1487,9 +1356,10 @@ describe('require', () => {
         ],
       },
       {
-        code: 'function loadModule() {\n\tconst foo = require("foo");\n\treturn foo;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function loadModule() {
+	const foo = require("foo");
+	return foo;
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1504,8 +1374,6 @@ describe('require', () => {
       },
       {
         code: 'const foo = require("foo"), bar = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1525,42 +1393,19 @@ describe('require', () => {
 describe('exports and module', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'function exports(exports) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'function module(module) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const exports = foo;\nexports.bar = bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const exports = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const module = foo;\nmodule.exports = bar;\nmodule.exports.bar = bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const module = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      'function exports(exports) {}',
+      'function module(module) {}',
+      `const exports = foo;
+exports.bar = bar;`,
+      'const exports = 1;',
+      `const module = foo;
+module.exports = bar;
+module.exports.bar = bar;`,
+      'const module = 1;',
     ],
     invalid: [
       {
         code: 'exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1581,8 +1426,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module.exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1603,8 +1446,6 @@ describe('exports and module', () => {
       },
       {
         code: '(( ((exports)) = ((foo)) ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1625,8 +1466,6 @@ describe('exports and module', () => {
       },
       {
         code: '(( ((module.exports)) = ((foo)) ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1647,8 +1486,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = 1;exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1669,8 +1506,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = 1;module.exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1691,8 +1526,6 @@ describe('exports and module', () => {
       },
       {
         code: 'exports["foo"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1707,8 +1540,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module.exports["foo"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1723,8 +1554,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = exports;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1739,8 +1568,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = exports.foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1755,8 +1582,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = module.exports;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1771,8 +1596,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = module.exports.foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1787,8 +1610,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module["exports"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1803,8 +1624,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module[exports] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1828,8 +1647,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module.exports.foo.bar = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1844,8 +1661,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = 1;exports.default = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1866,8 +1681,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = 1;module.exports.default = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1888,8 +1701,6 @@ describe('exports and module', () => {
       },
       {
         code: 'exports.foo.bar = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1904,8 +1715,6 @@ describe('exports and module', () => {
       },
       {
         code: 'exports = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1926,8 +1735,6 @@ describe('exports and module', () => {
       },
       {
         code: 'exports.foo = [];',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1942,8 +1749,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module.exports = function() {};',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1964,8 +1769,6 @@ describe('exports and module', () => {
       },
       {
         code: 'module.exports.foo = foo || bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1980,8 +1783,6 @@ describe('exports and module', () => {
       },
       {
         code: 'exports += foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1996,8 +1797,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const foo = module.children',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2012,8 +1811,6 @@ describe('exports and module', () => {
       },
       {
         code: 'const parentModule = module.parent',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2027,9 +1824,10 @@ describe('exports and module', () => {
         ],
       },
       {
-        code: 'function foo() {\n\texports.foo = foo;\n\tmodule.exports.foo = foo;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function foo() {
+	exports.foo = foo;
+	module.exports.foo = foo;
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2061,39 +1859,32 @@ describe('TypeScript', () => {
       {
         code: 'type module = number[];',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
       {
         code: 'type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
       {
         code: 'const module = 1; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
       {
         code: 'type module = number[]; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
       {
         code: 'type Data = { [module in keyof string]: number; };',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
       {
         code: 'type ModuleRegistry = { [exports: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
       },
     ],
     invalid: [
       {
         code: 'const foo: Foo = require("foo");',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2109,7 +1900,6 @@ describe('TypeScript', () => {
       {
         code: 'const {foo}: Foo = require("foo");',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2132,8 +1922,6 @@ describe('JSON modules', () => {
     invalid: [
       {
         code: 'const data = require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2154,8 +1942,6 @@ describe('JSON modules', () => {
       },
       {
         code: 'require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2176,8 +1962,6 @@ describe('JSON modules', () => {
       },
       {
         code: "const data = (require(('./a.json')));",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2198,8 +1982,6 @@ describe('JSON modules', () => {
       },
       {
         code: 'const {foo} = require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2222,20 +2004,17 @@ describe('.cjs files', () => {
       {
         code: '__dirname',
         filename: 'foo.cjs',
-        languageOptions: {},
       },
       {
         code: '__dirname',
         filename: 'foo.cjS',
         skip: 'The native compiler excludes mixed-case .cjS filenames before rule execution; Go extras cover the suffix behavior.',
-        languageOptions: {},
       },
     ],
     invalid: [
       {
         code: '__filename',
         filename: 'foo.mjs',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2262,7 +2041,6 @@ describe('.cjs files', () => {
       {
         code: 'require("lodash")',
         filename: 'foo.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2284,7 +2062,6 @@ describe('.cjs files', () => {
       {
         code: 'require("lodash")',
         filename: 'foo.cjs/foo.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2312,9 +2089,8 @@ describe('Comments in named exports', () => {
     valid: [],
     invalid: [
       {
-        code: 'const foo = 1;\nexports /* note */ .foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports /* note */ .foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2328,9 +2104,8 @@ describe('Comments in named exports', () => {
         ],
       },
       {
-        code: 'const foo = 1;\nexports./* c */foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports./* c */foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2344,9 +2119,8 @@ describe('Comments in named exports', () => {
         ],
       },
       {
-        code: 'const foo = 1;\nexports.foo /* c */ = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports.foo /* c */ = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2360,9 +2134,8 @@ describe('Comments in named exports', () => {
         ],
       },
       {
-        code: 'const foo = 1;\nmodule.exports /* c */ .foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+module.exports /* c */ .foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2385,7 +2158,6 @@ describe('Constructor callees', () => {
     invalid: [
       {
         code: 'new __filename.constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __filename: 'readonly',
@@ -2417,7 +2189,6 @@ describe('Constructor callees', () => {
       },
       {
         code: 'new (__filename).constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __filename: 'readonly',
@@ -2513,7 +2284,6 @@ describe('Constructor callees', () => {
       },
       {
         code: 'new __dirname.constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __dirname: 'readonly',
@@ -2545,7 +2315,6 @@ describe('Constructor callees', () => {
       },
       {
         code: 'new (__dirname).constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __dirname: 'readonly',
@@ -2649,8 +2418,6 @@ describe('Static template module sources', () => {
     invalid: [
       {
         code: 'const file = require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2671,8 +2438,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2693,8 +2458,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(`./file.json`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2715,8 +2478,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const {foo: bar} = require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2737,8 +2498,6 @@ describe('Static template module sources', () => {
       },
       {
         code: "const file = require(`./it's.js`);",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2758,9 +2517,8 @@ describe('Static template module sources', () => {
         ],
       },
       {
-        code: 'const file = require(`./line\nfile.js`);',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const file = require(\`./line
+file.js\`);`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2781,8 +2539,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(`./back\\`tick.js`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2803,8 +2559,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(`./fi\\u006ce`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2825,8 +2579,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(/* keep */ (`file`));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2847,8 +2599,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(`${name}`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2863,8 +2613,6 @@ describe('Static template module sources', () => {
       },
       {
         code: 'const file = require(tag`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2880,7 +2628,6 @@ describe('Static template module sources', () => {
       {
         code: 'const file: Foo = require(`file`);',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2900,67 +2647,31 @@ describe('Static template module sources', () => {
 describe('Documentation examples', () => {
   ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const __dirname = import.meta.dirname;\nconst __filename = import.meta.filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "import {fileURLToPath} from 'node:url';\nimport path from 'node:path';\nconst __filename = fileURLToPath(import.meta.url);\nconst __dirname = path.dirname(fileURLToPath(import.meta.url));",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "import {fileURLToPath} from 'node:url';\nconst foo = fileURLToPath(new URL('foo.js', import.meta.url));",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "const foo = new URL('foo.js', import.meta.url);",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'function run() {\n\tif (foo) {\n\t\treturn;\n\t}\n}\nrun();',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "const file = path.join(import.meta.dirname, 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "const file = path.join(path.dirname(url.fileURLToPath(import.meta.url)), 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "const content = fs.readFileSync(import.meta.filename, 'utf8');",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: "import {fromPairs} from 'lodash-es';",
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'export default foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
-      {
-        code: 'const foo = 1;export {foo};',
-        filename: 'upstream.js',
-        languageOptions: {},
-      },
+      `const __dirname = import.meta.dirname;
+const __filename = import.meta.filename;`,
+      `import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));`,
+      `import {fileURLToPath} from 'node:url';
+const foo = fileURLToPath(new URL('foo.js', import.meta.url));`,
+      "const foo = new URL('foo.js', import.meta.url);",
+      `function run() {
+	if (foo) {
+		return;
+	}
+}
+run();`,
+      "const file = path.join(import.meta.dirname, 'foo.js');",
+      "const file = path.join(path.dirname(url.fileURLToPath(import.meta.url)), 'foo.js');",
+      "const content = fs.readFileSync(import.meta.filename, 'utf8');",
+      "import {fromPairs} from 'lodash-es';",
+      'export default foo;',
+      'const foo = 1;export {foo};',
     ],
     invalid: [
       {
         code: "'use strict';",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -2980,8 +2691,9 @@ describe('Documentation examples', () => {
         ],
       },
       {
-        code: 'if (foo) {\n\treturn;\n}',
-        filename: 'upstream.js',
+        code: `if (foo) {
+	return;
+}`,
         languageOptions: {
           sourceType: 'script',
         },
@@ -2999,8 +2711,6 @@ describe('Documentation examples', () => {
       },
       {
         code: "const file = path.join(__dirname, 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3028,8 +2738,6 @@ describe('Documentation examples', () => {
       },
       {
         code: "const content = fs.readFileSync(__filename, 'utf8');",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3057,8 +2765,6 @@ describe('Documentation examples', () => {
       },
       {
         code: "const {fromPairs} = require('lodash');",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3079,8 +2785,6 @@ describe('Documentation examples', () => {
       },
       {
         code: 'module.exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3101,8 +2805,6 @@ describe('Documentation examples', () => {
       },
       {
         code: 'exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',

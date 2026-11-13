@@ -1,87 +1,34 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 new RuleTester(config).run('prefer-regex-literals', {
   valid: [
-    {
-      code: '/abc/',
-    },
-    {
-      code: '/abc/g',
-    },
-    {
-      code: 'new RegExp(pattern)',
-    },
-    {
-      code: "new RegExp('\\\\p{Emoji_Presentation}\\\\P{Script_Extensions=Latin}' + '', `ug`)",
-    },
-    {
-      code: "new RegExp('\\\\cA' + '')",
-    },
-    {
-      code: "RegExp(pattern, 'g')",
-    },
-    {
-      code: "new RegExp(f('a'))",
-    },
-    {
-      code: "RegExp(prefix + 'a')",
-    },
-    {
-      code: "new RegExp('a' + suffix)",
-    },
-    {
-      code: 'RegExp(`a` + suffix);',
-    },
-    {
-      code: 'new RegExp(String.raw`a` + suffix);',
-    },
-    {
-      code: "RegExp('a', flags)",
-    },
-    {
-      code: "const flags = 'gu';RegExp('a', flags)",
-    },
-    {
-      code: "RegExp('a', 'g' + flags)",
-    },
-    {
-      code: 'new RegExp(String.raw`a`, flags);',
-    },
-    {
-      code: 'RegExp(`${prefix}abc`)',
-    },
-    {
-      code: 'new RegExp(`a${b}c`);',
-    },
-    {
-      code: "new RegExp(`a${''}c`);",
-    },
-    {
-      code: 'new RegExp(String.raw`a${b}c`);',
-    },
-    {
-      code: "new RegExp(String.raw`a${''}c`);",
-    },
-    {
-      code: "new RegExp('a' + 'b')",
-    },
-    {
-      code: 'RegExp(1)',
-    },
-    {
-      code: "new RegExp('(\\\\p{Emoji_Presentation})\\\\1' + '', `ug`)",
-    },
-    {
-      code: "RegExp(String.raw`\\78\\126` + '\\\\5934', '' + `g` + '')",
-    },
-    {
-      code: "func(new RegExp(String.raw`a${''}c\\d`, 'u'),new RegExp(String.raw`a${''}c\\d`, 'u'))",
-    },
-    {
-      code: 'new RegExp(\'\\\\[\' + "b\\\\]")',
-    },
+    '/abc/',
+    '/abc/g',
+    'new RegExp(pattern)',
+    "new RegExp('\\\\p{Emoji_Presentation}\\\\P{Script_Extensions=Latin}' + '', `ug`)",
+    "new RegExp('\\\\cA' + '')",
+    "RegExp(pattern, 'g')",
+    "new RegExp(f('a'))",
+    "RegExp(prefix + 'a')",
+    "new RegExp('a' + suffix)",
+    'RegExp(`a` + suffix);',
+    'new RegExp(String.raw`a` + suffix);',
+    "RegExp('a', flags)",
+    "const flags = 'gu';RegExp('a', flags)",
+    "RegExp('a', 'g' + flags)",
+    'new RegExp(String.raw`a`, flags);',
+    'RegExp(`${prefix}abc`)',
+    'new RegExp(`a${b}c`);',
+    "new RegExp(`a${''}c`);",
+    'new RegExp(String.raw`a${b}c`);',
+    "new RegExp(String.raw`a${''}c`);",
+    "new RegExp('a' + 'b')",
+    'RegExp(1)',
+    "new RegExp('(\\\\p{Emoji_Presentation})\\\\1' + '', `ug`)",
+    "RegExp(String.raw`\\78\\126` + '\\\\5934', '' + `g` + '')",
+    "func(new RegExp(String.raw`a${''}c\\d`, 'u'),new RegExp(String.raw`a${''}c\\d`, 'u'))",
+    'new RegExp(\'\\\\[\' + "b\\\\]")',
     {
       code: 'new RegExp(/a/, flags);',
       options: [
@@ -110,33 +57,15 @@ new RuleTester(config).run('prefer-regex-literals', {
         },
       ],
     },
-    {
-      code: 'new RegExp;',
-    },
-    {
-      code: 'new RegExp();',
-    },
-    {
-      code: 'RegExp();',
-    },
-    {
-      code: "new RegExp('a', 'g', 'b');",
-    },
-    {
-      code: "RegExp('a', 'g', 'b');",
-    },
-    {
-      code: 'new RegExp(`a`, `g`, `b`);',
-    },
-    {
-      code: 'RegExp(`a`, `g`, `b`);',
-    },
-    {
-      code: 'new RegExp(String.raw`a`, String.raw`g`, String.raw`b`);',
-    },
-    {
-      code: 'RegExp(String.raw`a`, String.raw`g`, String.raw`b`);',
-    },
+    'new RegExp;',
+    'new RegExp();',
+    'RegExp();',
+    "new RegExp('a', 'g', 'b');",
+    "RegExp('a', 'g', 'b');",
+    'new RegExp(`a`, `g`, `b`);',
+    'RegExp(`a`, `g`, `b`);',
+    'new RegExp(String.raw`a`, String.raw`g`, String.raw`b`);',
+    'RegExp(String.raw`a`, String.raw`g`, String.raw`b`);',
     {
       code: "new RegExp(/a/, 'u', 'foo');",
       options: [
@@ -145,51 +74,21 @@ new RuleTester(config).run('prefer-regex-literals', {
         },
       ],
     },
-    {
-      code: 'new RegExp(String`a`);',
-    },
-    {
-      code: 'RegExp(raw`a`);',
-    },
-    {
-      code: 'new RegExp(f(String.raw)`a`);',
-    },
-    {
-      code: 'RegExp(string.raw`a`);',
-    },
-    {
-      code: 'new RegExp(String.Raw`a`);',
-    },
-    {
-      code: 'new RegExp(String[raw]`a`);',
-    },
-    {
-      code: 'RegExp(String.raw.foo`a`);',
-    },
-    {
-      code: 'new RegExp(String.foo.raw`a`);',
-    },
-    {
-      code: 'RegExp(foo.String.raw`a`);',
-    },
-    {
-      code: 'new RegExp(String.raw);',
-    },
-    {
-      code: 'let String; new RegExp(String.raw`a`);',
-    },
-    {
-      code: 'function foo() { var String; new RegExp(String.raw`a`); }',
-    },
-    {
-      code: 'function foo(String) { RegExp(String.raw`a`); }',
-    },
-    {
-      code: 'if (foo) { const String = bar; RegExp(String.raw`a`); }',
-    },
-    {
-      code: '/* globals String:off */ new RegExp(String.raw`a`);',
-    },
+    'new RegExp(String`a`);',
+    'RegExp(raw`a`);',
+    'new RegExp(f(String.raw)`a`);',
+    'RegExp(string.raw`a`);',
+    'new RegExp(String.Raw`a`);',
+    'new RegExp(String[raw]`a`);',
+    'RegExp(String.raw.foo`a`);',
+    'new RegExp(String.foo.raw`a`);',
+    'RegExp(foo.String.raw`a`);',
+    'new RegExp(String.raw);',
+    'let String; new RegExp(String.raw`a`);',
+    'function foo() { var String; new RegExp(String.raw`a`); }',
+    'function foo(String) { RegExp(String.raw`a`); }',
+    'if (foo) { const String = bar; RegExp(String.raw`a`); }',
+    '/* globals String:off */ new RegExp(String.raw`a`);',
     {
       code: "RegExp('a', String.raw`g`);",
       languageOptions: {
@@ -198,30 +97,14 @@ new RuleTester(config).run('prefer-regex-literals', {
         },
       },
     },
-    {
-      code: "new Regexp('abc');",
-    },
-    {
-      code: 'Regexp(`a`);',
-    },
-    {
-      code: 'new Regexp(String.raw`a`);',
-    },
-    {
-      code: "let RegExp; new RegExp('a');",
-    },
-    {
-      code: "function foo() { var RegExp; RegExp('a', 'g'); }",
-    },
-    {
-      code: 'function foo(RegExp) { new RegExp(String.raw`a`); }',
-    },
-    {
-      code: "if (foo) { const RegExp = bar; RegExp('a'); }",
-    },
-    {
-      code: "/* globals RegExp:off */ new RegExp('a');",
-    },
+    "new Regexp('abc');",
+    'Regexp(`a`);',
+    'new Regexp(String.raw`a`);',
+    "let RegExp; new RegExp('a');",
+    "function foo() { var RegExp; RegExp('a', 'g'); }",
+    'function foo(RegExp) { new RegExp(String.raw`a`); }',
+    "if (foo) { const RegExp = bar; RegExp('a'); }",
+    "/* globals RegExp:off */ new RegExp('a');",
     {
       code: "RegExp('a');",
       languageOptions: {
@@ -248,12 +131,8 @@ new RuleTester(config).run('prefer-regex-literals', {
         ecmaVersion: 2017,
       },
     },
-    {
-      code: "class C { #RegExp; foo() { globalThis.#RegExp('a'); } }",
-    },
-    {
-      code: "new RegExp('[[A--B]]' + a, 'v')",
-    },
+    "class C { #RegExp; foo() { globalThis.#RegExp('a'); } }",
+    "new RegExp('[[A--B]]' + a, 'v')",
   ],
   invalid: [
     {
@@ -2675,7 +2554,9 @@ new RegExp(/b/, 'g');`,
       ],
     },
     {
-      code: "\n            /abc/ == new RegExp('cba');\n            ",
+      code: `
+            /abc/ == new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2689,14 +2570,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ == /cba/;\n            ',
+              output: `
+            /abc/ == /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ === new RegExp('cba');\n            ",
+      code: `
+            /abc/ === new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2710,14 +2595,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ === /cba/;\n            ',
+              output: `
+            /abc/ === /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ != new RegExp('cba');\n            ",
+      code: `
+            /abc/ != new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2731,14 +2620,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ != /cba/;\n            ',
+              output: `
+            /abc/ != /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ !== new RegExp('cba');\n            ",
+      code: `
+            /abc/ !== new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2752,14 +2645,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ !== /cba/;\n            ',
+              output: `
+            /abc/ !== /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ > new RegExp('cba');\n            ",
+      code: `
+            /abc/ > new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2773,14 +2670,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ > /cba/;\n            ',
+              output: `
+            /abc/ > /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ < new RegExp('cba');\n            ",
+      code: `
+            /abc/ < new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2794,14 +2695,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ < /cba/;\n            ',
+              output: `
+            /abc/ < /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ >= new RegExp('cba');\n            ",
+      code: `
+            /abc/ >= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2815,14 +2720,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ >= /cba/;\n            ',
+              output: `
+            /abc/ >= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ <= new RegExp('cba');\n            ",
+      code: `
+            /abc/ <= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2836,14 +2745,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ <= /cba/;\n            ',
+              output: `
+            /abc/ <= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ << new RegExp('cba');\n            ",
+      code: `
+            /abc/ << new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2857,14 +2770,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ << /cba/;\n            ',
+              output: `
+            /abc/ << /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ >> new RegExp('cba');\n            ",
+      code: `
+            /abc/ >> new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2878,14 +2795,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ >> /cba/;\n            ',
+              output: `
+            /abc/ >> /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ >>> new RegExp('cba');\n            ",
+      code: `
+            /abc/ >>> new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2899,14 +2820,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ >>> /cba/;\n            ',
+              output: `
+            /abc/ >>> /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ ^ new RegExp('cba');\n            ",
+      code: `
+            /abc/ ^ new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2920,14 +2845,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ ^ /cba/;\n            ',
+              output: `
+            /abc/ ^ /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ & new RegExp('cba');\n            ",
+      code: `
+            /abc/ & new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2941,14 +2870,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ & /cba/;\n            ',
+              output: `
+            /abc/ & /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            /abc/ | new RegExp('cba');\n            ",
+      code: `
+            /abc/ | new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2962,14 +2895,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            /abc/ | /cba/;\n            ',
+              output: `
+            /abc/ | /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            null ?? new RegExp('blah')\n            ",
+      code: `
+            null ?? new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -2983,14 +2920,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            null ?? /blah/\n            ',
+              output: `
+            null ?? /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc *= new RegExp('blah')\n            ",
+      code: `
+            abc *= new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3004,14 +2945,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc *= /blah/\n            ',
+              output: `
+            abc *= /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            console.log({a: new RegExp('sup')})\n            ",
+      code: `
+            console.log({a: new RegExp('sup')})
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3025,14 +2970,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            console.log({a: /sup/})\n            ',
+              output: `
+            console.log({a: /sup/})
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            console.log(() => {new RegExp('sup')})\n            ",
+      code: `
+            console.log(() => {new RegExp('sup')})
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3046,14 +2995,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            console.log(() => {/sup/})\n            ',
+              output: `
+            console.log(() => {/sup/})
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            function abc() {new RegExp('sup')}\n            ",
+      code: `
+            function abc() {new RegExp('sup')}
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3067,14 +3020,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            function abc() {/sup/}\n            ',
+              output: `
+            function abc() {/sup/}
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            function abc() {return new RegExp('sup')}\n            ",
+      code: `
+            function abc() {return new RegExp('sup')}
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3088,15 +3045,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output:
-                '\n            function abc() {return /sup/}\n            ',
+              output: `
+            function abc() {return /sup/}
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc <<= new RegExp('cba');\n            ",
+      code: `
+            abc <<= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3110,14 +3070,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc <<= /cba/;\n            ',
+              output: `
+            abc <<= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc >>= new RegExp('cba');\n            ",
+      code: `
+            abc >>= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3131,14 +3095,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc >>= /cba/;\n            ',
+              output: `
+            abc >>= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc >>>= new RegExp('cba');\n            ",
+      code: `
+            abc >>>= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3152,14 +3120,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc >>>= /cba/;\n            ',
+              output: `
+            abc >>>= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc ^= new RegExp('cba');\n            ",
+      code: `
+            abc ^= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3173,14 +3145,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc ^= /cba/;\n            ',
+              output: `
+            abc ^= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc &= new RegExp('cba');\n            ",
+      code: `
+            abc &= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3194,14 +3170,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc &= /cba/;\n            ',
+              output: `
+            abc &= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc |= new RegExp('cba');\n            ",
+      code: `
+            abc |= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3215,14 +3195,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc |= /cba/;\n            ',
+              output: `
+            abc |= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc ??= new RegExp('cba');\n            ",
+      code: `
+            abc ??= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3236,14 +3220,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc ??= /cba/;\n            ',
+              output: `
+            abc ??= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc &&= new RegExp('cba');\n            ",
+      code: `
+            abc &&= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3257,14 +3245,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc &&= /cba/;\n            ',
+              output: `
+            abc &&= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc ||= new RegExp('cba');\n            ",
+      code: `
+            abc ||= new RegExp('cba');
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3278,14 +3270,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc ||= /cba/;\n            ',
+              output: `
+            abc ||= /cba/;
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc **= new RegExp('blah')\n            ",
+      code: `
+            abc **= new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3299,14 +3295,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc **= /blah/\n            ',
+              output: `
+            abc **= /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc /= new RegExp('blah')\n            ",
+      code: `
+            abc /= new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3320,14 +3320,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc /= /blah/\n            ',
+              output: `
+            abc /= /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc += new RegExp('blah')\n            ",
+      code: `
+            abc += new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3341,14 +3345,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc += /blah/\n            ',
+              output: `
+            abc += /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc -= new RegExp('blah')\n            ",
+      code: `
+            abc -= new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3362,14 +3370,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc -= /blah/\n            ',
+              output: `
+            abc -= /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            abc %= new RegExp('blah')\n            ",
+      code: `
+            abc %= new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3383,14 +3395,18 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            abc %= /blah/\n            ',
+              output: `
+            abc %= /blah/
+            `,
             },
           ],
         },
       ],
     },
     {
-      code: "\n            () => new RegExp('blah')\n            ",
+      code: `
+            () => new RegExp('blah')
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3404,7 +3420,9 @@ new RegExp(/b/, 'g');`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output: '\n            () => /blah/\n            ',
+              output: `
+            () => /blah/
+            `,
             },
           ],
         },
@@ -3522,7 +3540,15 @@ new RegExp('search')}`,
       ],
     },
     {
-      code: "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case RegExp('myReg').toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            ",
+      code: `
+            switch (value) {
+                case "possibility":
+                    console.log('possibility matched')
+                case RegExp('myReg').toString():
+                    console.log('matches a regexp\\' toString value')
+                    break;
+            }
+            `,
       errors: [
         {
           messageId: 'unexpectedRegExp',
@@ -3536,8 +3562,15 @@ new RegExp('search')}`,
             {
               messageId: 'replaceWithLiteral',
               desc: 'Replace with an equivalent regular expression literal.',
-              output:
-                "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case /myReg/.toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            ",
+              output: `
+            switch (value) {
+                case "possibility":
+                    console.log('possibility matched')
+                case /myReg/.toString():
+                    console.log('matches a regexp\\' toString value')
+                    break;
+            }
+            `,
             },
           ],
         },

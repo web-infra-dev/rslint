@@ -1,50 +1,69 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
   valid: [
+    `
+      declare const varAny: any;
+      varAny === true;
+    `,
+    `
+      declare const varAny: any;
+      varAny == false;
+    `,
+    `
+      declare const varString: string;
+      varString === false;
+    `,
+    `
+      declare const varString: string;
+      varString === true;
+    `,
+    `
+      declare const varObject: {};
+      varObject === true;
+    `,
+    `
+      declare const varObject: {};
+      varObject == false;
+    `,
+    `
+      declare const varNullOrUndefined: null | undefined;
+      varNullOrUndefined === false;
+    `,
+    `
+      declare const varBooleanOrString: boolean | string;
+      varBooleanOrString === false;
+    `,
+    `
+      declare const varBooleanOrString: boolean | string;
+      varBooleanOrString == true;
+    `,
+    `
+      declare const varTrueOrStringOrUndefined: true | string | undefined;
+      varTrueOrStringOrUndefined == true;
+    `,
+    `
+      const test: <T>(someCondition: T) => void = someCondition => {
+        if (someCondition === true) {
+        }
+      };
+    `,
+    `
+      const test: <T>(someCondition: boolean | string) => void = someCondition => {
+        if (someCondition === true) {
+        }
+      };
+    `,
+    `
+      declare const varBooleanOrUndefined: boolean | undefined;
+      varBooleanOrUndefined === true;
+    `,
     {
-      code: "\n      declare const varAny: any;\n      varAny === true;\n    ",
-    },
-    {
-      code: "\n      declare const varAny: any;\n      varAny == false;\n    ",
-    },
-    {
-      code: "\n      declare const varString: string;\n      varString === false;\n    ",
-    },
-    {
-      code: "\n      declare const varString: string;\n      varString === true;\n    ",
-    },
-    {
-      code: "\n      declare const varObject: {};\n      varObject === true;\n    ",
-    },
-    {
-      code: "\n      declare const varObject: {};\n      varObject == false;\n    ",
-    },
-    {
-      code: "\n      declare const varNullOrUndefined: null | undefined;\n      varNullOrUndefined === false;\n    ",
-    },
-    {
-      code: "\n      declare const varBooleanOrString: boolean | string;\n      varBooleanOrString === false;\n    ",
-    },
-    {
-      code: "\n      declare const varBooleanOrString: boolean | string;\n      varBooleanOrString == true;\n    ",
-    },
-    {
-      code: "\n      declare const varTrueOrStringOrUndefined: true | string | undefined;\n      varTrueOrStringOrUndefined == true;\n    ",
-    },
-    {
-      code: "\n      const test: <T>(someCondition: T) => void = someCondition => {\n        if (someCondition === true) {\n        }\n      };\n    ",
-    },
-    {
-      code: "\n      const test: <T>(someCondition: boolean | string) => void = someCondition => {\n        if (someCondition === true) {\n        }\n      };\n    ",
-    },
-    {
-      code: "\n      declare const varBooleanOrUndefined: boolean | undefined;\n      varBooleanOrUndefined === true;\n    ",
-    },
-    {
-      code: "\n        declare const varBooleanOrUndefined: boolean | undefined;\n        varBooleanOrUndefined === true;\n      ",
+      code: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        varBooleanOrUndefined === true;
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -52,7 +71,10 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
     },
     {
-      code: "\n        declare const varBooleanOrUndefined: boolean | undefined;\n        varBooleanOrUndefined === false;\n      ",
+      code: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        varBooleanOrUndefined === false;
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -60,7 +82,14 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
     },
     {
-      code: "\n        const test: <T extends boolean | undefined>(\n          someCondition: T,\n        ) => void = someCondition => {\n          if (someCondition === true) {\n          }\n        };\n      ",
+      code: `
+        const test: <T extends boolean | undefined>(
+          someCondition: T,
+        ) => void = someCondition => {
+          if (someCondition === true) {
+          }
+        };
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -68,27 +97,43 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
     },
     {
-      code: "\n        const test: <T extends boolean | undefined>(\n          someCondition: T,\n        ) => void = someCondition => {\n          if (someCondition === false) {\n          }\n        };\n      ",
+      code: `
+        const test: <T extends boolean | undefined>(
+          someCondition: T,
+        ) => void = someCondition => {
+          if (someCondition === false) {
+          }
+        };
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
         },
       ],
     },
+    "'false' === true;",
+    "'true' === false;",
+    `
+const unconstrained: <T>(someCondition: T) => void = someCondition => {
+  if (someCondition === true) {
+  }
+};
+    `,
+    `
+const extendsUnknown: <T extends unknown>(
+  someCondition: T,
+) => void = someCondition => {
+  if (someCondition === true) {
+  }
+};
+    `,
     {
-      code: "'false' === true;",
-    },
-    {
-      code: "'true' === false;",
-    },
-    {
-      code: "\nconst unconstrained: <T>(someCondition: T) => void = someCondition => {\n  if (someCondition === true) {\n  }\n};\n    ",
-    },
-    {
-      code: "\nconst extendsUnknown: <T extends unknown>(\n  someCondition: T,\n) => void = someCondition => {\n  if (someCondition === true) {\n  }\n};\n    ",
-    },
-    {
-      code: "\nfunction test(a?: boolean): boolean {\n  // eslint-disable-next-line\n  return a !== false;\n}\n      ",
+      code: `
+function test(a?: boolean): boolean {
+  // eslint-disable-next-line
+  return a !== false;
+}
+      `,
       options: [
         {
           allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: true,
@@ -96,70 +141,94 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       languageOptions: {
         parserOptions: {
-          project: "./tsconfig.unstrict.json",
+          project: './tsconfig.unstrict.json',
         },
       },
     },
   ],
   invalid: [
     {
-      code: "true === true;",
+      code: 'true === true;',
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 1,
           column: 1,
           endLine: 1,
           endColumn: 14,
         },
       ],
-      output: "true;",
+      output: 'true;',
     },
     {
-      code: "false !== true;",
+      code: 'false !== true;',
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 1,
           column: 1,
           endLine: 1,
           endColumn: 15,
         },
       ],
-      output: "!false;",
+      output: '!false;',
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean !== false) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean !== false) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 33,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varTrue: true;\n        if (varTrue !== true) {\n        }\n      ",
+      code: `
+        declare const varTrue: true;
+        if (varTrue !== true) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 29,
         },
       ],
-      output: "\n        declare const varTrue: true;\n        if (!varTrue) {\n        }\n      ",
+      output: `
+        declare const varTrue: true;
+        if (!varTrue) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varTrueOrUndefined: true | undefined;\n        if (varTrueOrUndefined === true) {\n        }\n      ",
+      code: `
+        declare const varTrueOrUndefined: true | undefined;
+        if (varTrueOrUndefined === true) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -167,18 +236,27 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToTrueDirect",
-          message: "This expression unnecessarily compares a nullable boolean value to true instead of using it directly.",
+          messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 40,
         },
       ],
-      output: "\n        declare const varTrueOrUndefined: true | undefined;\n        if (varTrueOrUndefined) {\n        }\n      ",
+      output: `
+        declare const varTrueOrUndefined: true | undefined;
+        if (varTrueOrUndefined) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varFalseOrNull: false | null;\n        if (varFalseOrNull !== true) {\n        }\n      ",
+      code: `
+        declare const varFalseOrNull: false | null;
+        if (varFalseOrNull !== true) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -186,18 +264,28 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToTrueNegated",
-          message: "This expression unnecessarily compares a nullable boolean value to true instead of negating it.",
+          messageId: 'comparingNullableToTrueNegated',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 36,
         },
       ],
-      output: "\n        declare const varFalseOrNull: false | null;\n        if (!varFalseOrNull) {\n        }\n      ",
+      output: `
+        declare const varFalseOrNull: false | null;
+        if (!varFalseOrNull) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        declare const otherBoolean: boolean;\n        if (varBooleanOrNull === false && otherBoolean) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        declare const otherBoolean: boolean;
+        if (varBooleanOrNull === false && otherBoolean) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -205,18 +293,29 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 4,
           column: 13,
           endLine: 4,
           endColumn: 39,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        declare const otherBoolean: boolean;\n        if (!(varBooleanOrNull ?? true) && otherBoolean) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        declare const otherBoolean: boolean;
+        if (!(varBooleanOrNull ?? true) && otherBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        declare const otherBoolean: boolean;\n        if (!(varBooleanOrNull === false) || otherBoolean) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        declare const otherBoolean: boolean;
+        if (!(varBooleanOrNull === false) || otherBoolean) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -224,18 +323,29 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 4,
           column: 15,
           endLine: 4,
           endColumn: 41,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        declare const otherBoolean: boolean;\n        if ((varBooleanOrNull ?? true) || otherBoolean) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        declare const otherBoolean: boolean;
+        if ((varBooleanOrNull ?? true) || otherBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varTrueOrFalseOrUndefined: true | false | undefined;\n        declare const otherBoolean: boolean;\n        if (varTrueOrFalseOrUndefined !== false && !otherBoolean) {\n        }\n      ",
+      code: `
+        declare const varTrueOrFalseOrUndefined: true | false | undefined;
+        declare const otherBoolean: boolean;
+        if (varTrueOrFalseOrUndefined !== false && !otherBoolean) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -243,466 +353,785 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 4,
           column: 13,
           endLine: 4,
           endColumn: 48,
         },
       ],
-      output: "\n        declare const varTrueOrFalseOrUndefined: true | false | undefined;\n        declare const otherBoolean: boolean;\n        if ((varTrueOrFalseOrUndefined ?? true) && !otherBoolean) {\n        }\n      ",
+      output: `
+        declare const varTrueOrFalseOrUndefined: true | false | undefined;
+        declare const otherBoolean: boolean;
+        if ((varTrueOrFalseOrUndefined ?? true) && !otherBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (false !== varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (false !== varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 33,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (true !== varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (true !== varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if ((x instanceof Error) === false) {\n        }\n      ",
+      code: `
+        declare const x;
+        if ((x instanceof Error) === false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 43,
         },
       ],
-      output: "\n        declare const x;\n        if (!(x instanceof Error)) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(x instanceof Error)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if (false === (x instanceof Error)) {\n        }\n      ",
+      code: `
+        declare const x;
+        if (false === (x instanceof Error)) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 43,
         },
       ],
-      output: "\n        declare const x;\n        if (!(x instanceof Error)) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(x instanceof Error)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if (x instanceof Error === false) {\n        }\n      ",
+      code: `
+        declare const x;
+        if (x instanceof Error === false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 41,
         },
       ],
-      output: "\n        declare const x;\n        if (!(x instanceof Error)) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(x instanceof Error)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if (typeof x === 'string' === false) {\n        }\n      ",
+      code: `
+        declare const x;
+        if (typeof x === 'string' === false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 44,
         },
       ],
-      output: "\n        declare const x;\n        if (!(typeof x === 'string')) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(typeof x === 'string')) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if (x instanceof Error === (false)) {\n        }\n      ",
+      code: `
+        declare const x;
+        if (x instanceof Error === (false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 43,
         },
       ],
-      output: "\n        declare const x;\n        if (!(x instanceof Error)) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(x instanceof Error)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const x;\n        if ((false) === x instanceof Error) {\n        }\n      ",
+      code: `
+        declare const x;
+        if ((false) === x instanceof Error) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 43,
         },
       ],
-      output: "\n        declare const x;\n        if (!(x instanceof Error)) {\n        }\n      ",
+      output: `
+        declare const x;
+        if (!(x instanceof Error)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean !== false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean !== false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 35,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean === false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean === false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 35,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean instanceof Event == false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean instanceof Event == false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 51,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean instanceof Event) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean instanceof Event) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean instanceof Event == false) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean instanceof Event == false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 49,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean instanceof Event)) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean instanceof Event)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!((varBoolean ?? false) !== false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!((varBoolean ?? false) !== false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 46,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean ?? false)) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean ?? false)) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!((varBoolean ?? false) === false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!((varBoolean ?? false) === false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 46,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean ?? false) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean ?? false) {
+        }
+      `,
     },
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (!((varBoolean ?? true) !== false)) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (!((varBoolean ?? true) !== false)) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 45,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!(varBoolean ?? true)) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!(varBoolean ?? true)) {
+        }
+      `,
     },
     {
-      code: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (someCondition === true) {\n          }\n        };\n      ",
+      code: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (someCondition === true) {
+          }
+        };
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 37,
         },
       ],
-      output: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (someCondition) {\n          }\n        };\n      ",
+      output: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (someCondition) {
+          }
+        };
+      `,
     },
     {
-      code: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (!(someCondition !== false)) {\n          }\n        };\n      ",
+      code: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (!(someCondition !== false)) {
+          }
+        };
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 17,
           endLine: 3,
           endColumn: 40,
         },
       ],
-      output: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (!someCondition) {\n          }\n        };\n      ",
+      output: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (!someCondition) {
+          }
+        };
+      `,
     },
     {
-      code: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (!((someCondition ?? true) !== false)) {\n          }\n        };\n      ",
+      code: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (!((someCondition ?? true) !== false)) {
+          }
+        };
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 17,
           endLine: 3,
           endColumn: 50,
         },
       ],
-      output: "\n        const test: <T extends boolean>(someCondition: T) => void = someCondition => {\n          if (!(someCondition ?? true)) {\n          }\n        };\n      ",
+      output: `
+        const test: <T extends boolean>(someCondition: T) => void = someCondition => {
+          if (!(someCondition ?? true)) {
+          }
+        };
+      `,
     },
+    // basic === true
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean === true) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === true) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // basic === false
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean === false) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 33,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // basic !== true
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean !== true) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean !== true) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose == true
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean == true) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == true) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 31,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // loose == false
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean == false) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose != true
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean != true) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != true) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 31,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose != false
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (varBoolean != false) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != false) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // loose == with literal on left
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (true == varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (true == varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 31,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // strict === with true literal on left
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (true === varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (true === varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // strict === with false literal on left
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (false === varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (false === varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 33,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose == with false literal on left
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (false == varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (false == varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose != with true literal on left
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (true != varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (true != varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 31,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (!varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
     },
+    // loose != with false literal on left (existing)
     {
-      code: "\n        declare const varBoolean: boolean;\n        if (false != varBoolean) {\n        }\n      ",
+      code: `
+        declare const varBoolean: boolean;
+        if (false != varBoolean) {
+        }
+      `,
       errors: [
         {
-          messageId: "negated",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+          messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 32,
         },
       ],
-      output: "\n        declare const varBoolean: boolean;\n        if (varBoolean) {\n        }\n      ",
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
     },
+    // literal false type
     {
-      code: "\n        declare const varFalse: false;\n        if (varFalse === false) {\n        }\n      ",
+      code: `
+        declare const varFalse: false;
+        if (varFalse === false) {
+        }
+      `,
       errors: [
         {
-          messageId: "direct",
-          message: "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+          messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 31,
         },
       ],
-      output: "\n        declare const varFalse: false;\n        if (!varFalse) {\n        }\n      ",
+      output: `
+        declare const varFalse: false;
+        if (!varFalse) {
+        }
+      `,
     },
+    // both nullable options false — comparing to true
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        if (varBooleanOrNull === true) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === true) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -711,18 +1140,28 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToTrueDirect",
-          message: "This expression unnecessarily compares a nullable boolean value to true instead of using it directly.",
+          messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 38,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        if (varBooleanOrNull) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull) {
+        }
+      `,
     },
+    // both nullable options false — comparing to false
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        if (varBooleanOrNull === false) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === false) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -731,18 +1170,28 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 39,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        if (!(varBooleanOrNull ?? true)) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
     },
+    // nullable with literal on left side
     {
-      code: "\n        declare const varBooleanOrUndefined: boolean | undefined;\n        if (true === varBooleanOrUndefined) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (true === varBooleanOrUndefined) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
@@ -750,18 +1199,28 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToTrueDirect",
-          message: "This expression unnecessarily compares a nullable boolean value to true instead of using it directly.",
+          messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 43,
         },
       ],
-      output: "\n        declare const varBooleanOrUndefined: boolean | undefined;\n        if (varBooleanOrUndefined) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (varBooleanOrUndefined) {
+        }
+      `,
     },
+    // nullable with false literal on left side
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        if (false === varBooleanOrNull) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (false === varBooleanOrNull) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -769,18 +1228,28 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 3,
           column: 13,
           endLine: 3,
           endColumn: 39,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        if (!(varBooleanOrNull ?? true)) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
     },
+    // nullable + unary negation + !== false: both ! and ?? true blocks fire
     {
-      code: "\n        declare const varBooleanOrNull: boolean | null;\n        if (!(varBooleanOrNull !== false)) {\n        }\n      ",
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull !== false)) {
+        }
+      `,
       options: [
         {
           allowComparingNullableBooleansToFalse: false,
@@ -788,18 +1257,25 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       errors: [
         {
-          messageId: "comparingNullableToFalse",
-          message: "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
           line: 3,
           column: 15,
           endLine: 3,
           endColumn: 41,
         },
       ],
-      output: "\n        declare const varBooleanOrNull: boolean | null;\n        if (!(varBooleanOrNull ?? true)) {\n        }\n      ",
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
     },
     {
-      code: "\nfunction foo(): boolean {}\n      ",
+      code: `
+function foo(): boolean {}
+      `,
       options: [
         {
           allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: false,
@@ -807,13 +1283,14 @@ new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
       ],
       languageOptions: {
         parserOptions: {
-          project: "./tsconfig.unstrict.json",
+          project: './tsconfig.unstrict.json',
         },
       },
       errors: [
         {
-          messageId: "noStrictNullCheck",
-          message: "This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.",
+          messageId: 'noStrictNullCheck',
+          message:
+            'This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.',
           line: 1,
           column: 1,
           endLine: 1,

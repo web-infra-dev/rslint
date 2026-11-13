@@ -1,25 +1,14 @@
 import { RuleTester, type TestCase } from '@rslint/rule-tester';
 import { config } from '../config';
 
-// Migrated from the existing suite. Each active case pins the full diagnostic and edits.
 // Skipped cases retain their upstream records; re-enabling them also requires complete expectations.
 new RuleTester(config).run('dot-notation', {
   valid: [
-    {
-      code: 'a.b;',
-    },
-    {
-      code: 'a.b.c;',
-    },
-    {
-      code: "a['12'];",
-    },
-    {
-      code: 'a[b];',
-    },
-    {
-      code: 'a[0];',
-    },
+    'a.b;',
+    'a.b.c;',
+    "a['12'];",
+    'a[b];',
+    'a[0];',
     {
       code: 'a.b.c;',
       options: [
@@ -140,9 +129,7 @@ new RuleTester(config).run('dot-notation', {
         },
       ],
     },
-    {
-      code: 'a[`time${range}`];',
-    },
+    'a[`time${range}`];',
     {
       code: 'a[`while`];',
       options: [
@@ -151,30 +138,14 @@ new RuleTester(config).run('dot-notation', {
         },
       ],
     },
-    {
-      code: 'a[`time range`];',
-    },
-    {
-      code: 'a.true;',
-    },
-    {
-      code: 'a.null;',
-    },
-    {
-      code: 'a[undefined];',
-    },
-    {
-      code: 'a[void 0];',
-    },
-    {
-      code: 'a[b()];',
-    },
-    {
-      code: 'a[/(?<zero>0)/];',
-    },
-    {
-      code: "class C { foo() { this['#a'] } }",
-    },
+    'a[`time range`];',
+    'a.true;',
+    'a.null;',
+    'a[undefined];',
+    'a[void 0];',
+    'a[b()];',
+    'a[/(?<zero>0)/];',
+    "class C { foo() { this['#a'] } }",
     {
       code: 'class C { #in; foo() { this.#in; } }',
       options: [

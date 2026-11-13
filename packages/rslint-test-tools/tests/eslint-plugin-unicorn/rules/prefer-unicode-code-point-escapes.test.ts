@@ -1,21 +1,15 @@
+// Ported from eslint-plugin-unicorn v76.0.0; see LICENSE.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v76.0.0/test/prefer-unicode-code-point-escapes.js
 import { RuleTester } from '@rslint/rule-tester';
 import { config } from '../config';
 
 // eslint-plugin-unicorn v76.0.0 upstream and documentation cases.
 new RuleTester(config).run('prefer-unicode-code-point-escapes', {
   valid: [
-    {
-      code: "const foo = '\\u{7A}'",
-    },
-    {
-      code: "const foo = '\\u{1F4A9}'",
-    },
-    {
-      code: "const foo = '\\n\\t\\r\\\\\\'\\\"'",
-    },
-    {
-      code: "const foo = '\\0'",
-    },
+    "const foo = '\\u{7A}'",
+    "const foo = '\\u{1F4A9}'",
+    "const foo = '\\n\\t\\r\\\\\\'\\\"'",
+    "const foo = '\\0'",
     {
       code: "const foo = '\\8\\9\\08'",
       skip: 'The native TypeScript parser rejects this legacy decimal escape before rule execution; Go source-only tests cover its diagnostics and fixes.',
@@ -23,66 +17,28 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
         sourceType: 'script',
       },
     },
-    {
-      code: "const foo = '\\\\u2661'",
-    },
-    {
-      code: "const foo = '\\\\x7A'",
-    },
-    {
-      code: 'const foo = tag`\\u2661`',
-    },
-    {
-      code: 'const foo = tag`\\123`',
-    },
-    {
-      code: 'const foo = String.raw`\\u2661`',
-    },
-    {
-      code: 'const foo = /\\u{61}/u',
-    },
-    {
-      code: 'const foo = /\\u{61}/v',
-    },
-    {
-      code: 'const foo = /[\\uD83D\\uDCA9]/u',
-    },
-    {
-      code: 'const foo = /[\\uD83D\\uDCA9]/v',
-    },
-    {
-      code: 'const foo = /[[\\uD83D\\uDCA9]\\uD83D\\uDCA9]/v',
-    },
-    {
-      code: 'const foo = /\\u{XYZ}/',
-    },
-    {
-      code: 'const foo = /\\u{110000}/',
-    },
-    {
-      code: 'const foo = /\\u{}/',
-    },
-    {
-      code: 'const foo = /\\u{/',
-    },
-    {
-      code: 'const foo = /\\cK/',
-    },
-    {
-      code: 'const foo = new RegExp("\\\\u0061")',
-    },
-    {
-      code: "const foo = '\\u{7A}';\nconst bar = '\\u{2661}';\nconst baz = '\\u{1F4A9}';",
-    },
-    {
-      code: 'const foo = `\\u{7A}${bar}\\u{2661}`;',
-    },
-    {
-      code: 'const foo = /\\u{61}/u;',
-    },
-    {
-      code: 'const foo = /\\u{61}/u;',
-    },
+    "const foo = '\\\\u2661'",
+    "const foo = '\\\\x7A'",
+    'const foo = tag`\\u2661`',
+    'const foo = tag`\\123`',
+    'const foo = String.raw`\\u2661`',
+    'const foo = /\\u{61}/u',
+    'const foo = /\\u{61}/v',
+    'const foo = /[\\uD83D\\uDCA9]/u',
+    'const foo = /[\\uD83D\\uDCA9]/v',
+    'const foo = /[[\\uD83D\\uDCA9]\\uD83D\\uDCA9]/v',
+    'const foo = /\\u{XYZ}/',
+    'const foo = /\\u{110000}/',
+    'const foo = /\\u{}/',
+    'const foo = /\\u{/',
+    'const foo = /\\cK/',
+    'const foo = new RegExp("\\\\u0061")',
+    `const foo = '\\u{7A}';
+const bar = '\\u{2661}';
+const baz = '\\u{1F4A9}';`,
+    'const foo = `\\u{7A}${bar}\\u{2661}`;',
+    'const foo = /\\u{61}/u;',
+    'const foo = /\\u{61}/u;',
   ],
   invalid: [
     {
@@ -504,7 +460,10 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
       ],
     },
     {
-      code: "const foo = '\\x7A';\nconst bar = '\\u2661';\nconst baz = '\\uD83D\\uDCA9';\n",
+      code: `const foo = '\\x7A';
+const bar = '\\u2661';
+const baz = '\\uD83D\\uDCA9';
+`,
       errors: [
         {
           messageId: 'prefer-unicode-code-point-escapes',
@@ -534,11 +493,14 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
           suggestions: [],
         },
       ],
-      output:
-        "const foo = '\\u{7A}';\nconst bar = '\\u{2661}';\nconst baz = '\\u{1F4A9}';\n",
+      output: `const foo = '\\u{7A}';
+const bar = '\\u{2661}';
+const baz = '\\u{1F4A9}';
+`,
     },
     {
-      code: 'const foo = `\\x7A${bar}\\u2661`;\n',
+      code: `const foo = \`\\x7A\${bar}\\u2661\`;
+`,
       errors: [
         {
           messageId: 'prefer-unicode-code-point-escapes',
@@ -559,10 +521,12 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
           suggestions: [],
         },
       ],
-      output: 'const foo = `\\u{7A}${bar}\\u{2661}`;\n',
+      output: `const foo = \`\\u{7A}\${bar}\\u{2661}\`;
+`,
     },
     {
-      code: 'const foo = /\\u0061/u;\n',
+      code: `const foo = /\\u0061/u;
+`,
       errors: [
         {
           messageId: 'prefer-unicode-code-point-escapes',
@@ -574,10 +538,12 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
           suggestions: [],
         },
       ],
-      output: 'const foo = /\\u{61}/u;\n',
+      output: `const foo = /\\u{61}/u;
+`,
     },
     {
-      code: 'const foo = /\\u0061/;\n',
+      code: `const foo = /\\u0061/;
+`,
       errors: [
         {
           messageId: 'prefer-unicode-code-point-escapes',
@@ -590,7 +556,8 @@ new RuleTester(config).run('prefer-unicode-code-point-escapes', {
             {
               messageId: 'prefer-unicode-code-point-escapes/add-unicode-flag',
               desc: 'Use Unicode code point escapes and add the `u` flag.',
-              output: 'const foo = /\\u{61}/u;\n',
+              output: `const foo = /\\u{61}/u;
+`,
             },
           ],
         },
