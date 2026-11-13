@@ -2,9 +2,13 @@ package consistent_generic_constructors
 
 import (
 	_ "embed"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed consistent_generic_constructors.schema.json
@@ -15,19 +19,16 @@ type ConsistentGenericConstructorsOptions struct {
 }
 
 func parseOptions(options []any) ConsistentGenericConstructorsOptions {
-	opts := ConsistentGenericConstructorsOptions{
-		Style: "constructor",
-	}
-	if len(options) == 0 {
-		return opts
-	}
-	if style, ok := options[0].(string); ok {
-		opts.Style = style
+	opts := ConsistentGenericConstructorsOptions{Style: "constructor"}
+	if len(options) > 0 {
+		if style, ok := options[0].(string); ok {
+			opts.Style = style
+		}
 	}
 	return opts
 }
 
-// ConsistentGenericConstructorsRule enforces consistent generic specifier style in constructor signatures
+// ConsistentGenericConstructorsRule enforces consistent generic specifier style in constructor signatures.
 var ConsistentGenericConstructorsRule = rule.CreateRule(rule.Rule{
 	Name:   "consistent-generic-constructors",
 	Schema: rule.NewSchema(schemaJSON),
@@ -36,181 +37,158 @@ var ConsistentGenericConstructorsRule = rule.CreateRule(rule.Rule{
 
 func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
+	sourceFile := ctx.SourceFile
+	text := sourceFile.Text()
+	isolatedDeclarations := false
+	if program := ctx.Program(); program != nil {
+		if compilerOptions := program.Options(); compilerOptions != nil {
+			isolatedDeclarations = compilerOptions.IsolatedDeclarations.IsTrue()
+		}
+	}
 
-	checkNode := func(node *ast.Node, typeAnnotation *ast.Node, initializer *ast.Node, isBindingElement bool) {
+	checkNode := func(node, name, typeAnnotation, initializer *ast.Node) {
 		if initializer == nil {
 			return
 		}
-
-		// Check if initializer is a NewExpression
-		if initializer.Kind != ast.KindNewExpression {
+		initializer = ast.SkipParentheses(initializer)
+		if initializer == nil || initializer.Kind != ast.KindNewExpression {
 			return
 		}
-
 		newExpr := initializer.AsNewExpression()
-		if newExpr == nil {
+		callee := ast.SkipParentheses(newExpr.Expression)
+		if callee == nil || callee.Kind != ast.KindIdentifier {
 			return
 		}
-
-		// Check if the callee is a simple identifier
-		if newExpr.Expression == nil || newExpr.Expression.Kind != ast.KindIdentifier {
-			return
-		}
-
-		calleeIdent := newExpr.Expression.AsIdentifier()
-		if calleeIdent == nil {
-			return
-		}
-
-		// Check if type arguments exist on constructor
-		hasTypeArgsOnConstructor := newExpr.TypeArguments != nil && len(newExpr.TypeArguments.Nodes) > 0
-
-		// Handle case where there's no type annotation
-		if typeAnnotation == nil {
-			// In type-annotation mode with type arguments on constructor,
-			// we should suggest adding a type annotation
-			// UNLESS it's a binding element (like array destructuring), where we can't add a type annotation
-			if opts.Style == "type-annotation" && hasTypeArgsOnConstructor && !isBindingElement {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "preferTypeAnnotation",
-					Description: "The generic type arguments should be specified as part of the type annotation.",
-				})
+		var typeRef *ast.TypeReferenceNode
+		if typeAnnotation != nil {
+			lhs := ast.SkipTypeParentheses(typeAnnotation)
+			if lhs.Kind != ast.KindTypeReference {
+				return
 			}
-			// For constructor mode or no type args, no violation
-			return
-		}
-
-		// Check if the type annotation is a type reference
-		if typeAnnotation.Kind != ast.KindTypeReference {
-			return
-		}
-
-		typeRef := typeAnnotation.AsTypeReferenceNode()
-		if typeRef == nil {
-			return
-		}
-
-		// Check if type reference name is an identifier
-		if typeRef.TypeName == nil || typeRef.TypeName.Kind != ast.KindIdentifier {
-			return
-		}
-
-		typeNameIdent := typeRef.TypeName.AsIdentifier()
-		if typeNameIdent == nil {
-			return
-		}
-
-		// Check if the names match
-		calleeText := calleeIdent.Text
-		typeNameText := typeNameIdent.Text
-		if calleeText != typeNameText {
-			return
-		}
-
-		// Check if type arguments exist on type annotation
-		hasTypeArgsOnAnnotation := typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) > 0
-
-		// If both have type arguments or neither has type arguments, no violation
-		if hasTypeArgsOnAnnotation == hasTypeArgsOnConstructor {
-			return
-		}
-
-		if opts.Style == "constructor" {
-			// Prefer constructor style
-			if hasTypeArgsOnAnnotation && !hasTypeArgsOnConstructor {
-				// Report: type args should be on constructor
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "preferConstructor",
-					Description: "The generic type arguments should be specified as part of the constructor type arguments.",
-				})
-			}
-		} else {
-			// Prefer type-annotation style
-			if hasTypeArgsOnConstructor && !hasTypeArgsOnAnnotation {
-				// Report: type args should be on type annotation
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "preferTypeAnnotation",
-					Description: "The generic type arguments should be specified as part of the type annotation.",
-				})
+			typeRef = lhs.AsTypeReferenceNode()
+			if typeRef.TypeName.Kind != ast.KindIdentifier || typeRef.TypeName.Text() != callee.Text() {
+				return
 			}
 		}
+
+		// A parameter declaration can carry decorators outside the upstream
+		// AssignmentPattern. Its diagnostic starts at the binding name.
+		reportRange := utils.TrimNodeTextRange(sourceFile, node)
+		if node.Kind == ast.KindParameter {
+			reportRange = reportRange.WithPos(utils.TrimNodeTextRange(sourceFile, name).Pos())
+		}
+		if opts.Style == "type-annotation" {
+			// An existing annotation (including a non-generic Foo) is preserved.
+			if typeAnnotation != nil || newExpr.TypeArguments == nil {
+				return
+			}
+			ctx.ReportRangeWithDeferredFixes(reportRange, rule.RuleMessage{
+				Id:          "preferTypeAnnotation",
+				Description: "The generic type arguments should be specified as part of the type annotation.",
+			}, func() []rule.RuleFix {
+				argsRange, ok := typeArgumentsRange(sourceFile, newExpr.TypeArguments)
+				if !ok {
+					return nil
+				}
+				// ComputedPropertyName includes the square brackets in tsgo.
+				// Optional/definite property markers must precede the annotation.
+				attachAfter := name
+				if node.Kind == ast.KindPropertyDeclaration {
+					if marker := node.PostfixToken(); marker != nil {
+						attachAfter = marker
+					}
+				}
+				return []rule.RuleFix{
+					rule.RuleFixRemoveRange(argsRange),
+					rule.RuleFixInsertAfter(attachAfter, ": "+utils.TrimmedNodeText(sourceFile, callee)+text[argsRange.Pos():argsRange.End()]),
+				}
+			})
+			return
+		}
+		if isolatedDeclarations || typeRef == nil || typeRef.TypeArguments == nil || newExpr.TypeArguments != nil {
+			return
+		}
+		ctx.ReportRangeWithDeferredFixes(reportRange, rule.RuleMessage{
+			Id:          "preferConstructor",
+			Description: "The generic type arguments should be specified as part of the constructor type arguments.",
+		}, func() []rule.RuleFix {
+			argsRange, ok := typeArgumentsRange(sourceFile, typeRef.TypeArguments)
+			if !ok {
+				return nil
+			}
+			colon, ok := utils.TokenBeforePosition(sourceFile, utils.TrimNodeTextRange(sourceFile, typeAnnotation).Pos())
+			if !ok || colon.Kind != ast.KindColonToken {
+				return nil
+			}
+			annotationRange := core.NewTextRange(colon.Start, typeAnnotation.End())
+			var moved strings.Builder
+			for _, comment := range utils.CommentsInSpan(ctx.Comments.All(), annotationRange.Pos(), annotationRange.End()) {
+				if comment.Pos() >= annotationRange.Pos() && comment.End() <= annotationRange.End() &&
+					(comment.Pos() < argsRange.Pos() || comment.End() > argsRange.End()) {
+					moved.WriteString(text[comment.Pos():comment.End()])
+					if comment.Kind == ast.KindSingleLineCommentTrivia {
+						terminator := ecmascript.LineTerminatorSequenceAt(text, comment.End())
+						if terminator == "" {
+							// Do not move an unterminated line comment into executable code.
+							return nil
+						}
+						moved.WriteString(terminator)
+					}
+				}
+			}
+			moved.WriteString(text[argsRange.Pos():argsRange.End()])
+			// Keep constructor grouping intact: inserting inside `(Foo)` would
+			// turn construction into a call to Foo followed by another construction.
+			calleeEnd := newExpr.Expression
+			next, ok := utils.TokenAtOrAfter(sourceFile, calleeEnd.End())
+			if !ok || next.Kind != ast.KindOpenParenToken {
+				moved.WriteString("()")
+			}
+			return []rule.RuleFix{
+				rule.RuleFixRemoveRange(annotationRange),
+				rule.RuleFixInsertAfter(calleeEnd, moved.String()),
+			}
+		})
 	}
 
 	return rule.RuleListeners{
-		// Variable declarations
 		ast.KindVariableDeclaration: func(node *ast.Node) {
-			if node.Kind != ast.KindVariableDeclaration {
-				return
-			}
-			varDecl := node.AsVariableDeclaration()
-			if varDecl == nil {
-				return
-			}
-
-			// For destructuring patterns, we need to be careful:
-			// - `const {a}: Foo<string> = new Foo()` - has type annotation, should check
-			// - `const {a} = new Foo<string>()` - the BindingElement listener handles elements inside
-			// - `const [a = new Foo<string>()] = []` - the BindingElement listener handles elements inside
-			// Since VariableDeclaration's initializer is the whole RHS (e.g., `[]`), not the BindingElement's initializer,
-			// we can check if the name is a binding pattern without type annotation and skip
-			if varDecl.Type == nil && varDecl.Name() != nil {
-				nameKind := varDecl.Name().Kind
-				if nameKind == ast.KindArrayBindingPattern || nameKind == ast.KindObjectBindingPattern {
-					return
-				}
-			}
-
-			checkNode(node, varDecl.Type, varDecl.Initializer, false)
+			decl := node.AsVariableDeclaration()
+			checkNode(node, decl.Name(), decl.Type, decl.Initializer)
 		},
-
-		// Property declarations (class properties, including accessor properties)
 		ast.KindPropertyDeclaration: func(node *ast.Node) {
-			if node.Kind != ast.KindPropertyDeclaration {
-				return
-			}
-			propDecl := node.AsPropertyDeclaration()
-			if propDecl == nil {
-				return
-			}
-			checkNode(node, propDecl.Type, propDecl.Initializer, false)
+			decl := node.AsPropertyDeclaration()
+			checkNode(node, decl.Name(), decl.Type, decl.Initializer)
 		},
-
-		// Parameters (for functions, constructors, methods, arrow functions)
 		ast.KindParameter: func(node *ast.Node) {
-			if node.Kind != ast.KindParameter {
+			// Upstream selects only direct parameters of function declarations
+			// and expressions (including methods/constructors), not arrows or
+			// parameter properties or default values nested in destructuring patterns.
+			if node.Parent == nil || node.Parent.Kind == ast.KindArrowFunction || ast.IsParameterPropertyDeclaration(node, node.Parent) {
 				return
 			}
-			param := node.AsParameterDeclaration()
-			if param == nil {
-				return
-			}
-
-			// Skip if the name is a binding pattern (destructuring), there's no type annotation,
-			// AND there's no initializer on the parameter itself
-			// If there's a type annotation, we should check it (e.g., `function foo({a}: Foo<string> = new Foo()) {}`)
-			// If there's an initializer on the parameter, we should check it (e.g., `function foo({a} = new Foo<string>()) {}`)
-			// Only skip when the BindingElement listener will handle initializers inside the pattern (e.g., `function foo([a = new Foo<string>()]) {}`)
-			if param.Type == nil && param.Initializer == nil && param.Name() != nil {
-				nameKind := param.Name().Kind
-				if nameKind == ast.KindArrayBindingPattern || nameKind == ast.KindObjectBindingPattern {
-					return
-				}
-			}
-
-			checkNode(node, param.Type, param.Initializer, false)
-		},
-
-		// Binding elements (for destructuring patterns)
-		ast.KindBindingElement: func(node *ast.Node) {
-			if node.Kind != ast.KindBindingElement {
-				return
-			}
-			bindingElem := node.AsBindingElement()
-			if bindingElem == nil {
-				return
-			}
-			// BindingElement doesn't have a Type field, it can only have an initializer
-			checkNode(node, nil, bindingElem.Initializer, true)
+			decl := node.AsParameterDeclaration()
+			checkNode(node, decl.Name(), decl.Type, decl.Initializer)
 		},
 	}
+}
+
+// The list range excludes its delimiters and may end before trailing trivia.
+// The parser consumes exactly one opening < before recording args.Pos(), even
+// when the source token index groups adjacent < characters. The closing token
+// must still skip trailing comments rather than scan their angle brackets.
+func typeArgumentsRange(sourceFile *ast.SourceFile, args *ast.NodeList) (core.TextRange, bool) {
+	if args == nil || len(args.Nodes) == 0 {
+		return core.TextRange{}, false
+	}
+	openingPos := args.Pos() - 1
+	text := sourceFile.Text()
+	if openingPos < 0 || openingPos >= len(text) || text[openingPos] != '<' {
+		return core.TextRange{}, false
+	}
+	closing, ok := utils.TokenAtOrAfter(sourceFile, args.End())
+	if !ok || closing.Kind != ast.KindGreaterThanToken || closing.Start < args.Pos() {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(openingPos, closing.End), true
 }
