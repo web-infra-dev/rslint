@@ -36,6 +36,9 @@ When `languageOptions.parserOptions.isolatedDeclarations` is `true`, the default
 explicit parser option is independent of the compiler option in `tsconfig.json`.
 The `"type-annotation"` mode continues to work when this option is enabled.
 
+For optional and definite class properties, inserted annotations follow the
+`?` or `!` marker, including computed keys and accessor properties.
+
 This rule does not provide suggestions.
 
 ## Differences from upstream
@@ -46,6 +49,16 @@ semantics. With `"constructor"` mode, Rslint fixes
 Upstream v8.46.3 instead produces `const x = new (Foo<string>())();`, which calls
 `Foo` first and then constructs its return value. Rslint inserts type arguments
 after the complete parenthesized constructor expression.
+
+Rslint also preserves the exact line terminator when moving a line comment out
+of a removed annotation. Upstream v8.46.3 drops the terminator, which can comment
+out constructor arguments and their side effects. LF, CRLF, CR, LS and PS are
+preserved.
+
+In `"type-annotation"` mode, Rslint fixes `class C { x? = new Foo<string>(); }`
+to `class C { x?: Foo<string> = new Foo(); }`. Upstream v8.46.3 instead inserts
+before the optional marker and produces the invalid type `Foo<string>?`.
+Rslint likewise keeps a definite assignment marker before an inserted annotation.
 
 ## Original Documentation
 

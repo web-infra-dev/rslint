@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed consistent_generic_constructors.schema.json
@@ -79,14 +80,21 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 				Id:          "preferTypeAnnotation",
 				Description: "The generic type arguments should be specified as part of the type annotation.",
 			}, func() []rule.RuleFix {
-				argsRange, ok := typeArgumentsRange(text, newExpr.TypeArguments)
+				argsRange, ok := typeArgumentsRange(sourceFile, newExpr.TypeArguments)
 				if !ok {
 					return nil
 				}
 				// ComputedPropertyName includes the square brackets in tsgo.
+				// Optional/definite property markers must precede the annotation.
+				attachAfter := name
+				if node.Kind == ast.KindPropertyDeclaration {
+					if marker := node.PostfixToken(); marker != nil {
+						attachAfter = marker
+					}
+				}
 				return []rule.RuleFix{
 					rule.RuleFixRemoveRange(argsRange),
-					rule.RuleFixInsertAfter(name, ": "+utils.TrimmedNodeText(sourceFile, callee)+text[argsRange.Pos():argsRange.End()]),
+					rule.RuleFixInsertAfter(attachAfter, ": "+utils.TrimmedNodeText(sourceFile, callee)+text[argsRange.Pos():argsRange.End()]),
 				}
 			})
 			return
@@ -98,7 +106,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			Id:          "preferConstructor",
 			Description: "The generic type arguments should be specified as part of the constructor type arguments.",
 		}, func() []rule.RuleFix {
-			argsRange, ok := typeArgumentsRange(text, typeRef.TypeArguments)
+			argsRange, ok := typeArgumentsRange(sourceFile, typeRef.TypeArguments)
 			if !ok {
 				return nil
 			}
@@ -108,10 +116,18 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			}
 			annotationRange := core.NewTextRange(colon.Start, typeAnnotation.End())
 			var moved strings.Builder
-			for _, comment := range ctx.Comments.All() {
+			for _, comment := range utils.CommentsInSpan(ctx.Comments.All(), annotationRange.Pos(), annotationRange.End()) {
 				if comment.Pos() >= annotationRange.Pos() && comment.End() <= annotationRange.End() &&
 					(comment.Pos() < argsRange.Pos() || comment.End() > argsRange.End()) {
 					moved.WriteString(text[comment.Pos():comment.End()])
+					if comment.Kind == ast.KindSingleLineCommentTrivia {
+						terminator := ecmascript.LineTerminatorSequenceAt(text, comment.End())
+						if terminator == "" {
+							// Do not move an unterminated line comment into executable code.
+							return nil
+						}
+						moved.WriteString(terminator)
+					}
 				}
 			}
 			moved.WriteString(text[argsRange.Pos():argsRange.End()])
@@ -151,7 +167,19 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	}
 }
 
-func typeArgumentsRange(text string, args *ast.NodeList) (core.TextRange, bool) {
-	start, end, ok := utils.RangeEnclosingDelimiters(text, args.Loc.Pos(), args.Loc.End(), '<', '>')
-	return core.NewTextRange(start, end), ok
+// The list range excludes its delimiters and may end before trailing trivia.
+// Use source tokens so comments containing angle brackets cannot truncate it.
+func typeArgumentsRange(sourceFile *ast.SourceFile, args *ast.NodeList) (core.TextRange, bool) {
+	if args == nil || len(args.Nodes) == 0 {
+		return core.TextRange{}, false
+	}
+	opening, ok := utils.TokenBeforePosition(sourceFile, args.Pos())
+	if !ok || opening.Kind != ast.KindLessThanToken {
+		return core.TextRange{}, false
+	}
+	closing, ok := utils.TokenAtOrAfter(sourceFile, args.End())
+	if !ok || closing.Kind != ast.KindGreaterThanToken || closing.Start < opening.End {
+		return core.TextRange{}, false
+	}
+	return core.NewTextRange(opening.Start, closing.End), true
 }
