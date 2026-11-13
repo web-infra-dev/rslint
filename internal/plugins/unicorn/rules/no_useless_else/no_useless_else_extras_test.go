@@ -23,6 +23,14 @@ func TestNoUselessElseCaughtExceptions(t *testing.T) {
 	}
 	valid := []rule_tester.ValidTestCase{
 		{FileName: "case.js", Code: branch("    try { `${value}${process.exit()}`; } catch {}")},
+		{FileName: "case.js", Code: branch("    inner: {\n      try { `${value}${process.exit()}`; } catch { break inner; }\n    }")},
+		{FileName: "case.js", Code: branch("    inner: {\n      try { `${value}${process.exit()}`; } catch {} finally { break inner; }\n    }")},
+		{FileName: "case.js", Code: branch("    do {\n      try { `${value}${process.exit()}`; } catch { continue; }\n    } while (false);")},
+		{FileName: "case.js", Code: branch("    do {\n      try { `${value}${process.exit()}`; } catch {} finally { continue; }\n    } while (false);")},
+		{FileName: "case.js", Code: branch("    outer: inner: do {\n      try { `${value}${process.exit()}`; } catch { continue outer; }\n    } while (false);")},
+		{FileName: "case.js", Code: branch("    switch (0) { default:\n      try { `${value}${process.exit()}`; } catch { break; }\n    }")},
+		{FileName: "case.js", Code: branch("    inner: {\n      try { `${value}${process.exit()}`; } catch { return; } finally { if (flag) break inner; }\n    }")},
+		{FileName: "case.js", Code: branch("    inner: {\n      try { `${value}${process.exit()}`; } finally { break inner; }\n    }")},
 		{FileName: "case.js", Code: branch("    try { ({} = value); return; } catch {}")},
 		{FileName: "case.js", Code: branch("    try { ([] = value); return; } catch {}")},
 		{FileName: "case.js", Code: branch("    try { try { throw null; } catch ({}) { return; } } catch {}")},
@@ -64,7 +72,30 @@ func TestNoUselessElseCaughtExceptions(t *testing.T) {
   }
 }`},
 	}
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_else.NoUselessElseRule, valid, nil)
+	var invalid []rule_tester.InvalidTestCase
+	const loop = "function run(flag, value) {\n  outer: while (flag) {\n    if (flag) {\n"
+	const end = "\n  }\n}"
+	for _, handler := range []string{
+		"catch { return; }",
+		"catch { throw 0; }",
+		"catch { break outer; }",
+		"catch { continue; }",
+		"catch {} finally { return; }",
+		"catch {} finally { throw 0; }",
+		"catch {} finally { break; }",
+		"catch {} finally { continue outer; }",
+		"catch { inner: { break inner; } return; }",
+		"catch {} finally { do { continue; } while (false); return; }",
+	} {
+		prefix := loop + "      try { `${value}${process.exit()}`; } " + handler
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			FileName: "case.js",
+			Code:     prefix + "\n    } else {\n      fallback();\n    }" + end,
+			Errors:   []rule_tester.InvalidTestCaseError{elseAt(5, 7)},
+			Output:   []string{prefix + "\n    }\n    fallback();" + end},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_else.NoUselessElseRule, valid, invalid)
 }
 
 func TestNoUselessElseSafeOperations(t *testing.T) {

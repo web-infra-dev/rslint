@@ -4,44 +4,63 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/cfg"
 )
 
-// The shared graph approximates some implicit exceptions. Check the omitted
-// operations where an exception could reach a catch inside the consequent.
-func (a *exitAnalysis) hasUnmodeledCatchPath(node *ast.Node, options cfg.BranchAnalysis) bool {
-	if node == nil || ast.IsFunctionLike(node) {
-		return false
+// Add a possible throw for operations the graph misses. Analyze the resulting
+// consequent as a whole so break, continue, and finally keep their context.
+func (a *exitAnalysis) withUnmodeledExceptions(consequent *ast.Node) *ast.Node {
+	if !containsTryStatement(consequent) {
+		return consequent
 	}
-	switch node.Kind {
-	case ast.KindTryStatement:
-		stmt := node.AsTryStatement()
-		if a.hasUnmodeledCatchPath(stmt.FinallyBlock, options) {
-			return true
-		}
-		// A finally that always leaves this branch overrides completion of
-		// its try and catch.
-		if stmt.FinallyBlock != nil && !cfg.StatementFallsThrough(stmt.FinallyBlock, options) {
-			return false
-		}
-		if stmt.CatchClause != nil && a.mayThrowOutsideGraph(stmt.TryBlock) &&
-			cfg.StatementFallsThrough(stmt.CatchClause.AsCatchClause().Block, options) {
-			return true
-		}
-		return a.hasUnmodeledCatchPath(stmt.TryBlock, options) ||
-			a.hasUnmodeledCatchPath(stmt.CatchClause, options)
-	case ast.KindIfStatement:
-		stmt := node.AsIfStatement()
-		if truthy, known := a.truthiness(stmt.Expression); known {
-			if truthy {
-				return a.hasUnmodeledCatchPath(stmt.ThenStatement, options)
+
+	factory := ast.NewNodeFactory(ast.NodeFactoryHooks{
+		OnUpdate: func(updated, original *ast.Node) {
+			if ast.IsLabeledStatement(updated) && updated.Statement() != original.Statement() {
+				// The graph reads labels from the statement's parent chain.
+				updated.Statement().Parent = updated
 			}
-			return a.hasUnmodeledCatchPath(stmt.ElseStatement, options)
-		}
-	}
-	return node.ForEachChild(func(child *ast.Node) bool {
-		return a.hasUnmodeledCatchPath(child, options)
+		},
 	})
+	withPossibleThrow := func(block *ast.Node) *ast.Node {
+		// The omitted expression lets the graph explore both outcomes.
+		branch := factory.NewIfStatement(factory.NewOmittedExpression(),
+			factory.NewThrowStatement(nil), nil)
+		original := block.AsBlock()
+		body := block.Statements()
+		statements := make([]*ast.Node, 1, len(body)+1)
+		statements[0] = branch
+		statements = append(statements, body...)
+		return factory.UpdateBlock(original, factory.NewNodeList(statements), original.MultiLine)
+	}
+	visitor := ast.NewNodeVisitor(nil, factory, ast.NodeVisitorHooks{})
+	visitor.Visit = func(node *ast.Node) *ast.Node {
+		if ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) {
+			return node
+		}
+		updated := node.VisitEachChild(visitor)
+		if !ast.IsTryStatement(node) {
+			return updated
+		}
+
+		original := node.AsTryStatement()
+		stmt := updated.AsTryStatement()
+		tryBlock, catchClause := stmt.TryBlock, stmt.CatchClause
+		if a.mayThrowOutsideGraph(original.TryBlock) {
+			// A possible throw at entry conservatively makes the handler reachable.
+			tryBlock = withPossibleThrow(tryBlock)
+		}
+		if a.mayThrowOutsideGraph(original.CatchClause) {
+			catch := catchClause.AsCatchClause()
+			catchClause = factory.UpdateCatchClause(catch, catch.VariableDeclaration, withPossibleThrow(catch.Block))
+		}
+		return factory.UpdateTryStatement(stmt, tryBlock, catchClause, stmt.FinallyBlock)
+	}
+	return visitor.VisitNode(consequent)
+}
+
+func containsTryStatement(node *ast.Node) bool {
+	return ast.IsTryStatement(node) ||
+		!ast.IsFunctionLikeOrClassStaticBlockDeclaration(node) && node.ForEachChild(containsTryStatement)
 }
 
 func (a *exitAnalysis) mayThrowOutsideGraph(node *ast.Node) bool {

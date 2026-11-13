@@ -45,7 +45,7 @@ func (a *exitAnalysis) analyze(root *ast.Node) map[*ast.Node]bool {
 			continue
 		}
 		stmt := node.AsIfStatement().ThenStatement
-		if a.hasUnmodeledCatchPath(stmt, options) {
+		if withExceptions := a.withUnmodeledExceptions(stmt); withExceptions != stmt && cfg.StatementFallsThrough(withExceptions, options) {
 			exits[node] = false
 		}
 	}
