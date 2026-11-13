@@ -34,9 +34,11 @@ type StaticStringEvaluator struct {
 	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
-	storedReferences       map[*ast.Symbol][]*ast.Node
+	storedReferences       map[*ast.Symbol][]staticReferenceTransfer
 	markedReferences       map[*ast.Node]staticReferenceFlags
 	trackCallEscapes       bool
+	escapeFacts            *staticEscapeFacts
+	capturePoint           *ast.Node
 	arrayPrototypeMutated  bool
 	stringPrototypeMutated bool
 }
@@ -442,9 +444,11 @@ func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) sta
 
 	staticEvaluator.resolving[symbol] = true
 	defer delete(staticEvaluator.resolving, symbol)
-
 	if isAggregateLiteral(initializer) && staticEvaluator.hasPropertyMutation(symbol) {
 		return staticEvalResult{}
+	}
+	if result := staticEvaluator.capturedInitializer(initializer, symbol); result.ok {
+		return result
 	}
 	result := staticEvaluator.evalValue(initializer)
 	if result.ok && staticValueIsAggregate(result.value) &&
@@ -1890,7 +1894,19 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 		(staticEvaluator.typeChecker == nil && staticEvaluator.referenceResolver == nil) {
 		return true
 	}
-	return staticEvaluator.referenceFlagsFor(symbol)&staticReferencePropertyMutation != 0
+	flags := staticEvaluator.referenceFlagsFor(symbol)
+	if staticEvaluator.capturePoint != nil && staticEvaluator.escapeFacts != nil {
+		if staticEvaluator.escapeFacts.explicit[symbol] {
+			return flags&staticReferencePropertyMutation != 0
+		}
+		for site := range staticEvaluator.escapeFacts.sites[symbol] {
+			if executionRoot(site) != executionRoot(staticEvaluator.capturePoint) || site.End() <= staticEvaluator.capturePoint.Pos() {
+				return true
+			}
+		}
+		return false
+	}
+	return flags&staticReferencePropertyMutation != 0
 }
 
 func (staticEvaluator *StaticStringEvaluator) referenceFlagsFor(symbol *ast.Symbol) staticReferenceFlags {
@@ -1912,6 +1928,7 @@ func (staticEvaluator *StaticStringEvaluator) ensureReferenceFlags() {
 		analysis.computeReferenceFlags()
 		staticEvaluator.referenceFlags = analysis.referenceFlags
 		staticEvaluator.storedReferences = analysis.storedReferences
+		staticEvaluator.escapeFacts = analysis.escapeFacts
 		staticEvaluator.arrayPrototypeMutated = analysis.arrayPrototypeMutated
 		staticEvaluator.stringPrototypeMutated = analysis.stringPrototypeMutated
 		staticEvaluator.referenceFlagsComputed = true
@@ -1942,6 +1959,11 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 	staticEvaluator.referenceFlags = nil
 	staticEvaluator.storedReferences = nil
 	staticEvaluator.markedReferences = nil
+	if staticEvaluator.trackCallEscapes {
+		staticEvaluator.escapeFacts = newStaticEscapeFacts()
+		staticEvaluator.escapeFacts.collecting = true
+		defer func() { staticEvaluator.escapeFacts.collecting = false }()
+	}
 	var mutationCandidates []staticMutationCandidate
 	var calls []*ast.Node
 
@@ -1956,9 +1978,21 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			}
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, known := AccessExpressionStaticName(callee); known {
+				if staticEvaluator.escapeFacts != nil {
+					staticEvaluator.escapeFacts.call = node
+				}
 				staticEvaluator.markCallMutation(node, callee, name)
+				if staticEvaluator.escapeFacts != nil {
+					staticEvaluator.escapeFacts.call = nil
+				}
 			} else if ast.IsAccessExpression(callee) {
 				mutationCandidates = append(mutationCandidates, staticMutationCandidate{call: node, access: callee})
+			}
+		}
+		if staticEvaluator.trackCallEscapes && node.Kind == ast.KindBinaryExpression {
+			assignment := node.AsBinaryExpression()
+			if ast.IsIdentifier(SkipAssertionsAndParens(assignment.Left)) && ast.IsAssignmentOperator(assignment.OperatorToken.Kind) {
+				staticEvaluator.recordBindingTransfer(assignment.Left, assignment.Right, node)
 			}
 		}
 		if staticEvaluator.trackCallEscapes && (node.Kind == ast.KindNewExpression || node.Kind == ast.KindTaggedTemplateExpression) {
@@ -1980,7 +2014,7 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 					assignment := outer.Parent.AsBinaryExpression()
 					switch assignment.OperatorToken.Kind {
 					case ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
-						staticEvaluator.recordStoredReferences(AccessExpressionObject(node), assignment.Right)
+						staticEvaluator.recordStoredReferences(AccessExpressionObject(node), assignment.Right, outer.Parent, false)
 					}
 				}
 			}
@@ -1994,7 +2028,13 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 
 	for _, candidate := range mutationCandidates {
 		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok {
+			if staticEvaluator.escapeFacts != nil {
+				staticEvaluator.escapeFacts.call = candidate.call
+			}
 			staticEvaluator.markCallMutation(candidate.call, candidate.access, methodName)
+			if staticEvaluator.escapeFacts != nil {
+				staticEvaluator.escapeFacts.call = nil
+			}
 		}
 	}
 	// First collect all explicit writes, so a call cannot be classified using
@@ -2004,7 +2044,13 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		optionalShortCircuits: make(map[*ast.Node]bool),
 	}
 	for _, call := range calls {
+		staticEvaluator.escapeFacts.call = call
+		staticEvaluator.escapeFacts.visited = make(map[*ast.Symbol]staticReferenceFlags)
+		staticEvaluator.markedReferences = nil
 		staticEvaluator.markCallEscapes(call)
+	}
+	if staticEvaluator.escapeFacts != nil {
+		staticEvaluator.escapeFacts.call = nil
 	}
 }
 
@@ -2082,18 +2128,51 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.stringPrototypeMutated = staticEvaluator.stringPrototypeMutated || str
 		}
 		symbol := staticEvaluator.referenceSymbol(node)
-		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag == flag {
+		if symbol == nil {
+			return
+		}
+		if facts := staticEvaluator.escapeFacts; facts != nil && flag&staticReferencePropertyMutation != 0 {
+			if facts.call == nil {
+				facts.explicit[symbol] = true
+			} else {
+				if facts.sites[symbol] == nil {
+					facts.sites[symbol] = make(map[*ast.Node]struct{})
+				}
+				facts.sites[symbol][facts.call] = struct{}{}
+			}
+			if facts.call != nil && flag&staticReferenceCallEscape != 0 {
+				if facts.visited[symbol]&flag == flag {
+					return
+				}
+				facts.visited[symbol] |= flag
+			} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
+				return
+			}
+		} else if staticEvaluator.referenceFlags[symbol]&flag == flag {
 			return
 		}
 		if staticEvaluator.referenceFlags == nil {
 			staticEvaluator.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, 8)
 		}
-		staticEvaluator.referenceFlags[symbol] |= flag
-		staticEvaluator.invalidateMutationValues()
+		if staticEvaluator.referenceFlags[symbol]&flag != flag {
+			staticEvaluator.referenceFlags[symbol] |= flag
+			staticEvaluator.invalidateMutationValues()
+		}
+		latestBinding := staticEvaluator.latestBindingTransfer(symbol)
 		if flag&staticReferenceCallEscape != 0 {
-			for _, value := range staticEvaluator.storedReferences[symbol] {
-				staticEvaluator.markReference(value, flag&^staticReferenceCallReceiver)
+			for _, transfer := range staticEvaluator.storedReferences[symbol] {
+				if !staticEvaluator.transferAvailable(transfer) || transfer.binding && latestBinding != nil && transfer.site.End() < latestBinding.End() {
+					continue
+				}
+				if transfer.copied {
+					staticEvaluator.markCopiedReferences(transfer.value, flag&^staticReferenceCallReceiver)
+				} else {
+					staticEvaluator.markReference(transfer.value, flag&^staticReferenceCallReceiver)
+				}
 			}
+		}
+		if latestBinding != nil && flag&staticReferenceCallEscape != 0 {
+			return
 		}
 		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
 			return

@@ -101,6 +101,7 @@ func (staticEvaluator *StaticStringEvaluator) isKnownObjectOperation(call, calle
 			return false
 		}
 		staticEvaluator.markMutationArgument(call.Arguments(), 0)
+		staticEvaluator.recordBuiltinTransfers(call, builtin, name)
 		if builtin == "Reflect" && name == "set" {
 			staticEvaluator.markMutationArgument(call.Arguments(), 3)
 		}
@@ -268,7 +269,7 @@ func (staticEvaluator *StaticStringEvaluator) markReturnedReferences(node *ast.N
 
 // Index references stored after an object's initializer, including writes made
 // through aliases. The index is built once with the other reference facts.
-func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, value *ast.Node) {
+func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, value, site *ast.Node, copied bool) {
 	visited := make(map[*ast.Symbol]bool)
 	var visit func(*ast.Node, bool)
 	visit = func(node *ast.Node, nested bool) {
@@ -283,9 +284,18 @@ func (staticEvaluator *StaticStringEvaluator) recordStoredReferences(target, val
 			}
 			visited[symbol] = true
 			if staticEvaluator.storedReferences == nil {
-				staticEvaluator.storedReferences = make(map[*ast.Symbol][]*ast.Node)
+				staticEvaluator.storedReferences = make(map[*ast.Symbol][]staticReferenceTransfer)
 			}
-			staticEvaluator.storedReferences[symbol] = append(staticEvaluator.storedReferences[symbol], value)
+			staticEvaluator.storedReferences[symbol] = append(staticEvaluator.storedReferences[symbol], staticReferenceTransfer{value: value, site: site, copied: copied})
+			latest := staticEvaluator.latestBindingAt(symbol, site)
+			for _, transfer := range staticEvaluator.storedReferences[symbol] {
+				if transfer.binding && transferAvailableAt(transfer, site) && (latest == nil || transfer.site.End() >= latest.End()) {
+					visit(transfer.value, nested)
+				}
+			}
+			if latest != nil {
+				return
+			}
 			if len(symbol.Declarations) == 1 {
 				declaration := symbol.Declarations[0]
 				switch declaration.Kind {
