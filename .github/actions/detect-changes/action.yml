@@ -30,6 +30,7 @@ runs:
           unsupported:
             - '(*([\s\S])[\r\n\u2028\u2029]*([\s\S]))'
           changed:
+            - '!website/**'
             - '!**/*.md'
             - '!**/*.mdx'
             - '!**/_meta.json'
