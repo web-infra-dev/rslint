@@ -852,6 +852,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/better-dom-traversing.test.ts',
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-json-file-read.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-template-literal-escape.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-tuple-labels.test.ts',
     './tests/eslint-plugin-unicorn/rules/empty-brace-spaces.test.ts',
