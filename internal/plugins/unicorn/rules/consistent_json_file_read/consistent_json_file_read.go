@@ -144,36 +144,9 @@ func isReadFileCallee(ctx *rule.RuleContext, callee *ast.Node, getEvaluator func
 	case ast.KindElementAccessExpression:
 		method, _ = getEvaluator().EvalAccessExpressionName(callee)
 	case ast.KindIdentifier:
-		method = importedFSName(ctx, callee)
+		_, method = fsImport(ctx.Refs.ResolveInFile(callee))
 	}
 	return method == "readFile" || method == "readFileSync"
-}
-
-func importedFSName(ctx *rule.RuleContext, callee *ast.Node) string {
-	symbol := ctx.Refs.Resolve(callee)
-	if symbol == nil {
-		return ""
-	}
-	for _, declaration := range symbol.Declarations {
-		if !ast.IsImportSpecifier(declaration) || ast.IsTypeOnlyImportDeclaration(declaration) {
-			continue
-		}
-		importNode := ast.FindAncestorKind(declaration, ast.KindImportDeclaration)
-		if importNode == nil || !ast.IsStringLiteral(importNode.ModuleSpecifier()) {
-			continue
-		}
-		switch importNode.ModuleSpecifier().Text() {
-		case "fs", "node:fs", "fs/promises", "node:fs/promises":
-			imported := declaration.AsImportSpecifier().PropertyName
-			if imported == nil {
-				imported = declaration.Name()
-			}
-			if ast.IsIdentifier(imported) {
-				return imported.Text()
-			}
-		}
-	}
-	return ""
 }
 
 func usesOppositeEncoding(ctx *rule.RuleContext, node *ast.Node, preferBuffer bool, getEvaluator func() *utils.StaticStringEvaluator) bool {

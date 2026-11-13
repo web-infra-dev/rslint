@@ -98,6 +98,9 @@ func (refs *optionReferences) localUse(node *ast.Node) bool {
 		case ast.KindExpressionStatement:
 			return true
 		case ast.KindCallExpression:
+			if refs.isNodeFileRead(parent, node) {
+				return true
+			}
 			switch refs.objectMethod(parent, node) {
 			case "isFrozen", "isSealed", "isExtensible":
 				return true

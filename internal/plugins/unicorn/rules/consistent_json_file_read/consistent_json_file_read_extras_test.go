@@ -102,6 +102,15 @@ func TestConsistentJSONFileReadOptionSafety(t *testing.T) {
 				declaration + "configure(options);\nJSON.parse(fs.readFileSync(file, {...options}));",
 				declaration + "const alias = Object.freeze(options);\nconfigure(alias);\n" + directRead,
 				declaration + "export {options};\n" + directRead,
+				"import {readFileSync} from 'node:fs';\n" + declaration +
+					"function configure(readFileSync) { readFileSync('a.json', options); }\n" +
+					"configure((_, o) => { o.signal = AbortSignal.abort(); });\nJSON.parse(readFileSync('b.json', options));",
+				"import {readFileSync} from 'node:fs';\n" + declaration +
+					"const fs = {readFileSync(_, o) { o.signal = AbortSignal.abort(); }};\n" +
+					"fs.readFileSync('a.json', options);\nJSON.parse(readFileSync('b.json', options));",
+				"import fs, {readFileSync} from 'node:fs';\n" + declaration +
+					"fs.readFileSync = (_, o) => { o.signal = AbortSignal.abort(); };\n" +
+					"fs.readFileSync('a.json', options);\nJSON.parse(readFileSync('b.json', options));",
 			}
 			if !mode.buffer {
 				valid = append(valid, "const options = {encoding: null, flag: undefined};\nconfigure(options);\n"+
@@ -123,6 +132,33 @@ func TestConsistentJSONFileReadOptionSafety(t *testing.T) {
 			aliasPrefix := declaration + "const alias = options;\n"
 			fixed = aliasPrefix + "JSON.parse(fs.readFileSync(file" + mode.replacement + "));"
 			invalid = append(invalid, readCase(aliasPrefix+"JSON.parse(fs.readFileSync(file, alias));", []string{fixed}, mode.buffer, 3, 34, 3, 39))
+
+			namedPrefix := "import {readFileSync} from 'node:fs';\n" + declaration
+			namedReads := readCase(namedPrefix+`JSON.parse(readFileSync('a.json', options));
+JSON.parse(readFileSync('b.json', options));`, []string{
+				namedPrefix + "JSON.parse(readFileSync('a.json'" + mode.replacement + "));\n" +
+					"JSON.parse(readFileSync('b.json'" + mode.replacement + "));",
+			}, mode.buffer, 3, 35, 3, 42)
+			second := namedReads.Errors[0]
+			second.Line, second.EndLine = 4, 4
+			namedReads.Errors = append(namedReads.Errors, second)
+			invalid = append(invalid, namedReads)
+
+			memberPrefix := "import fs from 'node:fs';\nimport * as fsp from 'node:fs/promises';\n" +
+				"const options = Object.freeze(" + literal + ");\nconst alias = options;\n"
+			memberReads := readCase(memberPrefix+`JSON.parse(await fsp['readFile']('a.json', (alias)));
+JSON.parse(fs.readFileSync('b.json', options));`, []string{
+				memberPrefix + "JSON.parse(await fsp['readFile']('a.json'" + mode.replacement + "));\n" +
+					"JSON.parse(fs.readFileSync('b.json'" + mode.replacement + "));",
+			}, mode.buffer, 5, 45, 5, 50)
+			if !mode.buffer {
+				memberReads.Output[0] = memberPrefix + "JSON.parse(await fsp['readFile']('a.json', ('utf8')));\n" +
+					"JSON.parse(fs.readFileSync('b.json', 'utf8'));"
+			}
+			second = memberReads.Errors[0]
+			second.Line, second.Column, second.EndLine, second.EndColumn = 6, 38, 6, 45
+			memberReads.Errors = append(memberReads.Errors, second)
+			invalid = append(invalid, memberReads)
 			runCases(t, valid, invalid, mode.buffer)
 		})
 	}
