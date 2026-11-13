@@ -1,20 +1,7 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import * as path from 'node:path';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootDir = getFixturesRootDir();
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
-  },
-});
-
-ruleTester.run('no-unnecessary-boolean-literal-compare', {
+new RuleTester(config).run('no-unnecessary-boolean-literal-compare', {
   valid: [
     `
       declare const varAny: any;
@@ -77,14 +64,22 @@ ruleTester.run('no-unnecessary-boolean-literal-compare', {
         declare const varBooleanOrUndefined: boolean | undefined;
         varBooleanOrUndefined === true;
       `,
-      options: [{ allowComparingNullableBooleansToFalse: false }],
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
     },
     {
       code: `
         declare const varBooleanOrUndefined: boolean | undefined;
         varBooleanOrUndefined === false;
       `,
-      options: [{ allowComparingNullableBooleansToTrue: false }],
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+        },
+      ],
     },
     {
       code: `
@@ -95,7 +90,11 @@ ruleTester.run('no-unnecessary-boolean-literal-compare', {
           }
         };
       `,
-      options: [{ allowComparingNullableBooleansToFalse: false }],
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
     },
     {
       code: `
@@ -106,7 +105,11 @@ ruleTester.run('no-unnecessary-boolean-literal-compare', {
           }
         };
       `,
-      options: [{ allowComparingNullableBooleansToTrue: false }],
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+        },
+      ],
     },
     "'false' === true;",
     "'true' === false;",
@@ -125,33 +128,36 @@ const extendsUnknown: <T extends unknown>(
 };
     `,
     {
-      // Skip: requires per-test-case tsconfigRootDir which the test framework doesn't support
-      skip: true,
       code: `
 function test(a?: boolean): boolean {
   // eslint-disable-next-line
   return a !== false;
 }
       `,
-      languageOptions: {
-        parserOptions: {
-          tsconfigRootDir: path.join(rootDir, 'unstrict'),
-        },
-      },
       options: [
         {
           allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: true,
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.unstrict.json',
+        },
+      },
     },
   ],
-
   invalid: [
     {
       code: 'true === true;',
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
       output: 'true;',
@@ -161,6 +167,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 15,
         },
       ],
       output: '!false;',
@@ -174,6 +186,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 33,
         },
       ],
       output: `
@@ -191,6 +209,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 29,
         },
       ],
       output: `
@@ -205,12 +229,22 @@ function test(a?: boolean): boolean {
         if (varTrueOrUndefined === true) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 40,
         },
       ],
-      options: [{ allowComparingNullableBooleansToTrue: false }],
       output: `
         declare const varTrueOrUndefined: true | undefined;
         if (varTrueOrUndefined) {
@@ -223,12 +257,22 @@ function test(a?: boolean): boolean {
         if (varFalseOrNull !== true) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToTrueNegated',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 36,
         },
       ],
-      options: [{ allowComparingNullableBooleansToTrue: false }],
       output: `
         declare const varFalseOrNull: false | null;
         if (!varFalseOrNull) {
@@ -242,12 +286,22 @@ function test(a?: boolean): boolean {
         if (varBooleanOrNull === false && otherBoolean) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 39,
         },
       ],
-      options: [{ allowComparingNullableBooleansToFalse: false }],
       output: `
         declare const varBooleanOrNull: boolean | null;
         declare const otherBoolean: boolean;
@@ -262,12 +316,22 @@ function test(a?: boolean): boolean {
         if (!(varBooleanOrNull === false) || otherBoolean) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 41,
         },
       ],
-      options: [{ allowComparingNullableBooleansToFalse: false }],
       output: `
         declare const varBooleanOrNull: boolean | null;
         declare const otherBoolean: boolean;
@@ -282,12 +346,22 @@ function test(a?: boolean): boolean {
         if (varTrueOrFalseOrUndefined !== false && !otherBoolean) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 48,
         },
       ],
-      options: [{ allowComparingNullableBooleansToFalse: false }],
       output: `
         declare const varTrueOrFalseOrUndefined: true | false | undefined;
         declare const otherBoolean: boolean;
@@ -304,6 +378,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 33,
         },
       ],
       output: `
@@ -321,6 +401,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -330,7 +416,7 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      code: noFormat`
+      code: `
         declare const x;
         if ((x instanceof Error) === false) {
         }
@@ -338,6 +424,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 43,
         },
       ],
       output: `
@@ -347,7 +439,7 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      code: noFormat`
+      code: `
         declare const x;
         if (false === (x instanceof Error)) {
         }
@@ -355,6 +447,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 43,
         },
       ],
       output: `
@@ -372,6 +470,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 41,
         },
       ],
       output: `
@@ -381,7 +485,7 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      code: noFormat`
+      code: `
         declare const x;
         if (typeof x === 'string' === false) {
         }
@@ -389,6 +493,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 44,
         },
       ],
       output: `
@@ -398,7 +508,7 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      code: noFormat`
+      code: `
         declare const x;
         if (x instanceof Error === (false)) {
         }
@@ -406,6 +516,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 43,
         },
       ],
       output: `
@@ -415,7 +531,7 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      code: noFormat`
+      code: `
         declare const x;
         if ((false) === x instanceof Error) {
         }
@@ -423,6 +539,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 43,
         },
       ],
       output: `
@@ -440,6 +562,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 35,
         },
       ],
       output: `
@@ -457,6 +585,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 35,
         },
       ],
       output: `
@@ -474,6 +608,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 51,
         },
       ],
       output: `
@@ -491,6 +631,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 49,
         },
       ],
       output: `
@@ -508,6 +654,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 46,
         },
       ],
       output: `
@@ -525,6 +677,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 46,
         },
       ],
       output: `
@@ -542,6 +700,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 45,
         },
       ],
       output: `
@@ -560,6 +724,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 37,
         },
       ],
       output: `
@@ -579,6 +749,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 40,
         },
       ],
       output: `
@@ -598,6 +774,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 50,
         },
       ],
       output: `
@@ -617,6 +799,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -635,6 +823,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 33,
         },
       ],
       output: `
@@ -653,6 +847,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -671,6 +871,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       output: `
@@ -689,6 +895,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -707,6 +919,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       output: `
@@ -725,6 +943,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -743,6 +967,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       output: `
@@ -761,6 +991,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -779,6 +1015,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 33,
         },
       ],
       output: `
@@ -797,6 +1039,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -815,6 +1063,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       output: `
@@ -833,6 +1087,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'negated',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of negating it.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 32,
         },
       ],
       output: `
@@ -851,6 +1111,12 @@ function test(a?: boolean): boolean {
       errors: [
         {
           messageId: 'direct',
+          message:
+            'This expression unnecessarily compares a boolean value to a boolean instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       output: `
@@ -866,15 +1132,21 @@ function test(a?: boolean): boolean {
         if (varBooleanOrNull === true) {
         }
       `,
-      errors: [
-        {
-          messageId: 'comparingNullableToTrueDirect',
-        },
-      ],
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
           allowComparingNullableBooleansToFalse: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 38,
         },
       ],
       output: `
@@ -890,15 +1162,21 @@ function test(a?: boolean): boolean {
         if (varBooleanOrNull === false) {
         }
       `,
-      errors: [
-        {
-          messageId: 'comparingNullableToFalse',
-        },
-      ],
       options: [
         {
           allowComparingNullableBooleansToTrue: false,
           allowComparingNullableBooleansToFalse: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 39,
         },
       ],
       output: `
@@ -914,12 +1192,22 @@ function test(a?: boolean): boolean {
         if (true === varBooleanOrUndefined) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToTrueDirect',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to true instead of using it directly.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 43,
         },
       ],
-      options: [{ allowComparingNullableBooleansToTrue: false }],
       output: `
         declare const varBooleanOrUndefined: boolean | undefined;
         if (varBooleanOrUndefined) {
@@ -933,12 +1221,22 @@ function test(a?: boolean): boolean {
         if (false === varBooleanOrNull) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 39,
         },
       ],
-      options: [{ allowComparingNullableBooleansToFalse: false }],
       output: `
         declare const varBooleanOrNull: boolean | null;
         if (!(varBooleanOrNull ?? true)) {
@@ -952,12 +1250,22 @@ function test(a?: boolean): boolean {
         if (!(varBooleanOrNull !== false)) {
         }
       `,
+      options: [
+        {
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
       errors: [
         {
           messageId: 'comparingNullableToFalse',
+          message:
+            'This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 41,
         },
       ],
-      options: [{ allowComparingNullableBooleansToFalse: false }],
       output: `
         declare const varBooleanOrNull: boolean | null;
         if (!(varBooleanOrNull ?? true)) {
@@ -965,24 +1273,28 @@ function test(a?: boolean): boolean {
       `,
     },
     {
-      // Skip: requires per-test-case tsconfigRootDir which the test framework doesn't support
-      skip: true,
       code: `
 function foo(): boolean {}
       `,
-      errors: [
+      options: [
         {
-          messageId: 'noStrictNullCheck',
+          allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: false,
         },
       ],
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootDir, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
-      options: [
+      errors: [
         {
-          allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: false,
+          messageId: 'noStrictNullCheck',
+          message:
+            'This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
         },
       ],
     },

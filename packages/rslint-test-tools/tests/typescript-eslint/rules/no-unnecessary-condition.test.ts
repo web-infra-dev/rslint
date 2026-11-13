@@ -1,37 +1,5 @@
-import type { InvalidTestCase } from '@typescript-eslint/rule-tester';
-
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import * as path from 'node:path';
-
-import type {
-  MessageId,
-  Options,
-} from '../../src/rules/no-unnecessary-condition';
-
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
-
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
-  },
-});
-
-const optionsWithExactOptionalPropertyTypes = {
-  project: './tsconfig.exactOptionalPropertyTypes.json',
-  tsconfigRootDir: rootPath,
-};
-
-const optionsWithNoUncheckedIndexedAccess = {
-  project: './tsconfig.noUncheckedIndexedAccess.json',
-  projectService: false,
-  tsconfigRootDir: getFixturesRootDir(),
-};
+import { RuleTester, type TestCase } from '@rslint/rule-tester';
+import { config } from '../config';
 
 const necessaryConditionTest = (condition: string): string => `
 declare const b1: ${condition};
@@ -41,13 +9,26 @@ const t1 = b1 && b2;
 
 const unnecessaryConditionTest = (
   condition: string,
-  messageId: MessageId,
-): InvalidTestCase<MessageId, Options> => ({
+  messageId: 'alwaysTruthy' | 'alwaysFalsy' | 'never',
+): TestCase => ({
   code: necessaryConditionTest(condition),
-  errors: [{ column: 12, line: 4, messageId }],
+  errors: [
+    {
+      messageId,
+      message: {
+        alwaysTruthy: 'Unnecessary conditional, value is always truthy.',
+        alwaysFalsy: 'Unnecessary conditional, value is always falsy.',
+        never: 'Unnecessary conditional, value is `never`.',
+      }[messageId],
+      line: 4,
+      column: 12,
+      endLine: 4,
+      endColumn: 14,
+    },
+  ],
 });
 
-ruleTester.run('no-unnecessary-condition', {
+new RuleTester(config).run('no-unnecessary-condition', {
   valid: [
     `
 declare const b1: boolean;
@@ -88,11 +69,16 @@ declare const bigInt: 0n | 1n;
 if (bigInt) {
 }
     `,
-    necessaryConditionTest('false | 5'), // Truthy literal and falsy literal
-    necessaryConditionTest('boolean | "foo"'), // boolean and truthy literal
-    necessaryConditionTest('0 | boolean'), // boolean and falsy literal
-    necessaryConditionTest('boolean | object'), // boolean and always-truthy type
-    necessaryConditionTest('false | object'), // always truthy type and falsy literal
+    // Truthy literal and falsy literal
+    necessaryConditionTest('false | 5'),
+    // boolean and truthy literal
+    necessaryConditionTest('boolean | "foo"'),
+    // boolean and falsy literal
+    necessaryConditionTest('0 | boolean'),
+    // boolean and always-truthy type
+    necessaryConditionTest('boolean | object'),
+    // always truthy type and falsy literal
+    necessaryConditionTest('false | object'),
     // always falsy type and always truthy type
     necessaryConditionTest('null | object'),
     necessaryConditionTest('undefined | true'),
@@ -123,12 +109,11 @@ if (bigInt) {
     necessaryConditionTest(
       '(string | number) & ("foo" | 123 | { __brandA: string })',
     ),
-
     necessaryConditionTest('string & string'),
-
-    necessaryConditionTest('any'), // any
-    necessaryConditionTest('unknown'), // unknown
-
+    // any
+    necessaryConditionTest('any'),
+    // unknown
+    necessaryConditionTest('unknown'),
     // Generic type params
     `
 function test<T extends string>(t: T) {
@@ -165,7 +150,6 @@ function test<T>(arg: T | { value: string }) {
   }
 }
     `,
-
     // Boolean expressions
     `
 function test(a: string) {
@@ -290,7 +274,6 @@ function foo<T extends object>(arg: T, key: keyof T): void {
   arg[key] == null;
 }
     `,
-
     // Predicate functions
     `
 // with literal arrow function
@@ -340,7 +323,6 @@ const notArray = {
 notArray.filter(() => true);
 notArray.find(() => true);
     `,
-
     // Nullish coalescing operator
     `
 function test(a: string | null) {
@@ -414,7 +396,6 @@ arr[41]?.();
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -449,7 +430,6 @@ foo[index]?.toString();
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -471,90 +451,140 @@ const bar = arr[42]?.foo ?? 0;
     `,
     // Doesn't check the right-hand side of a logical expression
     //  in a non-conditional context
-    {
-      code: `
+    `
 declare const b1: boolean;
 declare const b2: true;
 const x = b1 && b2;
       `,
-    },
     {
       code: `
 while (true) {}
       `,
-      options: [{ allowConstantLoopConditions: true }],
+      options: [
+        {
+          allowConstantLoopConditions: true,
+        },
+      ],
     },
     {
       code: `
 for (; true; ) {}
       `,
-      options: [{ allowConstantLoopConditions: true }],
+      options: [
+        {
+          allowConstantLoopConditions: true,
+        },
+      ],
     },
     {
       code: `
 do {} while (true);
       `,
-      options: [{ allowConstantLoopConditions: true }],
+      options: [
+        {
+          allowConstantLoopConditions: true,
+        },
+      ],
     },
     {
       code: `
 while (true) {}
       `,
-      options: [{ allowConstantLoopConditions: 'always' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'always',
+        },
+      ],
     },
     {
       code: `
 for (; true; ) {}
       `,
-      options: [{ allowConstantLoopConditions: 'always' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'always',
+        },
+      ],
     },
     {
       code: `
 for (; true; ) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 for (; 0; ) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 do {} while (0);
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 do {} while (true);
       `,
-      options: [{ allowConstantLoopConditions: 'always' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'always',
+        },
+      ],
     },
     {
       code: `
 while (true) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 while (1) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 while (false) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     {
       code: `
 while (0) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
     },
     `
 let variable = 'abc' as string | void;
@@ -737,7 +767,10 @@ const key = '1' as BrandedKey;
 foo?.[key]?.trim();
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     {
@@ -753,7 +786,6 @@ foo?.[key].trim();
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -773,7 +805,6 @@ function Foo(outer: Outer, key: BrandedKey): number | undefined {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -791,7 +822,10 @@ function Foo(outer: Outer, key: Foo): number | undefined {
 }
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     {
@@ -804,7 +838,10 @@ declare const key: Key;
 foo?.[key]?.trim();
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     {
@@ -816,7 +853,10 @@ declare const foo: Foo;
 foo.key?.someKey?.key;
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     {
@@ -830,7 +870,10 @@ declare const foo: Foo;
 foo.key?.value?.();
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     {
@@ -848,7 +891,10 @@ declare const a: A;
 a.a?.a?.a;
       `,
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
       },
     },
     `
@@ -896,26 +942,23 @@ declare const unknownTyped: unknown;
 if (!(booleanTyped || unknownTyped)) {
 }
     `,
-    // Skipped: rule-tester does not support per-case
-    // `parserOptions.tsconfigRootDir` overrides.
     {
-      skip: true,
       code: `
 declare const x: string[] | null;
 // eslint-disable-next-line
 if (x) {
 }
       `,
-      languageOptions: {
-        parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
-        },
-      },
       options: [
         {
           allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: true,
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.unstrict.json',
+        },
+      },
     },
     `
 interface Foo {
@@ -967,14 +1010,22 @@ foo[key] ??= 1;
 declare const foo: { bar?: number };
 foo.bar ??= 1;
       `,
-      languageOptions: { parserOptions: optionsWithExactOptionalPropertyTypes },
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.exactOptionalPropertyTypes.json',
+        },
+      },
     },
     {
       code: `
 declare const foo: { bar: { baz?: number } };
 foo['bar'].baz ??= 1;
       `,
-      languageOptions: { parserOptions: optionsWithExactOptionalPropertyTypes },
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.exactOptionalPropertyTypes.json',
+        },
+      },
     },
     {
       code: `
@@ -983,7 +1034,11 @@ type Key = 'baz' | 'qux';
 declare const key: Key;
 foo.bar[key] ??= 1;
       `,
-      languageOptions: { parserOptions: optionsWithExactOptionalPropertyTypes },
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.exactOptionalPropertyTypes.json',
+        },
+      },
     },
     `
 declare let foo: number;
@@ -1020,7 +1075,6 @@ function getElem(dict: Record<string, { foo: string }>, key: string) {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -1079,7 +1133,11 @@ class ConsistentRand {
   }
 }
       `,
-      languageOptions: { parserOptions: optionsWithExactOptionalPropertyTypes },
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.exactOptionalPropertyTypes.json',
+        },
+      },
     },
     {
       code: `
@@ -1087,7 +1145,11 @@ declare function assert(x: unknown): asserts x;
 
 assert(Math.random() > 0.5);
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
     {
       code: `
@@ -1095,18 +1157,26 @@ declare function assert(x: unknown, y: unknown): asserts x;
 
 assert(Math.random() > 0.5, true);
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // should not report because option is disabled.
     {
-      // should not report because option is disabled.
       code: `
 declare function assert(x: unknown): asserts x;
 assert(true);
       `,
-      options: [{ checkTypePredicates: false }],
+      options: [
+        {
+          checkTypePredicates: false,
+        },
+      ],
     },
+    // could be argued that this should report since `thisAsserter` is truthy.
     {
-      // could be argued that this should report since `thisAsserter` is truthy.
       code: `
 class ThisAsserter {
   assertThis(this: unknown, arg2: unknown): asserts this {}
@@ -1115,10 +1185,14 @@ class ThisAsserter {
 const thisAsserter: ThisAsserter = new ThisAsserter();
 thisAsserter.assertThis(true);
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // could be argued that this should report since `thisAsserter` is truthy.
     {
-      // could be argued that this should report since `thisAsserter` is truthy.
       code: `
 class ThisAsserter {
   assertThis(this: unknown, arg2: unknown): asserts this {}
@@ -1127,22 +1201,34 @@ class ThisAsserter {
 const thisAsserter: ThisAsserter = new ThisAsserter();
 thisAsserter.assertThis(Math.random());
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
     {
       code: `
 declare function assert(x: unknown): asserts x;
 assert(...[]);
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // ok to report if we start unpacking spread params one day.
     {
-      // ok to report if we start unpacking spread params one day.
       code: `
 declare function assert(x: unknown): asserts x;
 assert(...[], {});
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
     {
       code: `
@@ -1150,44 +1236,66 @@ declare function assertString(x: unknown): asserts x is string;
 declare const a: string;
 assertString(a);
       `,
-      options: [{ checkTypePredicates: false }],
+      options: [
+        {
+          checkTypePredicates: false,
+        },
+      ],
     },
+    // typeGuardAlreadyIsType: lock down the {{typeGuardOrAssertionFunction}}
+    // placeholder fill for both type-predicate and assertion-function forms.
     {
       code: `
 declare function isString(x: unknown): x is string;
 declare const a: string;
 isString(a);
       `,
-      options: [{ checkTypePredicates: false }],
+      options: [
+        {
+          checkTypePredicates: false,
+        },
+      ],
     },
+    // Technically, this has type 'falafel' and not string.
     {
-      // Technically, this has type 'falafel' and not string.
       code: `
 declare function assertString(x: unknown): asserts x is string;
 assertString('falafel');
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // Technically, this has type 'falafel' and not string.
     {
-      // Technically, this has type 'falafel' and not string.
       code: `
 declare function isString(x: unknown): x is string;
 isString('falafel');
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // string | number | bigint is not a subtype of string | number
     {
-      // string | number | bigint is not a subtype of string | number
       code: `
 declare function isStringOrNumber(x: unknown): x is string | number;
 declare const s: string | number | bigint;
 if (isStringOrNumber(s)) {
 }
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
+    // Narrower is not a subtype of Wider
     {
-      // Narrower is not a subtype of Wider
       code: `
 interface Wider {
   a: string;
@@ -1201,7 +1309,11 @@ declare const w: Wider;
 if (isNarrower(w)) {
 }
       `,
-      options: [{ checkTypePredicates: true }],
+      options: [
+        {
+          checkTypePredicates: true,
+        },
+      ],
     },
     `
 type A = { [name in Lowercase<string>]?: A };
@@ -1232,7 +1344,6 @@ t.a.a.a.value;
 t.A?.A?.A?.VALUE;
     `,
   ],
-
   invalid: [
     // Ensure that it's checking in all the right places
     {
@@ -1258,34 +1369,96 @@ switch (b1) {
 }
       `,
       errors: [
-        { column: 12, line: 4, messageId: 'alwaysTruthy' },
-        { column: 12, line: 5, messageId: 'alwaysTruthy' },
-        { column: 5, line: 6, messageId: 'alwaysTruthy' },
-        { column: 11, line: 8, messageId: 'alwaysTruthy' },
-        { column: 8, line: 10, messageId: 'alwaysTruthy' },
-        { column: 14, line: 11, messageId: 'alwaysTruthy' },
-        { column: 17, line: 12, messageId: 'alwaysTruthy' },
-        { column: 12, line: 15, messageId: 'alwaysTruthy' },
-        { column: 18, line: 16, messageId: 'alwaysTruthy' },
         {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 14,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 5,
+          column: 12,
+          endLine: 5,
+          endColumn: 14,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 6,
+          column: 5,
+          endLine: 6,
+          endColumn: 7,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 13,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 10,
           column: 8,
-          data: {
-            left: 'true',
-            operator: '===',
-            right: 'true',
-            trueOrFalse: 'true',
-          },
-          line: 18,
+          endLine: 10,
+          endColumn: 10,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 11,
+          column: 14,
+          endLine: 11,
+          endColumn: 16,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 12,
+          column: 17,
+          endLine: 12,
+          endColumn: 19,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 15,
+          column: 12,
+          endLine: 15,
+          endColumn: 14,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 16,
+          column: 18,
+          endLine: 16,
+          endColumn: 20,
+        },
+        {
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `true === true` is true.',
+          line: 18,
+          column: 8,
+          endLine: 18,
+          endColumn: 12,
         },
       ],
     },
     // Ensure that it's complaining about the right things
     unnecessaryConditionTest('object', 'alwaysTruthy'),
     unnecessaryConditionTest('object | true', 'alwaysTruthy'),
-    unnecessaryConditionTest('"" | false', 'alwaysFalsy'), // Two falsy literals
+    // Two falsy literals
+    unnecessaryConditionTest('"" | false', 'alwaysFalsy'),
     unnecessaryConditionTest('"always truthy"', 'alwaysTruthy'),
-    unnecessaryConditionTest(`undefined`, 'alwaysFalsy'),
+    unnecessaryConditionTest('undefined', 'alwaysFalsy'),
     unnecessaryConditionTest('null', 'alwaysFalsy'),
     unnecessaryConditionTest('void', 'alwaysFalsy'),
     unnecessaryConditionTest('never', 'never'),
@@ -1297,7 +1470,16 @@ declare const falseyBigInt: 0n;
 if (falseyBigInt) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: `
@@ -1305,7 +1487,16 @@ declare const posbigInt: 1n;
 if (posbigInt) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: `
@@ -1313,7 +1504,16 @@ declare const negBigInt: -2n;
 if (negBigInt) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: `
@@ -1327,12 +1527,32 @@ if (b1 || b2 || true) {
 }
       `,
       errors: [
-        { column: 5, line: 4, messageId: 'alwaysTruthy' },
-        { column: 11, line: 6, messageId: 'alwaysFalsy' },
-        { column: 17, line: 8, messageId: 'alwaysTruthy' },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 9,
+        },
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 6,
+          column: 11,
+          endLine: 6,
+          endColumn: 16,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 8,
+          column: 17,
+          endLine: 8,
+          endColumn: 21,
+        },
       ],
     },
-
     // Generic type params
     {
       code: `
@@ -1340,7 +1560,16 @@ function test<T extends object>(t: T) {
   return t ? 'yes' : 'no';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1348,7 +1577,16 @@ function test<T extends false>(t: T) {
   return t ? 'yes' : 'no';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1356,9 +1594,17 @@ function test<T extends 'a' | 'b'>(t: T) {
   return t ? 'yes' : 'no';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
-
     // Boolean expressions
     {
       code: `
@@ -1368,15 +1614,13 @@ function test(a: 'a') {
       `,
       errors: [
         {
-          column: 10,
-          data: {
-            left: '"a"',
-            operator: '===',
-            right: '"a"',
-            trueOrFalse: 'true',
-          },
-          line: 3,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `"a" === "a"` is true.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 19,
         },
       ],
     },
@@ -1388,14 +1632,13 @@ a > b;
       `,
       errors: [
         {
-          data: {
-            left: '"34"',
-            operator: '>',
-            right: '"56"',
-            trueOrFalse: 'false',
-          },
-          line: 4,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `"34" > "56"` is false.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 6,
         },
       ],
     },
@@ -1407,14 +1650,13 @@ if (y === 0) {
       `,
       errors: [
         {
-          data: {
-            left: '1',
-            operator: '===',
-            right: '0',
-            trueOrFalse: 'false',
-          },
-          line: 3,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `1 === 0` is false.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 12,
         },
       ],
     },
@@ -1426,14 +1668,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '1',
-            operator: '==',
-            right: '"1"',
-            trueOrFalse: 'true',
-          },
-          line: 3,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `1 == "1"` is true.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 13,
         },
       ],
     },
@@ -1443,14 +1684,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '2.3',
-            operator: '>',
-            right: '2.3',
-            trueOrFalse: 'false',
-          },
-          line: 2,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `2.3 > 2.3` is false.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 10,
         },
       ],
     },
@@ -1460,14 +1700,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '2.3',
-            operator: '>=',
-            right: '2.3',
-            trueOrFalse: 'true',
-          },
-          line: 2,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `2.3 >= 2.3` is true.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 11,
         },
       ],
     },
@@ -1477,14 +1716,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '2n',
-            operator: '<',
-            right: '2n',
-            trueOrFalse: 'false',
-          },
-          line: 2,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `2n < 2n` is false.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 8,
         },
       ],
     },
@@ -1494,14 +1732,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '2n',
-            operator: '<=',
-            right: '2n',
-            trueOrFalse: 'true',
-          },
-          line: 2,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `2n <= 2n` is true.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 9,
         },
       ],
     },
@@ -1511,14 +1748,13 @@ if (1 == '1') {
       `,
       errors: [
         {
-          data: {
-            left: '-2n',
-            operator: '!==',
-            right: '2n',
-            trueOrFalse: 'true',
-          },
-          line: 2,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `-2n !== 2n` is true.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 11,
         },
       ],
     },
@@ -1530,14 +1766,13 @@ if (1 == '2') {
       `,
       errors: [
         {
-          data: {
-            left: '1',
-            operator: '==',
-            right: '"2"',
-            trueOrFalse: 'false',
-          },
-          line: 3,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `1 == "2"` is false.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 13,
         },
       ],
     },
@@ -1549,14 +1784,13 @@ if (1 != '2') {
       `,
       errors: [
         {
-          data: {
-            left: '1',
-            operator: '!=',
-            right: '"2"',
-            trueOrFalse: 'true',
-          },
-          line: 3,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `1 != "2"` is true.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 13,
         },
       ],
     },
@@ -1573,15 +1807,13 @@ if (x === Foo.a) {
       `,
       errors: [
         {
-          column: 5,
-          data: {
-            left: 'Foo.a',
-            operator: '===',
-            right: 'Foo.a',
-            trueOrFalse: 'true',
-          },
-          line: 8,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `Foo.a === Foo.a` is true.',
+          line: 8,
+          column: 5,
+          endLine: 8,
+          endColumn: 16,
         },
       ],
     },
@@ -1598,20 +1830,18 @@ if (x === 1) {
       `,
       errors: [
         {
-          column: 5,
-          data: {
-            left: 'Foo.a',
-            operator: '===',
-            right: 1,
-            trueOrFalse: 'true',
-          },
-          line: 8,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `Foo.a === 1` is true.',
+          line: 8,
+          column: 5,
+          endLine: 8,
+          endColumn: 12,
         },
       ],
     },
+    // narrowed to null. always-true because of loose nullish equality
     {
-      // narrowed to null. always-true because of loose nullish equality
       code: `
 function takesMaybeValue(a: null | object) {
   if (a) {
@@ -1621,22 +1851,18 @@ function takesMaybeValue(a: null | object) {
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            left: 'null',
-            operator: '==',
-            right: 'undefined',
-            trueOrFalse: 'true',
-          },
-          endColumn: 28,
-          endLine: 4,
-          line: 4,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `null == undefined` is true.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 28,
         },
       ],
     },
+    // narrowed to null. always-false because of strict undefined equality
     {
-      // narrowed to null. always-false because of strict undefined equality
       code: `
 function takesMaybeValue(a: null | object) {
   if (a) {
@@ -1646,22 +1872,18 @@ function takesMaybeValue(a: null | object) {
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            left: 'null',
-            operator: '===',
-            right: 'undefined',
-            trueOrFalse: 'false',
-          },
-          endColumn: 29,
-          endLine: 4,
-          line: 4,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `null === undefined` is false.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 29,
         },
       ],
     },
+    // narrowed to null. always-false because of loose nullish equality
     {
-      // narrowed to null. always-false because of loose nullish equality
       code: `
 function takesMaybeValue(a: null | object) {
   if (a) {
@@ -1671,22 +1893,18 @@ function takesMaybeValue(a: null | object) {
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            left: 'null',
-            operator: '!=',
-            right: 'undefined',
-            trueOrFalse: 'false',
-          },
-          endColumn: 28,
-          endLine: 4,
-          line: 4,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `null != undefined` is false.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 28,
         },
       ],
     },
+    // narrowed to null. always-true because of strict undefined equality
     {
-      // narrowed to null. always-true because of strict undefined equality
       code: `
 function takesMaybeValue(a: null | object) {
   if (a) {
@@ -1696,17 +1914,13 @@ function takesMaybeValue(a: null | object) {
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            left: 'null',
-            operator: '!==',
-            right: 'undefined',
-            trueOrFalse: 'true',
-          },
-          endColumn: 29,
-          endLine: 4,
-          line: 4,
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `null !== undefined` is true.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 29,
         },
       ],
     },
@@ -1716,13 +1930,13 @@ true === false;
       `,
       errors: [
         {
-          data: {
-            left: 'true',
-            operator: '===',
-            right: 'false',
-            trueOrFalse: 'false',
-          },
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `true === false` is false.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 15,
         },
       ],
     },
@@ -1732,13 +1946,13 @@ true === true;
       `,
       errors: [
         {
-          data: {
-            left: 'true',
-            operator: '===',
-            right: 'true',
-            trueOrFalse: 'true',
-          },
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always true, since `true === true` is true.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 14,
         },
       ],
     },
@@ -1748,13 +1962,13 @@ true === undefined;
       `,
       errors: [
         {
-          data: {
-            left: 'true',
-            operator: '===',
-            right: 'undefined',
-            trueOrFalse: 'false',
-          },
           messageId: 'comparisonBetweenLiteralTypes',
+          message:
+            'Unnecessary conditional, comparison is always false, since `true === undefined` is false.',
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 19,
         },
       ],
     },
@@ -1773,14 +1987,70 @@ function test(a: string) {
 }
       `,
       errors: [
-        { column: 14, line: 3, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 4, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 5, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 6, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 7, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 8, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 9, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 10, messageId: 'noOverlapBooleanExpression' },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 6,
+          column: 14,
+          endLine: 6,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 7,
+          column: 14,
+          endLine: 7,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 8,
+          column: 14,
+          endLine: 8,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 9,
+          column: 14,
+          endLine: 9,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 10,
+          column: 14,
+          endLine: 10,
+          endColumn: 24,
+        },
       ],
     },
     {
@@ -1797,10 +2067,38 @@ function test(a?: string) {
 }
       `,
       errors: [
-        { column: 14, line: 7, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 8, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 9, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 10, messageId: 'noOverlapBooleanExpression' },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 7,
+          column: 14,
+          endLine: 7,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 8,
+          column: 14,
+          endLine: 8,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 9,
+          column: 14,
+          endLine: 9,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 10,
+          column: 14,
+          endLine: 10,
+          endColumn: 24,
+        },
       ],
     },
     {
@@ -1817,10 +2115,38 @@ function test(a: null | string) {
 }
       `,
       errors: [
-        { column: 14, line: 3, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 4, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 5, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 6, messageId: 'noOverlapBooleanExpression' },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 29,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 6,
+          column: 14,
+          endLine: 6,
+          endColumn: 29,
+        },
       ],
     },
     {
@@ -1845,22 +2171,134 @@ function test<T extends object>(a: T) {
 }
       `,
       errors: [
-        { column: 14, line: 3, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 4, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 5, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 6, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 7, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 8, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 9, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 10, messageId: 'noOverlapBooleanExpression' },
-        { column: 14, line: 11, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 12, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 13, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 14, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 15, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 16, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 17, messageId: 'noOverlapBooleanExpression' },
-        { column: 15, line: 18, messageId: 'noOverlapBooleanExpression' },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 23,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 23,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 23,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 6,
+          column: 14,
+          endLine: 6,
+          endColumn: 23,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 7,
+          column: 14,
+          endLine: 7,
+          endColumn: 28,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 8,
+          column: 14,
+          endLine: 8,
+          endColumn: 28,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 9,
+          column: 14,
+          endLine: 9,
+          endColumn: 28,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 10,
+          column: 14,
+          endLine: 10,
+          endColumn: 28,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 11,
+          column: 14,
+          endLine: 11,
+          endColumn: 24,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 12,
+          column: 15,
+          endLine: 12,
+          endColumn: 25,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 13,
+          column: 15,
+          endLine: 13,
+          endColumn: 25,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 14,
+          column: 15,
+          endLine: 14,
+          endColumn: 25,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 15,
+          column: 15,
+          endLine: 15,
+          endColumn: 30,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 16,
+          column: 15,
+          endLine: 16,
+          endColumn: 30,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 17,
+          column: 15,
+          endLine: 17,
+          endColumn: 30,
+        },
+        {
+          messageId: 'noOverlapBooleanExpression',
+          message: 'Unnecessary conditional, the types have no overlap.',
+          line: 18,
+          column: 15,
+          endLine: 18,
+          endColumn: 30,
+        },
       ],
     },
     // Nullish coalescing operator
@@ -1870,7 +2308,17 @@ function test(a: string) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'neverNullish' }],
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1878,7 +2326,17 @@ function test(a: string | false) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'neverNullish' }],
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1886,7 +2344,17 @@ function test<T extends string>(a: T) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'neverNullish' }],
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     // nullish + array index without optional chaining
     {
@@ -1895,7 +2363,17 @@ function test(a: { foo: string }[]) {
   return a[0].foo ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'neverNullish' }],
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `
@@ -1903,7 +2381,17 @@ function test(a: null) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysNullish' }],
+      errors: [
+        {
+          messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1911,7 +2399,17 @@ function test(a: null[]) {
   return a[0] ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysNullish' }],
+      errors: [
+        {
+          messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
     },
     {
       code: `
@@ -1919,7 +2417,17 @@ function test<T extends null>(a: T) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'alwaysNullish' }],
+      errors: [
+        {
+          messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1927,7 +2435,16 @@ function test(a: never) {
   return a ?? 'default';
 }
       `,
-      errors: [{ column: 10, line: 3, messageId: 'never' }],
+      errors: [
+        {
+          messageId: 'never',
+          message: 'Unnecessary conditional, value is `never`.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -1935,7 +2452,17 @@ function test<T extends { foo: number }, K extends 'foo'>(num: T[K]) {
   num ?? 'default';
 }
       `,
-      errors: [{ column: 3, line: 3, messageId: 'neverNullish' }],
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 6,
+        },
+      ],
     },
     // Predicate functions
     {
@@ -1959,11 +2486,46 @@ function nothing3(x: [string, string]) {
 }
       `,
       errors: [
-        { column: 24, line: 2, messageId: 'alwaysTruthy' },
-        { column: 10, line: 4, messageId: 'alwaysFalsy' },
-        { column: 25, line: 9, messageId: 'alwaysFalsy' },
-        { column: 25, line: 13, messageId: 'alwaysFalsy' },
-        { column: 25, line: 17, messageId: 'alwaysFalsy' },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 28,
+        },
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 15,
+        },
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 9,
+          column: 25,
+          endLine: 9,
+          endColumn: 30,
+        },
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 13,
+          column: 25,
+          endLine: 13,
+          endColumn: 30,
+        },
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 17,
+          column: 25,
+          endLine: 17,
+          endColumn: 30,
+        },
       ],
     },
     {
@@ -1972,22 +2534,41 @@ declare const test: <T extends true>() => T;
 
 [1, null].filter(test);
       `,
-      errors: [{ column: 18, line: 4, messageId: 'alwaysTruthyFunc' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthyFunc',
+          message:
+            'This callback should return a conditional, but return is always truthy.',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 22,
+        },
+      ],
     },
     // Indexing cases
+    // This is an error because 'dict' doesn't represent
+    //  the potential for undefined in its types
     {
-      // This is an error because 'dict' doesn't represent
-      //  the potential for undefined in its types
       code: `
 declare const dict: Record<string, object>;
 if (dict['mightNotExist']) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 26,
+        },
+      ],
     },
+    // Should still check tuples when accessed with literal numbers, since they don't have
+    //   unsound index signatures
     {
-      // Should still check tuples when accessed with literal numbers, since they don't have
-      //   unsound index signatures
       code: `
 const x = [{}] as [{ foo: string }];
 if (x[0]) {
@@ -1997,17 +2578,24 @@ if (x[0]?.foo) {
       `,
       errors: [
         {
-          column: 5,
-          line: 3,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 9,
         },
         {
-          column: 9,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 const x = [{}] as [{ foo: string }];
 if (x[0]) {
@@ -2020,14 +2608,23 @@ if (x[0].foo) {
         },
       ],
     },
+    // Shouldn't mistake this for an array indexing case
     {
-      // Shouldn't mistake this for an array indexing case
       code: `
 declare const arr: object[];
 if (arr.filter) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 15,
+        },
+      ],
     },
     {
       code: `
@@ -2040,31 +2637,62 @@ function falsy() {}
 [1, 2, 3].findLastIndex(falsy);
       `,
       errors: [
-        { column: 18, line: 6, messageId: 'alwaysTruthyFunc' },
-        { column: 16, line: 7, messageId: 'alwaysFalsyFunc' },
-        { column: 25, line: 8, messageId: 'alwaysFalsyFunc' },
+        {
+          messageId: 'alwaysTruthyFunc',
+          message:
+            'This callback should return a conditional, but return is always truthy.',
+          line: 6,
+          column: 18,
+          endLine: 6,
+          endColumn: 24,
+        },
+        {
+          messageId: 'alwaysFalsyFunc',
+          message:
+            'This callback should return a conditional, but return is always falsy.',
+          line: 7,
+          column: 16,
+          endLine: 7,
+          endColumn: 21,
+        },
+        {
+          messageId: 'alwaysFalsyFunc',
+          message:
+            'This callback should return a conditional, but return is always falsy.',
+          line: 8,
+          column: 25,
+          endLine: 8,
+          endColumn: 30,
+        },
       ],
     },
     // Supports generics
-    // TODO: fix this
-    //     {
-    //       code: `
     // const isTruthy = <T>(t: T) => T;
     // // Valid: numbers can be truthy or falsy (0).
     // [0,1,2,3].filter(isTruthy);
     // // Invalid: arrays are always falsy.
     // [[1,2], [3,4]].filter(isTruthy);
-    // `,
-    //       errors: [({ line: 6, column: 23, messageId: 'alwaysTruthyFunc' })],
-    //     },
     {
       code: `
 declare const test: true;
 
 while (test) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: false }],
+      options: [
+        {
+          allowConstantLoopConditions: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2072,8 +2700,21 @@ declare const test: true;
 
 for (; test; ) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: false }],
+      options: [
+        {
+          allowConstantLoopConditions: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2081,8 +2722,21 @@ declare const test: true;
 
 do {} while (test);
       `,
-      errors: [{ column: 14, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: false }],
+      options: [
+        {
+          allowConstantLoopConditions: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `
@@ -2090,8 +2744,21 @@ declare const test: true;
 
 while (test) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'never' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'never',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2099,8 +2766,21 @@ declare const test: true;
 
 for (; test; ) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'never' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'never',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2108,8 +2788,21 @@ declare const test: true;
 
 do {} while (test);
       `,
-      errors: [{ column: 14, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'never' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'never',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `
@@ -2117,8 +2810,21 @@ declare const test: true;
 
 while (test) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2126,8 +2832,21 @@ declare const test: 1;
 
 while (test) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2135,8 +2854,21 @@ declare const test: true;
 
 for (; test; ) {}
       `,
-      errors: [{ column: 8, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
@@ -2144,8 +2876,21 @@ declare const test: true;
 
 do {} while (test);
       `,
-      errors: [{ column: 14, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `
@@ -2153,25 +2898,64 @@ let shouldRun = true;
 
 while ((shouldRun = true)) {}
       `,
-      errors: [{ column: 9, line: 4, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: `
 while (2) {}
       `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 8,
+          endLine: 2,
+          endColumn: 9,
+        },
+      ],
     },
     {
       code: `
 while ('truthy') {}
       `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+      options: [
+        {
+          allowConstantLoopConditions: 'only-allowed-literals',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 8,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
     },
     {
-      code: noFormat`
+      code: `
 let foo = { bar: true };
 foo?.bar;
 foo ?. bar;
@@ -2182,15 +2966,17 @@ foo
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 6,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = { bar: true };
 foo.bar;
 foo ?. bar;
@@ -2203,15 +2989,17 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = { bar: true };
 foo?.bar;
 foo . bar;
@@ -2224,15 +3012,17 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 5,
+          endLine: 5,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = { bar: true };
 foo?.bar;
 foo ?. bar;
@@ -2245,15 +3035,17 @@ foo
           ],
         },
         {
-          column: 3,
-          endColumn: 5,
-          endLine: 8,
-          line: 8,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = { bar: true };
 foo?.bar;
 foo ?. bar;
@@ -2268,7 +3060,7 @@ foo
       ],
     },
     {
-      code: noFormat`
+      code: `
 let foo = () => {};
 foo?.();
 foo ?. ();
@@ -2279,15 +3071,17 @@ foo
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 6,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo();
 foo ?. ();
@@ -2300,15 +3094,17 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.();
 foo  ();
@@ -2321,19 +3117,21 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 5,
+          endLine: 5,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.();
 foo ?. ();
-foo${' '}
+foo\x20
   ();
 foo
   ?. ();
@@ -2342,15 +3140,17 @@ foo
           ],
         },
         {
-          column: 3,
-          endColumn: 5,
-          endLine: 8,
-          line: 8,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.();
 foo ?. ();
@@ -2365,7 +3165,7 @@ foo
       ],
     },
     {
-      code: noFormat`
+      code: `
 let foo = () => {};
 foo?.(bar);
 foo ?. (bar);
@@ -2376,15 +3176,17 @@ foo
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 6,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo(bar);
 foo ?. (bar);
@@ -2397,15 +3199,17 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.(bar);
 foo  (bar);
@@ -2418,19 +3222,21 @@ foo
           ],
         },
         {
-          column: 5,
-          endColumn: 7,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 5,
+          endLine: 5,
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.(bar);
 foo ?. (bar);
-foo${' '}
+foo\x20
   (bar);
 foo
   ?. (bar);
@@ -2439,15 +3245,17 @@ foo
           ],
         },
         {
-          column: 3,
-          endColumn: 5,
-          endLine: 8,
-          line: 8,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 let foo = () => {};
 foo?.(bar);
 foo ?. (bar);
@@ -2465,14 +3273,16 @@ foo
       code: 'const foo = [1, 2, 3]?.[0];',
       errors: [
         {
-          column: 22,
-          endColumn: 24,
-          endLine: 1,
-          line: 1,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 24,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: 'const foo = [1, 2, 3][0];',
             },
           ],
@@ -2486,14 +3296,16 @@ x?.a?.b;
       `,
       errors: [
         {
-          column: 2,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 2,
+          endLine: 3,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const x: { a?: { b: string } };
 x.a?.b;
@@ -2510,14 +3322,16 @@ x.a?.b?.c;
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 6,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const x: { a: { b?: { c: string } } };
 x.a.b?.c;
@@ -2534,14 +3348,16 @@ x?.a;
       `,
       errors: [
         {
-          column: 2,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 2,
+          endLine: 3,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 let x: { a?: string };
 x.a;
@@ -2558,14 +3374,16 @@ foo?.bar?.baz;
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { c: string } } } | null;
 foo?.bar.baz;
@@ -2582,14 +3400,16 @@ foo?.bar?.baz?.qux;
       `,
       errors: [
         {
-          column: 14,
-          endColumn: 16,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 16,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar?: { baz: { qux: string } } } | null;
 foo?.bar?.baz.qux;
@@ -2606,14 +3426,16 @@ foo?.bar?.baz?.qux?.();
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { qux?: () => {} } } } | null;
 foo?.bar.baz?.qux?.();
@@ -2622,14 +3444,16 @@ foo?.bar.baz?.qux?.();
           ],
         },
         {
-          column: 14,
-          endColumn: 16,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 16,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { qux?: () => {} } } } | null;
 foo?.bar?.baz.qux?.();
@@ -2646,14 +3470,16 @@ foo?.bar?.baz?.qux?.();
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { qux: () => {} } } } | null;
 foo?.bar.baz?.qux?.();
@@ -2662,14 +3488,16 @@ foo?.bar.baz?.qux?.();
           ],
         },
         {
-          column: 14,
-          endColumn: 16,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 16,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { qux: () => {} } } } | null;
 foo?.bar?.baz.qux?.();
@@ -2678,14 +3506,16 @@ foo?.bar?.baz.qux?.();
           ],
         },
         {
-          column: 19,
-          endColumn: 21,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 21,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const foo: { bar: { baz: { qux: () => {} } } } | null;
 foo?.bar?.baz?.qux();
@@ -2703,14 +3533,16 @@ foo?.bar?.baz?.().qux?.();
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = () => { qux: () => {} };
 declare const foo: { bar: { baz: baz } } | null;
@@ -2720,14 +3552,16 @@ foo?.bar.baz?.().qux?.();
           ],
         },
         {
-          column: 14,
-          endColumn: 16,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 16,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = () => { qux: () => {} };
 declare const foo: { bar: { baz: baz } } | null;
@@ -2737,14 +3571,16 @@ foo?.bar?.baz().qux?.();
           ],
         },
         {
-          column: 22,
-          endColumn: 24,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 24,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = () => { qux: () => {} };
 declare const foo: { bar: { baz: baz } } | null;
@@ -2763,14 +3599,16 @@ foo?.bar?.baz?.().qux?.();
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = null | (() => { qux: () => {} });
 declare const foo: { bar: { baz: baz } } | null;
@@ -2780,14 +3618,16 @@ foo?.bar.baz?.().qux?.();
           ],
         },
         {
-          column: 22,
-          endColumn: 24,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 24,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = null | (() => { qux: () => {} });
 declare const foo: { bar: { baz: baz } } | null;
@@ -2806,14 +3646,16 @@ foo?.bar?.baz?.()?.qux?.();
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 11,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = null | (() => { qux: () => {} } | null);
 declare const foo: { bar: { baz: baz } } | null;
@@ -2823,14 +3665,16 @@ foo?.bar.baz?.()?.qux?.();
           ],
         },
         {
-          column: 23,
-          endColumn: 25,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 25,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type baz = null | (() => { qux: () => {} } | null);
 declare const foo: { bar: { baz: baz } } | null;
@@ -2850,14 +3694,16 @@ foo?.fooOrBar?.baz?.qux;
       `,
       errors: [
         {
-          column: 14,
-          endColumn: 16,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type Foo = { baz: number };
 type Bar = { baz: null | string | { qux: string } };
@@ -2876,12 +3722,16 @@ x[0].a?.b;
       `,
       errors: [
         {
-          column: 7,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 9,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const x: { a: { b: number } }[];
 x[0].a.b;
@@ -2902,14 +3752,16 @@ foo?.[key]?.trim();
       `,
       errors: [
         {
-          column: 11,
-          endColumn: 13,
-          endLine: 7,
-          line: 7,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 13,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type Foo = { [key: string]: string; foo: 'foo'; bar: 'bar' } | null;
 type Key = 'bar' | 'foo';
@@ -2932,14 +3784,16 @@ foo?.[key]?.trim();
       `,
       errors: [
         {
-          column: 11,
-          endColumn: 13,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 13,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type Foo = { [key: string]: string; foo: 'foo'; bar: 'bar' } | null;
 declare const foo: Foo;
@@ -2967,14 +3821,16 @@ export function test(outer: Outer): number | undefined {
       `,
       errors: [
         {
-          column: 28,
-          endColumn: 30,
-          endLine: 11,
-          line: 11,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 11,
+          column: 28,
+          endLine: 11,
+          endColumn: 30,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface Outer {
   inner?: {
@@ -3009,14 +3865,16 @@ function Foo(outer: Outer, key: Bar): number | undefined {
       `,
       errors: [
         {
-          column: 28,
-          endColumn: 30,
-          endLine: 11,
-          line: 11,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 11,
+          column: 28,
+          endLine: 11,
+          endColumn: 30,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface Outer {
   inner?: {
@@ -3046,11 +3904,12 @@ function test(testVal?: true) {
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 22,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 22,
         },
       ],
     },
@@ -3061,7 +3920,16 @@ const a = null;
 if (!a) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: `
@@ -3069,7 +3937,16 @@ const a = true;
 if (!a) {
 }
       `,
-      errors: [{ column: 5, line: 3, messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 7,
+        },
+      ],
     },
     {
       code: `
@@ -3081,34 +3958,47 @@ let speech: never = sayHi();
 if (!speech) {
 }
       `,
-      errors: [{ column: 5, line: 7, messageId: 'never' }],
+      errors: [
+        {
+          messageId: 'never',
+          message: 'Unnecessary conditional, value is `never`.',
+          line: 7,
+          column: 5,
+          endLine: 7,
+          endColumn: 12,
+        },
+      ],
     },
-    // Skipped: rule-tester does not support per-case
-    // `parserOptions.tsconfigRootDir` overrides.
     {
-      skip: true,
       code: `
 declare const x: string[] | null;
 if (x) {
 }
       `,
-      errors: [
-        {
-          column: 1,
-          line: 0,
-          messageId: 'noStrictNullCheck',
-        },
-        {
-          column: 5,
-          line: 3,
-          messageId: 'alwaysTruthy',
-        },
-      ],
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
+      errors: [
+        {
+          messageId: 'noStrictNullCheck',
+          message:
+            'This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+        },
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 5,
+          endLine: 3,
+          endColumn: 6,
+        },
+      ],
     },
     {
       code: `
@@ -3123,14 +4013,16 @@ foo?.test?.length;
       `,
       errors: [
         {
-          column: 10,
-          endColumn: 12,
-          endLine: 9,
-          line: 9,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 9,
+          column: 10,
+          endLine: 9,
+          endColumn: 12,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface Foo {
   test: string;
@@ -3163,11 +4055,12 @@ pick({ foo: 1, bar: 2 }, 'bar');
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 15,
-          endLine: 7,
-          line: 7,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 7,
+          column: 7,
+          endLine: 7,
+          endColumn: 15,
         },
       ],
     },
@@ -3183,11 +4076,12 @@ function getElem(dict: Record<string, { foo: string }>, key: string) {
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 16,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 16,
         },
       ],
     },
@@ -3198,11 +4092,13 @@ foo ??= 1;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3213,11 +4109,13 @@ foo ??= 1;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3228,11 +4126,13 @@ foo ??= null;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysNullish',
+          message:
+            'Unnecessary conditional, left-hand side of `??` operator is always `null` or `undefined`.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3243,11 +4143,12 @@ foo ||= 1;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3258,11 +4159,12 @@ foo ||= null;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3273,11 +4175,12 @@ foo &&= 1;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3288,11 +4191,12 @@ foo &&= null;
       `,
       errors: [
         {
-          column: 1,
-          endColumn: 4,
-          endLine: 3,
-          line: 3,
           messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 4,
         },
       ],
     },
@@ -3301,16 +4205,22 @@ foo &&= null;
 declare const foo: { bar: number };
 foo.bar ??= 1;
       `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.exactOptionalPropertyTypes.json',
+        },
+      },
       errors: [
         {
-          column: 1,
-          endColumn: 8,
-          endLine: 3,
-          line: 3,
           messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 8,
         },
       ],
-      languageOptions: { parserOptions: optionsWithExactOptionalPropertyTypes },
     },
     {
       code: `
@@ -3320,15 +4230,17 @@ foo?.bar()?.toExponential();
       `,
       errors: [
         {
-          column: 11,
-          endColumn: 13,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 13,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = { bar: () => number } | null;
 declare const foo: Foo;
 foo?.bar().toExponential();
@@ -3346,15 +4258,17 @@ foo?.bar?.baz()?.qux?.toExponential();
       `,
       errors: [
         {
-          column: 16,
-          endColumn: 18,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 16,
+          endLine: 4,
+          endColumn: 18,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = { bar: null | { baz: () => { qux: number } } } | null;
 declare const foo: Foo;
 foo?.bar?.baz().qux?.toExponential();
@@ -3363,15 +4277,17 @@ foo?.bar?.baz().qux?.toExponential();
           ],
         },
         {
-          column: 21,
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 23,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = { bar: null | { baz: () => { qux: number } } } | null;
 declare const foo: Foo;
 foo?.bar?.baz()?.qux.toExponential();
@@ -3389,15 +4305,17 @@ foo?.()?.toExponential();
       `,
       errors: [
         {
-          column: 8,
-          endColumn: 10,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = (() => number) | null;
 declare const foo: Foo;
 foo?.().toExponential();
@@ -3415,15 +4333,17 @@ foo?.['bar']()?.toExponential();
       `,
       errors: [
         {
-          column: 15,
-          endColumn: 17,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 17,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = { [key: string]: () => number } | null;
 declare const foo: Foo;
 foo?.['bar']().toExponential();
@@ -3441,15 +4361,17 @@ foo?.['bar']?.()?.toExponential();
       `,
       errors: [
         {
-          column: 17,
-          endColumn: 19,
-          endLine: 4,
-          line: 4,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 19,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
-              output: noFormat`
+              desc: 'Remove unnecessary optional chain',
+              output: `
 type Foo = { [key: string]: () => number } | null;
 declare const foo: Foo;
 foo?.['bar']?.().toExponential();
@@ -3465,34 +4387,58 @@ foo?.['bar']?.().toExponential();
         if (!!a) {
         }
       `,
-      errors: [{ column: 13, line: 3, messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `
 declare function assert(x: unknown): asserts x;
 assert(true);
       `,
-      errors: [
+      options: [
         {
-          line: 3,
-          messageId: 'alwaysTruthy',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
 declare function assert(x: unknown): asserts x;
 assert(false);
       `,
-      errors: [
+      options: [
         {
-          column: 8,
-          line: 3,
-          messageId: 'alwaysFalsy',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 13,
+        },
+      ],
     },
     {
       code: `
@@ -3500,28 +4446,42 @@ declare function assert(x: unknown, y: unknown): asserts x;
 
 assert(true, Math.random() > 0.5);
       `,
-      errors: [
+      options: [
         {
-          column: 8,
-          line: 4,
-          messageId: 'alwaysTruthy',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 12,
+        },
+      ],
     },
     {
       code: `
 declare function assert(x: unknown): asserts x;
 assert({});
       `,
-      errors: [
+      options: [
         {
-          column: 8,
-          line: 3,
-          messageId: 'alwaysTruthy',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 10,
+        },
+      ],
     },
     {
       code: `
@@ -3529,13 +4489,22 @@ declare function assertsString(x: unknown): asserts x is string;
 declare const a: string;
 assertsString(a);
       `,
-      errors: [
+      options: [
         {
-          line: 4,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the assertion function.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 16,
+        },
+      ],
     },
     {
       code: `
@@ -3543,13 +4512,22 @@ declare function isString(x: unknown): x is string;
 declare const a: string;
 isString(a);
       `,
-      errors: [
+      options: [
         {
-          line: 4,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -3557,29 +4535,47 @@ declare function isString(x: unknown): x is string;
 declare const a: string;
 isString('fa' + 'lafel');
       `,
-      errors: [
+      options: [
         {
-          line: 4,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 24,
+        },
+      ],
     },
+    // string is a strict subtype of string | number.
     {
-      // string is a strict subtype of string | number.
       code: `
 declare function isStringOrNumber(x: unknown): x is string | number;
 declare const s: string;
 if (isStringOrNumber(s)) {
 }
       `,
-      errors: [
+      options: [
         {
-          line: 4,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: `
@@ -3595,17 +4591,26 @@ declare const n: Narrower;
 if (isWider(n)) {
 }
       `,
-      errors: [
+      options: [
         {
-          line: 11,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 11,
+          column: 13,
+          endLine: 11,
+          endColumn: 14,
+        },
+      ],
     },
+    // Mutually assignable types: Wider is assignable to Narrower (b is
+    // optional), so the type guard condition is always true.
     {
-      // Mutually assignable types: Wider is assignable to Narrower (b is
-      // optional), so the type guard condition is always true.
       code: `
 interface Wider {
   a: string;
@@ -3619,15 +4624,23 @@ declare const w: Wider;
 if (isNarrower(w)) {
 }
       `,
-      errors: [
+      options: [
         {
-          line: 11,
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 11,
+          column: 16,
+          endLine: 11,
+          endColumn: 17,
+        },
+      ],
     },
-
     // "branded" types
     unnecessaryConditionTest('"" & {}', 'alwaysFalsy'),
     unnecessaryConditionTest('"" & { __brand: string }', 'alwaysFalsy'),
@@ -3675,14 +4688,16 @@ a.a?.a?.a;
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 9,
-          endLine: 12,
-          line: 12,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 12,
+          column: 7,
+          endLine: 12,
+          endColumn: 9,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 type A = {
   [name in Lowercase<string>]?: {
@@ -3726,14 +4741,16 @@ t.a?.a?.a?.value;
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6,
-          endLine: 21,
-          line: 21,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 21,
+          column: 4,
+          endLine: 21,
+          endColumn: 6,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface T {
   [name: Lowercase<string>]: {
@@ -3760,14 +4777,16 @@ t.a.a?.a?.value;
           ],
         },
         {
-          column: 7,
-          endColumn: 9,
-          endLine: 21,
-          line: 21,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 21,
+          column: 7,
+          endLine: 21,
+          endColumn: 9,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface T {
   [name: Lowercase<string>]: {
@@ -3794,14 +4813,16 @@ t.a?.a.a?.value;
           ],
         },
         {
-          column: 10,
-          endColumn: 12,
-          endLine: 21,
-          line: 21,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 21,
+          column: 10,
+          endLine: 21,
+          endColumn: 12,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 interface T {
   [name: Lowercase<string>]: {
@@ -3837,16 +4858,24 @@ if (test[0]?.a) {
   test[0]?.a;
 }
       `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
+      },
       errors: [
         {
-          column: 10,
-          endColumn: 12,
-          endLine: 5,
-          line: 5,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 5,
+          column: 10,
+          endLine: 5,
+          endColumn: 12,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const test: Array<{ a?: string }>;
 
@@ -3858,29 +4887,30 @@ if (test[0]?.a) {
           ],
         },
       ],
-      languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noUncheckedIndexedAccess.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
-        },
-      },
     },
     {
       code: `
 declare const arr2: Array<{ x: { y: { z: object } } }>;
 arr2[42]?.x?.y?.z;
       `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+        },
+      },
       errors: [
         {
-          column: 12,
-          endColumn: 14,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 14,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const arr2: Array<{ x: { y: { z: object } } }>;
 arr2[42]?.x.y?.z;
@@ -3889,14 +4919,16 @@ arr2[42]?.x.y?.z;
           ],
         },
         {
-          column: 15,
-          endColumn: 17,
-          endLine: 3,
-          line: 3,
           messageId: 'neverOptionalChain',
+          message: 'Unnecessary optional chain on a non-nullish value.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 17,
           suggestions: [
             {
               messageId: 'suggestRemoveOptionalChain',
+              desc: 'Remove unnecessary optional chain',
               output: `
 declare const arr2: Array<{ x: { y: { z: object } } }>;
 arr2[42]?.x?.y.z;
@@ -3905,13 +4937,6 @@ arr2[42]?.x?.y.z;
           ],
         },
       ],
-      languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noUncheckedIndexedAccess.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
-        },
-      },
     },
     {
       code: `
@@ -3921,22 +4946,23 @@ if (arr[0]) {
   arr[0] ?? 'foo';
 }
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 9,
-          endLine: 5,
-          line: 5,
-          messageId: 'neverNullish',
-        },
-      ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
+      errors: [
+        {
+          messageId: 'neverNullish',
+          message:
+            'Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 9,
+        },
+      ],
     },
     {
       code: `
@@ -3945,38 +4971,45 @@ declare const arr: object[];
 if (arr[42] && arr[42]) {
 }
       `,
-      errors: [
-        {
-          column: 16,
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'alwaysTruthy',
-        },
-      ],
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noUncheckedIndexedAccess.json',
           projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
         },
       },
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 4,
+          column: 16,
+          endLine: 4,
+          endColumn: 23,
+        },
+      ],
     },
-    // typeGuardAlreadyIsType: lock down the {{typeGuardOrAssertionFunction}}
-    // placeholder fill for both type-predicate and assertion-function forms.
     {
       code: `
 declare function isString(x: unknown): x is string;
 declare const a: string;
 isString(a);
       `,
-      errors: [
+      options: [
         {
-          data: { typeGuardOrAssertionFunction: 'type guard' },
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the type guard.',
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
@@ -3984,13 +5017,22 @@ declare function assertsString(x: unknown): asserts x is string;
 declare const a: string;
 assertsString(a);
       `,
-      errors: [
+      options: [
         {
-          data: { typeGuardOrAssertionFunction: 'assertion function' },
-          messageId: 'typeGuardAlreadyIsType',
+          checkTypePredicates: true,
         },
       ],
-      options: [{ checkTypePredicates: true }],
+      errors: [
+        {
+          messageId: 'typeGuardAlreadyIsType',
+          message:
+            'Unnecessary conditional, expression already has the type being checked by the assertion function.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 16,
+        },
+      ],
     },
     // alwaysTruthy / alwaysFalsy in array-predicate callback body: when the
     // body is an expression or a single-return BlockStatement, the rule
@@ -4001,7 +5043,16 @@ assertsString(a);
       code: `
 [1, 2, 3].filter(() => 'truthy-string');
       `,
-      errors: [{ messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 39,
+        },
+      ],
     },
     {
       code: `
@@ -4009,19 +5060,46 @@ assertsString(a);
   return 0;
 });
       `,
-      errors: [{ messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 11,
+        },
+      ],
     },
     {
       code: `
 [1, 2, 3].some(() => 1);
       `,
-      errors: [{ messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 22,
+          endLine: 2,
+          endColumn: 23,
+        },
+      ],
     },
     {
       code: `
 [1, 2, 3].every(() => null);
       `,
-      errors: [{ messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: `
@@ -4029,13 +5107,31 @@ assertsString(a);
   return undefined;
 });
       `,
-      errors: [{ messageId: 'alwaysFalsy' }],
+      errors: [
+        {
+          messageId: 'alwaysFalsy',
+          message: 'Unnecessary conditional, value is always falsy.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: `
 [1, 2, 3].findLast(() => 'always');
       `,
-      errors: [{ messageId: 'alwaysTruthy' }],
+      errors: [
+        {
+          messageId: 'alwaysTruthy',
+          message: 'Unnecessary conditional, value is always truthy.',
+          line: 2,
+          column: 26,
+          endLine: 2,
+          endColumn: 34,
+        },
+      ],
     },
   ],
 });

@@ -1,69 +1,107 @@
-import { RuleTester } from '../rule-tester.js';
-
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/no-empty-named-blocks.js
 // https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/no-empty-named-blocks.md
-// This wrapper checks diagnostic counts and messages. Go tests additionally
-// assert complete ranges, fixes, suggestions, and the absence of message IDs.
-const ruleTester = new RuleTester();
-const rule = null as never;
-const message = 'Unexpected empty named import block';
+import { RuleTester, type TestCase } from '@rslint/rule-tester';
+import { config } from '../config';
 
-function suggestionCases(codes: string[], output = "import 'mod';") {
+function suggestionCases(
+  codes: string[],
+  output = "import 'mod';",
+  name?: string,
+): TestCase[] {
   return codes.map((code) => ({
     code,
-    output: null,
+    ...(name ? { name } : {}),
     errors: [
       {
-        message,
+        messageId: '',
+        message: 'Unexpected empty named import block',
         line: 1,
         column: 1,
         endLine: 1,
         endColumn: code.length + 1,
         suggestions: [
-          { desc: 'Remove unused import', output: '' },
-          { desc: 'Remove empty import block', output },
+          { messageId: '', desc: 'Remove unused import', output: '' },
+          { messageId: '', desc: 'Remove empty import block', output },
         ],
       },
     ],
   }));
 }
 
-ruleTester.run('no-empty-named-blocks', rule, {
+// Skipped cases retain their upstream records; re-enabling them also requires complete expectations.
+new RuleTester(config).run('no-empty-named-blocks', {
   valid: [
-    { code: "import 'mod';" },
-    { code: "import Default from 'mod';" },
-    { code: "import { Named } from 'mod';" },
-    { code: "import Default, { Named } from 'mod';" },
-    { code: "import * as Namespace from 'mod';" },
+    "import 'mod';",
+    "import Default from 'mod';",
+    "import { Named } from 'mod';",
+    "import Default, { Named } from 'mod';",
+    "import * as Namespace from 'mod';",
     // TypeScript.
-    { code: "import type Default from 'mod';" },
-    { code: "import type { Named } from 'mod';" },
-    { code: "import type Default, { Named } from 'mod';" },
-    { code: "import type * as Namespace from 'mod';" },
-    {
-      code: `
+    "import type Default from 'mod';",
+    "import type { Named } from 'mod';",
+    "import type Default, { Named } from 'mod';",
+    "import type * as Namespace from 'mod';",
+    `
         module.exports = {
           rules: {
             'keyword-spacing': ['error', {overrides: {}}],
           }
         };
       `,
-    },
-    {
-      code: `
+    `
         import { DESCRIPTORS, NODE } from '../helpers/constants';
         // ...
         import { timeLimitedPromise } from '../helpers/helpers';
         // ...
         import { DESCRIPTORS2 } from '../helpers/constants';
       `,
+    {
+      name: 'documentation examples',
+      code: "import { mod } from 'mod'",
+    },
+    {
+      name: 'documentation examples',
+      code: "import Default, { mod } from 'mod'",
+    },
+    {
+      name: 'documentation examples',
+      code: "import type { mod } from 'mod'",
+    },
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof Default from 'mod'; // babel old",
+    },
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof { Named } from 'mod'; // babel old",
+    },
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof Default, { Named } from 'mod'; // babel old",
+    },
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof { mod } from 'mod'",
     },
   ],
   invalid: [
     {
       code: "import Default, {} from 'mod';",
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
       output: "import Default from 'mod';",
-      errors: [{ message }],
     },
     ...suggestionCases([
       "import {} from 'mod';",
@@ -71,7 +109,6 @@ ruleTester.run('no-empty-named-blocks', rule, {
       "import {} from'mod';",
       "import {}from 'mod';",
     ]),
-    // TypeScript.
     ...suggestionCases([
       "import type {} from 'mod';",
       "import type {}from 'mod';",
@@ -80,66 +117,194 @@ ruleTester.run('no-empty-named-blocks', rule, {
     ]),
     {
       code: "import type Default, {} from 'mod';",
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
       output: "import type Default from 'mod';",
-      errors: [{ message }],
     },
+    ...suggestionCases(
+      ["import {} from 'mod'", "import type {} from 'mod'"],
+      "import 'mod'",
+      'documentation examples',
+    ),
+    {
+      name: 'documentation examples',
+      code: "import Default, {} from 'mod'",
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+      output: "import Default from 'mod'",
+    },
+    {
+      name: 'documentation examples',
+      code: "import type Default, {} from 'mod'",
+      errors: [
+        {
+          messageId: '',
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+      output: "import type Default from 'mod'",
+    },
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof imports.',
+      code: "import typeof {} from 'mod';",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+          suggestions: [
+            {
+              desc: 'Remove unused import',
+              output: '',
+            },
+            {
+              desc: 'Remove empty import block',
+              output: "import 'mod';",
+            },
+          ],
+        },
+      ],
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof imports.',
+      code: "import typeof {}from 'mod';",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+          suggestions: [
+            {
+              desc: 'Remove unused import',
+              output: '',
+            },
+            {
+              desc: 'Remove empty import block',
+              output: "import 'mod';",
+            },
+          ],
+        },
+      ],
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof imports.',
+      code: "import typeof {} from'mod';",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+          suggestions: [
+            {
+              desc: 'Remove unused import',
+              output: '',
+            },
+            {
+              desc: 'Remove empty import block',
+              output: "import 'mod';",
+            },
+          ],
+        },
+      ],
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof imports.',
+      code: "import typeof{}from'mod';",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+          suggestions: [
+            {
+              desc: 'Remove unused import',
+              output: '',
+            },
+            {
+              desc: 'Remove empty import block',
+              output: "import 'mod';",
+            },
+          ],
+        },
+      ],
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof Default, {} from 'mod';",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+        },
+      ],
+      output: "import typeof Default from 'mod';",
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof imports.',
+      code: "import typeof {} from 'mod'",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+          suggestions: [
+            {
+              desc: 'Remove unused import',
+              output: '',
+            },
+            {
+              desc: 'Remove empty import block',
+              output: "import 'mod'",
+            },
+          ],
+        },
+      ],
+    } as unknown as TestCase,
+    {
+      name: 'Flow typeof imports are unsupported',
+      skip: 'The native TypeScript parser does not support Flow typeof import specifiers.',
+      code: "import typeof Default, {} from 'mod'",
+      errors: [
+        {
+          message: 'Unexpected empty named import block',
+        },
+      ],
+      output: "import typeof Default from 'mod'",
+    } as unknown as TestCase,
   ],
-});
-
-describe('documentation examples', () => {
-  ruleTester.run('no-empty-named-blocks', rule, {
-    valid: [
-      { code: "import { mod } from 'mod'" },
-      { code: "import Default, { mod } from 'mod'" },
-      { code: "import type { mod } from 'mod'" },
-    ],
-    invalid: [
-      ...suggestionCases(
-        ["import {} from 'mod'", "import type {} from 'mod'"],
-        "import 'mod'",
-      ),
-      {
-        code: "import Default, {} from 'mod'",
-        output: "import Default from 'mod'",
-        errors: [{ message }],
-      },
-      {
-        code: "import type Default, {} from 'mod'",
-        output: "import type Default from 'mod'",
-        errors: [{ message }],
-      },
-    ],
-  });
-});
-
-// Retain every Flow test/documentation example. The TypeScript parser does
-// not support Flow's `import typeof` syntax.
-describe.skip('Flow typeof imports are unsupported', () => {
-  ruleTester.run('no-empty-named-blocks', rule, {
-    valid: [
-      { code: "import typeof Default from 'mod'; // babel old" },
-      { code: "import typeof { Named } from 'mod'; // babel old" },
-      { code: "import typeof Default, { Named } from 'mod'; // babel old" },
-      { code: "import typeof { mod } from 'mod'" },
-    ],
-    invalid: [
-      ...suggestionCases([
-        "import typeof {} from 'mod';",
-        "import typeof {}from 'mod';",
-        "import typeof {} from'mod';",
-        "import typeof{}from'mod';",
-      ]),
-      {
-        code: "import typeof Default, {} from 'mod';",
-        output: "import typeof Default from 'mod';",
-        errors: [{ message }],
-      },
-      ...suggestionCases(["import typeof {} from 'mod'"], "import 'mod'"),
-      {
-        code: "import typeof Default, {} from 'mod'",
-        output: "import typeof Default from 'mod'",
-        errors: [{ message }],
-      },
-    ],
-  });
 });
