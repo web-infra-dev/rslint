@@ -238,6 +238,28 @@ func (staticEvaluator *StaticStringEvaluator) EvalValue(node *ast.Node) (any, bo
 	return result.value, true
 }
 
+// StaticPlainObjectOnlyProperty reads the sole own property of a folded object
+// with the default prototype. Repeated keys count as one property, with the
+// value of the last assignment.
+func StaticPlainObjectOnlyProperty(value any, name string) (any, bool) {
+	object, ok := value.(*staticObjectValue)
+	if !ok || object.propertyCount == 0 || object.prototypeSet ||
+		ecmascript.CompareStrings(object.property.name, name) != 0 {
+		return nil, false
+	}
+	propertyValue := object.property.value
+	for _, property := range object.extraProperties {
+		if ecmascript.CompareStrings(property.name, name) != 0 {
+			return nil, false
+		}
+		propertyValue = property.value
+	}
+	if text, ok := staticValueAsString(propertyValue); ok {
+		return text, true
+	}
+	return propertyValue, true
+}
+
 // EvalArrayValue classifies a statically known value by whether it is an
 // array. The second result is false when the expression cannot be folded. It
 // keeps the evaluator's private aggregate representation encapsulated while

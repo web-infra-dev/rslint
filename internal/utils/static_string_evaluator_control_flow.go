@@ -27,6 +27,11 @@ func IsPrimitiveStaticValue(value any) bool {
 	return staticValueKindOf(value) != staticKindUnknown
 }
 
+// IsNullishStaticValue reports whether a folded value is null or undefined.
+func IsNullishStaticValue(value any) bool {
+	return staticValueNullish(value)
+}
+
 // Follow constant aliases without treating function calls alone as mutable
 // member reads. Reuse the ordinary static evaluator's member safety policy.
 func (safety *staticControlFlowSafety) hasMutableMember(node *ast.Node) bool {

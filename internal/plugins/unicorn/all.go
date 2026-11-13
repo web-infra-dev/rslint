@@ -4,6 +4,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/better_dom_traversing"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_json_file_read"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_template_literal_escape"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_tuple_labels"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/empty_brace_spaces"
@@ -149,6 +150,7 @@ func GetAllRules() []rule.Rule {
 		better_dom_traversing.BetterDomTraversingRule,
 		catch_error_name.CatchErrorNameRule,
 		consistent_date_clone.ConsistentDateCloneRule,
+		consistent_json_file_read.ConsistentJSONFileReadRule,
 		consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,
 		consistent_tuple_labels.ConsistentTupleLabelsRule,
 		empty_brace_spaces.EmptyBraceSpacesRule,
