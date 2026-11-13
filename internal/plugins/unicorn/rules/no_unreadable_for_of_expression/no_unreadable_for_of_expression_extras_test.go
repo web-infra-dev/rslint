@@ -77,3 +77,58 @@ func TestNoUnreadableForOfExpressionExtras(t *testing.T) {
 for (const x of factories.rows().map(fn)) {}`, "case.ts", loopDiagnostic("for…of", 2, 17, 2, 41)),
 	})
 }
+
+func TestNoUnreadableForOfExpressionSourceTypesWithoutChecker(t *testing.T) {
+	testRule := NoUnreadableForOfExpressionRule
+	testRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		ctx.TypeChecker = nil
+		return NoUnreadableForOfExpressionRule.Run(ctx, options)
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, []rule_tester.ValidTestCase{
+		validCase(`function consume(make = /** @returns {IteratorObject<number>} */ () => [1].values()) {
+  for (const x of make().map(fn)) {}
+}
+consume(() => [1, 2, 3]);`, "case.js"),
+		validCase(`/** @param {function(): IteratorObject<number>} make */
+function consume(make = () => [1].values()) {
+  make = () => [1];
+  for (const x of make().map(fn)) {}
+}`, "case.js"),
+		validCase(`declare const source: IteratorObject<number>;
+const alias: any = source;
+const array: Array<number> = alias;
+for (const x of array.map(fn)) {}
+for (const x of (alias as number[]).map(fn)) {}`, "case.ts"),
+		validCase(`declare const source: IteratorObject<number>;
+let alias: any = source;
+alias = [];
+for (const x of alias.map(fn)) {}`, "case.ts"),
+		// TypeScript rejects assigning to a const, but source-only linting still
+		// sees the write and must leave the receiver unclassified.
+		validCase(`declare const source: IteratorObject<number>;
+const alias: any = source;
+alias = [];
+for (const x of alias.map(fn)) {}`, "case.ts"),
+		validCase(`const alias: any = other;
+const other: unknown = alias;
+for (const x of alias.map(fn)) {}`, "case.ts"),
+		validCase(`declare const source: IteratorObject<number>;
+const alias: any = source;
+{
+  const IteratorObject = null;
+  for (const x of alias.map(fn)) {}
+}`, "case.ts"),
+	}, []rule_tester.InvalidTestCase{
+		invalidCase(`declare const source: IteratorObject<number>;
+const alias: any = source;
+for (const x of alias.map(fn)) {}`, "case.ts", loopDiagnostic("for…of", 3, 17, 3, 30)),
+		invalidCase(`declare const source: IteratorObject<number>;
+const alias: unknown = source;
+for (const x of (alias as any).map(fn)) {}`, "case.ts", loopDiagnostic("for…of", 3, 17, 3, 39)),
+		invalidCase(`declare const source: IteratorObject<number>;
+type Loose = any;
+const intermediate = source;
+const alias: Loose = intermediate;
+for (const x of alias.map(fn)) {}`, "case.ts", loopDiagnostic("for…of", 5, 17, 5, 30)),
+	})
+}

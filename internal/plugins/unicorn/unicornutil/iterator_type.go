@@ -13,6 +13,7 @@ var iteratorTypes = TypeClassifierOptions{
 		"ArrayIterator", "Generator", "IterableIterator", "Iterator", "IteratorObject",
 		"MapIterator", "RegExpStringIterator", "SetIterator", "StringIterator",
 	),
+	NonTargetTypeNames:       arrayTargets,
 	HeritageSymbolFlags:      ast.SymbolFlagsClass | ast.SymbolFlagsInterface,
 	AllowNullishInMixedUnion: true,
 }
@@ -20,11 +21,11 @@ var iteratorTypes = TypeClassifierOptions{
 const annotationWrappers = ast.OEKParentheses | ast.OEKNonNullAssertions | ast.OEKSatisfies
 
 func isKnownIteratorType(ctx *rule.RuleContext, expression *ast.Node) bool {
-	switch classifyIteratorSourceType(ctx, expression, iteratorTypes) {
+	switch classifyIteratorSourceType(ctx, expression, iteratorTypes, nil) {
 	case TypeTarget:
 		options := iteratorTypesAt(ctx, expression)
 		return options.TargetTypeNames == iteratorTypes.TargetTypeNames ||
-			classifyIteratorSourceType(ctx, expression, options) == TypeTarget
+			classifyIteratorSourceType(ctx, expression, options, nil) == TypeTarget
 	case TypeNonTarget:
 		return false
 	}
@@ -64,50 +65,81 @@ func iteratorTypesAt(ctx *rule.RuleContext, expression *ast.Node) TypeClassifier
 	return options
 }
 
-func classifyIteratorSourceType(ctx *rule.RuleContext, expression *ast.Node, options TypeClassifierOptions) TypeClass {
+func classifyIteratorSourceType(ctx *rule.RuleContext, expression *ast.Node, options TypeClassifierOptions, aliases map[*ast.Symbol]TypeClass) TypeClass {
 	node := ast.SkipOuterExpressions(expression, annotationWrappers|ast.OEKAssignments|ast.OEKComma)
 	var annotation *ast.Node
+	var binding *ast.Symbol
 	switch node.Kind {
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		return classifyIteratorAlternatives(ctx, conditional.WhenTrue, conditional.WhenFalse, options)
+		return classifyIteratorAlternatives(ctx, conditional.WhenTrue, conditional.WhenFalse, options, aliases)
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()
 		if ast.IsLogicalOrCoalescingBinaryOperator(binary.OperatorToken.Kind) {
-			return classifyIteratorAlternatives(ctx, binary.Left, binary.Right, options)
+			return classifyIteratorAlternatives(ctx, binary.Left, binary.Right, options, aliases)
 		}
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
 		if utils.IsJSDocTypeCastWrapper(node) {
-			return classifyIteratorSourceType(ctx, node.Expression(), options)
+			return classifyIteratorSourceType(ctx, node.Expression(), options, aliases)
 		}
 		annotation = node.Type()
 		if annotation != nil && (annotation.Kind == ast.KindAnyKeyword || annotation.Kind == ast.KindUnknownKeyword) {
-			return classifyIteratorSourceType(ctx, node.Expression(), options)
+			return classifyIteratorSourceType(ctx, node.Expression(), options, aliases)
 		}
 	case ast.KindIdentifier:
-		symbol := ctx.Refs.ResolveInFile(node)
-		if symbol != nil && len(symbol.Declarations) == 1 {
-			declaration := symbol.Declarations[0]
-			if declaration.Kind == ast.KindParameter || declaration.Kind == ast.KindVariableDeclaration {
-				annotation, _ = ValueTypeAnnotation(*ctx, declaration)
-			}
+		binding = ctx.Refs.ResolveInFile(node)
+		if binding == nil || len(binding.Declarations) != 1 {
+			return TypeUnknown
+		}
+		if class, ok := aliases[binding]; ok {
+			return class
+		}
+		declaration := binding.Declarations[0]
+		if declaration.Kind == ast.KindParameter || declaration.Kind == ast.KindVariableDeclaration {
+			annotation, _ = ValueTypeAnnotation(*ctx, declaration)
 		}
 	case ast.KindCallExpression:
 		annotation = iteratorReturnAnnotation(ctx, utils.ESTreeCallCallee(node.Expression()))
 	}
-	if annotation == nil {
+	if annotation != nil {
+		class := ClassifyTypeAnnotation(*ctx, annotation, options)
+		if class == TypeTarget && isArrayForIterator(ctx, node) {
+			return TypeNonTarget
+		}
+		if class != TypeUnknown || utils.IsJSDocSyntaxNode(annotation) {
+			return class
+		}
+	}
+	if binding == nil || (annotation == nil && aliases == nil) {
 		return TypeUnknown
 	}
-	class := ClassifyTypeAnnotation(*ctx, annotation, options)
-	if class == TypeTarget && isArrayForIterator(ctx, node) {
-		return TypeNonTarget
+	return classifyIteratorConstInitializer(ctx, binding, options, aliases)
+}
+
+// Follow an unchanged const after encountering an inconclusive annotation.
+func classifyIteratorConstInitializer(ctx *rule.RuleContext, symbol *ast.Symbol, options TypeClassifierOptions, aliases map[*ast.Symbol]TypeClass) TypeClass {
+	declaration := symbol.Declarations[0]
+	if !ast.IsVariableDeclaration(declaration) || !ast.IsVarConst(declaration) {
+		return TypeUnknown
 	}
+	initializer := declaration.Initializer()
+	name := declaration.Name()
+	if initializer == nil || name == nil || !ast.IsIdentifier(name) || !bindingIsUnchanged(ctx, symbol) {
+		return TypeUnknown
+	}
+	if aliases == nil {
+		aliases = make(map[*ast.Symbol]TypeClass)
+	}
+	// Mark this binding as unknown until its initializer has been classified.
+	aliases[symbol] = TypeUnknown
+	class := classifyIteratorSourceType(ctx, initializer, options, aliases)
+	aliases[symbol] = class
 	return class
 }
 
-func classifyIteratorAlternatives(ctx *rule.RuleContext, left, right *ast.Node, options TypeClassifierOptions) TypeClass {
-	leftType := classifyIteratorSourceType(ctx, left, options)
-	rightType := classifyIteratorSourceType(ctx, right, options)
+func classifyIteratorAlternatives(ctx *rule.RuleContext, left, right *ast.Node, options TypeClassifierOptions, aliases map[*ast.Symbol]TypeClass) TypeClass {
+	leftType := classifyIteratorSourceType(ctx, left, options, aliases)
+	rightType := classifyIteratorSourceType(ctx, right, options, aliases)
 	switch {
 	case leftType == TypeNullish:
 		return rightType
@@ -128,7 +160,13 @@ func iteratorReturnAnnotation(ctx *rule.RuleContext, callee *ast.Node) *ast.Node
 	switch declaration.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression:
 		function = declaration
-	case ast.KindVariableDeclaration, ast.KindParameter:
+	case ast.KindParameter:
+		// A default callback can be replaced by a caller-supplied value.
+		if bindingIsUnchanged(ctx, symbol) {
+			return CallableReturnTypeAnnotation(*ctx, declaration)
+		}
+		return nil
+	case ast.KindVariableDeclaration:
 		if declaration.Type() != nil && !utils.IsJSDocSyntaxNode(declaration.Type()) {
 			return nil
 		}
