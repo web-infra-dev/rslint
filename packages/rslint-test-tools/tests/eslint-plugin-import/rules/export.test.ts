@@ -1,340 +1,296 @@
-import { RuleTester } from '../rule-tester.js';
-import { testFixturePath } from '../utils.js';
-
-// Upstream: eslint-plugin-import v2.32.0 tests/src/rules/export.js and docs/rules/export.md.
-// Parser/version variants are deduplicated; SYNTAX_CASES are expanded.
-new RuleTester().run('export', null as never, {
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(fixtureConfig()).run('export', {
   valid: [
-    // JavaScript and SYNTAX_CASES
-    // Skipped: the project rejects this malformed dependency before rules run.
-    // import "./malformed.js"
     {
+      name: 'run 0 valid 0',
       code: 'var foo = "foo"; export default foo;',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 1',
       code: 'export var foo = "foo"; export var bar = "bar";',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 2',
       code: 'export var foo = "foo", bar = "bar";',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 3',
       code: 'export var { foo, bar } = object;',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 4',
       code: 'export var [ foo, bar ] = array;',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 5',
       code: 'let foo; export { foo, foo as bar }',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 6',
       code: 'let bar; export { bar }; export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
-    // Intentional difference: explicit exports shadow stars (issue #2409).
     {
+      name: 'run 0 valid 7',
       code: 'let foo; export { foo }; export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 8',
       code: 'let foo; export { foo as "foo" }; export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 9',
       code: 'export * from "./export-all"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 10',
       code: 'export * from "./does-not-exist"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 11',
       code: 'export default foo; export * from "./bar"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 12',
       code: 'for (let { foo, bar } of baz) {}',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 13',
       code: 'for (let [ foo, bar ] of baz) {}',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 14',
       code: 'const { x, y } = bar',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 15',
       code: 'const { x, y, ...z } = bar',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 16',
       code: 'let x; export { x }',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 17',
       code: 'let x; export { x as y }',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 18',
       code: 'export const x = null',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 19',
       code: 'export var x = null',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 20',
       code: 'export let x = null',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 21',
       code: 'export default x',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 22',
       code: 'export default class x {}',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 23',
       code: 'import json from "./data.json"',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      settings: { 'import/extensions': ['.js'] },
+      filename: 'fixtures/export-rule/consumer.ts',
+      settings: {
+        'import/extensions': ['.js'],
+      },
     },
     {
+      name: 'run 0 valid 24',
       code: 'import foo from "./foobar.json";',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      settings: { 'import/extensions': ['.js'] },
+      filename: 'fixtures/export-rule/consumer.ts',
+      settings: {
+        'import/extensions': ['.js'],
+      },
     },
     {
+      name: 'run 0 valid 25',
       code: 'import foo from "./foobar";',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      settings: { 'import/extensions': ['.js'] },
+      filename: 'fixtures/export-rule/consumer.ts',
+      settings: {
+        'import/extensions': ['.js'],
+      },
     },
     {
+      name: 'run 0 valid 26',
       code: 'import { foo } from "./issue-370-commonjs-namespace/bar"',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      settings: { 'import/ignore': ['foo'] },
+      filename: 'fixtures/export-rule/consumer.ts',
+      settings: {
+        'import/ignore': ['foo'],
+      },
     },
     {
+      name: 'run 0 valid 27',
       code: 'export * from "./issue-370-commonjs-namespace/bar"',
-      filename: testFixturePath('export-rule/consumer.ts'),
-      settings: { 'import/ignore': ['foo'] },
+      filename: 'fixtures/export-rule/consumer.ts',
+      settings: {
+        'import/ignore': ['foo'],
+      },
     },
     {
+      name: 'run 0 valid 28',
       code: 'import * as a from "./commonjs-namespace/a"; a.b',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 29',
       code: 'import { foo } from "./ignore.invalid.extension"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-        import * as A from './named-export-collision/a';
-        import * as B from './named-export-collision/b';
-
-        export { A, B };
-      `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 30',
+      code: "\n        import * as A from './named-export-collision/a';\n        import * as B from './named-export-collision/b';\n\n        export { A, B };\n      ",
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-        export * as A from './named-export-collision/a';
-        export * as B from './named-export-collision/b';
-      `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 31',
+      code: "\n        export * as A from './named-export-collision/a';\n        export * as B from './named-export-collision/b';\n      ",
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-        export default function foo(param: string): boolean;
-        export default function foo(param: string, param1: number): boolean;
-        export default function foo(param: string, param1?: number): boolean {
-          return param && param1;
-        }
-      `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 32',
+      code: '\n        export default function foo(param: string): boolean;\n        export default function foo(param: string, param1: number): boolean;\n        export default function foo(param: string, param1?: number): boolean {\n          return param && param1;\n        }\n      ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-        export default function foo(param: string): boolean;
-        export default function foo(param: string, param1?: number): boolean {
-          return param && param1;
-        }
-      `,
-      filename: testFixturePath('export-rule/consumer.ts'),
-    },
-    // TypeScript
-    {
-      code: `
-            export const Foo = 1;
-            export type Foo = number;
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 33',
+      code: '\n        export default function foo(param: string): boolean;\n        export default function foo(param: string, param1?: number): boolean {\n          return param && param1;\n        }\n      ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export const Foo = 1;
-            export interface Foo {}
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 34',
+      code: '\n            export const Foo = 1;\n            export type Foo = number;\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export function fff(a: string);
-            export function fff(a: number);
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 35',
+      code: '\n            export const Foo = 1;\n            export interface Foo {}\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export function fff(a: string);
-            export function fff(a: number);
-            export function fff(a: string|number) {};
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 36',
+      code: '\n            export function fff(a: string);\n            export function fff(a: number);\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export const Bar = 1;
-            export namespace Foo {
-              export const Bar = 1;
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 37',
+      code: '\n            export function fff(a: string);\n            export function fff(a: number);\n            export function fff(a: string|number) {};\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export type Bar = string;
-            export namespace Foo {
-              export type Bar = string;
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 38',
+      code: '\n            export const Bar = 1;\n            export namespace Foo {\n              export const Bar = 1;\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export const Bar = 1;
-            export type Bar = string;
-            export namespace Foo {
-              export const Bar = 1;
-              export type Bar = string;
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 39',
+      code: '\n            export type Bar = string;\n            export namespace Foo {\n              export type Bar = string;\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export namespace Foo {
-              export const Foo = 1;
-              export namespace Bar {
-                export const Foo = 2;
-              }
-              export namespace Baz {
-                export const Foo = 3;
-              }
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 40',
+      code: '\n            export const Bar = 1;\n            export type Bar = string;\n            export namespace Foo {\n              export const Bar = 1;\n              export type Bar = string;\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-              export class Foo { }
-              export namespace Foo { }
-              export namespace Foo {
-                export class Bar {}
-              }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 41',
+      code: '\n            export namespace Foo {\n              export const Foo = 1;\n              export namespace Bar {\n                export const Foo = 2;\n              }\n              export namespace Baz {\n                export const Foo = 3;\n              }\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-              export function Foo();
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 42',
+      code: '\n              export class Foo { }\n              export namespace Foo { }\n              export namespace Foo {\n                export class Bar {}\n              }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-              export function Foo(a: string);
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 43',
+      code: '\n              export function Foo();\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-              export function Foo(a: string);
-              export function Foo(a: number);
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 44',
+      code: '\n              export function Foo(a: string);\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-              export enum Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 45',
+      code: '\n              export function Foo(a: string);\n              export function Foo(a: number);\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
+      name: 'run 0 valid 46',
+      code: '\n              export enum Foo { }\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
+    },
+    {
+      name: 'run 0 valid 47',
       code: 'export * from "./file1.ts"',
-      filename: testFixturePath('export-rule/typescript-d-ts/file-2.ts'),
+      filename: 'fixtures/export-rule/typescript-d-ts/file-2.ts',
     },
     {
-      code: `
-              export * as A from './named-export-collision/a';
-              export * as B from './named-export-collision/b';
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 48',
+      code: "\n              export * as A from './named-export-collision/a';\n              export * as B from './named-export-collision/b';\n            ",
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            declare module "a" {
-              const Foo = 1;
-              export {Foo as default};
-            }
-            declare module "b" {
-              const Bar = 2;
-              export {Bar as default};
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 49',
+      code: '\n            declare module "a" {\n              const Foo = 1;\n              export {Foo as default};\n            }\n            declare module "b" {\n              const Bar = 2;\n              export {Bar as default};\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            declare module "a" {
-              const Foo = 1;
-              export {Foo as default};
-            }
-            const Bar = 2;
-            export {Bar as default};
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 valid 50',
+      code: '\n            declare module "a" {\n              const Foo = 1;\n              export {Foo as default};\n            }\n            const Bar = 2;\n            export {Bar as default};\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
     },
     {
-      code: `
-            export * from './module';
-          `,
-      filename: testFixturePath('export-rule/export-star-4/index.ts'),
-      settings: { 'import/extensions': ['.js', '.ts', '.jsx'] },
+      name: 'run 0 valid 51',
+      code: "\n            export * from './module';\n          ",
+      filename: 'fixtures/export-rule/export-star-4/index.ts',
+      settings: {
+        'import/extensions': ['.js', '.ts', '.jsx'],
+      },
     },
-    // Documentation
   ],
   invalid: [
-    // JavaScript and SYNTAX_CASES
-    // Skipped: tsgo accepts the top-level return that Espree rejects.
-    // export * from "./malformed.js"
-    // Parse errors in imported module './malformed.js': 'return' outside of function (1:1)
     {
+      name: 'run 0 invalid 0',
       code: 'export * from "./default-export"',
-      filename: testFixturePath('export-rule/consumer.ts'),
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'noNamed',
           message: "No named exports found in module './default-export'.",
           line: 1,
           column: 15,
@@ -344,14 +300,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-        export default function a(): void;
-        export default function a() {}
-        export { x as default };
-      `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 1',
+      code: '\n        export default function a(): void;\n        export default function a() {}\n        export { x as default };\n      ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 3,
           column: 9,
@@ -359,6 +313,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 39,
         },
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 4,
           column: 23,
@@ -367,15 +322,13 @@ new RuleTester().run('export', null as never, {
         },
       ],
     },
-    // TypeScript
     {
-      code: `
-            export type Foo = string;
-            export type Foo = number;
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 2',
+      code: '\n            export type Foo = string;\n            export type Foo = number;\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 25,
@@ -383,6 +336,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 28,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 25,
@@ -392,16 +346,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-            export const a = 1
-            export namespace Foo {
-              export const a = 2;
-              export const a = 3;
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 3',
+      code: '\n            export const a = 1\n            export namespace Foo {\n              export const a = 2;\n              export const a = 3;\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'a'.",
           line: 4,
           column: 28,
@@ -409,6 +359,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 29,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'a'.",
           line: 5,
           column: 28,
@@ -418,16 +369,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-            declare module 'foo' {
-              const Foo = 1;
-              export default Foo;
-              export default Foo;
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 4',
+      code: "\n            declare module 'foo' {\n              const Foo = 1;\n              export default Foo;\n              export default Foo;\n            }\n          ",
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 4,
           column: 15,
@@ -435,6 +382,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 34,
         },
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 5,
           column: 15,
@@ -444,21 +392,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-            export namespace Foo {
-              export namespace Bar {
-                export const Foo = 1;
-                export const Foo = 2;
-              }
-              export namespace Baz {
-                export const Bar = 3;
-                export const Bar = 4;
-              }
-            }
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 5',
+      code: '\n            export namespace Foo {\n              export namespace Bar {\n                export const Foo = 1;\n                export const Foo = 2;\n              }\n              export namespace Baz {\n                export const Bar = 3;\n                export const Bar = 4;\n              }\n            }\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 4,
           column: 30,
@@ -466,6 +405,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 33,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 5,
           column: 30,
@@ -473,6 +413,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 33,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Bar'.",
           line: 8,
           column: 30,
@@ -480,6 +421,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 33,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Bar'.",
           line: 9,
           column: 30,
@@ -489,14 +431,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export class Foo { }
-              export class Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 6',
+      code: '\n              export class Foo { }\n              export class Foo { }\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 28,
@@ -504,6 +444,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 31,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 28,
@@ -513,14 +454,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export enum Foo { }
-              export enum Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 7',
+      code: '\n              export enum Foo { }\n              export enum Foo { }\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 27,
@@ -528,6 +467,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 30,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 27,
@@ -537,14 +477,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export enum Foo { }
-              export class Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 8',
+      code: '\n              export enum Foo { }\n              export class Foo { }\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 27,
@@ -552,6 +490,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 30,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 28,
@@ -561,14 +500,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export const Foo = 'bar';
-              export class Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 9',
+      code: "\n              export const Foo = 'bar';\n              export class Foo { }\n              export namespace Foo { }\n            ",
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 28,
@@ -576,6 +513,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 31,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 28,
@@ -585,14 +523,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export function Foo() { };
-              export class Foo { }
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 10',
+      code: '\n              export function Foo() { };\n              export class Foo { }\n              export namespace Foo { }\n            ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 31,
@@ -600,6 +536,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 34,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 28,
@@ -609,14 +546,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export const Foo = 'bar';
-              export function Foo() { };
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 11',
+      code: "\n              export const Foo = 'bar';\n              export function Foo() { };\n              export namespace Foo { }\n            ",
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 28,
@@ -624,6 +559,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 31,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 31,
@@ -633,13 +569,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-              export const Foo = 'bar';
-              export namespace Foo { }
-            `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 12',
+      code: "\n              export const Foo = 'bar';\n              export namespace Foo { }\n            ",
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 2,
           column: 28,
@@ -647,6 +582,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 31,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'Foo'.",
           line: 3,
           column: 32,
@@ -656,19 +592,12 @@ new RuleTester().run('export', null as never, {
       ],
     },
     {
-      code: `
-            declare module "a" {
-              const Foo = 1;
-              export {Foo as default};
-            }
-            const Bar = 2;
-            export {Bar as default};
-            const Baz = 3;
-            export {Baz as default};
-          `,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 13',
+      code: '\n            declare module "a" {\n              const Foo = 1;\n              export {Foo as default};\n            }\n            const Bar = 2;\n            export {Bar as default};\n            const Baz = 3;\n            export {Baz as default};\n          ',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 7,
           column: 28,
@@ -676,6 +605,7 @@ new RuleTester().run('export', null as never, {
           endColumn: 35,
         },
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 9,
           column: 28,
@@ -684,16 +614,13 @@ new RuleTester().run('export', null as never, {
         },
       ],
     },
-    // Documentation
     {
-      code: `export default class MyClass { /*...*/ } // Multiple default exports.
-
-function makeClass() { return new MyClass(...arguments) }
-
-export default makeClass // Multiple default exports.`,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 14',
+      code: 'export default class MyClass { /*...*/ } // Multiple default exports.\n\nfunction makeClass() { return new MyClass(...arguments) }\n\nexport default makeClass // Multiple default exports.',
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 1,
           column: 1,
@@ -701,6 +628,7 @@ export default makeClass // Multiple default exports.`,
           endColumn: 41,
         },
         {
+          messageId: 'multipleDefault',
           message: 'Multiple default exports.',
           line: 5,
           column: 1,
@@ -710,13 +638,12 @@ export default makeClass // Multiple default exports.`,
       ],
     },
     {
-      code: `export const foo = function () { /*...*/ } // Multiple exports of name 'foo'.
-
-function bar() { /*...*/ }
-export { bar as foo } // Multiple exports of name 'foo'.`,
-      filename: testFixturePath('export-rule/consumer.ts'),
+      name: 'run 0 invalid 15',
+      code: "export const foo = function () { /*...*/ } // Multiple exports of name 'foo'.\n\nfunction bar() { /*...*/ }\nexport { bar as foo } // Multiple exports of name 'foo'.",
+      filename: 'fixtures/export-rule/consumer.ts',
       errors: [
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'foo'.",
           line: 1,
           column: 14,
@@ -724,6 +651,7 @@ export { bar as foo } // Multiple exports of name 'foo'.`,
           endColumn: 17,
         },
         {
+          messageId: 'multipleNamed',
           message: "Multiple exports of name 'foo'.",
           line: 4,
           column: 17,

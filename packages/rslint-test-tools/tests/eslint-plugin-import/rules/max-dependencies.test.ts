@@ -1,17 +1,15 @@
-import { RuleTester } from '../rule-tester.js';
-
-// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/max-dependencies.js
-// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/docs/rules/max-dependencies.md
-// Flow and TypeScript parser variants use the suite's TypeScript parser.
-const ruleTester = new RuleTester();
-
-ruleTester.run('max-dependencies', null as never, {
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(fixtureConfig()).run('max-dependencies', {
   valid: [
-    // max-dependencies.
     {
+      name: 'run 0 valid 0',
       code: 'import "./foo.js"',
     },
     {
+      name: 'run 0 valid 1',
       code: 'import "./foo.js"; import "./bar.js";',
       options: [
         {
@@ -20,6 +18,7 @@ ruleTester.run('max-dependencies', null as never, {
       ],
     },
     {
+      name: 'run 0 valid 2',
       code: 'import "./foo.js"; import "./bar.js"; const a = require("./foo.js"); const b = require("./bar.js");',
       options: [
         {
@@ -28,10 +27,11 @@ ruleTester.run('max-dependencies', null as never, {
       ],
     },
     {
+      name: 'run 0 valid 3',
       code: 'import {x, y, z} from "./foo"',
     },
-    // max-dependencies (typescript).
     {
+      name: 'run 0 valid 4',
       code: "import type { x } from './foo'; import { y } from './bar';",
       options: [
         {
@@ -40,8 +40,8 @@ ruleTester.run('max-dependencies', null as never, {
         },
       ],
     },
-    // Documentation examples.
     {
+      name: 'run 0 valid 5',
       code: "import a from './a'; // 1\nconst anotherA = require('./a'); // still 1\nimport {x, y, z} from './foo'; // 2",
       options: [
         {
@@ -50,6 +50,7 @@ ruleTester.run('max-dependencies', null as never, {
       ],
     },
     {
+      name: 'run 0 valid 6',
       code: "import a from './a';\nimport b from './b';\nimport type c from './c'; // Doesn't count against max",
       options: [
         {
@@ -60,53 +61,103 @@ ruleTester.run('max-dependencies', null as never, {
     },
   ],
   invalid: [
-    // max-dependencies.
     {
+      name: 'run 0 invalid 0',
       code: "import { x } from './foo'; import { y } from './foo'; import {z} from './bar';",
       options: [
         {
           max: 1,
         },
       ],
-      errors: ['Maximum number of dependencies (1) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (1) exceeded.',
+          line: 1,
+          column: 71,
+          endLine: 1,
+          endColumn: 78,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 1',
       code: "import { x } from './foo'; import { y } from './bar'; import { z } from './baz';",
       options: [
         {
           max: 2,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 1,
+          column: 73,
+          endLine: 1,
+          endColumn: 80,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 2',
       code: "import { x } from './foo'; require(\"./bar\"); import { z } from './baz';",
       options: [
         {
           max: 2,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 1,
+          column: 64,
+          endLine: 1,
+          endColumn: 71,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 3',
       code: 'import { x } from \'./foo\'; import { z } from \'./foo\'; require("./bar"); const path = require("path");',
       options: [
         {
           max: 2,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 1,
+          column: 94,
+          endLine: 1,
+          endColumn: 100,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 4',
       code: "import type { x } from './foo'; import type { y } from './bar'",
       options: [
         {
           max: 1,
         },
       ],
-      errors: ['Maximum number of dependencies (1) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (1) exceeded.',
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 5',
       code: "import type { x } from './foo'; import type { y } from './bar'; import type { z } from './baz'",
       options: [
         {
@@ -114,19 +165,38 @@ ruleTester.run('max-dependencies', null as never, {
           ignoreTypeImports: false,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 1,
+          column: 88,
+          endLine: 1,
+          endColumn: 95,
+        },
+      ],
     },
-    // max-dependencies (typescript).
     {
+      name: 'run 0 invalid 6',
       code: "import type { x } from './foo'; import type { y } from './bar'",
       options: [
         {
           max: 1,
         },
       ],
-      errors: ['Maximum number of dependencies (1) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (1) exceeded.',
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 63,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 7',
       code: "import type { x } from './foo'; import type { y } from './bar'; import type { z } from './baz'",
       options: [
         {
@@ -134,19 +204,38 @@ ruleTester.run('max-dependencies', null as never, {
           ignoreTypeImports: false,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 1,
+          column: 88,
+          endLine: 1,
+          endColumn: 95,
+        },
+      ],
     },
-    // Documentation examples.
     {
+      name: 'run 0 invalid 8',
       code: "import a from './a'; // 1\nconst b = require('./b'); // 2\nimport c from './c'; // 3 - exceeds max!",
       options: [
         {
           max: 2,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 20,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 9',
       code: "import a from './a';\nimport b from './b';\nimport c from './c';",
       options: [
         {
@@ -154,7 +243,16 @@ ruleTester.run('max-dependencies', null as never, {
           ignoreTypeImports: true,
         },
       ],
-      errors: ['Maximum number of dependencies (2) exceeded.'],
+      errors: [
+        {
+          messageId: '',
+          message: 'Maximum number of dependencies (2) exceeded.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 20,
+        },
+      ],
     },
   ],
 });

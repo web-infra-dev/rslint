@@ -1,109 +1,294 @@
-// https://github.com/import-js/eslint-plugin-import/blob/v2.32.0/tests/src/rules/no-unassigned-import.js
-import { test } from '../utils.js';
-import path from 'node:path';
-
-import { RuleTester } from '../rule-tester.js';
-
-const ruleTester = new RuleTester();
-const rule = null as never;
-
-const error = {
-  message: 'Imported module should be assigned',
-};
-
-ruleTester.run('no-unassigned-import', rule, {
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(fixtureConfig()).run('no-unassigned-import', {
   valid: [
-    test({ code: 'import _ from "lodash"' }),
-    test({ code: 'import _, {foo} from "lodash"' }),
-    test({ code: 'import _, {foo as bar} from "lodash"' }),
-    test({ code: 'import {foo as bar} from "lodash"' }),
-    test({ code: 'import * as _ from "lodash"' }),
-    test({ code: 'import _ from "./"' }),
-    test({ code: 'const _ = require("lodash")' }),
-    test({ code: 'const {foo} = require("lodash")' }),
-    test({ code: 'const {foo: bar} = require("lodash")' }),
-    test({ code: 'const [a, b] = require("lodash")' }),
-    test({ code: 'const _ = require("./")' }),
-    test({ code: 'foo(require("lodash"))' }),
-    test({ code: 'require("lodash").foo' }),
-    test({ code: 'require("lodash").foo()' }),
-    test({ code: 'require("lodash")()' }),
-    test({
+    {
+      name: 'run 0 valid 0',
+      code: 'import _ from "lodash"',
+    },
+    {
+      name: 'run 0 valid 1',
+      code: 'import _, {foo} from "lodash"',
+    },
+    {
+      name: 'run 0 valid 2',
+      code: 'import _, {foo as bar} from "lodash"',
+    },
+    {
+      name: 'run 0 valid 3',
+      code: 'import {foo as bar} from "lodash"',
+    },
+    {
+      name: 'run 0 valid 4',
+      code: 'import * as _ from "lodash"',
+    },
+    {
+      name: 'run 0 valid 5',
+      code: 'import _ from "./"',
+    },
+    {
+      name: 'run 0 valid 6',
+      code: 'const _ = require("lodash")',
+    },
+    {
+      name: 'run 0 valid 7',
+      code: 'const {foo} = require("lodash")',
+    },
+    {
+      name: 'run 0 valid 8',
+      code: 'const {foo: bar} = require("lodash")',
+    },
+    {
+      name: 'run 0 valid 9',
+      code: 'const [a, b] = require("lodash")',
+    },
+    {
+      name: 'run 0 valid 10',
+      code: 'const _ = require("./")',
+    },
+    {
+      name: 'run 0 valid 11',
+      code: 'foo(require("lodash"))',
+    },
+    {
+      name: 'run 0 valid 12',
+      code: 'require("lodash").foo',
+    },
+    {
+      name: 'run 0 valid 13',
+      code: 'require("lodash").foo()',
+    },
+    {
+      name: 'run 0 valid 14',
+      code: 'require("lodash")()',
+    },
+    {
+      name: 'run 0 valid 15',
       code: 'import "app.css"',
-      options: [{ allow: ['**/*.css'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.css'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 16',
       code: 'import "app.css";',
-      options: [{ allow: ['*.css'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['*.css'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 17',
       code: 'import "./app.css"',
-      options: [{ allow: ['**/*.css'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.css'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 18',
       code: 'import "foo/bar"',
-      options: [{ allow: ['foo/**'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['foo/**'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 19',
       code: 'import "foo/bar"',
-      options: [{ allow: ['foo/bar'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['foo/bar'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 20',
       code: 'import "../dir/app.css"',
-      options: [{ allow: ['**/*.css'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.css'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 21',
       code: 'import "../dir/app.js"',
-      options: [{ allow: ['**/dir/**'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/dir/**'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 22',
       code: 'require("./app.css")',
-      options: [{ allow: ['**/*.css'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.css'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 23',
       code: 'import "babel-register"',
-      options: [{ allow: ['babel-register'] }],
-    }),
-    test({
+      options: [
+        {
+          allow: ['babel-register'],
+        },
+      ],
+    },
+    {
+      name: 'run 0 valid 24',
       code: 'import "./styles/app.css"',
-      options: [{ allow: ['src/styles/**'] }],
-      filename: path.join(process.cwd(), 'src/app.js'),
-    }),
-    test({
+      filename: 'src/app.js',
+      options: [
+        {
+          allow: ['src/styles/**'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 25',
       code: 'import "../scripts/register.js"',
-      options: [{ allow: ['src/styles/**', '**/scripts/*.js'] }],
-      filename: path.join(process.cwd(), 'src/app.js'),
-    }),
+      filename: 'src/app.js',
+      options: [
+        {
+          allow: ['src/styles/**', '**/scripts/*.js'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
   ],
   invalid: [
-    test({
+    {
+      name: 'run 0 invalid 0',
       code: 'import "lodash"',
-      errors: [error],
-    }),
-    test({
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 1',
       code: 'require("lodash")',
-      errors: [error],
-    }),
-    test({
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 2',
       code: 'import "./app.css"',
-      options: [{ allow: ['**/*.js'] }],
-      errors: [error],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.js'],
+        },
+      ],
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 3',
       code: 'import "./app.css"',
-      options: [{ allow: ['**/dir/**'] }],
-      errors: [error],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/dir/**'],
+        },
+      ],
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 4',
       code: 'require("./app.css")',
-      options: [{ allow: ['**/*.js'] }],
-      errors: [error],
-    }),
-    test({
+      options: [
+        {
+          allow: ['**/*.js'],
+        },
+      ],
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 5',
       code: 'import "./styles/app.css"',
-      options: [{ allow: ['styles/*.css'] }],
-      filename: path.join(process.cwd(), 'src/app.js'),
-      errors: [error],
-    }),
+      filename: 'src/app.js',
+      options: [
+        {
+          allow: ['styles/*.css'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Imported module should be assigned',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
+    },
   ],
 });
