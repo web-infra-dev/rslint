@@ -9,13 +9,14 @@ type staticReferenceTransfer struct {
 }
 
 type staticEscapeFacts struct {
-	call       *ast.Node
-	collecting bool
-	explicit   map[*ast.Symbol]bool
-	sites      map[*ast.Symbol]map[*ast.Node]struct{}
-	visited    map[*ast.Symbol]staticReferenceFlags
-	captures   map[*ast.Symbol]staticEvalResult
-	capturing  map[*ast.Symbol]bool
+	call        *ast.Node
+	collecting  bool
+	explicit    map[*ast.Symbol]bool
+	sites       map[*ast.Symbol]map[*ast.Node]struct{}
+	visited     map[*ast.Symbol]staticReferenceFlags
+	captures    map[*ast.Symbol]staticEvalResult
+	capturing   map[*ast.Symbol]bool
+	ownCaptures map[*ast.Symbol]*staticObjectValue
 }
 
 func newStaticEscapeFacts() *staticEscapeFacts {
@@ -61,10 +62,7 @@ func (e *StaticStringEvaluator) capturedInitializer(initializer *ast.Node, symbo
 	view.GlobalAccess = e.GlobalAccess
 	view.resolveIdentifiers = e.resolveIdentifiers
 	view.trackCallEscapes = true
-	view.referenceFlagsComputed = true
-	view.referenceFlags = e.referenceFlags
-	view.storedReferences = e.storedReferences
-	view.escapeFacts = e.escapeFacts
+	view.useReferenceFacts(e)
 	view.capturePoint = initializer
 	view.resolving[symbol] = true
 	result := view.evalValue(initializer)
@@ -72,9 +70,50 @@ func (e *StaticStringEvaluator) capturedInitializer(initializer *ast.Node, symbo
 	freshContainer := literal.Kind == ast.KindObjectLiteralExpression || literal.Kind == ast.KindArrayLiteralExpression
 	if !result.ok || !IsPrimitiveStaticValue(result.value) && (!freshContainer || !view.hasOnlyPrimitiveChildren(initializer)) {
 		result = staticEvalResult{}
+	} else if object, ok := result.value.(*staticObjectValue); ok && object.prototypeSet && object.prototype != nil {
+		// The own primitive properties were copied at initialization. Retain
+		// them separately, without making a snapshot of the live prototype
+		// available to whole-object or inherited-property evaluation.
+		own := *object
+		own.prototype, own.prototypeSet = nil, false
+		if e.escapeFacts.ownCaptures == nil {
+			e.escapeFacts.ownCaptures = make(map[*ast.Symbol]*staticObjectValue)
+		}
+		e.escapeFacts.ownCaptures[symbol] = &own
+		result = staticEvalResult{}
 	}
 	e.escapeFacts.captures[symbol] = result
 	return result
+}
+
+func (e *StaticStringEvaluator) capturedOwnMember(node *ast.Node, key string) staticEvalResult {
+	initializer, symbol, ok := e.resolveIdentifierInitializer(node)
+	if !ok || e.resolving[symbol] || e.hasPropertyMutation(symbol) ||
+		e.capturePoint != nil && initializer.End() > e.capturePoint.Pos() {
+		return staticEvalResult{}
+	}
+	e.resolving[symbol] = true
+	defer delete(e.resolving, symbol)
+	e.capturedInitializer(initializer, symbol)
+	if e.escapeFacts != nil {
+		if own := e.escapeFacts.ownCaptures[symbol]; own != nil {
+			if value, found := staticObjectOwnProperty(own, key); found {
+				return staticEvalResult{value: value, ok: true}
+			}
+		}
+	}
+	return e.capturedOwnMember(initializer, key)
+}
+
+// Keep every completed reference fact together when constructing an evaluation
+// view. Expression caches and recursion stacks remain local to the view.
+func (e *StaticStringEvaluator) useReferenceFacts(source *StaticStringEvaluator) {
+	e.referenceFlags = source.referenceFlags
+	e.storedReferences = source.storedReferences
+	e.escapeFacts = source.escapeFacts
+	e.arrayPrototypeMutated = source.arrayPrototypeMutated
+	e.stringPrototypeMutated = source.stringPrototypeMutated
+	e.referenceFlagsComputed = true
 }
 
 func (e *StaticStringEvaluator) recordBindingTransfer(target, value, site *ast.Node) {
@@ -125,7 +164,17 @@ func (e *StaticStringEvaluator) transferAvailable(transfer staticReferenceTransf
 }
 
 func transferAvailableAt(transfer staticReferenceTransfer, point *ast.Node) bool {
-	return point == nil || executionRoot(point) != executionRoot(transfer.site) || transfer.site.End() <= point.Pos()
+	if point == nil || executionRoot(point) != executionRoot(transfer.site) {
+		return true
+	}
+	end := point.Pos()
+	switch point.Kind {
+	case ast.KindCallExpression, ast.KindNewExpression, ast.KindTaggedTemplateExpression:
+		// Callee and argument evaluation finish before the invocation itself.
+		// Do not include the invocation's own stores as earlier transfers.
+		end = point.End()
+	}
+	return transfer.site != point && transfer.site.End() <= end
 }
 
 func (e *StaticStringEvaluator) recordBuiltinTransfers(call *ast.Node, builtin, name string) {
@@ -143,6 +192,9 @@ func (e *StaticStringEvaluator) recordBuiltinTransfers(call *ast.Node, builtin, 
 			}
 			e.recordStoredReferences(args[0], source, call, true)
 		}
+	}
+	if (builtin == "Object" || builtin == "Reflect") && name == "setPrototypeOf" {
+		e.recordStoredReferences(args[0], args[1], call, false)
 	}
 	if (builtin == "Object" || builtin == "Reflect") && name == "defineProperty" && len(args) >= 3 {
 		e.recordStoredReferences(args[0], args[2], call, true)

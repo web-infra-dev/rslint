@@ -1032,6 +1032,9 @@ func (staticEvaluator *StaticStringEvaluator) evalMemberAccess(node *ast.Node) s
 
 	object := staticEvaluator.evalValue(objectNode)
 	if !object.ok {
+		if staticEvaluator.trackCallEscapes {
+			return staticEvaluator.capturedOwnMember(objectNode, key)
+		}
 		return staticEvalResult{}
 	}
 	if key == "length" {
@@ -1926,12 +1929,7 @@ func (staticEvaluator *StaticStringEvaluator) ensureReferenceFlags() {
 		analysis.resolveIdentifiers = staticEvaluator.resolveIdentifiers
 		analysis.trackCallEscapes = staticEvaluator.trackCallEscapes
 		analysis.computeReferenceFlags()
-		staticEvaluator.referenceFlags = analysis.referenceFlags
-		staticEvaluator.storedReferences = analysis.storedReferences
-		staticEvaluator.escapeFacts = analysis.escapeFacts
-		staticEvaluator.arrayPrototypeMutated = analysis.arrayPrototypeMutated
-		staticEvaluator.stringPrototypeMutated = analysis.stringPrototypeMutated
-		staticEvaluator.referenceFlagsComputed = true
+		staticEvaluator.useReferenceFacts(analysis)
 	}
 }
 
@@ -1973,9 +1971,6 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			return
 		}
 		if node.Kind == ast.KindCallExpression {
-			if staticEvaluator.trackCallEscapes {
-				calls = append(calls, node)
-			}
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, known := AccessExpressionStaticName(callee); known {
 				if staticEvaluator.escapeFacts != nil {
@@ -1994,9 +1989,6 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			if ast.IsIdentifier(SkipAssertionsAndParens(assignment.Left)) && ast.IsAssignmentOperator(assignment.OperatorToken.Kind) {
 				staticEvaluator.recordBindingTransfer(assignment.Left, assignment.Right, node)
 			}
-		}
-		if staticEvaluator.trackCallEscapes && (node.Kind == ast.KindNewExpression || node.Kind == ast.KindTaggedTemplateExpression) {
-			calls = append(calls, node)
 		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
 			if IsWriteReference(node) {
@@ -2023,6 +2015,11 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			visit(child)
 			return false
 		})
+		// Process calls after their callee and arguments so nested built-in
+		// stores are available when propagating the outer invocation's escapes.
+		if staticEvaluator.trackCallEscapes && (node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression || node.Kind == ast.KindTaggedTemplateExpression) {
+			calls = append(calls, node)
+		}
 	}
 	visit(&staticEvaluator.sourceFile.Node)
 
