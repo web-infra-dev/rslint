@@ -2,12 +2,13 @@ package no_invalid_regexp
 
 import (
 	_ "embed"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 )
 
@@ -15,7 +16,7 @@ import (
 var schemaJSON []byte
 
 // validFlags is the set of standard RegExp flags.
-var validFlags = map[byte]bool{
+var validFlags = map[rune]bool{
 	'd': true,
 	'g': true,
 	'i': true,
@@ -49,6 +50,17 @@ var NoInvalidRegexpRule = rule.Rule{
 				return
 			}
 
+			if !ctx.Globals.Access("RegExp").IsDeclared() {
+				return
+			}
+			if ctx.Refs != nil {
+				if !ctx.Refs.IsGlobalReference(callee) {
+					return
+				}
+			} else if utils.IsShadowed(callee, "RegExp") {
+				return
+			}
+
 			// No arguments means RegExp() which is valid (produces /(?:)/)
 			if args == nil || len(args.Nodes) == 0 {
 				return
@@ -57,9 +69,9 @@ var NoInvalidRegexpRule = rule.Rule{
 			// Get flags (second argument)
 			var flags *string // nil means unknown (non-literal)
 			if len(args.Nodes) >= 2 {
-				flagsNode := args.Nodes[1]
+				flagsNode := ast.SkipParentheses(args.Nodes[1])
 				if flagsNode.Kind == ast.KindStringLiteral {
-					f := flagsNode.AsStringLiteral().Text
+					f := stringLiteralValue(ctx, flagsNode)
 					flags = &f
 				}
 			} else {
@@ -76,11 +88,11 @@ var NoInvalidRegexpRule = rule.Rule{
 			}
 
 			// Validate pattern only if first argument is a string literal
-			patternNode := args.Nodes[0]
+			patternNode := ast.SkipParentheses(args.Nodes[0])
 			if patternNode.Kind != ast.KindStringLiteral {
 				return
 			}
-			pattern := patternNode.AsStringLiteral().Text
+			pattern := stringLiteralValue(ctx, patternNode)
 
 			if flags != nil {
 				// Known flags: validate pattern with those flags
@@ -90,11 +102,10 @@ var NoInvalidRegexpRule = rule.Rule{
 			} else {
 				// Unknown flags: only report if pattern is invalid in ALL
 				// flag combinations (unicode, unicodeSets, neither)
-				msg1 := validatePattern(pattern, "u")
-				msg2 := validatePattern(pattern, "v")
-				msg3 := validatePattern(pattern, "")
-				if msg1 != "" && msg2 != "" && msg3 != "" {
-					report(node, msg3)
+				if validatePattern(pattern, "u") != "" && validatePattern(pattern, "v") != "" {
+					if msg := validatePattern(pattern, ""); msg != "" {
+						report(node, msg)
+					}
 				}
 			}
 		}
@@ -115,8 +126,8 @@ var NoInvalidRegexpRule = rule.Rule{
 // validateFlags checks for invalid or duplicate flags, and mutually exclusive u/v.
 // Returns an error message or empty string if valid.
 // Follows ESLint's validation order: strip valid flags → check u+v → check duplicates → check invalid.
-func validateFlags(flags string, allowConstructorFlags map[byte]bool) string {
-	allFlags := make(map[byte]bool)
+func validateFlags(flags string, allowConstructorFlags map[rune]bool) string {
+	allFlags := make(map[rune]bool)
 	for k, v := range validFlags {
 		allFlags[k] = v
 	}
@@ -131,10 +142,10 @@ func validateFlags(flags string, allowConstructorFlags map[byte]bool) string {
 	}
 
 	// Collect duplicate flags (remaining chars that are in allFlags)
-	var duplicates []byte
-	for i := range len(remaining) {
-		if allFlags[remaining[i]] {
-			duplicates = append(duplicates, remaining[i])
+	var duplicates []rune
+	for _, ch := range remaining {
+		if allFlags[ch] {
+			duplicates = append(duplicates, ch)
 		}
 	}
 
@@ -156,52 +167,46 @@ func validateFlags(flags string, allowConstructorFlags map[byte]bool) string {
 	return ""
 }
 
-// validatePattern reports whether the pattern compiles as a JavaScript
-// RegExp, returning an error message or the empty string when it does.
-// See no_invalid_regexp.md "Known Limitations" for the misalignments that
-// remain against ESLint.
+// validatePattern validates syntax without invoking a matching engine. Only u/v
+// affect the grammar; custom constructor flags have already been checked.
 func validatePattern(pattern string, flags string) string {
-	// Flags are validated separately by validateFlags, which also honors
-	// allowConstructorFlags, so only the ones that change what the pattern
-	// means are passed on here. `v` extends `u` rather than replacing it, and
-	// the set syntax it adds is not supported, so it is read as the `u` it
-	// builds on.
-	var builder strings.Builder
-	for _, flag := range "imsu" { // cspell:ignore imsu
-		if strings.ContainsRune(flags, flag) {
-			builder.WriteRune(flag)
-		}
+	syntaxFlags := ""
+	if strings.Contains(flags, "u") {
+		syntaxFlags = "u"
 	}
-	compileFlags := builder.String()
-	if !strings.Contains(compileFlags, "u") && strings.Contains(flags, "v") {
-		compileFlags += "u"
+	if strings.Contains(flags, "v") {
+		syntaxFlags = "v"
 	}
-
-	_, err := esregexp.Compile(pattern, compileFlags)
-	if err != nil {
-		errMsg := err.Error()
-		// A regexp2 message opens with "error parsing regexp: ", which says
-		// nothing the diagnostic has not already said. Trimming up to the
-		// first ": " drops it — but the package's own errors name what they
-		// refused after that same separator, so trimming there would keep the
-		// refused text and throw the explanation away.
-		if !errors.Is(err, esregexp.ErrUnsupportedSyntax) && !errors.Is(err, esregexp.ErrUnsupportedFlag) {
-			if idx := strings.Index(errMsg, ": "); idx != -1 {
-				errMsg = errMsg[idx+2:]
-			}
-		}
-		return fmt.Sprintf("Invalid regular expression: /%s/: %s", pattern, errMsg)
+	if err := esregexp.Validate(pattern, syntaxFlags); err != nil {
+		return err.Error()
 	}
 	return ""
 }
 
+// The AST's decoded text does not decode legacy octal escapes in sloppy scripts.
+func stringLiteralValue(ctx rule.RuleContext, node *ast.Node) string {
+	if utils.IsInStrictModeWithSourceType(node, ctx.SourceFile, ctx.LanguageOptions.EffectiveSourceType()) {
+		return node.AsStringLiteral().Text
+	}
+	r := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	units := utils.ParseJSStringLiteralSource(ctx.SourceFile.Text()[r.Pos():r.End()])
+	if units == nil {
+		return node.AsStringLiteral().Text
+	}
+	values := make([]uint16, len(units))
+	for i, unit := range units {
+		values[i] = uint16(unit.Value)
+	}
+	return ecmascript.StringFromCodeUnits(values)
+}
+
 type noInvalidRegexpOptions struct {
-	allowConstructorFlags map[byte]bool
+	allowConstructorFlags map[rune]bool
 }
 
 func parseOptions(options []any) noInvalidRegexpOptions {
 	opts := noInvalidRegexpOptions{
-		allowConstructorFlags: make(map[byte]bool),
+		allowConstructorFlags: make(map[rune]bool),
 	}
 
 	if len(options) == 0 {
@@ -211,8 +216,8 @@ func parseOptions(options []any) noInvalidRegexpOptions {
 	if allowArr, ok := m["allowConstructorFlags"].([]interface{}); ok {
 		for _, item := range allowArr {
 			if str, ok := item.(string); ok {
-				for i := range len(str) {
-					opts.allowConstructorFlags[str[i]] = true
+				for _, ch := range str {
+					opts.allowConstructorFlags[ch] = true
 				}
 			}
 		}
