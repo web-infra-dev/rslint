@@ -50,6 +50,8 @@ This rule has no options. Enable it with `"unicorn/no-useless-else": "error"`.
 
 - A call to `process.exit()` is treated as an ordinary call when the `process` global is configured as `"off"` or a surrounding `with` statement can supply that name. Unicorn may report an `else` in these cases.
 - If a `finally` block overrides a pending `break` or `continue`, the rule follows the destination that execution actually takes. This can keep an `else` that Unicorn reports, or report one when the `finally` block exits.
+- The rule keeps an `else` if a `catch` could let execution continue after a JSX factory call, a destructured catch binding, or a read of `this` in a derived constructor. Reads of `this` are treated conservatively even after a call to `super()`.
+- In a `try` block, more complex assignments and optional chains can keep an `else` that Unicorn reports. For example, the rule can prove that `value = 1` is safe when `value` is a local parameter, but it may keep the `else` after `value = other`.
 - When an `else` body contains a lint directive such as `eslint-disable-next-line`, the rule reports it without an autofix. Keep the directive next to its intended statement if you move the body manually.
 
 ## Original Documentation

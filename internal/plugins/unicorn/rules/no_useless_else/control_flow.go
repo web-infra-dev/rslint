@@ -25,18 +25,30 @@ func (a *exitAnalysis) analyze(root *ast.Node) map[*ast.Node]bool {
 		if !isCandidate(node) {
 			return
 		}
+		stmt := node.AsIfStatement().ThenStatement
 		exitsHere := !fallsThrough
 		if !entered {
 			// Upstream also checks the shape of a consequent under a constant
 			// false condition, as long as the if statement itself is reachable.
-			exitsHere = !cfg.StatementFallsThrough(node.AsIfStatement().ThenStatement, options)
+			exitsHere = !cfg.StatementFallsThrough(stmt, options)
 		}
+		exitsHere = exitsHere || a.exitsAfterSafeOperations(stmt)
 		if previous, exists := exits[node]; exists {
 			exitsHere = exitsHere && previous
 		}
 		exits[node] = exitsHere
 	}
 	cfg.AnalyzeIfBranches(root, options)
+	options.IfConsequent = nil
+	for node, exitsHere := range exits {
+		if !exitsHere {
+			continue
+		}
+		stmt := node.AsIfStatement().ThenStatement
+		if a.hasUnmodeledCatchPath(stmt, options) {
+			exits[node] = false
+		}
+	}
 	return exits
 }
 
@@ -94,13 +106,43 @@ func (a *exitAnalysis) isProcessExit(node *ast.Node) bool {
 func (a *exitAnalysis) safeRead(node *ast.Node) bool {
 	symbol := a.ctx.Refs.ResolveInFile(node)
 	if symbol == nil {
+		// Only these immutable language globals are known here. Configured
+		// host globals may be accessors.
+		switch node.Text() {
+		case "undefined", "Infinity", "NaN":
+			return ast.FindAncestorKind(node, ast.KindWithStatement) == nil &&
+				a.ctx.Globals.Access(node.Text()) == utils.GlobalAccessReadonly &&
+				a.ctx.Refs.IsGlobalReference(node)
+		}
 		return false
 	}
 	decl := symbol.ValueDeclaration
 	if decl == nil {
 		return false
 	}
-	// A simple parameter of this function is initialized before the body.
-	return decl.Kind == ast.KindParameter && cfg.RootOf(node) == decl.Parent &&
-		decl.Parent.Body() != nil && decl.Parent.Body().Pos() <= node.Pos()
+	switch decl.Kind {
+	case ast.KindParameter:
+		return parameterReadIsSafe(node, decl)
+	case ast.KindVariableDeclaration:
+		if decl.Initializer() == nil || decl.Parent == nil || !ast.IsVarConst(decl.Parent) {
+			return false
+		}
+		stmt := decl.Parent.Parent
+		// An earlier const in an enclosing block has been initialized.
+		// Text order alone proves nothing across functions or switch clauses.
+		return stmt != nil && stmt.Kind == ast.KindVariableStatement &&
+			stmt.Flags&ast.NodeFlagsAmbient == 0 && stmt.Parent != nil &&
+			(stmt.Parent.Kind == ast.KindBlock || stmt.Parent.Kind == ast.KindSourceFile) &&
+			stmt.End() <= node.Pos() && cfg.RootOf(node) == cfg.RootOf(stmt) &&
+			ast.FindAncestor(node, func(n *ast.Node) bool { return n == stmt.Parent }) != nil &&
+			ast.FindAncestorKind(node, ast.KindWithStatement) == nil
+	}
+	return false
+}
+
+func parameterReadIsSafe(node, declaration *ast.Node) bool {
+	// A parameter of this function is initialized before the body.
+	function := declaration.Parent
+	return function != nil && cfg.RootOf(node) == function && function.Body() != nil &&
+		function.Body().Pos() <= node.Pos() && ast.FindAncestorKind(node, ast.KindWithStatement) == nil
 }

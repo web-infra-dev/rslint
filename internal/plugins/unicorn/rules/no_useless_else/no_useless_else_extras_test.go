@@ -14,6 +14,97 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestNoUselessElseCaughtExceptions(t *testing.T) {
+	// Keep these alternatives fixable in shape so a false positive also
+	// exposes the unsafe rewrite.
+	branch := func(body string) string {
+		return "function run(flag, value) {\n" +
+			"  if (flag) {\n" + body + "\n  } else {\n    fallback();\n  }\n}"
+	}
+	valid := []rule_tester.ValidTestCase{
+		{FileName: "case.js", Code: branch("    try { `${value}${process.exit()}`; } catch {}")},
+		{FileName: "case.js", Code: branch("    try { ({} = value); return; } catch {}")},
+		{FileName: "case.js", Code: branch("    try { ([] = value); return; } catch {}")},
+		{FileName: "case.js", Code: branch("    try { try { throw null; } catch ({}) { return; } } catch {}")},
+		{FileName: "case.js", Code: branch("    try { for (const key in value) { return true; } return false; } catch {}")},
+		{FileName: "case.js", Code: `class C extends Object {
+  constructor(flag) {
+    if (flag) {
+      try { this; return; } catch {}
+    } else {
+      fallback();
+    }
+    return {};
+  }
+}`},
+		{FileName: "case.jsx", Code: "/** @jsx factory */\n" + branch("    try { return <div />; } catch {}")},
+		{FileName: "case.jsx", Code: branch("    try { return <Unknown value={process.exit()} />; } catch {}")},
+		{
+			FileName:        "case.js",
+			Code:            branch("    try { with (value) { return; } } catch {}"),
+			LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+		},
+		{FileName: "case.js", Code: branch("    try { value?.x; process.exit(); } catch {}")},
+		{FileName: "case.js", Code: branch("    try { (void missing)?.x; process.exit(); } catch {}")},
+		{FileName: "case.js", Code: branch("    try { `${void missing}${process.exit()}`; } catch {}")},
+		{FileName: "case.js", Code: branch("    try { process.exit(status); } catch {}\n    const status = 1;")},
+		{FileName: "case.js", Code: branch("    try { process.exit(undefined); } catch {}"), Globals: map[string]any{"undefined": "off"}},
+		{FileName: "case.js", Code: branch("    const status = 1;\n    try { status = 2; process.exit(); } catch {}")},
+		{FileName: "case.jsx", Code: branch("    try { try { return <div />; } catch {} return; } catch {}")},
+		{FileName: "case.js", Code: branch("    try { if (value) return;\n      `${value}${process.exit()}`;\n    } catch {}")},
+		{FileName: "case.js", Code: branch("    try { try { throw null; } catch ([]) { return; } } catch {}")},
+		{FileName: "case.jsx", Code: `function run(flag, value) {
+  if (flag) {
+    try {
+      const component = { [<div />]() {} };
+      process.exit();
+    } catch {}
+  } else {
+    fallback();
+  }
+}`},
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_else.NoUselessElseRule, valid, nil)
+}
+
+func TestNoUselessElseSafeOperations(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	const prefix = "function run(flag, value) {\n  const status = 1;\n  if (flag) {\n"
+	for _, body := range []string{
+		"    try { process.exit(status); } catch {}",
+		"    try { process.exit(undefined); } catch {}",
+		"    try { value = 1; process.exit(); } catch {}",
+		"    try { null?.x; process.exit(); } catch {}",
+		"    try { null?.[process.exit()]; return; } catch {}",
+		"    try { (null?.x?.y); process.exit(); } catch {}",
+		"    try { undefined?.x; process.exit(); } catch {}",
+		"    try { (void 0)?.x; process.exit(1); } catch {}",
+		"    try { ({} = process.exit()); } catch {}",
+		"    try { for (const key in process.exit()) {} } catch {}",
+		"    try { return; ({} = value); } catch {}",
+		"    try { `${1}${process.exit()}`; } catch {}",
+		"    try { value`${value}${process.exit()}`; } catch {}",
+		"    try { value`${value}`; return; } catch { return; }",
+		"    try { if (false) { `${value}${process.exit()}`; } return; } catch {}",
+		"    try { const capture = () => `${value}`; return; } catch {}",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			FileName: "case.js",
+			Code:     prefix + body + "\n  } else {\n    fallback();\n  }\n}",
+			Errors:   []rule_tester.InvalidTestCaseError{elseAt(5, 5)},
+			Output:   []string{prefix + body + "\n  }\n  fallback();\n}"},
+		})
+	}
+	const jsx = "    try { return <div title=\"status\" value={process.exit()} />; } catch {}"
+	invalid = append(invalid, rule_tester.InvalidTestCase{
+		FileName: "case.jsx",
+		Code:     prefix + jsx + "\n  } else {\n    fallback();\n  }\n}",
+		Errors:   []rule_tester.InvalidTestCaseError{elseAt(5, 5)},
+		Output:   []string{prefix + jsx + "\n  }\n  fallback();\n}"},
+	})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &no_useless_else.NoUselessElseRule, nil, invalid)
+}
+
 func TestNoUselessElseExtras(t *testing.T) {
 	valid := []rule_tester.ValidTestCase{
 		{FileName: "case.js", Code: `function run(enabled, values) {
