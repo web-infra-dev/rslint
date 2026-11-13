@@ -8,11 +8,6 @@ import (
 
 const ruleName = "no-duplicate-loops"
 
-var loopMethods = unicornutil.DotMethodCallOptions{
-	Methods:          []string{"map", "filter"},
-	MinimumArguments: new(1),
-}
-
 var NoDuplicateLoopsRule = rule.Rule{
 	Name:   "unicorn/" + ruleName,
 	Schema: rule.EmptyArraySchema,
@@ -20,8 +15,8 @@ var NoDuplicateLoopsRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindForOfStatement: func(node *ast.Node) {
 				loop := node.AsForInOrOfStatement()
-				call, ok := unicornutil.MatchDotMethodCall(unwrapExpression(loop.Expression), loopMethods)
-				if !ok || isIteratorExpression(&ctx, call.Object, make(map[*ast.Node]struct{})) {
+				call, ok := unicornutil.MatchMapOrFilterCall(unicornutil.UnwrapIteratorExpression(loop.Expression))
+				if !ok || unicornutil.IsIteratorExpression(&ctx, call.Object) {
 					return
 				}
 

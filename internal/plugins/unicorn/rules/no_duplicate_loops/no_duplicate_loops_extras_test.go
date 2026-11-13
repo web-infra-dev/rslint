@@ -132,7 +132,21 @@ function consume(a) {
   for (const x of make().map(fn)) {}
   return [1].values();
 };`, "case.ts"),
+		validCase(`/** @param {function(): IteratorObject<number>} make */
+function consume(make = () => [1].values()) {
+  for (const x of make().map(fn)) {}
+}`, "case.js"),
+		validCase(`function consume(make: () => IteratorObject<number> = () => [1].values()) {
+  for (const x of make().map(fn)) {}
+}`, "case.ts"),
+		validCase(`declare const source: IteratorObject<number>;
+const alias: any = source;
+for (const x of alias.map(fn)) {}`, "case.ts"),
 	}, []rule_tester.InvalidTestCase{
+		invalidCase(`function consume(make = /** @returns {IteratorObject<number>} */ () => [1].values()) {
+  for (const x of make().map(fn)) {}
+}
+consume(() => [1, 2, 3]);`, "case.js", loopDiagnostic("map", "for…of", 2, 26, 29)),
 		invalidCase(`/**
  * @param {IteratorObject<number>} a
  * @param {number[]} items

@@ -1,23 +1,56 @@
-package no_duplicate_loops
+package unicornutil
 
 import (
 	"slices"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func unwrapExpression(node *ast.Node) *ast.Node {
+var mapOrFilterCall = DotMethodCallOptions{
+	Methods:          []string{"map", "filter"},
+	MinimumArguments: new(1),
+}
+
+var iteratorMethodCall = DotMethodCallOptions{
+	AllowOptionalCall: true, AllowOptionalMember: true,
+}
+
+var lazyIteratorHelperCall = DotMethodCallOptions{
+	Methods:             []string{"drop", "filter", "flatMap", "map", "take"},
+	MinimumArguments:    new(1),
+	AllowOptionalCall:   true,
+	AllowOptionalMember: true,
+}
+
+// MatchMapOrFilterCall matches the dot calls with arguments considered by both loop rules.
+func MatchMapOrFilterCall(node *ast.Node) (DotMethodCall, bool) {
+	return MatchDotMethodCall(node, mapOrFilterCall)
+}
+
+// UnwrapIteratorExpression skips parentheses and TypeScript wrappers around
+// an iterable expression. Optional-chain tokens remain on their original nodes.
+func UnwrapIteratorExpression(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
 	return ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions|ast.OEKExpressionsWithTypeArguments)
 }
 
+// IsIteratorExpression reports whether the expression produces a known iterator.
+func IsIteratorExpression(ctx *rule.RuleContext, expression *ast.Node) bool {
+	return isIteratorExpression(ctx, expression, make(map[*ast.Node]struct{}))
+}
+
+// IsLazyIteratorHelperCall matches a lazy helper called on a known iterator.
+func IsLazyIteratorHelperCall(ctx *rule.RuleContext, node *ast.Node) bool {
+	call, ok := MatchDotMethodCall(node, lazyIteratorHelperCall)
+	return ok && IsIteratorExpression(ctx, call.Object)
+}
+
 func isIteratorExpression(ctx *rule.RuleContext, expression *ast.Node, visited map[*ast.Node]struct{}) bool {
-	node := unwrapExpression(expression)
+	node := UnwrapIteratorExpression(expression)
 	if node == nil {
 		return false
 	}
@@ -40,28 +73,26 @@ func isIteratorExpression(ctx *rule.RuleContext, expression *ast.Node, visited m
 }
 
 func isIteratorCall(ctx *rule.RuleContext, node *ast.Node, visited map[*ast.Node]struct{}) bool {
-	call, ok := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
-		AllowOptionalCall: true, AllowOptionalMember: true,
-	})
+	call, ok := MatchDotMethodCall(node, iteratorMethodCall)
 	if ok {
 		args := node.Arguments()
-		switch call.Property.Text() {
+		method := call.Property.Text()
+		switch method {
 		case "from", "concat", "zip", "zipKeyed":
 			return isGlobalIterator(ctx, call.Object)
 		case "entries", "keys", "values":
 			return len(args) == 0
 		case "matchAll":
 			return len(args) == 0 || (len(args) == 1 && args[0].Kind != ast.KindSpreadElement)
-		case "drop", "filter", "flatMap", "map", "take":
-			return len(args) > 0 && isIteratorExpression(ctx, call.Object, visited)
 		}
-		return false
+		return len(args) > 0 && matchesMethodName(method, lazyIteratorHelperCall) &&
+			isIteratorExpression(ctx, call.Object, visited)
 	}
 	return !ast.IsOptionalChainRoot(node) && isSynchronousGenerator(ctx, node.Expression(), visited)
 }
 
 func isGlobalIterator(ctx *rule.RuleContext, node *ast.Node) bool {
-	node = unwrapExpression(node)
+	node = UnwrapIteratorExpression(node)
 	if node == nil {
 		return false
 	}
@@ -70,7 +101,7 @@ func isGlobalIterator(ctx *rule.RuleContext, node *ast.Node) bool {
 		if property.Kind != ast.KindIdentifier || property.Text() != "Iterator" {
 			return false
 		}
-		return isGlobalName(ctx, unwrapExpression(node.Expression()), "globalThis")
+		return isGlobalName(ctx, UnwrapIteratorExpression(node.Expression()), "globalThis")
 	}
 	return isGlobalName(ctx, node, "Iterator")
 }
@@ -118,7 +149,7 @@ func bindingIsUnchanged(ctx *rule.RuleContext, symbol *ast.Symbol) bool {
 
 func isSynchronousGenerator(ctx *rule.RuleContext, node *ast.Node, visited map[*ast.Node]struct{}) bool {
 	for node != nil {
-		node = unwrapExpression(node)
+		node = UnwrapIteratorExpression(node)
 		if _, seen := visited[node]; seen {
 			return false
 		}
