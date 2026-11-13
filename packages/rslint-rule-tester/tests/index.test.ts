@@ -4,11 +4,7 @@ import { beforeEach, describe, expect, rs, test } from 'rstack/test' with {
 };
 import * as actualTest from 'rstack/test' with { rstest: 'importActual' };
 import { lint } from '@rslint/core/internal';
-import {
-  RuleTester,
-  type FixtureTestCase,
-  type ValidTestCase,
-} from '../src/index.ts';
+import { RuleTester } from '../src/index.ts';
 
 const runner = rs.hoisted(() => ({
   test: rs.fn<(name: string, callback: () => Promise<void>) => void>(),
@@ -29,8 +25,10 @@ rs.mock('rstack/test', () => ({
 
 rs.mock('@rslint/core/internal', () => ({ lint: rs.fn() }));
 rs.mock('../src/fixture.ts', () => ({
-  createFixtureRoot: rs.fn(async () => path.resolve('/fixture')),
-  removeFixtureRoot: rs.fn(async () => {}),
+  createFixtureRoot: rs
+    .fn<() => Promise<string>>()
+    .mockResolvedValue(path.resolve('/fixture')),
+  removeFixtureRoot: rs.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 describe('RuleTester.run', () => {
@@ -242,7 +240,7 @@ describe('RuleTester.run', () => {
     async (key) => {
       const entry = {
         create: () => ({ code: 'x()', [key]: 'late metadata' }),
-      } as unknown as FixtureTestCase<ValidTestCase>;
+      };
       tester.run('no-process-exit', { valid: [entry], invalid: [] });
       await expect(runner.test.mock.calls[0][1]()).rejects.toThrow(
         `${key} belongs outside create(root)`,
