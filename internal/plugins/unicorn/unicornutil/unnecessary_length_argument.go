@@ -188,40 +188,13 @@ func isRepeatableReference(ctx rule.RuleContext, node *ast.Node) bool {
 		// Without type information we cannot distinguish a data property from a
 		// getter. Re-evaluating a member chain can therefore change which object
 		// receives the splice, so only checker-backed member paths are repeatable.
-		if ctx.TypeChecker == nil || accessHasGetter(ctx, node) {
+		if ctx.TypeChecker == nil || AccessHasGetter(ctx.TypeChecker, node) {
 			return false
 		}
 		return isRepeatableReference(ctx, utils.AccessExpressionObject(node))
 	default:
 		return false
 	}
-}
-
-func accessHasGetter(ctx rule.RuleContext, node *ast.Node) bool {
-	if ctx.TypeChecker == nil || node == nil {
-		return false
-	}
-	var location *ast.Node
-	switch node.Kind {
-	case ast.KindPropertyAccessExpression:
-		location = node.AsPropertyAccessExpression().Name()
-	case ast.KindElementAccessExpression:
-		location = node
-	default:
-		return false
-	}
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(location)
-	if symbol == nil {
-		return false
-	}
-
-	for _, declaration := range symbol.Declarations {
-		if declaration.Kind == ast.KindGetAccessor ||
-			ast.HasSyntacticModifier(declaration, ast.ModifierFlagsAccessor) {
-			return true
-		}
-	}
-	return false
 }
 
 func isSideEffectFreeArgument(node *ast.Node) bool {

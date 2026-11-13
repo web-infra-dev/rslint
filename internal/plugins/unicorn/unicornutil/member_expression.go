@@ -4,10 +4,39 @@ import (
 	"regexp"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 var decimalIntegerPattern = regexp.MustCompile(`^(?:0|0[0-7]*[89][0-9]*|[1-9](?:_?[0-9])*)$`)
+
+// AccessHasGetter reports whether a property read resolves to a getter or
+// TypeScript auto-accessor.
+func AccessHasGetter(chk *checker.Checker, node *ast.Node) bool {
+	if chk == nil || node == nil {
+		return false
+	}
+	var location *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		location = node.Name()
+	case ast.KindElementAccessExpression:
+		location = node
+	default:
+		return false
+	}
+	symbol := chk.GetSymbolAtLocation(location)
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		if declaration.Kind == ast.KindGetAccessor ||
+			ast.HasSyntacticModifier(declaration, ast.ModifierFlagsAccessor) {
+			return true
+		}
+	}
+	return false
+}
 
 // IsReferenceTarget reports whether an expression is written, updated, or
 // deleted through any enclosing parentheses and TypeScript assertions.
