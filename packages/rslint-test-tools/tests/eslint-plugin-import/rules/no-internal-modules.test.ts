@@ -1,561 +1,876 @@
-// Upstream: eslint-plugin-import v2.32.0 tests/src/rules/no-internal-modules.js.
-import fs from 'node:fs';
-import path from 'node:path';
-import { RuleTester } from '../rule-tester.js';
-
-const root = fs.mkdtempSync(path.join(process.cwd(), '.no-internal-modules-'));
-const archive = fs.readFileSync(
-  path.resolve(
-    import.meta.dirname,
-    '../../../../../internal/plugins/import/rules/no_internal_modules/testdata/modules.txtar',
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(
+  fixtureConfig(
+    'internal/plugins/import/rules/no_internal_modules/testdata/modules.txtar',
   ),
-  'utf8',
-);
-const chunks = archive.split(/^-- (.+) --\r?$/m);
-if (chunks.length < 3) throw new Error('Missing upstream fixtures');
-for (let i = 1; i < chunks.length; i += 2) {
-  const file = path.join(root, chunks[i]);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, chunks[i + 1].replace(/^\r?\n/, ''));
-}
-afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
-const testFilePath = (name: string) => path.join(root, name);
-
-const ruleTester = new RuleTester();
-const test = (value: any) => value;
-const getTSParsers = () => ['native'];
-const flatMap = (values: string[], fn: (parser: string) => any[]) =>
-  values.flatMap(fn);
-
-ruleTester.run('no-internal-modules', null as never, {
+).run('no-internal-modules', {
   valid: [
-    // imports
-    test({
+    {
+      name: 'run 0 valid 0',
       code: 'import a from "./plugin2"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [],
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 1',
       code: 'const a = require("./plugin2")',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 2',
       code: 'const a = require("./plugin2/")',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 3',
       code: 'const dynamic = "./plugin2/"; const a = require(dynamic)',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 4',
       code: 'import b from "./internal.js"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/index.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 5',
       code: 'import get from "lodash.get"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/index.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 6',
       code: 'import b from "@org/package"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 7',
       code: 'import b from "../../api/service"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['**/api/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 8',
       code: 'import "jquery/dist/jquery"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['jquery/dist/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 9',
       code: 'import "./app/index.js";\nimport "./app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['**/index{.js,}'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 10',
       code: 'import a from "./plugin2/thing"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
+      filename: 'internal-modules/plugins/plugin.js',
       options: [
         {
           forbid: ['**/api/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 11',
       code: 'const a = require("./plugin2/thing")',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
+      filename: 'internal-modules/plugins/plugin.js',
       options: [
         {
           forbid: ['**/api/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 12',
       code: 'import b from "app/a"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           forbid: ['app/**/**'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 13',
       code: 'import b from "@org/package"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           forbid: ['@org/package/*'],
         },
       ],
-    }),
-    // exports
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 14',
       code: 'export {a} from "./internal.js"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/index.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 15',
       code: 'export * from "lodash.get"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/index.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 16',
       code: 'export {b} from "@org/package"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-    }),
-    test({
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 17',
       code: 'export {b} from "../../api/service"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['**/api/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 18',
       code: 'export * from "jquery/dist/jquery"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['jquery/dist/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 19',
       code: 'export * from "./app/index.js";\nexport * from "./app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           allow: ['**/index{.js,}'],
         },
       ],
-    }),
-    test({
-      code: `
-        export class AuthHelper {
-
-          static checkAuth(auth) {
-          }
-        }
-      `,
-    }),
-    ...flatMap(getTSParsers(), (parser) => [
-      test({
-        code: `
-          export class AuthHelper {
-
-            public static checkAuth(auth?: string): boolean {
-            }
-          }
-        `,
-        filename: testFilePath('internal-modules/plugins/plugin.ts'),
-        parser,
-      }),
-    ]),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 20',
+      code: '\n        export class AuthHelper {\n\n          static checkAuth(auth) {\n          }\n        }\n      ',
+    },
+    {
+      name: 'run 0 valid 21 [upstream parser metadata: {"parser":"native"}]',
+      code: '\n          export class AuthHelper {\n\n            public static checkAuth(auth?: string): boolean {\n            }\n          }\n        ',
+      filename: 'internal-modules/plugins/plugin.ts',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 22',
       code: 'export * from "./plugin2/thing"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
+      filename: 'internal-modules/plugins/plugin.js',
       options: [
         {
           forbid: ['**/api/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 23',
       code: 'export * from "app/a"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           forbid: ['app/**/**'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 24',
       code: 'export { b } from "@org/package"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           forbid: ['@org/package/*'],
         },
       ],
-    }),
-    test({
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 25',
       code: 'export * from "./app/index.js";\nexport * from "./app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
+      filename: 'internal-modules/plugins/plugin2/internal.js',
       options: [
         {
           forbid: ['**/index.ts'],
         },
       ],
-    }),
-  ],
-
-  invalid: [
-    // imports
-    test({
-      code: 'import "./plugin2/index.js";\nimport "./plugin2/app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [
-        {
-          allow: ['*/index.js'],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
         },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "./plugin2/app/index" is not allowed.',
-          line: 2,
-          column: 8,
-        },
-      ],
-    }),
-    test({
-      code: 'import "./app/index.js"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      errors: [
-        {
-          message: 'Reaching to "./app/index.js" is not allowed.',
-          line: 1,
-          column: 8,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "./plugin2/internal"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      errors: [
-        {
-          message: 'Reaching to "./plugin2/internal" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import a from "../api/service/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [
-        {
-          allow: ['**/internal-modules/*'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "../api/service/index" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "@org/package/internal"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      errors: [
-        {
-          message: 'Reaching to "@org/package/internal" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import get from "debug/node"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      errors: [
-        {
-          message: 'Reaching to "debug/node" is not allowed.',
-          line: 1,
-          column: 17,
-        },
-      ],
-    }),
-    test({
-      code: 'import "./app/index.js"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      options: [
-        {
-          forbid: ['*/app/*'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "./app/index.js" is not allowed.',
-          line: 1,
-          column: 8,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "@org/package"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      options: [
-        {
-          forbid: ['@org/**'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "@org/package" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "app/a/b"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      options: [
-        {
-          forbid: ['app/**/**'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "app/a/b" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import get from "lodash.get"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/index.js'),
-      options: [
-        {
-          forbid: ['lodash.*'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "lodash.get" is not allowed.',
-          line: 1,
-          column: 17,
-        },
-      ],
-    }),
-    test({
-      code: 'import "./app/index.js";\nimport "./app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      options: [
-        {
-          forbid: ['**/index{.js,}'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "./app/index.js" is not allowed.',
-          line: 1,
-          column: 8,
-        },
-        {
-          message: 'Reaching to "./app/index" is not allowed.',
-          line: 2,
-          column: 8,
-        },
-      ],
-    }),
-    // Unsupported upstream webpack resolver case: native rules cannot execute JS resolvers.
-    // test({
-    // code: 'import "@/api/service";',
-    // options: [{
-    // forbid: ['**/api/*'],
-    // }],
-    // errors: [{
-    // message: 'Reaching to "@/api/service" is not allowed.',
-    // line: 1,
-    // column: 8,
-    // }],
-    // settings: {
-    // 'import/resolver': {
-    // webpack: {
-    // config: {
-    // resolve: {
-    // alias: {
-    // '@': testFilePath('internal-modules'),
-    // },
-    // },
-    // },
-    // },
-    // },
-    // },
-    // }),
-    // exports
-    test({
-      code: 'export * from "./plugin2/index.js";\nexport * from "./plugin2/app/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [
-        {
-          allow: ['*/index.js'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "./plugin2/app/index" is not allowed.',
-          line: 2,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'export * from "./app/index.js"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      errors: [
-        {
-          message: 'Reaching to "./app/index.js" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'export {b} from "./plugin2/internal"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      errors: [
-        {
-          message: 'Reaching to "./plugin2/internal" is not allowed.',
-          line: 1,
-          column: 17,
-        },
-      ],
-    }),
-    test({
-      code: 'export {a} from "../api/service/index"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [
-        {
-          allow: ['**/internal-modules/*'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "../api/service/index" is not allowed.',
-          line: 1,
-          column: 17,
-        },
-      ],
-    }),
-    test({
-      code: 'export {b} from "@org/package/internal"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      errors: [
-        {
-          message: 'Reaching to "@org/package/internal" is not allowed.',
-          line: 1,
-          column: 17,
-        },
-      ],
-    }),
-    test({
-      code: 'export {get} from "debug/node"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      errors: [
-        {
-          message: 'Reaching to "debug/node" is not allowed.',
-          line: 1,
-          column: 19,
-        },
-      ],
-    }),
-    test({
-      code: 'export * from "./plugin2/thing"',
-      filename: testFilePath('./internal-modules/plugins/plugin.js'),
-      options: [
-        {
-          forbid: ['**/plugin2/*'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "./plugin2/thing" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'export * from "app/a"',
-      filename: testFilePath('./internal-modules/plugins/plugin2/internal.js'),
-      options: [
-        {
-          forbid: ['**'],
-        },
-      ],
-      errors: [
-        {
-          message: 'Reaching to "app/a" is not allowed.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-  ],
-});
-
-// Pinned documentation examples. Babel's export-default-from example is
-// unsupported; use export { default as getUser } from '../actions/getUser'.
-new RuleTester().run('no-internal-modules', null as never, {
-  valid: [
+      },
+    },
     {
-      filename: path.join(root, 'my-project/entry.js'),
+      name: 'run 1 valid 0',
       code: "import 'source-map-support/register';\nimport { settings } from '../app';\nimport getUser from '../actions/getUser';\nexport * from 'source-map-support/register';\nexport { settings } from '../app';",
+      filename: 'my-project/entry.js',
       options: [
         {
           allow: ['**/actions/*', 'source-map-support/*'],
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
-      filename: path.join(root, 'my-project/entry.js'),
+      name: 'run 1 valid 1',
       code: "import 'source-map-support';\nimport { getUser } from '../actions';\nexport * from 'source-map-support';\nexport { getUser } from '../actions';",
+      filename: 'my-project/entry.js',
       options: [
         {
           forbid: ['**/actions/*', 'source-map-support/*'],
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
   ],
   invalid: [
     {
-      filename: path.join(root, 'my-project/entry.js'),
+      name: 'run 0 invalid 0',
+      code: 'import "./plugin2/index.js";\nimport "./plugin2/app/index"',
+      filename: 'internal-modules/plugins/plugin.js',
+      options: [
+        {
+          allow: ['*/index.js'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./plugin2/app/index" is not allowed.',
+          line: 2,
+          column: 8,
+          endLine: 2,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 1',
+      code: 'import "./app/index.js"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./app/index.js" is not allowed.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 2',
+      code: 'import b from "./plugin2/internal"',
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./plugin2/internal" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 3',
+      code: 'import a from "../api/service/index"',
+      filename: 'internal-modules/plugins/plugin.js',
+      options: [
+        {
+          allow: ['**/internal-modules/*'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "../api/service/index" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 4',
+      code: 'import b from "@org/package/internal"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "@org/package/internal" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 38,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 5',
+      code: 'import get from "debug/node"',
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "debug/node" is not allowed.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 6',
+      code: 'import "./app/index.js"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      options: [
+        {
+          forbid: ['*/app/*'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./app/index.js" is not allowed.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 7',
+      code: 'import b from "@org/package"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      options: [
+        {
+          forbid: ['@org/**'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "@org/package" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 8',
+      code: 'import b from "app/a/b"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      options: [
+        {
+          forbid: ['app/**/**'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "app/a/b" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 9',
+      code: 'import get from "lodash.get"',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      options: [
+        {
+          forbid: ['lodash.*'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "lodash.get" is not allowed.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 10',
+      code: 'import "./app/index.js";\nimport "./app/index"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      options: [
+        {
+          forbid: ['**/index{.js,}'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./app/index.js" is not allowed.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 24,
+        },
+        {
+          messageId: '',
+          message: 'Reaching to "./app/index" is not allowed.',
+          line: 2,
+          column: 8,
+          endLine: 2,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 11',
+      code: 'export * from "./plugin2/index.js";\nexport * from "./plugin2/app/index"',
+      filename: 'internal-modules/plugins/plugin.js',
+      options: [
+        {
+          allow: ['*/index.js'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./plugin2/app/index" is not allowed.',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 36,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 12',
+      code: 'export * from "./app/index.js"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./app/index.js" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 13',
+      code: 'export {b} from "./plugin2/internal"',
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./plugin2/internal" is not allowed.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 37,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 14',
+      code: 'export {a} from "../api/service/index"',
+      filename: 'internal-modules/plugins/plugin.js',
+      options: [
+        {
+          allow: ['**/internal-modules/*'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "../api/service/index" is not allowed.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 15',
+      code: 'export {b} from "@org/package/internal"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "@org/package/internal" is not allowed.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 40,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 16',
+      code: 'export {get} from "debug/node"',
+      filename: 'internal-modules/plugins/plugin.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "debug/node" is not allowed.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 17',
+      code: 'export * from "./plugin2/thing"',
+      filename: 'internal-modules/plugins/plugin.js',
+      options: [
+        {
+          forbid: ['**/plugin2/*'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "./plugin2/thing" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 32,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 18',
+      code: 'export * from "app/a"',
+      filename: 'internal-modules/plugins/plugin2/internal.js',
+      options: [
+        {
+          forbid: ['**'],
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message: 'Reaching to "app/a" is not allowed.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      name: 'run 1 invalid 0',
       code: "import { settings } from './app/index';\nimport userReducer from './reducer/user';\nimport configureStore from './redux/configureStore';\nexport { settings } from './app/index';\nexport * from './reducer/user';",
+      filename: 'my-project/entry.js',
       options: [
         {
           allow: ['**/actions/*', 'source-map-support/*'],
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Reaching to "./app/index" is not allowed.',
           line: 1,
           column: 26,
@@ -563,6 +878,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 39,
         },
         {
+          messageId: '',
           message: 'Reaching to "./reducer/user" is not allowed.',
           line: 2,
           column: 25,
@@ -570,6 +886,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 41,
         },
         {
+          messageId: '',
           message: 'Reaching to "./redux/configureStore" is not allowed.',
           line: 3,
           column: 28,
@@ -577,6 +894,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 52,
         },
         {
+          messageId: '',
           message: 'Reaching to "./app/index" is not allowed.',
           line: 4,
           column: 26,
@@ -584,6 +902,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 39,
         },
         {
+          messageId: '',
           message: 'Reaching to "./reducer/user" is not allowed.',
           line: 5,
           column: 15,
@@ -593,15 +912,23 @@ new RuleTester().run('no-internal-modules', null as never, {
       ],
     },
     {
-      filename: path.join(root, 'my-project/entry.js'),
+      name: 'run 1 invalid 1',
       code: "import 'source-map-support/register';\nimport getUser from '../actions/getUser';\nexport * from 'source-map-support/register';",
+      filename: 'my-project/entry.js',
       options: [
         {
           forbid: ['**/actions/*', 'source-map-support/*'],
         },
       ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
       errors: [
         {
+          messageId: '',
           message: 'Reaching to "source-map-support/register" is not allowed.',
           line: 1,
           column: 8,
@@ -609,6 +936,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 37,
         },
         {
+          messageId: '',
           message: 'Reaching to "../actions/getUser" is not allowed.',
           line: 2,
           column: 21,
@@ -616,6 +944,7 @@ new RuleTester().run('no-internal-modules', null as never, {
           endColumn: 41,
         },
         {
+          messageId: '',
           message: 'Reaching to "source-map-support/register" is not allowed.',
           line: 3,
           column: 15,
