@@ -93,8 +93,6 @@ export interface RulesRecord {
  * TypeScript parser options. `project` may be a single tsconfig path or a list.
  */
 export interface ParserOptions {
-  /** Preserve annotations required for isolated declaration emit. */
-  isolatedDeclarations?: boolean;
   /**
    * Discover a tsconfig/jsconfig whose files/include roots contain each target,
    * including nested configs and project references. Cannot be combined with

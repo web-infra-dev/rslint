@@ -1,5 +1,6 @@
 // Upstream: @typescript-eslint/eslint-plugin v8.46.3.
-// All 38 valid and 34 invalid cases preserve their input, options and output.
+// All 38 valid and 34 invalid cases preserve their input, rule options and output.
+// The isolatedDeclarations case uses the owning TS project instead of a parser flag.
 // Full diagnostic positions/messages were verified with that exact version.
 import { RuleTester } from '@rslint/rule-tester';
 
@@ -9,6 +10,12 @@ const noFormat = (strings: TemplateStringsArray, ...values: unknown[]) =>
 const ruleTester = new RuleTester({
   plugin: '@typescript-eslint',
   filename: 'input.ts',
+  fixtureFiles: {
+    'isolated/tsconfig.json': JSON.stringify({
+      compilerOptions: { isolatedDeclarations: true, declaration: true },
+      include: ['input.ts'],
+    }),
+  },
 });
 
 ruleTester.run('consistent-generic-constructors', {
@@ -56,9 +63,10 @@ const a = function (a: Foo = new Foo<string>()) {};
       code: `
 const foo: Foo<string> = new Foo();
       `,
+      filename: 'isolated/input.ts',
       languageOptions: {
         parserOptions: {
-          isolatedDeclarations: true,
+          project: './isolated/tsconfig.json',
         },
       },
     },

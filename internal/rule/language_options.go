@@ -8,9 +8,7 @@ package rule
 // 6 (ES2015), 17 (ES2026), and "latest" are normalized before this reaches a
 // rule.
 type LanguageOptions struct {
-	// IsolatedDeclarations is the explicit parser option, independent of tsconfig.
-	IsolatedDeclarations bool `json:"isolatedDeclarations"`
-	ECMAVersion          int  `json:"ecmaVersion"`
+	ECMAVersion int `json:"ecmaVersion"`
 	// SourceType is the normalized source goal selected for the file. An empty
 	// value has ESLint's default module semantics; file-specific defaults are
 	// resolved before the options reach a RuleContext.

@@ -529,11 +529,10 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 // ProjectService distinguishes omission from false; TsconfigRootDir retains an
 // empty string so final policy validation cannot confuse it with a null reset.
 type ParserOptions struct {
-	IsolatedDeclarations *bool        `json:"isolatedDeclarations,omitempty"`
-	ProjectService       *bool        `json:"projectService,omitempty"`
-	Project              ProjectPaths `json:"project,omitempty"`
-	TsconfigRootDir      *string      `json:"tsconfigRootDir,omitempty"`
-	ProjectDisabled      bool         `json:"-"`
+	ProjectService  *bool        `json:"projectService,omitempty"`
+	Project         ProjectPaths `json:"project,omitempty"`
+	TsconfigRootDir *string      `json:"tsconfigRootDir,omitempty"`
+	ProjectDisabled bool         `json:"-"`
 
 	projectAutomatic bool
 	rootDirSet       bool
@@ -548,13 +547,6 @@ func (options *ParserOptions) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*options = ParserOptions{}
-	if value, ok := fields["isolatedDeclarations"]; ok {
-		var enabled bool
-		if err := json.Unmarshal(value, &enabled); err != nil {
-			return errors.New("parserOptions.isolatedDeclarations supports only a boolean")
-		}
-		options.IsolatedDeclarations = BoolPtr(enabled)
-	}
 	if value, ok := fields["projectService"]; ok {
 		var enabled bool
 		if err := json.Unmarshal(value, &enabled); err != nil {
@@ -594,9 +586,6 @@ func (options *ParserOptions) UnmarshalJSON(data []byte) error {
 // would re-enable tsconfig.json fallback after a config round trip.
 func (options ParserOptions) MarshalJSON() ([]byte, error) {
 	encoded := make(map[string]any, 2)
-	if options.IsolatedDeclarations != nil {
-		encoded["isolatedDeclarations"] = *options.IsolatedDeclarations
-	}
 	if options.ProjectService != nil {
 		encoded["projectService"] = *options.ProjectService
 	}
@@ -1111,9 +1100,6 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			merged.ParserOptions = override.ParserOptions
 		} else {
 			po := *merged.ParserOptions
-			if override.ParserOptions.IsolatedDeclarations != nil {
-				po.IsolatedDeclarations = override.ParserOptions.IsolatedDeclarations
-			}
 			if override.ParserOptions.ProjectService != nil {
 				po.ProjectService = override.ParserOptions.ProjectService
 			}
@@ -1161,13 +1147,8 @@ func ExtractGlobals(langOpts *LanguageOptions) map[string]utils.GlobalAccess {
 // defaults, so a missing languageOptions object needs no allocation.
 func ExtractLanguageOptions(langOpts *LanguageOptions) rule.LanguageOptions {
 	var result rule.LanguageOptions
-	if langOpts == nil {
+	if langOpts == nil || langOpts.Raw == nil {
 		return result
-	}
-	if langOpts.ParserOptions != nil && langOpts.ParserOptions.IsolatedDeclarations != nil {
-		result.IsolatedDeclarations = *langOpts.ParserOptions.IsolatedDeclarations
-	} else if parserOptions, ok := configObject(langOpts.Raw["parserOptions"]); ok {
-		result.IsolatedDeclarations, _ = parserOptions["isolatedDeclarations"].(bool)
 	}
 	if value, present := langOpts.Raw["ecmaVersion"]; present {
 		if version, ok := normalizeConfigECMAVersion(value); ok {

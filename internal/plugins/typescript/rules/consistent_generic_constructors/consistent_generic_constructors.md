@@ -31,10 +31,12 @@ receive `()` when type arguments are moved onto the constructor.
 An existing type annotation is preserved in `"type-annotation"` mode, including
 an annotation without generic arguments such as `const a: Foo = new Foo<string>();`.
 
-When `languageOptions.parserOptions.isolatedDeclarations` is `true`, the default
-`"constructor"` mode preserves type annotations and does not report them. This
-explicit parser option is independent of the compiler option in `tsconfig.json`.
-The `"type-annotation"` mode continues to work when this option is enabled.
+When the current file's TypeScript Program has `compilerOptions.isolatedDeclarations`
+enabled, the default `"constructor"` mode preserves type annotations and does not
+report them. The value comes from the file's resolved TypeScript project, including
+its inherited compiler options. This check does not require a type checker.
+The `"type-annotation"` mode continues to work when the compiler option is enabled.
+When no project configuration is available, this protection is not enabled.
 
 For optional and definite class properties, inserted annotations follow the
 `?` or `!` marker, including computed keys and accessor properties.
@@ -59,6 +61,10 @@ In `"type-annotation"` mode, Rslint fixes `class C { x? = new Foo<string>(); }`
 to `class C { x?: Foo<string> = new Foo(); }`. Upstream v8.46.3 instead inserts
 before the optional marker and produces the invalid type `Foo<string>?`.
 Rslint likewise keeps a definite assignment marker before an inserted annotation.
+
+Unlike upstream v8.46.3, which reads an explicit parser option, Rslint uses the
+current file's Program compiler options as the source of truth for
+`isolatedDeclarations`. There is no separate public parser-option override.
 
 ## Original Documentation
 

@@ -39,6 +39,12 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	opts := parseOptions(options)
 	sourceFile := ctx.SourceFile
 	text := sourceFile.Text()
+	isolatedDeclarations := false
+	if program := ctx.Program(); program != nil {
+		if compilerOptions := program.Options(); compilerOptions != nil {
+			isolatedDeclarations = compilerOptions.IsolatedDeclarations.IsTrue()
+		}
+	}
 
 	checkNode := func(node, name, typeAnnotation, initializer *ast.Node) {
 		if initializer == nil {
@@ -99,7 +105,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 			})
 			return
 		}
-		if ctx.LanguageOptions.IsolatedDeclarations || typeRef == nil || typeRef.TypeArguments == nil || newExpr.TypeArguments != nil {
+		if isolatedDeclarations || typeRef == nil || typeRef.TypeArguments == nil || newExpr.TypeArguments != nil {
 			return
 		}
 		ctx.ReportRangeWithDeferredFixes(reportRange, rule.RuleMessage{
@@ -168,18 +174,21 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 }
 
 // The list range excludes its delimiters and may end before trailing trivia.
-// Use source tokens so comments containing angle brackets cannot truncate it.
+// The parser consumes exactly one opening < before recording args.Pos(), even
+// when the source token index groups adjacent < characters. The closing token
+// must still skip trailing comments rather than scan their angle brackets.
 func typeArgumentsRange(sourceFile *ast.SourceFile, args *ast.NodeList) (core.TextRange, bool) {
 	if args == nil || len(args.Nodes) == 0 {
 		return core.TextRange{}, false
 	}
-	opening, ok := utils.TokenBeforePosition(sourceFile, args.Pos())
-	if !ok || opening.Kind != ast.KindLessThanToken {
+	openingPos := args.Pos() - 1
+	text := sourceFile.Text()
+	if openingPos < 0 || openingPos >= len(text) || text[openingPos] != '<' {
 		return core.TextRange{}, false
 	}
 	closing, ok := utils.TokenAtOrAfter(sourceFile, args.End())
-	if !ok || closing.Kind != ast.KindGreaterThanToken || closing.Start < opening.End {
+	if !ok || closing.Kind != ast.KindGreaterThanToken || closing.Start < args.Pos() {
 		return core.TextRange{}, false
 	}
-	return core.NewTextRange(opening.Start, closing.End), true
+	return core.NewTextRange(openingPos, closing.End), true
 }
