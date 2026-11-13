@@ -77,18 +77,24 @@ var ConsistentJSONFileReadRule = rule.Rule{
 				}
 
 				encoding := utils.ESTreeRuntimeExpression(args[1])
-				if !usesOppositeEncoding(encoding, preferBuffer, getEvaluator) {
+				if !usesOppositeEncoding(&ctx, encoding, preferBuffer, getEvaluator) {
 					return
 				}
+				message := stringMessage
 				if preferBuffer {
-					ctx.ReportNodeWithDeferredFixes(encoding, bufferMessage, func() []rule.RuleFix {
-						return removeEncoding(&ctx, args)
-					})
-				} else {
-					ctx.ReportNodeWithDeferredFixes(encoding, stringMessage, func() []rule.RuleFix {
-						return replaceEncoding(&ctx, encoding)
-					})
+					message = bufferMessage
 				}
+				ctx.ReportNodeWithDeferredFixes(encoding, message, func() []rule.RuleFix {
+					// Folding can treat Object.freeze and similar calls as pass-through.
+					// Their effects still matter when the argument itself is removed.
+					if evaluator.HasSideEffect(encoding, false) {
+						return nil
+					}
+					if preferBuffer {
+						return removeEncoding(&ctx, args)
+					}
+					return replaceEncoding(&ctx, encoding)
+				})
 			},
 		}
 	},
@@ -170,23 +176,26 @@ func importedFSName(ctx *rule.RuleContext, callee *ast.Node) string {
 	return ""
 }
 
-func usesOppositeEncoding(node *ast.Node, preferBuffer bool, getEvaluator func() *utils.StaticStringEvaluator) bool {
+func usesOppositeEncoding(ctx *rule.RuleContext, node *ast.Node, preferBuffer bool, getEvaluator func() *utils.StaticStringEvaluator) bool {
 	node = utils.SkipAssertionsAndParens(node)
 	if text, ok := utils.GetStaticStringLiteralValue(node); ok {
 		return preferBuffer && isUTF8Encoding(text)
 	}
-	value, known := getEvaluator().EvalValueIfNoSideEffects(node)
+	evaluator := getEvaluator()
+	value, known := evaluator.EvalValueIfNoSideEffects(node)
 	if !known {
 		return false
 	}
-	if property, ok := utils.StaticPlainObjectOnlyProperty(value, "encoding"); ok {
+	property, isOptionsObject := utils.StaticPlainObjectOnlyProperty(value, "encoding")
+	if isOptionsObject {
 		value = property
 	}
+	matches := utils.IsNullishStaticValue(value)
 	if preferBuffer {
 		text, ok := value.(string)
-		return ok && isUTF8Encoding(text)
+		matches = ok && isUTF8Encoding(text)
 	}
-	return utils.IsNullishStaticValue(value)
+	return matches && (!isOptionsObject || optionsStayLocal(ctx, evaluator, node))
 }
 
 func isUTF8Encoding(text string) bool {

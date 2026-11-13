@@ -78,6 +78,56 @@ func TestConsistentJSONFileReadExtras(t *testing.T) {
 	})
 }
 
+func TestConsistentJSONFileReadOptionSafety(t *testing.T) {
+	for _, mode := range []struct {
+		name        string
+		encoding    string
+		replacement string
+		buffer      bool
+	}{
+		{"string", "null", ", 'utf8'", false},
+		{"buffer", "'utf8'", "", true},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			declaration := "const options = {encoding: " + mode.encoding + "};\n"
+			literal := "{encoding: " + mode.encoding + "}"
+			const directRead = "JSON.parse(fs.readFileSync(file, options));"
+			valid := []string{
+				// A helper can add an option that changes the outcome of the read.
+				"import {readFile} from 'node:fs/promises';\n" + declaration +
+					"function configure(o) { o.signal = AbortSignal.abort(); }\n" +
+					"configure(options);\nJSON.parse(await readFile(file, options));",
+				declaration + "const alias = (options);\nconfigure(alias);\n" + directRead,
+				declaration + "configure([options]);\n" + directRead,
+				declaration + "configure(options);\nJSON.parse(fs.readFileSync(file, {...options}));",
+				declaration + "const alias = Object.freeze(options);\nconfigure(alias);\n" + directRead,
+				declaration + "export {options};\n" + directRead,
+			}
+			if !mode.buffer {
+				valid = append(valid, "const options = {encoding: null, flag: undefined};\nconfigure(options);\n"+
+					"JSON.parse(fs.readFileSync(file, {encoding: void options.flag}));")
+			}
+			invalid := []rule_tester.InvalidTestCase{}
+			for _, method := range []struct{ apply, check string }{
+				{"freeze", "isFrozen"}, {"seal", "isSealed"}, {"preventExtensions", "isExtensible"},
+			} {
+				argument := "Object." + method.apply + "(options)"
+				code := declaration + "JSON.parse(fs.readFileSync(file, " + argument + "));\n" +
+					"console.log(Object." + method.check + "(options));"
+				invalid = append(invalid, readCase(code, nil, mode.buffer, 2, 34, 2, 34+len(argument)))
+			}
+			// Freezing in the initializer keeps the call when the rule fixes the read.
+			prefix := "const options = Object.freeze(" + literal + ");\n"
+			fixed := prefix + "JSON.parse(fs.readFileSync(file" + mode.replacement + "));"
+			invalid = append(invalid, readCase(prefix+directRead, []string{fixed}, mode.buffer, 2, 34, 2, 41))
+			aliasPrefix := declaration + "const alias = options;\n"
+			fixed = aliasPrefix + "JSON.parse(fs.readFileSync(file" + mode.replacement + "));"
+			invalid = append(invalid, readCase(aliasPrefix+"JSON.parse(fs.readFileSync(file, alias));", []string{fixed}, mode.buffer, 3, 34, 3, 39))
+			runCases(t, valid, invalid, mode.buffer)
+		})
+	}
+}
+
 func TestConsistentJSONFileReadEditDemand(t *testing.T) {
 	const fileName = "file.mjs"
 	const code = `JSON.parse(fs.readFileSync(file));

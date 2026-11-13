@@ -71,6 +71,12 @@ const config = JSON.parse(await fs.readFile('./config.json'));
   in `"buffer"` mode. Rslint also preserves options with an explicit prototype,
   such as `{ __proto__: { flag: 'r' }, encoding: null }`, so the read keeps its
   inherited `flag` option.
+- Rslint skips reads whose options may be changed by another function. For
+  example, after `configure(options)`, the rule preserves the options argument
+  so the read still honors any `signal` added by `configure`.
+- Rslint reports an encoding mismatch without a fix when removing the argument
+  would also remove a call such as `Object.freeze(options)`. A freeze in a
+  separate options initializer still allows the fix.
 
 ## Original Documentation
 
