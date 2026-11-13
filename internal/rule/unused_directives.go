@@ -222,14 +222,15 @@ func (dm *DisableManager) removeEntry(d trackedDirective, name string) RuleFix {
 
 // A newline inside a block comment participates in automatic semicolon insertion.
 // Preserve every ECMAScript line terminator without joining separate CR and LF
-// into CRLF, including across the replacement's boundaries.
+// into CRLF, including when adjacent replacements are applied together.
 func directiveLineTerminators(text string, start, end int) string {
 	var replacement strings.Builder
 	previousCR := start > 0 && text[start-1] == '\r'
 	removed := false
 	for _, r := range text[start:end] {
 		if ecmascript.IsLineTerminator(r) {
-			if r == '\n' && previousCR && removed {
+			// An independent fix before this range can also expose a CR.
+			if r == '\n' && removed && (previousCR || replacement.Len() == 0) {
 				replacement.WriteByte(' ')
 			}
 			replacement.WriteRune(r)
@@ -239,7 +240,9 @@ func directiveLineTerminators(text string, start, end int) string {
 			removed = true
 		}
 	}
-	if previousCR && removed && end < len(text) && text[end] == '\n' {
+	// The next edit may expose an LF that is not adjacent in the original text.
+	// Keep a separator after a CR whose following characters were removed.
+	if previousCR && removed {
 		replacement.WriteByte(' ')
 	}
 	return replacement.String()

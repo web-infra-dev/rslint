@@ -23,9 +23,24 @@ var lineTerminators = regexp.MustCompile("\r\n|[\r\n\u2028\u2029]")
 // rslint's line-preservation policy. The checked-in upstream oracle stays intact.
 func LinePreservingFix(t *testing.T, source string, fix Fix) Fix {
 	t.Helper()
-	deleted := source[ByteOffset(t, source, fix.Range[0]):ByteOffset(t, source, fix.Range[1])]
-	if breaks := lineTerminators.FindAllString(deleted, -1); len(breaks) > 0 {
-		fix.Text = strings.Join(breaks, "")
+	start := ByteOffset(t, source, fix.Range[0])
+	deleted := source[start:ByteOffset(t, source, fix.Range[1])]
+	if breaks := lineTerminators.FindAllStringIndex(deleted, -1); len(breaks) > 0 {
+		var replacement strings.Builder
+		for i, span := range breaks {
+			if deleted[span[0]:span[1]] == "\n" && ((i == 0 && span[0] > 0) ||
+				(i > 0 && deleted[breaks[i-1][0]:breaks[i-1][1]] == "\r")) {
+				replacement.WriteByte(' ')
+			}
+			replacement.WriteString(deleted[span[0]:span[1]])
+		}
+		last := breaks[len(breaks)-1]
+		if deleted[last[0]:last[1]] == "\r" && last[1] < len(deleted) {
+			replacement.WriteByte(' ')
+		}
+		fix.Text = replacement.String()
+	} else if start > 0 && source[start-1] == '\r' && len(deleted) > 0 {
+		fix.Text = " "
 	}
 	return fix
 }

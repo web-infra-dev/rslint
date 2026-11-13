@@ -728,17 +728,19 @@ describe('unused disable directives', () => {
       LS: '\u2028',
       PS: '\u2029',
     })) {
+      const retainedNewline = newline === '\r' ? '\r ' : newline;
+      const leadingNewline = newline === '\n' ? ' \n' : retainedNewline;
       for (const [kind, names, remaining] of [
-        ['whole', `no-console${newline}`, newline],
+        ['whole', `no-console${newline}`, leadingNewline],
         [
           'first',
           `no-console,${newline}no-debugger`,
-          `/* ${prefix}-disable ${newline}no-debugger */`,
+          `/* ${prefix}-disable ${newline === '\n' ? ' \n' : newline}no-debugger */`,
         ],
         [
           'last',
           `no-debugger${newline}, no-console`,
-          `/* ${prefix}-disable no-debugger${newline} */`,
+          `/* ${prefix}-disable no-debugger${retainedNewline} */`,
         ],
       ]) {
         test(`preserves return behavior: ${prefix}/${name}/${kind}`, async () => {
@@ -771,51 +773,71 @@ describe('unused disable directives', () => {
   }
 
   for (const prefix of ['eslint', 'rslint']) {
-    test(`keeps separate CR and LF lines during ${prefix} directive cleanup`, async () => {
-      const source = `/* ${prefix}-disable-next-line */\r/* ${prefix}-disable no-alert -- TODO\n*/debugger;\n`;
-      const tempDir = await createTempDir({
-        'test.ts': source,
-        'rslint.config.mjs': `export default [{ files: ['**/*.ts'], rules: {
+    for (const kind of ['single', 'adjacent', 'ordinary']) {
+      test(`keeps separate CR and LF lines during ${prefix} directive cleanup (${kind})`, async () => {
+        const source =
+          kind === 'ordinary'
+            ? `/* ${prefix}-disable-next-line *//* ordinary\r*//* ${prefix}-disable no-alert -- TODO\n*/debugger;\n`
+            : kind === 'adjacent'
+              ? `/* ${prefix}-disable-next-line *//* ${prefix}-disable no-alert\r*//* ${prefix}-disable no-console -- TODO\n*/debugger;\n`
+              : `/* ${prefix}-disable-next-line */\r/* ${prefix}-disable no-alert -- TODO\n*/debugger;\n`;
+        const tempDir = await createTempDir({
+          'test.ts': source,
+          'rslint.config.mjs': `export default [{ files: ['**/*.ts'],
+          plugins: { custom: { rules: { clean: {
+            meta: { schema: [], fixable: 'code' },
+            create(context) { return { Program() {
+              for (const comment of context.sourceCode.getAllComments()) {
+                if (comment.value.startsWith(' ordinary')) context.report({
+                  node: comment, message: 'clean ordinary comment',
+                  fix(fixer) { return fixer.replaceText(comment, '\\r'); },
+                });
+              }
+            } }; }
+          } } } }, rules: {
+          'custom/clean': 'error',
           'no-alert': 'error',
+          'no-console': 'error',
           'no-debugger': 'error',
           'no-warning-comments': ['error', { terms: ['todo'], location: 'anywhere' }],
         } }];`,
-      });
-      try {
-        for (const args of [[], ['--fix']]) {
-          const result = await runRslint(
-            [
-              '--report-unused-disable-directives',
-              ...args,
-              '--format',
-              'jsonline',
-              'test.ts',
-            ],
-            tempDir,
-          );
-          expect(result.exitCode).toBe(1);
-          const diagnostics = result.stdout
-            .trim()
-            .split('\n')
-            .filter(Boolean)
-            .map(
-              (line) =>
-                JSON.parse(line) as {
-                  ruleName: string;
-                  range: { start: { line: number } };
-                },
+        });
+        try {
+          for (const args of [[], ['--fix']]) {
+            const result = await runRslint(
+              [
+                '--report-unused-disable-directives',
+                ...args,
+                '--format',
+                'jsonline',
+                'test.ts',
+              ],
+              tempDir,
             );
-          expect(
-            diagnostics.filter((d) => d.ruleName === 'no-debugger'),
-          ).toMatchObject([{ range: { start: { line: 3 } } }]);
+            expect(result.exitCode).toBe(1);
+            const diagnostics = result.stdout
+              .trim()
+              .split('\n')
+              .filter(Boolean)
+              .map(
+                (line) =>
+                  JSON.parse(line) as {
+                    ruleName: string;
+                    range: { start: { line: number } };
+                  },
+              );
+            expect(
+              diagnostics.filter((d) => d.ruleName === 'no-debugger'),
+            ).toMatchObject([{ range: { start: { line: 3 } } }]);
+          }
+          expect(await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8')).toBe(
+            kind === 'adjacent' ? ` \r  \ndebugger;\n` : ` \r \ndebugger;\n`,
+          );
+        } finally {
+          await cleanupTempDir(tempDir);
         }
-        expect(await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8')).toBe(
-          `/* ${prefix}-disable-next-line */\r \ndebugger;\n`,
-        );
-      } finally {
-        await cleanupTempDir(tempDir);
-      }
-    });
+      });
+    }
   }
 
   test('uses mixed native/plugin usage and fixes only unused entries', async () => {

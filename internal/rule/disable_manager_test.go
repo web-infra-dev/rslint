@@ -6,6 +6,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/testutil/directivefixtures"
 	"os"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -674,13 +676,13 @@ func TestUnusedDisableDirectives(t *testing.T) {
 		{"partial first", "/* eslint-disable a, b -- reason */\nx();", "b", "/* eslint-disable b -- reason */\nx();", 1},
 		{"rule name substring", "/* eslint-disable bar, a -- reason */\nx();", "bar", "/* eslint-disable bar -- reason */\nx();", 1},
 		{"partial last", "/* eslint-disable a, b -- reason */\nx();", "a", "/* eslint-disable a -- reason */\nx();", 1},
-		{"whole LF", "/* eslint-disable a\n */\nx();", "", "\n\nx();", 1},
+		{"whole LF", "/* eslint-disable a\n */\nx();", "", " \n\nx();", 1},
 		{"whole CRLF", "/* eslint-disable a\r\n */\nx();", "", "\r\n\nx();", 1},
 		{"whole separated CR LF", "/* eslint-disable a\r -- reason\n */\nx();", "", "\r \n\nx();", 1},
 		{"whole preceding CR", "\r/* eslint-disable a\n */x();", "", "\r \nx();", 1},
 		{"whole following LF", "/* eslint-disable a\r */\nx();", "", "\r \nx();", 1},
 		{"whole both boundaries", "\r/* eslint-disable a\n -- reason\r */\nx();", "", "\r \n\r \nx();", 1},
-		{"partial first LF", "/* eslint-disable a,\nb */\nx();", "b", "/* eslint-disable \nb */\nx();", 1},
+		{"partial first LF", "/* eslint-disable a,\nb */\nx();", "b", "/* eslint-disable  \nb */\nx();", 1},
 		{"partial first CRLF", "/* eslint-disable a,\r\nb */\nx();", "b", "/* eslint-disable \r\nb */\nx();", 1},
 		{"partial last LF", "/* eslint-disable b\n, a */\nx();", "b", "/* eslint-disable b\n */\nx();", 1},
 		{"partial last CRLF", "/* eslint-disable b\r\n, a */\nx();", "b", "/* eslint-disable b\r\n */\nx();", 1},
@@ -1011,5 +1013,66 @@ func runDirectiveConformance(t *testing.T, corpus directivefixtures.Corpus) {
 				}
 			}
 		})
+	}
+}
+
+// Compare complete line-terminator tokens, rather than just the total count:
+// splitting a CRLF and merging a different CR/LF must not cancel each other out.
+func TestUnusedDirectiveLineTerminatorComposition(t *testing.T) {
+	terminators := regexp.MustCompile("\r\n|[\r\n\u2028\u2029]")
+	breaks := []string{"", "\r", "\n", "\r\n", "\n\r", "\r x\n", "\u2028", "\u2029"}
+	boundaries := []string{"", "\r", "\n", "\r\n"}
+	for _, prefix := range boundaries {
+		for _, suffix := range boundaries {
+			for _, first := range breaks {
+				for _, second := range breaks {
+					for _, third := range breaks {
+						comments := []string{"/* eslint-disable a" + first + "*/", "/* eslint-disable b" + second + "*/", "/* eslint-disable c" + third + "*/"}
+						source := prefix + strings.Join(comments, "") + suffix + "debugger;"
+						want := terminators.FindAllString(source, -1)
+						for mask := range 8 {
+							var fixed strings.Builder
+							fixed.WriteString(prefix)
+							offset := len(prefix)
+							for i, comment := range comments {
+								end := offset + len(comment)
+								if mask&(1<<i) != 0 {
+									replacement := directiveLineTerminators(source, offset, end)
+									if replacement == "" {
+										replacement = " "
+									}
+									fixed.WriteString(replacement)
+								} else {
+									fixed.WriteString(comment)
+								}
+								offset = end
+							}
+							fixed.WriteString(suffix + "debugger;")
+							if got := terminators.FindAllString(fixed.String(), -1); !slices.Equal(got, want) {
+								t.Fatalf("mask=%d source=%q fixed=%q; line terminators got=%q want=%q", mask, source, fixed.String(), got, want)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestUnusedDirectiveFixturePrecedingCR(t *testing.T) {
+	const source = "/* eslint-disable \ra,b */x();"
+	sf := parseCommentStoreSource(t, source)
+	manager := NewDisableManager(sf, NewCommentStore(sf))
+	if !manager.IsRuleDisabled("b", strings.Index(source, "x();")) {
+		t.Fatal("expected b to be suppressed")
+	}
+	diagnostics := manager.UnusedDiagnostics("/test.ts", SeverityWarning, EditDemandAutofix, nil)
+	if len(diagnostics) != 1 {
+		t.Fatalf("got %d diagnostics, want 1", len(diagnostics))
+	}
+	fix := diagnostics[0].Fixes()[0]
+	want := directivefixtures.LinePreservingFix(t, source, directivefixtures.Fix{Range: [2]int{fix.Range.Pos(), fix.Range.End()}, Text: ""})
+	if fix.Text != " " || want.Text != " " {
+		t.Fatalf("production fix = %q, fixture fix = %q, want space", fix.Text, want.Text)
 	}
 }

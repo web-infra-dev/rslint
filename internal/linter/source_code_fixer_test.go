@@ -5,6 +5,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/web-infra-dev/rslint/internal/testutil/directivefixtures"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -529,6 +530,43 @@ func TestUnusedDirectiveESLintFixOutputs(t *testing.T) {
 							}
 						})
 					}
+				}
+			})
+		}
+	}
+}
+
+func TestUnusedDirectiveAdjacentLineBreaks(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, tc := range []struct {
+			name, source, fixed string
+			usedRules           []string
+		}{
+			{"separate CR LF", "/* %[1]s-disable a\r*//* %[1]s-disable b\n*/x();", "\r  \nx();", nil},
+			{"original CRLF", "/* %[1]s-disable a\r\n*//* %[1]s-disable b\r\n*/x();", "\r\n\r\nx();", nil},
+			{"LF CR", "/* %[1]s-disable a\n*//* %[1]s-disable b\r*/x();", " \n\r x();", nil},
+			{"partial separate CR LF", "/* %[1]s-disable a, b\r, c\n, d */x();", "/* %[1]s-disable a\r \n, d */x();", []string{"a", "d"}},
+		} {
+			t.Run(prefix+"/"+tc.name, func(t *testing.T) {
+				source := fmt.Sprintf(tc.source, prefix)
+				expected := tc.fixed
+				if len(tc.usedRules) != 0 {
+					expected = fmt.Sprintf(expected, prefix)
+				}
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/adjacent.js", Path: "/adjacent.js"}, source, core.ScriptKindJS)
+				manager := rule.NewDisableManager(sf, rule.NewCommentStore(sf))
+				for _, name := range tc.usedRules {
+					if !manager.IsRuleDisabled(name, strings.Index(source, "x();")) {
+						t.Fatalf("expected %s to be suppressed", name)
+					}
+				}
+				diagnostics := manager.UnusedDiagnostics("/adjacent.js", rule.SeverityWarning, rule.EditDemandAutofix, nil)
+				if len(diagnostics) != 2 {
+					t.Fatalf("got %d diagnostics, want 2", len(diagnostics))
+				}
+				fixed, unapplied, applied := ApplyRuleFixes(source, diagnostics)
+				if fixed != expected || !applied || len(unapplied) != 0 {
+					t.Fatalf("fixed = %q, want %q; applied = %v, unapplied = %d", fixed, expected, applied, len(unapplied))
 				}
 			})
 		}
