@@ -34,6 +34,9 @@ type StaticStringEvaluator struct {
 	evaluation             *staticEvaluationState
 	referenceFlagsComputed bool
 	referenceFlags         map[*ast.Symbol]staticReferenceFlags
+	storedReferences       map[*ast.Symbol][]*ast.Node
+	markedReferences       map[*ast.Node]staticReferenceFlags
+	trackCallEscapes       bool
 	arrayPrototypeMutated  bool
 	stringPrototypeMutated bool
 }
@@ -66,6 +69,16 @@ func NewStaticStringEvaluatorWithReferenceResolver(
 		resolving:          map[*ast.Symbol]bool{},
 	}
 	staticEvaluator.evaluator = evaluator.NewEvaluator(staticEvaluator.evaluateEntity, ast.OEKAssertions)
+	return staticEvaluator
+}
+
+// NewStaticStringEvaluatorWithCallEscapes adds conservative object-escape
+// tracking for consumers that need to trust a computed key after earlier calls.
+// Ordinary evaluators retain their existing contract for consumers evaluating
+// arguments before the inspected call executes.
+func NewStaticStringEvaluatorWithCallEscapes(typeChecker *checker.Checker, sourceFile *ast.SourceFile, referenceResolver StaticReferenceResolver) *StaticStringEvaluator {
+	staticEvaluator := NewStaticStringEvaluatorWithReferenceResolver(typeChecker, sourceFile, referenceResolver)
+	staticEvaluator.trackCallEscapes = true
 	return staticEvaluator
 }
 
@@ -123,6 +136,10 @@ const (
 	// A nested write can reach values held in a fresh object or array. A write
 	// to the container itself cannot mutate values copied into that container.
 	staticReferenceNestedMutation
+	// An unknown call can retain references, invoke callbacks, and mutate
+	// objects reachable through the values it receives.
+	staticReferenceCallEscape
+	staticReferenceCallReceiver
 )
 
 // objectPassThroughMethods are the `Object` methods that return their argument
@@ -1891,8 +1908,10 @@ func (staticEvaluator *StaticStringEvaluator) ensureReferenceFlags() {
 		)
 		analysis.GlobalAccess = staticEvaluator.GlobalAccess
 		analysis.resolveIdentifiers = staticEvaluator.resolveIdentifiers
+		analysis.trackCallEscapes = staticEvaluator.trackCallEscapes
 		analysis.computeReferenceFlags()
 		staticEvaluator.referenceFlags = analysis.referenceFlags
+		staticEvaluator.storedReferences = analysis.storedReferences
 		staticEvaluator.arrayPrototypeMutated = analysis.arrayPrototypeMutated
 		staticEvaluator.stringPrototypeMutated = analysis.stringPrototypeMutated
 		staticEvaluator.referenceFlagsComputed = true
@@ -1921,7 +1940,10 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 
 	staticEvaluator.referenceFlagsComputed = true
 	staticEvaluator.referenceFlags = nil
+	staticEvaluator.storedReferences = nil
+	staticEvaluator.markedReferences = nil
 	var mutationCandidates []staticMutationCandidate
+	var calls []*ast.Node
 
 	var visit func(node *ast.Node)
 	visit = func(node *ast.Node) {
@@ -1929,12 +1951,18 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			return
 		}
 		if node.Kind == ast.KindCallExpression {
+			if staticEvaluator.trackCallEscapes {
+				calls = append(calls, node)
+			}
 			callee := SkipAssertionsAndParens(node.Expression())
 			if name, known := AccessExpressionStaticName(callee); known {
 				staticEvaluator.markCallMutation(node, callee, name)
 			} else if ast.IsAccessExpression(callee) {
 				mutationCandidates = append(mutationCandidates, staticMutationCandidate{call: node, access: callee})
 			}
+		}
+		if staticEvaluator.trackCallEscapes && (node.Kind == ast.KindNewExpression || node.Kind == ast.KindTaggedTemplateExpression) {
+			calls = append(calls, node)
 		}
 		if node.Kind == ast.KindIdentifier && !IsNonReferenceIdentifier(node) {
 			if IsWriteReference(node) {
@@ -1948,6 +1976,13 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 			}
 			if outer.Parent != nil && (ast.IsAssignmentTarget(outer) || outer.Parent.Kind == ast.KindDeleteExpression) {
 				staticEvaluator.markReference(AccessExpressionObject(node), staticReferencePropertyMutation)
+				if staticEvaluator.trackCallEscapes && outer.Parent.Kind == ast.KindBinaryExpression {
+					assignment := outer.Parent.AsBinaryExpression()
+					switch assignment.OperatorToken.Kind {
+					case ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+						staticEvaluator.recordStoredReferences(AccessExpressionObject(node), assignment.Right)
+					}
+				}
 			}
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
@@ -1961,6 +1996,15 @@ func (staticEvaluator *StaticStringEvaluator) computeReferenceFlags() {
 		if methodName, ok := staticEvaluator.evalAccessExpressionKey(candidate.access); ok {
 			staticEvaluator.markCallMutation(candidate.call, candidate.access, methodName)
 		}
+	}
+	// First collect all explicit writes, so a call cannot be classified using
+	// a binding whose reassignment appears later in the file.
+	staticEvaluator.evaluation = &staticEvaluationState{
+		values:                make(map[*ast.Node]staticEvalResult),
+		optionalShortCircuits: make(map[*ast.Node]bool),
+	}
+	for _, call := range calls {
+		staticEvaluator.markCallEscapes(call)
 	}
 }
 
@@ -2010,14 +2054,32 @@ func (staticEvaluator *StaticStringEvaluator) markMutationArgument(arguments []*
 
 func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag staticReferenceFlags) {
 	node = SkipAssertionsAndParens(node)
+	if flag&staticReferenceCallEscape != 0 && node != nil {
+		value := staticEvaluator.evalValue(node)
+		if value.ok && IsPrimitiveStaticValue(value.value) {
+			return
+		}
+	}
+	if node != nil && !ast.IsIdentifier(node) {
+		if staticEvaluator.markedReferences[node]&flag == flag {
+			return
+		}
+		if staticEvaluator.markedReferences == nil {
+			staticEvaluator.markedReferences = make(map[*ast.Node]staticReferenceFlags)
+		}
+		staticEvaluator.markedReferences[node] |= flag
+	}
 	for node != nil && ast.IsIdentifier(node) {
-		if flag&staticReferenceNestedMutation != 0 {
+		if flag&staticReferenceNestedMutation != 0 && flag&staticReferenceCallReceiver == 0 {
 			// Destructuring a constructor can reach its prototype without a
 			// property-access node, e.g. const {prototype: proto} = Array.
-			staticEvaluator.arrayPrototypeMutated = staticEvaluator.arrayPrototypeMutated ||
-				staticEvaluator.isBuiltinIdentifier(node, "Array")
-			staticEvaluator.stringPrototypeMutated = staticEvaluator.stringPrototypeMutated ||
-				staticEvaluator.isBuiltinIdentifier(node, "String")
+			array := staticEvaluator.isBuiltinIdentifier(node, "Array")
+			str := staticEvaluator.isBuiltinIdentifier(node, "String")
+			if array && !staticEvaluator.arrayPrototypeMutated || str && !staticEvaluator.stringPrototypeMutated {
+				staticEvaluator.invalidateMutationValues()
+			}
+			staticEvaluator.arrayPrototypeMutated = staticEvaluator.arrayPrototypeMutated || array
+			staticEvaluator.stringPrototypeMutated = staticEvaluator.stringPrototypeMutated || str
 		}
 		symbol := staticEvaluator.referenceSymbol(node)
 		if symbol == nil || staticEvaluator.referenceFlags[symbol]&flag == flag {
@@ -2027,6 +2089,12 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.referenceFlags = make(map[*ast.Symbol]staticReferenceFlags, 8)
 		}
 		staticEvaluator.referenceFlags[symbol] |= flag
+		staticEvaluator.invalidateMutationValues()
+		if flag&staticReferenceCallEscape != 0 {
+			for _, value := range staticEvaluator.storedReferences[symbol] {
+				staticEvaluator.markReference(value, flag&^staticReferenceCallReceiver)
+			}
+		}
 		if flag&staticReferencePropertyMutation == 0 || len(symbol.Declarations) != 1 {
 			return
 		}
@@ -2043,12 +2111,19 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				if element.DotDotDotToken != nil && flag&staticReferenceNestedMutation == 0 {
 					return
 				}
+				if element.DotDotDotToken != nil && flag&staticReferenceCallEscape != 0 &&
+					staticEvaluator.hasOnlyPrimitiveChildren(root.AsVariableDeclaration().Initializer) {
+					return
+				}
 				staticEvaluator.markReference(element.Initializer, flag)
 				flag |= staticReferenceNestedMutation
 			}
 			declaration = root
 		}
 		if declaration.Kind != ast.KindVariableDeclaration {
+			if flag&staticReferenceCallEscape != 0 {
+				staticEvaluator.markReturnedReferences(declaration, flag)
+			}
 			return
 		}
 		// A local alias may still share its initializer's aggregate even when
@@ -2078,17 +2153,21 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 			staticEvaluator.markReference(expression.Right, flag)
 		}
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		staticEvaluator.markReference(AccessExpressionObject(node), flag|staticReferenceNestedMutation)
+		staticEvaluator.markReference(AccessExpressionObject(node), (flag&^staticReferenceCallReceiver)|staticReferenceNestedMutation)
 	case ast.KindObjectLiteralExpression:
 		if flag&staticReferenceNestedMutation != 0 {
 			for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
 				switch property.Kind {
 				case ast.KindPropertyAssignment:
-					staticEvaluator.markReference(property.AsPropertyAssignment().Initializer, flag)
+					staticEvaluator.markReference(property.AsPropertyAssignment().Initializer, flag&^staticReferenceCallReceiver)
 				case ast.KindShorthandPropertyAssignment:
-					staticEvaluator.markReference(property.Name(), flag)
+					staticEvaluator.markReference(property.Name(), flag&^staticReferenceCallReceiver)
 				case ast.KindSpreadAssignment:
-					staticEvaluator.markReference(property.Expression(), flag)
+					staticEvaluator.markCopiedReferences(property.Expression(), flag)
+				case ast.KindMethodDeclaration, ast.KindGetAccessor:
+					if flag&staticReferenceCallEscape != 0 {
+						staticEvaluator.markReturnedReferences(property, flag)
+					}
 				}
 			}
 		}
@@ -2096,12 +2175,18 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 		if flag&staticReferenceNestedMutation != 0 {
 			for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
 				if ast.IsSpreadElement(element) {
-					element = element.Expression()
+					staticEvaluator.markCopiedReferences(element.Expression(), flag)
+					continue
 				}
-				staticEvaluator.markReference(element, flag)
+				staticEvaluator.markReference(element, flag&^staticReferenceCallReceiver)
 			}
 		}
 	case ast.KindCallExpression:
+		if flag&staticReferenceCallEscape != 0 &&
+			!staticEvaluator.isBuiltinMethodValue(node.Expression(), "Array", "of", map[*ast.Symbol]bool{}) &&
+			!staticEvaluator.isKnownObjectOperation(node, node.Expression()) {
+			staticEvaluator.markCallReceiver(node.Expression(), flag|staticReferenceCallReceiver)
+		}
 		if argument, ok := staticEvaluator.objectPassThroughArgument(node); ok {
 			staticEvaluator.markReference(argument, flag)
 		} else if staticEvaluator.isBuiltinMethodValue(node.Expression(), "Object", "assign", map[*ast.Symbol]bool{}) {
@@ -2112,7 +2197,13 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 					argument = argument.Expression()
 					argumentFlag |= staticReferenceNestedMutation
 				}
-				staticEvaluator.markReference(argument, argumentFlag)
+				if spread {
+					staticEvaluator.markCopiedReferences(argument, argumentFlag)
+				} else if argumentFlag&staticReferenceNestedMutation != 0 {
+					staticEvaluator.markCopiedReferences(argument, argumentFlag)
+				} else {
+					staticEvaluator.markReference(argument, argumentFlag)
+				}
 				// A leading spread may be empty, so the next argument can
 				// still be the target returned by Object.assign.
 				if !spread && flag&staticReferenceNestedMutation == 0 {
@@ -2125,11 +2216,20 @@ func (staticEvaluator *StaticStringEvaluator) markReference(node *ast.Node, flag
 				staticEvaluator.isBuiltinArrayValue(AccessExpressionObject(callee), map[*ast.Symbol]bool{}) {
 				for _, argument := range node.Arguments() {
 					if ast.IsSpreadElement(argument) {
-						argument = argument.Expression()
+						staticEvaluator.markCopiedReferences(argument.Expression(), flag)
+					} else {
+						staticEvaluator.markReference(argument, flag)
 					}
-					staticEvaluator.markReference(argument, flag)
 				}
 			}
+		}
+	case ast.KindNewExpression:
+		if flag&staticReferenceCallEscape != 0 {
+			staticEvaluator.markReference(node.Expression(), flag)
+		}
+	case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression:
+		if flag&staticReferenceCallEscape != 0 {
+			staticEvaluator.markReturnedReferences(node, flag)
 		}
 	}
 }

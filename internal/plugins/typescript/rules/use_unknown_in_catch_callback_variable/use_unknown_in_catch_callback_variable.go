@@ -130,7 +130,7 @@ var UseUnknownInCatchCallbackVariableRule = rule.CreateRule(rule.Rule{
 				propertyName, found := utils.AccessExpressionStaticName(callee)
 				if !found {
 					if evaluator == nil {
-						evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+						evaluator = utils.NewStaticStringEvaluatorWithCallEscapes(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 						evaluator.GlobalAccess = ctx.Globals.Access
 					}
 					propertyName, found = evaluator.EvalAccessExpressionName(callee)

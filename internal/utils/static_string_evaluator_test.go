@@ -825,6 +825,103 @@ const selfRead = selfMutating[0];`
 	})
 }
 
+func TestStaticStringEvaluatorCallEscapes(t *testing.T) {
+	for _, test := range []struct {
+		name, operation, expression string
+		known                       bool
+	}{
+		{"parameter mutation", `function change(holder: typeof methods) { holder.current = "then"; } change(methods);`, `methods.current`, false},
+		{"unknown function", `unknown(methods);`, `methods.current`, false},
+		{"alias", `const alias = methods; unknown(alias);`, `methods.current`, false},
+		{"object wrapper", `unknown({methods});`, `methods.current`, false},
+		{"array wrapper", `unknown([methods]);`, `methods.current`, false},
+		{"nested wrapper", `unknown({nested: [methods]});`, `methods.current`, false},
+		{"destructured alias", `const {item: alias} = {item: methods}; unknown(alias);`, `methods.current`, false},
+		{"conditional argument", `unknown(condition ? methods : {});`, `methods.current`, false},
+		{"logical argument", `unknown(methods || {});`, `methods.current`, false},
+		{"sequence argument", `unknown((0, methods));`, `methods.current`, false},
+		{"method argument", `callable.change(methods);`, `methods.current`, false},
+		{"method receiver", `methods.change();`, `methods.current`, false},
+		{"call receiver", `callable.call(methods);`, `methods.current`, false},
+		{"apply arguments", `callable.apply(null, [methods]);`, `methods.current`, false},
+		{"bound argument", `callable.bind(null, methods);`, `methods.current`, false},
+		{"constructor", `new callable(methods);`, `methods.current`, false},
+		{"spread arguments", `unknown(...[methods]);`, `methods.current`, false},
+		{"optional call", `callable?.(methods);`, `methods.current`, false},
+		{"tagged template", "callable`key ${methods}`;", `methods.current`, false},
+		{"array argument", `unknown(names);`, `names[0]`, false},
+		{"shallow freeze", `unknown(Object.freeze({methods}));`, `methods.current`, false},
+		{"object rest nested reference", `const {...copy} = {methods}; unknown(copy);`, `methods.current`, false},
+		{"spread nested reference", `unknown({...{methods}});`, `methods.current`, false},
+		{"factory nested reference", `unknown(Array.of(methods));`, `methods.current`, false},
+		{"assign nested reference", `unknown(Object.assign({}, {methods}));`, `methods.current`, false},
+		{"returned closure reference", `unknown(() => methods);`, `methods.current`, false},
+		{"function declaration reference", `function get() { return methods; } unknown(get);`, `methods.current`, false},
+		{"nested returned callback", `unknown(() => () => methods);`, `methods.current`, false},
+		{"stored after initializer", `const holder = {}; holder.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through holder alias", `const holder = {}; const alias = holder; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through destructured alias", `const holder = {}; const {item: alias} = {item: holder}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through default alias", `const holder = {}; const {alias = holder} = {}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through nested default alias", `const holder = {}; const {outer: {alias} = {alias: holder}} = {}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through nested holder", `const holder = {nested: {}}; holder.nested.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through referenced member", `const other = {current: "catch"}; const holder = {nested: other}; holder.nested.item = methods; unknown(other);`, `methods.current`, false},
+		{"callback publishes reference", `unknown((holder: any) => { holder.item = methods; });`, `methods.current`, false},
+		{"callback throws reference", `unknown(() => { throw methods; });`, `methods.current`, false},
+		{"generator yields reference", `unknown(function*() { yield methods; });`, `methods.current`, false},
+		{"class returns reference", `class Factory { constructor() { return methods; } } unknown(new Factory());`, `methods.current`, false},
+		{"getter exposes reference", `unknown({get item() { return methods; }});`, `methods.current`, false},
+		{"primitive binding", `let key = "catch"; unknown(key);`, `key`, true},
+		{"primitive member argument", `unknown(methods.current);`, `methods.current`, true},
+		{"primitive callback result", `unknown(() => methods.current);`, `methods.current`, true},
+		{"unused nested function", `unknown(() => { function unused() { return methods; } });`, `methods.current`, true},
+		{"primitive object spread", `unknown({...methods});`, `methods.current`, true},
+		{"primitive array spread", `unknown([...names]);`, `names[0]`, true},
+		{"primitive object rest", `const {...copy} = methods; unknown(copy);`, `methods.current`, true},
+		{"primitive array rest", `const [...copy] = names; unknown(copy);`, `names[0]`, true},
+		{"primitive array factory copy", `unknown(Array.of(...names));`, `names[0]`, true},
+		{"primitive assign copy", `unknown(Object.assign({}, methods));`, `methods.current`, true},
+		{"private stored reference", `const holder = {}; holder.item = methods;`, `methods.current`, true},
+		{"store into fresh rest copy", `const holder = {}; const {...copy} = holder; copy.item = methods; unknown(holder);`, `methods.current`, true},
+		{"string conversion", `const key = String(names);`, `key`, true},
+		{"array join", `const key = names.join("");`, `key`, true},
+		{"empty function", `function noop(value: unknown) {} noop(methods);`, `methods.current`, true},
+		{"empty method", `const handler = {noop(value: unknown) {}}; handler.noop(methods);`, `methods.current`, true},
+		{"overwritten empty function", `let noop = (value: unknown) => {}; noop = callable; noop(methods);`, `methods.current`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			filePath := tspath.ResolvePath(root.Dir, "call-escape.ts")
+			code := `const methods = {current: "catch"}; const names = ["catch"];
+declare function unknown(...args: any[]): any;
+declare const callable: any;
+declare const condition: boolean;
+` + test.operation + ` const result = ` + test.expression + `;`
+			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			sourceFile := program.GetSourceFile(filePath)
+			assert.Assert(t, sourceFile != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			for _, resolution := range []string{"checker", "references"} {
+				t.Run(resolution, func(t *testing.T) {
+					evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, sourceFile, nil)
+					if resolution == "references" {
+						resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+						evaluator = NewStaticStringEvaluatorWithCallEscapes(nil, sourceFile, resolver)
+					}
+					for range 2 {
+						value, known := evaluator.Eval(findVariableInitializer(t, sourceFile, "result"))
+						if known != test.known || known && value != "catch" {
+							t.Fatalf("result = (%q, %v), want known = %v", value, known, test.known)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestStaticStringEvaluatorIteratorPrototypeMutations(t *testing.T) {
 	for _, test := range []struct {
 		name, mutation              string

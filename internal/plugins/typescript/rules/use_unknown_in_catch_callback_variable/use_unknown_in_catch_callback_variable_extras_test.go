@@ -78,3 +78,27 @@ func TestUseUnknownInCatchCallbackVariableComputedKeys(t *testing.T) {
 		}},
 	})
 }
+
+// The original review reproduction and related cases were checked against v8.67.0.
+func TestUseUnknownInCatchCallbackVariableCallMutations(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{
+		// reviewer reproduction
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\nfunction changeMethod(holder: typeof methods) {\n  holder.current = 'then';\n}\nchangeMethod(methods);\n\nconst promise: Record<'then' | 'catch', (\n  callback: (value: number) => unknown,\n  onRejected?: (error: unknown) => unknown,\n) => unknown> = Promise.resolve(1);\n\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// alias
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nconst alias = methods; mutate(alias);\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// nested container
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nmutate({nested: [methods]});\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// apply
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nmutate.apply(null, [methods]);\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// constructor
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nnew mutate(methods);\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// optional call
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nmutate?.(methods);\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// shallow freeze
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nmutate(Object.freeze({methods}));\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+		// callback exposes object
+		{Code: "const methods: { current: 'catch' | 'then' } = { current: 'catch' };\ndeclare const mutate: any;\nmutate(() => methods);\nconst promise: Record<'then' | 'catch', (callback: (value: number) => unknown, onRejected?: (error: unknown) => unknown) => unknown> = Promise.resolve(1);\npromise[methods.current](value => value + 1, (error: unknown) => {});\n"},
+	}, []rule_tester.InvalidTestCase{
+		{Code: "let method = 'catch';\nfunction change(value: string) { value = 'then'; }\nchange(method);\nPromise.resolve()[method]((error: Error) => {});\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useUnknown", Message: "Prefer the safe `: unknown` for a `catch` callback variable.", Line: 4, Column: 28, EndLine: 4, EndColumn: 40, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "wrongTypeAnnotationSuggestion", Output: "let method = 'catch';\nfunction change(value: string) { value = 'then'; }\nchange(method);\nPromise.resolve()[method]((error: unknown) => {});\n"}}}}},
+	})
+}
