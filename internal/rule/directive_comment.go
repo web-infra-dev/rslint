@@ -7,9 +7,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
-// Scanning shared by ESLint's block directive comments (`/* global */`,
-// `/* exported */`). Each directive owns its own value syntax; what they share
-// is locating the label and dropping a `-- justification` tail.
+// These helpers scan inline directive comments. Each directive owns its value
+// syntax, while descriptions and whitespace follow the same ECMAScript rules.
 
 // mayContainDirective reports whether text could contain a block comment whose
 // content starts with one of keywords. It is a cheap source-text scan that lets
@@ -49,62 +48,63 @@ func mayContainDirective(text string, keywords []string) bool {
 // end of the content after it, so a `/* globally */` comment is not a directive.
 func matchDirectiveLabelRange(text string, start int, end int, keywords []string) (int, bool) {
 	for _, keyword := range keywords {
-		if !strings.HasPrefix(text[start:end], keyword) {
-			continue
-		}
-		restStart := start + len(keyword)
-		if restStart == end {
-			return restStart, true
-		}
-		r, _ := utf8.DecodeRuneInString(text[restStart:end])
-		if ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			return restStart, true
+		if _, ok := cutDirectiveLabel(text[start:end], keyword); ok {
+			return start + len(keyword), true
 		}
 	}
 	return 0, false
+}
+
+func cutDirectiveLabel(text string, label string) (string, bool) {
+	value, ok := strings.CutPrefix(text, label)
+	if !ok || value == "" {
+		return value, ok
+	}
+	if value[0] < utf8.RuneSelf {
+		return value, ecmascript.IsTriviaWhitespaceByte(value[0])
+	}
+	next, _ := utf8.DecodeRuneInString(value)
+	return value, ecmascript.IsTriviaWhitespaceRune(next)
 }
 
 // findDirectiveJustification returns the offset where a ` -- justification `
 // tail begins within text[start:end], or -1 when there is none. ESLint splits
 // on /\s-{2,}\s/u and keeps only the part before the match.
 func findDirectiveJustification(text string, start int, end int) int {
-	for index := start; index < end; {
-		r, size := utf8.DecodeRuneInString(text[index:end])
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			index += size
-			continue
+	for from := start; from < end; {
+		offset := strings.Index(text[from:end], "--")
+		if offset < 0 {
+			break
 		}
-
-		hyphenStart := index + size
-		afterHyphens := hyphenStart
+		hyphenStart := from + offset
+		afterHyphens := hyphenStart + 2
 		for afterHyphens < end && text[afterHyphens] == '-' {
 			afterHyphens++
 		}
-		if afterHyphens-hyphenStart >= 2 && afterHyphens < end {
-			next, _ := utf8.DecodeRuneInString(text[afterHyphens:end])
-			if ecmascript.IsWhiteSpaceOrLineTerminator(next) {
-				return index
-			}
+		before, size := utf8.DecodeLastRuneInString(text[start:hyphenStart])
+		after, _ := utf8.DecodeRuneInString(text[afterHyphens:end])
+		if ecmascript.IsWhiteSpaceOrLineTerminator(before) && ecmascript.IsWhiteSpaceOrLineTerminator(after) {
+			return hyphenStart - size
 		}
-		index += size
+		from = afterHyphens
 	}
 	return -1
 }
 
 func trimECMAScriptWhitespaceRange(text string, start int, end int) (int, int) {
-	for start < end {
-		r, size := utf8.DecodeRuneInString(text[start:end])
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			break
+	start += ecmascript.SkipLeadingWhitespace(text[start:end], 0, end-start)
+	return start, start + ecmascript.SkipTrailingWhitespace(text[start:end], 0, end-start)
+}
+
+// stripMatchingQuoteRange removes one matching layer of single or double
+// quotes, the unwrapping parseListConfig performs on every entry. An unbalanced
+// or lone quote is part of the name.
+func stripMatchingQuoteRange(text string, start int, end int) (int, int) {
+	if end-start >= 2 {
+		first, last := text[start], text[end-1]
+		if (first == '\'' || first == '"') && first == last {
+			return start + 1, end - 1
 		}
-		start += size
-	}
-	for end > start {
-		r, size := utf8.DecodeLastRuneInString(text[start:end])
-		if !ecmascript.IsWhiteSpaceOrLineTerminator(r) {
-			break
-		}
-		end -= size
 	}
 	return start, end
 }

@@ -149,16 +149,3 @@ func parseExportedNameListEntries(text string, start int, end int) []inlineExpor
 
 	return entries
 }
-
-// stripMatchingQuoteRange removes one matching layer of single or double
-// quotes, the unwrapping parseListConfig performs on every entry. An unbalanced
-// or lone quote is part of the name.
-func stripMatchingQuoteRange(text string, start int, end int) (int, int) {
-	if end-start >= 2 {
-		first, last := text[start], text[end-1]
-		if (first == '\'' || first == '"') && first == last {
-			return start + 1, end - 1
-		}
-	}
-	return start, end
-}
