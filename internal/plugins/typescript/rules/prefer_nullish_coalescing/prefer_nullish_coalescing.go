@@ -1,8 +1,10 @@
 package prefer_nullish_coalescing
 
 import (
+	"cmp"
 	_ "embed"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -11,6 +13,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed prefer_nullish_coalescing.schema.json
@@ -260,12 +263,13 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 			return isBooleanConstructorContext(parent)
 		}
 	}
-	return isBuiltInBooleanCall(parent, node)
+	return isBuiltInBooleanCall(parent)
 }
 
-// isBuiltInBooleanCall reports whether `callNode` is a CallExpression to the
-// global Boolean(...) and `child` (paren-skipped) is its first argument.
-func isBuiltInBooleanCall(callNode *ast.Node, child *ast.Node) bool {
+// isBuiltInBooleanCall reports whether `callNode` is a call to the global
+// Boolean(...) with at least one argument. Like upstream, the expression may be
+// any of its arguments.
+func isBuiltInBooleanCall(callNode *ast.Node) bool {
 	if callNode.Kind != ast.KindCallExpression {
 		return false
 	}
@@ -277,24 +281,44 @@ func isBuiltInBooleanCall(callNode *ast.Node, child *ast.Node) bool {
 	if callee.AsIdentifier().Text != "Boolean" {
 		return false
 	}
-	args := call.Arguments
-	if args == nil || len(args.Nodes) == 0 {
-		return false
-	}
-	// match either bare or paren-wrapped child
-	first := args.Nodes[0]
-	if first != child && ast.SkipParentheses(first) != child {
+	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 		return false
 	}
 	return !utils.IsShadowed(callNode, "Boolean")
 }
 
+// logicalExpression returns the BinaryExpression when `node` is what ESTree
+// models as a `LogicalExpression` (`||`, `&&`, `??`).
+func logicalExpression(node *ast.Node) *ast.BinaryExpression {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return nil
+	}
+	bin := node.AsBinaryExpression()
+	if !isLogicalLikeOperator(bin.OperatorToken.Kind) {
+		return nil
+	}
+	return bin
+}
+
+// isLogicalOrExpression mirrors upstream's isLogicalOrOperator: a
+// `LogicalExpression` whose operator is `||`. `||=` is an
+// AssignmentExpression in ESTree and does not match.
+func isLogicalOrExpression(node *ast.Node) bool {
+	bin := logicalExpression(node)
+	return bin != nil && bin.OperatorToken.Kind == ast.KindBarBarToken
+}
+
 // isMixedLogicalExpression mirrors upstream's BFS over parent + left + right
-// looking for an `&&` operator.
+// looking for an `&&` operator. Parentheses are transparent, and only
+// `LogicalExpression` nodes are expanded; `||=` is not one.
 func isMixedLogicalExpression(node *ast.Node) bool {
 	seen := map[*ast.Node]bool{}
 	bin := node.AsBinaryExpression()
-	queue := []*ast.Node{node.Parent, bin.Left, bin.Right}
+	queue := []*ast.Node{
+		utils.ESTreeParent(node),
+		utils.ESTreeRuntimeExpression(bin.Left),
+		utils.ESTreeRuntimeExpression(bin.Right),
+	}
 	for len(queue) > 0 {
 		current := queue[0]
 		queue = queue[1:]
@@ -302,72 +326,51 @@ func isMixedLogicalExpression(node *ast.Node) bool {
 			continue
 		}
 		seen[current] = true
-		if current.Kind == ast.KindParenthesizedExpression {
-			queue = append(queue, current.AsParenthesizedExpression().Expression)
+		cb := logicalExpression(current)
+		if cb == nil {
 			continue
 		}
-		if current.Kind == ast.KindBinaryExpression {
-			cb := current.AsBinaryExpression()
-			op := cb.OperatorToken.Kind
-			if op == ast.KindAmpersandAmpersandToken {
-				return true
-			}
-			if op == ast.KindBarBarToken || op == ast.KindBarBarEqualsToken {
-				queue = append(queue, current.Parent, cb.Left, cb.Right)
-			}
+		switch cb.OperatorToken.Kind {
+		case ast.KindAmpersandAmpersandToken:
+			return true
+		case ast.KindBarBarToken:
+			queue = append(queue,
+				utils.ESTreeParent(current),
+				utils.ESTreeRuntimeExpression(cb.Left),
+				utils.ESTreeRuntimeExpression(cb.Right),
+			)
 		}
 	}
 	return false
 }
 
 // areNodesSimilarMemberAccess mirrors typescript-eslint's
-// areNodesSimilarMemberAccess + isNodeEqual byte-for-byte — including the
-// upstream limitation that `isNodeEqual` only handles a small set of node
-// kinds (ThisExpression / Literal / Identifier / MemberExpression). Anything
-// else (PrivateIdentifier, TSAsExpression-wrapped computed keys, …) falls
-// through to `return false`, which means rules don't pair the two branches.
-//
-// We deliberately NOT generalize this with `AreNodesStructurallyEqual` —
-// upstream's narrower compare is part of the rule's contract; widening it
-// would cause spurious reports relative to ESLint.
-func areNodesSimilarMemberAccess(sf *ast.SourceFile, a, b *ast.Node) bool {
+// areNodesSimilarMemberAccess: two member-access sequences are similar when
+// they access the same members in the same order, regardless of optional
+// chaining. Parentheses are transparent as in ESTree; tsgo has no
+// ChainExpression wrapper to skip. Other wrappers such as non-null
+// assertions are compared by isNodeEqual, which rejects them.
+func areNodesSimilarMemberAccess(a, b *ast.Node) bool {
 	a = ast.SkipParentheses(a)
 	b = ast.SkipParentheses(b)
 	if a == nil || b == nil {
 		return false
 	}
-	if a.Kind == ast.KindNonNullExpression {
-		return areNodesSimilarMemberAccess(sf, a.AsNonNullExpression().Expression, b)
-	}
-	if b.Kind == ast.KindNonNullExpression {
-		return areNodesSimilarMemberAccess(sf, a, b.AsNonNullExpression().Expression)
-	}
-	aIsMember := isMemberExpressionLike(a)
-	bIsMember := isMemberExpressionLike(b)
-	if aIsMember && bIsMember {
-		// Recurse on objects.
-		if !areNodesSimilarMemberAccess(sf, utils.AccessExpressionObject(a), utils.AccessExpressionObject(b)) {
+	if isMemberExpressionLike(a) && isMemberExpressionLike(b) {
+		if !areNodesSimilarMemberAccess(utils.AccessExpressionObject(a), utils.AccessExpressionObject(b)) {
 			return false
 		}
-		// Property comparison — mirrors upstream's two-branch logic:
-		//   if (a.computed === b.computed) return isNodeEqual(a.property, b.property)
-		//   else if (a.property is Literal && b.property is Identifier) name-compare
-		//   else if vice versa, name-compare
-		//   else false
 		aProp, aComputed := memberProperty(a)
 		bProp, bComputed := memberProperty(b)
 		if aComputed == bComputed {
 			return isNodeEqual(aProp, bProp)
 		}
-		if isStringLikeLiteral(aProp) && bProp.Kind == ast.KindIdentifier {
-			return literalString(aProp) == bProp.AsIdentifier().Text
+		if aProp.Kind == ast.KindStringLiteral && bProp.Kind == ast.KindIdentifier {
+			return aProp.AsStringLiteral().Text == bProp.AsIdentifier().Text
 		}
-		if aProp.Kind == ast.KindIdentifier && isStringLikeLiteral(bProp) {
-			return aProp.AsIdentifier().Text == literalString(bProp)
+		if aProp.Kind == ast.KindIdentifier && bProp.Kind == ast.KindStringLiteral {
+			return aProp.AsIdentifier().Text == bProp.AsStringLiteral().Text
 		}
-		return false
-	}
-	if aIsMember != bIsMember {
 		return false
 	}
 	return isNodeEqual(a, b)
@@ -375,100 +378,58 @@ func areNodesSimilarMemberAccess(sf *ast.SourceFile, a, b *ast.Node) bool {
 
 // isMemberExpressionLike reports whether `node` is a MemberExpression-shaped
 // access (PropertyAccessExpression / ElementAccessExpression in tsgo terms).
-// Mirrors upstream's "MemberExpression" kind.
 func isMemberExpressionLike(node *ast.Node) bool {
 	return node.Kind == ast.KindPropertyAccessExpression ||
 		node.Kind == ast.KindElementAccessExpression
 }
 
-// memberProperty returns the property node and whether it's a computed access.
-//   - PropertyAccessExpression: property = `.name` (Identifier / PrivateIdentifier), computed=false
-//   - ElementAccessExpression : property = `[arg]` (any Expression), computed=true
+// memberProperty returns the ESTree `property` node and whether the access is
+// computed.
 func memberProperty(node *ast.Node) (*ast.Node, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		return node.AsPropertyAccessExpression().Name(), false
 	case ast.KindElementAccessExpression:
-		return node.AsElementAccessExpression().ArgumentExpression, true
+		return ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression), true
 	}
 	return nil, false
 }
 
-// isNodeEqual mirrors upstream's restricted-set isNodeEqual exactly.
-// Only handles ThisExpression / Literal / Identifier / MemberExpression;
-// returns false for any other kind (PrivateIdentifier, TSAsExpression, etc.).
+// isNodeEqual mirrors typescript-eslint's isNodeEqual, which only compares
+// ThisExpression, Literal, Identifier and MemberExpression nodes. Template
+// literals are not ESTree `Literal`s, and member expressions compare their
+// object and property without regard to `computed`. Every other kind is
+// unequal.
 func isNodeEqual(a, b *ast.Node) bool {
-	if a == nil || b == nil {
-		return false
-	}
 	a = ast.SkipParentheses(a)
 	b = ast.SkipParentheses(b)
 	if a == nil || b == nil {
 		return false
 	}
-	switch a.Kind {
-	case ast.KindThisKeyword:
-		return b.Kind == ast.KindThisKeyword
-	case ast.KindIdentifier:
-		if b.Kind != ast.KindIdentifier {
-			return false
-		}
-		return a.AsIdentifier().Text == b.AsIdentifier().Text
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		if !isStringLikeLiteral(b) {
-			return false
-		}
-		return literalString(a) == literalString(b)
-	case ast.KindNumericLiteral:
-		if b.Kind != ast.KindNumericLiteral {
-			return false
-		}
-		return a.AsNumericLiteral().Text == b.AsNumericLiteral().Text
-	case ast.KindBigIntLiteral:
-		if b.Kind != ast.KindBigIntLiteral {
-			return false
-		}
-		return a.AsBigIntLiteral().Text == b.AsBigIntLiteral().Text
-	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
-		return a.Kind == b.Kind
-	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		if !isMemberExpressionLike(b) {
-			return false
-		}
-		aProp, aComputed := memberProperty(a)
-		bProp, bComputed := memberProperty(b)
-		if aComputed != bComputed {
-			return false
-		}
+	if isMemberExpressionLike(a) && isMemberExpressionLike(b) {
+		aProp, _ := memberProperty(a)
+		bProp, _ := memberProperty(b)
 		return isNodeEqual(aProp, bProp) &&
 			isNodeEqual(utils.AccessExpressionObject(a), utils.AccessExpressionObject(b))
 	}
-	// Any other kind (PrivateIdentifier, TSAsExpression, ComputedPropertyName,
-	// SpreadElement, …) — upstream's isNodeEqual returns false here, and so
-	// do we. Don't widen.
-	return false
-}
-
-// isStringLikeLiteral reports whether the node is a StringLiteral or a
-// no-substitution template literal — both map to ESTree's `Literal` with a
-// string value.
-func isStringLikeLiteral(node *ast.Node) bool {
-	if node == nil {
+	if a.Kind != b.Kind {
 		return false
 	}
-	return node.Kind == ast.KindStringLiteral ||
-		node.Kind == ast.KindNoSubstitutionTemplateLiteral
-}
-
-// literalString returns the cooked string value of a string-like literal.
-func literalString(node *ast.Node) string {
-	switch node.Kind {
+	switch a.Kind {
+	case ast.KindThisKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	case ast.KindIdentifier:
+		return a.AsIdentifier().Text == b.AsIdentifier().Text
 	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
+		return a.AsStringLiteral().Text == b.AsStringLiteral().Text
+	case ast.KindNumericLiteral:
+		av, aok := ecmascript.StringToNumber(a.AsNumericLiteral().Text)
+		bv, bok := ecmascript.StringToNumber(b.AsNumericLiteral().Text)
+		return aok && bok && av == bv
+	case ast.KindBigIntLiteral:
+		return a.AsBigIntLiteral().Text == b.AsBigIntLiteral().Text
 	}
-	return ""
+	return false
 }
 
 func getOperatorAndNodesInsideTestExpression(test *ast.Node) (operator nullishCheckOperator, nodes []*ast.Node, ok bool) {
@@ -602,7 +563,7 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts *Options) bool {
 // node is a ConditionalExpression that is the direct argument of a
 // CallExpression, the ignoreBooleanCoercion early-return does NOT fire.
 func isTruthinessCheckEligible(ctx rule.RuleContext, opts *Options, node *ast.Node, testNode *ast.Node) bool {
-	t := ctx.TypeChecker.GetTypeAtLocation(testNode)
+	t := ctx.TypeChecker.GetTypeAtLocation(ast.SkipParentheses(testNode))
 	if !isTypeEligibleForPreferNullish(t, opts) {
 		return false
 	}
@@ -631,9 +592,37 @@ func isTruthinessCheckEligible(ctx rule.RuleContext, opts *Options, node *ast.No
 	return true
 }
 
+// pendingReports buffers the rule's reports so they are emitted in source
+// order, as ESLint orders them. No single traversal order does this: a `||`
+// report covers only its operator, so a left-nested chain such as
+// `(a || b) || c` reports the inner expression first while a right-nested one
+// such as `a ||= b || c` reports the outer one first.
+type pendingReports struct {
+	reports []pendingReport
+}
+
+type pendingReport struct {
+	pos  int
+	emit func()
+}
+
+func (p *pendingReports) add(pos int, emit func()) {
+	p.reports = append(p.reports, pendingReport{pos: pos, emit: emit})
+}
+
+func (p *pendingReports) flush() {
+	slices.SortStableFunc(p.reports, func(a, b pendingReport) int {
+		return cmp.Compare(a.pos, b.pos)
+	})
+	for _, report := range p.reports {
+		report.emit()
+	}
+	p.reports = nil
+}
+
 // reportPreferNullishOverOr handles `x || y` and `x ||= y`. They share one
 // BinaryExpression listener in tsgo.
-func reportPreferNullishOverOr(ctx rule.RuleContext, opts *Options, node *ast.Node, description, equals string) {
+func reportPreferNullishOverOr(ctx rule.RuleContext, opts *Options, pending *pendingReports, node *ast.Node, description, equals string) {
 	bin := node.AsBinaryExpression()
 	if !isTruthinessCheckEligible(ctx, opts, node, bin.Left) {
 		return
@@ -647,63 +636,43 @@ func reportPreferNullishOverOr(ctx rule.RuleContext, opts *Options, node *ast.No
 	opPos := scanner.SkipTrivia(src, bin.OperatorToken.Pos())
 	opEnd := bin.OperatorToken.End()
 	opRange := core.NewTextRange(opPos, opEnd)
-	rawOp := src[opPos:opEnd]
-	newOp := strings.Replace(rawOp, "||", "??", 1)
-
-	fixes := []rule.RuleFix{rule.RuleFixReplaceRange(opRange, newOp)}
-	addOrParenFixes(ctx.SourceFile, node, &fixes)
-
-	ctx.ReportRangeWithSuggestions(opRange, buildPreferNullishOverOrMessage(description, equals), rule.RuleSuggestion{
-		Message:  buildSuggestNullishMessage(equals),
-		FixesArr: fixes,
+	pending.add(opPos, func() {
+		ctx.ReportRangeWithDeferredSuggestions(opRange, buildPreferNullishOverOrMessage(description, equals), func() []rule.RuleSuggestion {
+			newOp := strings.Replace(src[opPos:opEnd], "||", "??", 1)
+			fixes := []rule.RuleFix{rule.RuleFixReplaceRange(opRange, newOp)}
+			addOrParenFixes(ctx.SourceFile, node, &fixes)
+			return []rule.RuleSuggestion{{
+				Message:  buildSuggestNullishMessage(equals),
+				FixesArr: fixes,
+			}}
+		})
 	})
 }
 
-// addOrParenFixes mirrors upstream's paren-adding logic when our parent is `||`
-// / `||=`. Mixing `&&` and `??` requires parens.
-//
-// In ESTree, ParenthesizedExpression is transparent — `node.parent` of an
-// expression inside `(...)` is the enclosing expression, not the paren. tsgo
-// keeps explicit ParenthesizedExpression nodes; walk through them so the
-// paren-add decision matches upstream byte-for-byte.
+// addOrParenFixes mirrors upstream's paren-adding logic when the ESTree parent
+// is a `||` LogicalExpression: `&&` and `??` cannot be mixed without
+// parentheses. Parentheses are transparent as in ESTree, so `node.left`,
+// `node.right` and `node.parent` refer to the nodes inside them; `||=` is an
+// AssignmentExpression and is not a `||` parent.
 func addOrParenFixes(sf *ast.SourceFile, node *ast.Node, fixes *[]rule.RuleFix) {
-	parent := node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-	if parent == nil || parent.Kind != ast.KindBinaryExpression {
-		return
-	}
-	pop := parent.AsBinaryExpression().OperatorToken.Kind
-	if pop != ast.KindBarBarToken && pop != ast.KindBarBarEqualsToken {
+	if !isLogicalOrExpression(utils.ESTreeParent(node)) {
 		return
 	}
 	bin := node.AsBinaryExpression()
-	leftSkipped := ast.SkipParentheses(bin.Left)
-	if leftSkipped != nil && leftSkipped.Kind == ast.KindBinaryExpression {
-		innerLeftBin := leftSkipped.AsBinaryExpression()
-		innerLeftLeftSkipped := ast.SkipParentheses(innerLeftBin.Left)
-		innerLeftLeftIsLogicalOr := innerLeftLeftSkipped != nil &&
-			innerLeftLeftSkipped.Kind == ast.KindBinaryExpression &&
-			(innerLeftLeftSkipped.AsBinaryExpression().OperatorToken.Kind == ast.KindBarBarToken ||
-				innerLeftLeftSkipped.AsBinaryExpression().OperatorToken.Kind == ast.KindBarBarEqualsToken)
-		if !innerLeftLeftIsLogicalOr {
-			*fixes = append(*fixes,
-				rule.RuleFixInsertBefore(sf, innerLeftBin.Right, "("),
-				rule.RuleFixInsertAfter(bin.Right, ")"),
-			)
-			return
-		}
+	left := utils.ESTreeRuntimeExpression(bin.Left)
+	right := utils.ESTreeRuntimeExpression(bin.Right)
+	if leftLogical := logicalExpression(left); leftLogical != nil &&
+		!isLogicalOrExpression(utils.ESTreeRuntimeExpression(leftLogical.Left)) {
+		*fixes = append(*fixes, rule.RuleFixInsertBefore(sf, utils.ESTreeRuntimeExpression(leftLogical.Right), "("))
+	} else {
+		*fixes = append(*fixes, rule.RuleFixInsertBefore(sf, left, "("))
 	}
-	*fixes = append(*fixes,
-		rule.RuleFixInsertBefore(sf, bin.Left, "("),
-		rule.RuleFixInsertAfter(bin.Right, ")"),
-	)
+	*fixes = append(*fixes, rule.RuleFixInsertAfter(right, ")"))
 }
 
 // reportPreferNullishOverTernary reports on a ConditionalExpression whose test
 // can be replaced by ?? on the corresponding branches.
-func reportPreferNullishOverTernary(ctx rule.RuleContext, opts *Options, node *ast.Node) {
+func reportPreferNullishOverTernary(ctx rule.RuleContext, opts *Options, pending *pendingReports, node *ast.Node) {
 	if opts.ignoreTernaryTests {
 		return
 	}
@@ -718,12 +687,14 @@ func reportPreferNullishOverTernary(ctx rule.RuleContext, opts *Options, node *a
 		return
 	}
 
-	leftText := getTextWithParentheses(ctx.SourceFile, leftNode)
-	rightText := getRightTextForTernary(ctx.SourceFile, nullishBranch)
-	replacement := leftText + " ?? " + rightText
-	ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverTernaryMessage(""), rule.RuleSuggestion{
-		Message:  buildSuggestNullishMessage(""),
-		FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+	pending.add(utils.TrimNodeTextRange(ctx.SourceFile, node).Pos(), func() {
+		ctx.ReportNodeWithDeferredSuggestions(node, buildPreferNullishOverTernaryMessage(""), func() []rule.RuleSuggestion {
+			replacement := getTextWithParentheses(ctx.SourceFile, leftNode) + " ?? " + getRightTextForTernary(ctx.SourceFile, nullishBranch)
+			return []rule.RuleSuggestion{{
+				Message:  buildSuggestNullishMessage(""),
+				FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+			}}
+		})
 	})
 }
 
@@ -747,43 +718,54 @@ func getTextWithParentheses(sf *ast.SourceFile, node *ast.Node) string {
 	return utils.TrimmedNodeText(sf, node)
 }
 
-// getRightTextForTernary mirrors upstream: if the nullish branch is already
-// parenthesized in source, keep it as-is; otherwise wrap with parens iff its
-// precedence is below `??`.
+// getRightTextForTernary mirrors upstream: a parenthesized nullish branch keeps
+// one layer of its parentheses; otherwise it is wrapped when its precedence is
+// not higher than `??`.
 func getRightTextForTernary(sf *ast.SourceFile, node *ast.Node) string {
-	// If the SOURCE-LEVEL form of `node` is wrapped in parens, keep the parens
-	// in the output by reading the outer node's text.
 	if node.Kind == ast.KindParenthesizedExpression {
-		return utils.TrimmedNodeText(sf, node)
+		return getTextWithParentheses(sf, node)
 	}
 	text := utils.TrimmedNodeText(sf, node)
-	if isLowPrecedenceForCoalesce(node) {
+	if needsParensAsCoalesceRight(node) {
 		return "(" + text + ")"
 	}
 	return text
 }
 
-// isLowPrecedenceForCoalesce reports whether `node`'s precedence is below the
-// coalesce operator (`??`), so it must be parenthesized when placed on the
-// right-hand side of a `??` substitution.
-func isLowPrecedenceForCoalesce(node *ast.Node) bool {
+// needsParensAsCoalesceRight mirrors upstream's
+// getWrappedCode(text, getOperatorPrecedenceForNode(node), Coalesce), which
+// wraps every node whose precedence is at most Coalesce (= Conditional) or is
+// unclassified (Invalid):
+//   - yield, arrow functions, conditionals, sequences and `??`;
+//   - assignments, including `=` and `/=`, which upstream does not classify;
+//   - `==`, which upstream's table places with the assignment operators;
+//   - `satisfies`, `import(...)` and instantiation expressions, which upstream
+//     does not classify.
+//
+// Upstream leaves `||` and `&&` unwrapped, which yields a suggestion such as
+// `a ?? b || c`, a syntax error. These are wrapped here instead.
+func needsParensAsCoalesceRight(node *ast.Node) bool {
 	switch node.Kind {
+	case ast.KindYieldExpression, ast.KindArrowFunction, ast.KindConditionalExpression,
+		ast.KindSatisfiesExpression, ast.KindExpressionWithTypeArguments:
+		return true
+	case ast.KindCallExpression:
+		return node.AsCallExpression().Expression.Kind == ast.KindImportKeyword
 	case ast.KindBinaryExpression:
 		op := node.AsBinaryExpression().OperatorToken.Kind
-		switch op {
-		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindCommaToken:
-			return true
-		}
 		if ast.IsAssignmentOperator(op) {
 			return true
 		}
-	case ast.KindConditionalExpression, ast.KindYieldExpression, ast.KindArrowFunction:
-		return true
+		switch op {
+		case ast.KindCommaToken, ast.KindQuestionQuestionToken, ast.KindEqualsEqualsToken,
+			ast.KindBarBarToken, ast.KindAmpersandAmpersandToken:
+			return true
+		}
 	}
 	return false
 }
 
-func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, node *ast.Node) {
+func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, pending *pendingReports, node *ast.Node) {
 	if opts.ignoreIfStatements {
 		return
 	}
@@ -835,98 +817,57 @@ func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, node *ast.No
 		return
 	}
 
-	src := ctx.SourceFile.Text()
-	leftText := getTextWithParentheses(ctx.SourceFile, leftAssignment)
-	rightText := getTextWithParentheses(ctx.SourceFile, rightAssignment)
+	pending.add(utils.TrimNodeTextRange(ctx.SourceFile, node).Pos(), func() {
+		ctx.ReportNodeWithDeferredSuggestions(node, buildPreferNullishOverAssignmentMessage("="), func() []rule.RuleSuggestion {
+			// Mirrors upstream's getCommentsBefore(assignmentExpression) and, for
+			// a block, getCommentsAfter(expressionStatement). The ESTree
+			// assignment excludes its parentheses, so the comments before it start
+			// after the token that precedes the innermost one.
+			comments := ctx.Comments.All()
+			separator := " "
+			if isConsequentBlock {
+				separator = "\n"
+			}
+			commentsBefore := formatComments(ctx.SourceFile, comments, assignmentExprStripped.Pos(), scanner.SkipTrivia(ctx.SourceFile.Text(), assignmentExprStripped.Pos()), separator)
+			commentsAfter := ""
+			if isConsequentBlock {
+				exprStmt := is.ThenStatement.AsBlock().Statements.Nodes[0]
+				// The closing `}` is the token after the statement.
+				commentsAfter = formatComments(ctx.SourceFile, comments, exprStmt.End(), is.ThenStatement.End()-1, "\n")
+			}
 
-	// Comment handling: mirror upstream's commentsBefore / commentsAfter
-	// via forward-walking the trivia chunks around the assignment.
-	//
-	//   block:    `if (cond) { <leading-trivia> stmt; <trailing-trivia> }`
-	//   single:   `if (cond) <leading-trivia> stmt;`
-	commentsBefore := ""
-	commentsAfter := ""
-	if isConsequentBlock {
-		exprStmt := is.ThenStatement.AsBlock().Statements.Nodes[0]
-		leadingStart := exprStmt.Pos()
-		leadingEnd := scanner.SkipTrivia(src, leadingStart)
-		if leadingStart < leadingEnd {
-			commentsBefore = formatComments(src[leadingStart:leadingEnd], "\n")
-		}
-		// Trailing trivia: between the end of the (only) statement and the
-		// closing `}` of the block.
-		trailingStart := exprStmt.End()
-		trailingEnd := is.ThenStatement.End() - 1 // points at `}`
-		if trailingStart < trailingEnd {
-			commentsAfter = formatComments(src[trailingStart:trailingEnd], "\n")
-		}
-	} else {
-		// `if (cond) /* c */ foo = makeFoo();` form — preserve comments
-		// that sit in the trivia before the expression statement.
-		leadingStart := is.ThenStatement.Pos()
-		leadingEnd := scanner.SkipTrivia(src, leadingStart)
-		if leadingStart < leadingEnd {
-			commentsBefore = formatComments(src[leadingStart:leadingEnd], " ")
-		}
-	}
-
-	replacement := leftText + " ??= " + rightText + ";"
-	fixes := []rule.RuleFix{}
-	if commentsBefore != "" {
-		fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, node, commentsBefore))
-	}
-	fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, node, replacement))
-	if commentsAfter != "" {
-		// Strip the trailing separator added by formatComments and emit with
-		// a leading space — matches upstream's `slice(0, -1)` + space.
-		trimmed := strings.TrimRight(commentsAfter, "\n ")
-		fixes = append(fixes, rule.RuleFixInsertAfter(node, " "+trimmed))
-	}
-
-	ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage("="), rule.RuleSuggestion{
-		Message:  buildSuggestNullishMessage("="),
-		FixesArr: fixes,
+			replacement := getTextWithParentheses(ctx.SourceFile, leftAssignment) + " ??= " + getTextWithParentheses(ctx.SourceFile, rightAssignment) + ";"
+			fixes := []rule.RuleFix{}
+			if commentsBefore != "" {
+				fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, node, commentsBefore))
+			}
+			fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+			if commentsAfter != "" {
+				// Upstream drops the final separator: `commentsAfter.slice(0, -1)`.
+				fixes = append(fixes, rule.RuleFixInsertAfter(node, " "+strings.TrimSuffix(commentsAfter, "\n")))
+			}
+			return []rule.RuleSuggestion{{
+				Message:  buildSuggestNullishMessage("="),
+				FixesArr: fixes,
+			}}
+		})
 	})
 }
 
-// formatComments extracts comments out of a trivia chunk and returns them with
-// `separator` between each.
-func formatComments(triviaChunk string, separator string) string {
+// formatComments mirrors upstream's formatComments for the comments lying
+// within [start, end): each comment's source text followed by `separator`.
+func formatComments(sf *ast.SourceFile, comments []*ast.CommentRange, start, end int, separator string) string {
 	var out strings.Builder
-	i := 0
-	for i < len(triviaChunk) {
-		c := triviaChunk[i]
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
-			i++
+	text := sf.Text()
+	for _, comment := range comments {
+		if comment.Pos() < start {
 			continue
 		}
-		if c == '/' && i+1 < len(triviaChunk) {
-			if triviaChunk[i+1] == '/' {
-				j := i + 2
-				for j < len(triviaChunk) && triviaChunk[j] != '\n' && triviaChunk[j] != '\r' {
-					j++
-				}
-				out.WriteString(triviaChunk[i:j])
-				out.WriteString(separator)
-				i = j
-				continue
-			}
-			if triviaChunk[i+1] == '*' {
-				j := i + 2
-				for j+1 < len(triviaChunk) && (triviaChunk[j] != '*' || triviaChunk[j+1] != '/') {
-					j++
-				}
-				if j+1 < len(triviaChunk) {
-					out.WriteString(triviaChunk[i : j+2])
-					out.WriteString(separator)
-					i = j + 2
-					continue
-				}
-				return out.String()
-			}
+		if comment.End() > end {
+			break
 		}
-		// Anything else — give up; this isn't pure trivia.
-		return out.String()
+		out.WriteString(text[comment.Pos():comment.End()])
+		out.WriteString(separator)
 	}
 	return out.String()
 }
@@ -959,13 +900,14 @@ func getNullishCoalescingParams(
 		if test == nil {
 			return nil, false
 		}
-		test = ast.SkipParentheses(test)
-		if test.Kind == ast.KindPrefixUnaryExpression {
-			nullishCoalescingLeftNode = ast.SkipParentheses(test.AsPrefixUnaryExpression().Operand)
+		// Keep the parentheses around the tested expression: upstream's
+		// getTextWithParentheses preserves one layer of them in the suggestion.
+		if unwrapped := ast.SkipParentheses(test); unwrapped.Kind == ast.KindPrefixUnaryExpression {
+			nullishCoalescingLeftNode = unwrapped.AsPrefixUnaryExpression().Operand
 		} else {
 			nullishCoalescingLeftNode = test
 		}
-		if !areNodesSimilarMemberAccess(ctx.SourceFile, nullishCoalescingLeftNode, nonNullishNode) {
+		if !areNodesSimilarMemberAccess(nullishCoalescingLeftNode, nonNullishNode) {
 			return nil, false
 		}
 	} else {
@@ -975,7 +917,7 @@ func getNullishCoalescingParams(
 				hasNullCheck = true
 			} else if utils.IsUndefinedIdentifier(tnSkipped) {
 				hasUndefinedCheck = true
-			} else if areNodesSimilarMemberAccess(ctx.SourceFile, tn, nonNullishNode) {
+			} else if areNodesSimilarMemberAccess(tn, nonNullishNode) {
 				if nullishCoalescingLeftNode == nil {
 					nullishCoalescingLeftNode = tn
 				}
@@ -1007,8 +949,20 @@ func getNullishCoalescingParams(
 		return nullishCoalescingLeftNode, true
 	}
 
-	t := ctx.TypeChecker.GetTypeAtLocation(nullishCoalescingLeftNode)
+	t := ctx.TypeChecker.GetTypeAtLocation(ast.SkipParentheses(nullishCoalescingLeftNode))
 	flags := getTypeFlags(t)
+	for _, part := range utils.UnionTypeParts(t) {
+		// A generic type (`T`, `NoInfer<T>`, `T[K]`, ...) may be `null` or
+		// `undefined` unless its constraint rules that out.
+		if checker.Type_flags(part)&checker.TypeFlagsInstantiable == 0 {
+			continue
+		}
+		constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, part)
+		if constraint == nil {
+			return nil, false
+		}
+		flags |= getTypeFlags(constraint)
+	}
 	if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
 		return nil, false
 	}
@@ -1023,15 +977,15 @@ func getNullishCoalescingParams(
 	return nil, false
 }
 
+// getTypeFlags mirrors typescript-eslint's getTypeFlags: the flags of every
+// union constituent. Intersections are not decomposed.
 func getTypeFlags(t *checker.Type) checker.TypeFlags {
 	if t == nil {
 		return 0
 	}
 	var flags checker.TypeFlags
 	for _, p := range utils.UnionTypeParts(t) {
-		for _, ip := range utils.IntersectionTypeParts(p) {
-			flags |= checker.Type_flags(ip)
-		}
+		flags |= checker.Type_flags(p)
 	}
 	return flags
 }
@@ -1048,10 +1002,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 			ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())
 		}
 
-		// Use exit listeners (post-order / leaf-first) so the diagnostic
-		// emission order matches ESLint's `LogicalExpression` listener
-		// semantics. ESLint reports inner `||` before outer `||` for chains
-		// like `(a && b) || c || d`; pre-order would reverse that.
+		pending := &pendingReports{}
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindBinaryExpression): func(node *ast.Node) {
 				bin := node.AsBinaryExpression()
@@ -1060,16 +1011,19 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				if op == ast.KindBarBarToken {
-					reportPreferNullishOverOr(ctx, &opts, node, "or", "")
+					reportPreferNullishOverOr(ctx, &opts, pending, node, "or", "")
 				} else {
-					reportPreferNullishOverOr(ctx, &opts, node, "assignment", "=")
+					reportPreferNullishOverOr(ctx, &opts, pending, node, "assignment", "=")
 				}
 			},
-			rule.ListenerOnExit(ast.KindConditionalExpression): func(node *ast.Node) {
-				reportPreferNullishOverTernary(ctx, &opts, node)
+			ast.KindConditionalExpression: func(node *ast.Node) {
+				reportPreferNullishOverTernary(ctx, &opts, pending, node)
 			},
-			rule.ListenerOnExit(ast.KindIfStatement): func(node *ast.Node) {
-				reportPreferNullishOverIf(ctx, &opts, node)
+			ast.KindIfStatement: func(node *ast.Node) {
+				reportPreferNullishOverIf(ctx, &opts, pending, node)
+			},
+			rule.ListenerOnExit(ast.KindEndOfFile): func(*ast.Node) {
+				pending.flush()
 			},
 		}
 	},

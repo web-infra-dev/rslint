@@ -83,7 +83,11 @@ Default: `{ bigint: false, boolean: false, number: false, string: false }`. Set 
 
 Default: `false`. By default the rule errors on every file when `strictNullChecks` is off. Setting this to `true` silences that error and lets the rule run anyway.
 
+## Differences from upstream
+
+When the suggestion for a ternary moves a `||` or `&&` expression to the right of `??`, rslint wraps it in parentheses. For `a !== null ? a : b || 'z'`, rslint suggests `a ?? (b || 'z')`; typescript-eslint v8.72.2 suggests `a ?? b || 'z'`, which is a syntax error because `??` cannot be mixed with `||` or `&&` without parentheses. The diagnostic itself is the same.
+
 ## Original Documentation
 
 - [typescript-eslint: prefer-nullish-coalescing](https://typescript-eslint.io/rules/prefer-nullish-coalescing)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/prefer-nullish-coalescing.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/src/rules/prefer-nullish-coalescing.ts)
