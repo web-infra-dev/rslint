@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestDisableManagerSameLineBoundaries(t *testing.T) {
@@ -47,6 +48,41 @@ func TestDisableManagerSameLineBoundaries(t *testing.T) {
 	}
 }
 
+func TestDisableManagerDirectiveDescriptions(t *testing.T) {
+	tests := []struct {
+		name         string
+		code         string
+		wantDisabled []bool
+	}{
+		{"empty", "/* eslint-disable no-console -- */\nlog();", []bool{true}},
+		{"multiline", "/* eslint-disable no-console --\n * reason\n */\nlog();", []bool{true}},
+		{"comma in description is not a rule separator", "/* eslint-disable no-alert --\n * for example, no-console\n */\nlog();", []bool{false}},
+		{"ECMAScript whitespace and extra hyphens", "/* rslint-disable no-console\uFEFF---\u2028 reason */\nlog();", []bool{true}},
+		{"missing trailing whitespace", "/* eslint-disable no-console --*/\nlog();", []bool{false}},
+		{"re-enable with empty description", "/* rslint-disable no-console */\nlog();\n/* eslint-enable no-console -- */\nlog();", []bool{true, false}},
+		{"block directives in line comments", "// eslint-disable no-console -- \nlog();\n/* eslint-disable no-console */\n// rslint-enable no-console -- \nlog();", []bool{false, true}},
+		{"next line after CRLF comment", "/* eslint-disable-next-line no-console --\r\n */ log();\r\nlog();\r\nlog();", []bool{false, true, false}},
+		{"disable-line spanning multiple lines", "log(); /* eslint-disable-line no-console --\n * reason\n */", []bool{false}},
+		{"explicit star is not a wildcard", "// eslint-disable-next-line * -- \nlog();\n/* eslint-disable-next-line -- */\nlog();", []bool{false, true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/directives.js", Path: "/directives.js"}, tt.code, core.ScriptKindJS)
+			dm := NewDisableManager(sf, NewCommentStore(sf))
+			statements := sf.Statements.Nodes
+			if len(statements) != len(tt.wantDisabled) {
+				t.Fatalf("got %d statements, want %d", len(statements), len(tt.wantDisabled))
+			}
+			for i, node := range statements {
+				pos := utils.TrimNodeTextRange(sf, node).Pos()
+				if got := dm.IsRuleDisabled("no-console", pos); got != tt.wantDisabled[i] {
+					t.Errorf("statement %d: disabled = %v, want %v", i+1, got, tt.wantDisabled[i])
+				}
+			}
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // parseRuleNames
 // ---------------------------------------------------------------------------
@@ -71,6 +107,7 @@ func TestParseRuleNames(t *testing.T) {
 		{"empty description after --", "no-console -- ", []string{"no-console"}},
 		{"multiple -- separators", "no-console, no-debugger -- reason1 -- reason2", []string{"no-console", "no-debugger"}},
 		{"-- without space before is not separator", "no-console--not-stripped", []string{"no-console--not-stripped"}},
+		{"quoted rules before a description", `"no-console", 'no-alert' -- reason`, []string{"no-console", "no-alert"}},
 	}
 
 	for _, tt := range tests {
@@ -164,18 +201,15 @@ func TestMatchDirective(t *testing.T) {
 		{"mixed case Rslint-Disable not recognized", "Rslint-Disable no-console", directiveNone, nil},
 		{"mixed case Eslint-Enable not recognized", "Eslint-Enable no-console", directiveNone, nil},
 
-		// ---- no space between prefix and rule name ------------------------
-		{"rslint-disable no space before rule", "rslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
-		{"eslint-disable no space before rule", "eslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
-
-		// ---- typos / near-miss prefixes -----------------------------------
-		{"rslint-disabled (extra d)", "rslint-disabled no-console", directiveBlock, []string{"d no-console"}},
-		{"eslint-disabled (extra d)", "eslint-disabled no-console", directiveBlock, []string{"d no-console"}},
-
-		// ---- enable-line / enable-next-line (not valid ESLint directives) --
-		{"rslint-enable-line treated as enable rule -line", "rslint-enable-line", directiveEnable, []string{"-line"}},
-		{"rslint-enable-next-line treated as enable rule -next-line", "rslint-enable-next-line", directiveEnable, []string{"-next-line"}},
-		{"eslint-enable-line treated as enable rule -line", "eslint-enable-line", directiveEnable, []string{"-line"}},
+		// ---- malformed labels --------------------------------------------
+		{"rslint-disable no space before rule", "rslint-disable" + "no-console", directiveNone, nil},     // cspell:disable-line
+		{"eslint-disable no space before rule", "eslint-disable" + "no-console -- ", directiveNone, nil}, // cspell:disable-line
+		{"eslint-disable comma after label", "eslint-disable, --\n ", directiveNone, nil},
+		{"rslint-disabled (extra d)", "rslint-disabled no-console", directiveNone, nil},
+		{"eslint-disabled (extra d)", "eslint-disabled no-console", directiveNone, nil},
+		{"rslint-enable-line", "rslint-enable-line", directiveNone, nil},
+		{"rslint-enable-next-line", "rslint-enable-next-line", directiveNone, nil},
+		{"eslint-enable-line", "eslint-enable-line", directiveNone, nil},
 
 		// ---- whitespace variants ------------------------------------------
 		{"tab between prefix and rule", "rslint-disable\tno-console", directiveBlock, []string{"no-console"}},
@@ -555,11 +589,11 @@ func TestDisableManagerLineLevelDirectives(t *testing.T) {
 	dm := &DisableManager{
 		lineDisabledRules: map[int][]string{
 			5:  {"no-unused-vars"},
-			10: {"*"},
+			10: {allLineRules},
 		},
 		nextLineDisabledRules: map[int][]string{
 			8:  {"no-debugger"},
-			12: {"*"},
+			12: {allLineRules},
 		},
 	}
 
@@ -594,14 +628,14 @@ func TestDisableManagerLineLevelDirectives(t *testing.T) {
 func (dm *DisableManager) isLineDisabled(ruleName string, line int) bool {
 	if lineRules, exists := dm.lineDisabledRules[line]; exists {
 		for _, r := range lineRules {
-			if r == ruleName || r == "*" {
+			if r == ruleName || r == allLineRules {
 				return true
 			}
 		}
 	}
 	if nextLineRules, exists := dm.nextLineDisabledRules[line]; exists {
 		for _, r := range nextLineRules {
-			if r == ruleName || r == "*" {
+			if r == ruleName || r == allLineRules {
 				return true
 			}
 		}
