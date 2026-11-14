@@ -154,15 +154,16 @@ let _a: any, b: any;
 				{MessageId: "unusedVar", Line: 3, Column: 6},
 			},
 		},
-		// simple object destructuring assignment (write-only)
+		// simple object destructuring assignment (write-only), reported at the
+		// shorthand write like upstream
 		{
 			Code: `
 let a: any, b: any;
 ({ a, b } = { a: 1, b: 2 });
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unusedVar", Line: 2, Column: 5},
-				{MessageId: "unusedVar", Line: 2, Column: 13},
+				{MessageId: "unusedVar", Message: "'a' is assigned a value but never used.", Line: 3, Column: 4},
+				{MessageId: "unusedVar", Message: "'b' is assigned a value but never used.", Line: 3, Column: 7},
 			},
 		},
 		// nested destructuring assignment (write-only)
@@ -223,7 +224,7 @@ let a: any;
 [{ a }] = [{ a: 1 }] as any;
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unusedVar", Line: 2, Column: 5},
+				{MessageId: "unusedVar", Message: "'a' is assigned a value but never used.", Line: 3, Column: 4},
 			},
 		},
 		// nested: array in object assignment (write-only)
@@ -274,7 +275,7 @@ let a: any;
 for ({ a } of [{ a: 1 }] as any) {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unusedVar", Line: 2, Column: 5},
+				{MessageId: "unusedVar", Message: "'a' is assigned a value but never used.", Line: 3, Column: 8},
 			},
 		},
 		// deeply nested array assignment: write-only
@@ -294,7 +295,7 @@ let a: any;
 [{ x: [{ a }] }] = [{ x: [{ a: 1 }] }] as any;
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "unusedVar", Line: 2, Column: 5},
+				{MessageId: "unusedVar", Message: "'a' is assigned a value but never used.", Line: 3, Column: 10},
 			},
 		},
 		// default value in destructuring assignment: write-only

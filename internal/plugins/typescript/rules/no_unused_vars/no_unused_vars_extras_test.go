@@ -542,3 +542,93 @@ export function update(value: unknown) {
 		},
 	)
 }
+
+// TestNoUnusedVarsUpstreamParityEdges covers boundaries of behavior aligned
+// with typescript-eslint v8.72.1; each expectation was checked against it.
+func TestNoUnusedVarsUpstreamParityEdges(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// A destructuring-assignment property with a rest sibling is ignored
+			// for renamed targets too.
+			{
+				Code:    "let a, rest;\n({ key: a, ...rest } = obj);\nconsole.log(rest);\n",
+				Options: map[string]interface{}{"ignoreRestSiblings": true},
+			},
+			// A function passed as an argument inside a self-assigned IIFE can run
+			// later, so its read is a real use.
+			{Code: "let cb = 0;\ncb = (function () {\n  register(function () {\n    cb();\n  });\n})();\n"},
+			// A value read after a type-only one marks the later parameter used.
+			{
+				Code:    "export function g(a: string, b: number): typeof b {\n  return b;\n}\n",
+				Options: map[string]interface{}{"args": "after-used"},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Exporting only the type half of a merged declaration, even when it
+			// comes first, leaves the value unused.
+			{
+				Code: "export interface Foo {}\nconst Foo = 1;\n",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'Foo' is assigned a value but never used.",
+					Line: 2, Column: 7, EndLine: 2, EndColumn: 10,
+				}},
+			},
+			// Without an initializer, the report stays on the first declaration.
+			{
+				Code: "export type Foo = string;\nlet Foo;\n",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'Foo' is defined but never used.",
+					Line: 1, Column: 13, EndLine: 1, EndColumn: 16,
+				}},
+			},
+			// A defaulted property is not a direct rest sibling.
+			{
+				Code:    "let a, rest;\n({ a = 1, ...rest } = obj);\nconsole.log(rest);\n",
+				Options: map[string]interface{}{"ignoreRestSiblings": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'a' is assigned a value but never used.",
+					Line: 2, Column: 4, EndLine: 2, EndColumn: 5,
+				}},
+			},
+			// Unlike ESLint core, an unused explicit global ignores `vars`.
+			{
+				Code:    "/* global foo */\n",
+				Options: map[string]interface{}{"vars": "local"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'foo' is defined but never used.",
+					Line: 1, Column: 11, EndLine: 1, EndColumn: 14,
+				}},
+			},
+			{
+				Code: "/* global a, b */\na;\n",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'b' is defined but never used.",
+					Line: 1, Column: 14, EndLine: 1, EndColumn: 15,
+				}},
+			},
+			{
+				Code: "for (const k in obj) {\n}\n",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'k' is assigned a value but never used.",
+					Line: 1, Column: 12, EndLine: 1, EndColumn: 13,
+				}},
+			},
+			// Only the default import is used: remove `, { ... }`.
+			{
+				Code: "import Used, { Unused } from 'm';\nUsed;\n",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unusedVar", Message: "'Unused' is defined but never used.",
+					Line: 1, Column: 16, EndLine: 1, EndColumn: 22,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "removeUnusedVar",
+						Output:    "import Used from 'm';\nUsed;\n",
+					}},
+				}},
+			},
+		},
+	)
+}

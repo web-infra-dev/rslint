@@ -7,9 +7,13 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	coreNoUnusedVars "github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
 	"github.com/web-infra-dev/rslint/internal/utils/scope"
 	"github.com/web-infra-dev/rslint/internal/utils/scopeanalysis"
@@ -229,6 +233,88 @@ func isTypeOnlyReference(node *ast.Node) bool {
 	return node != nil && node.Kind == ast.KindTypePredicate
 }
 
+// isMergedTypeDeclaration reports whether declaration is an interface or type
+// alias that shares its symbol with a value, such as `interface Foo {}` beside
+// `const Foo = 1`. Upstream's scope manager models that pair as one variable
+// that is both a type and a value; exporting only the type half does not
+// export the value.
+func isMergedTypeDeclaration(sym *ast.Symbol, declaration *ast.Node) bool {
+	return declaration != nil && sym != nil &&
+		(declaration.Kind == ast.KindInterfaceDeclaration || declaration.Kind == ast.KindTypeAliasDeclaration) &&
+		sym.Flags&ast.SymbolFlagsValue != 0
+}
+
+// mergedVariableDeclaration returns the first `var`/`let`/`const` declarator
+// that shares sym, or nil.
+func mergedVariableDeclaration(sym *ast.Symbol) *ast.Node {
+	if sym == nil {
+		return nil
+	}
+	for _, declaration := range sym.Declarations {
+		if declaration.Kind == ast.KindVariableDeclaration {
+			return declaration
+		}
+	}
+	return nil
+}
+
+// hasTypeDeclaration reports whether sym has an interface or type alias.
+func hasTypeDeclaration(sym *ast.Symbol) bool {
+	for _, declaration := range sym.Declarations {
+		if declaration.Kind == ast.KindInterfaceDeclaration || declaration.Kind == ast.KindTypeAliasDeclaration {
+			return true
+		}
+	}
+	return false
+}
+
+// isTypeOnlyUsage extends isTypeOnlyReference with upstream's merged-variable
+// rule: when a symbol has a `var`/`let`/`const` declarator, a reference in a
+// type position reads only the type half of the merged binding.
+func isTypeOnlyUsage(usage *ast.Node, sym *ast.Symbol) bool {
+	if isTypeOnlyReference(usage) {
+		return true
+	}
+	return mergedVariableDeclaration(sym) != nil && ast.IsPartOfTypeNode(usage)
+}
+
+// hasRestSiblingReference mirrors upstream's reference half of
+// ignoreRestSiblings: a reference that is a property value in a destructuring
+// assignment whose last element is a rest element, such as `a` in
+// `({ a, ...rest } = value)`. Declaration patterns are handled while visiting
+// their binding names.
+func hasRestSiblingReference(refs []*ast.Node) bool {
+	for _, ref := range refs {
+		property := ref.Parent
+		if property == nil {
+			continue
+		}
+		switch property.Kind {
+		case ast.KindShorthandPropertyAssignment:
+			// `{ a = 1, ...rest }` puts the identifier under an AssignmentPattern
+			// in ESTree, not directly under the Property.
+			if property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+				continue
+			}
+		case ast.KindPropertyAssignment:
+			if property.Initializer() != ref {
+				continue
+			}
+		default:
+			continue
+		}
+		object := property.Parent
+		if object == nil || object.Kind != ast.KindObjectLiteralExpression || !ast.IsAssignmentTarget(object) {
+			continue
+		}
+		properties := object.AsObjectLiteralExpression().Properties.Nodes
+		if len(properties) != 0 && properties[len(properties)-1].Kind == ast.KindSpreadAssignment {
+			return true
+		}
+	}
+	return false
+}
+
 type assignmentReferenceKind uint8
 
 const (
@@ -353,6 +439,10 @@ func hasAssignment(definition *ast.Node, writeRefs []*ast.Node) bool {
 			// Variable with initializer: `const x = 1`, `let x = 1`
 			varDecl := definition.AsVariableDeclaration()
 			if varDecl != nil && varDecl.Initializer != nil {
+				return true
+			}
+			// A for-in/for-of head writes its declaration on every iteration.
+			if isForInOfDeclaration(definition) != nil {
 				return true
 			}
 		case ast.KindBindingElement:
@@ -660,9 +750,17 @@ func isMethodCallOnSameSymbol(callee *ast.Node, sym *ast.Symbol, checker *checke
 //
 //	`cb = (0, function(a) { cb(1+a); })` (non-IIFE, assigned directly)
 //	`cb = (function(a) { cb(1+a); }, cb)` (discarded in comma left operand)
+//
+// Like upstream's isInsideOfStorableFunction, only the nearest enclosing
+// function is examined. A function declaration, or a function stored or passed
+// as an argument, can run later, so its reads are real uses even inside an
+// IIFE assigned back to the variable.
 func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
 	current := node
 	for current != nil {
+		if ast.IsFunctionLike(current) && !ast.IsFunctionExpressionOrArrowFunction(current) {
+			return false
+		}
 		if ast.IsFunctionExpressionOrArrowFunction(current) {
 			// Walk up from the function expression through parens, commas, and calls
 			// to find the enclosing assignment.
@@ -702,6 +800,7 @@ func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *ch
 				}
 				break
 			}
+			return false
 		}
 		current = current.Parent
 	}
@@ -719,8 +818,10 @@ func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, ac *analysisContext) 
 		rawSym := binderSymbolForDefinition(nameNode, definition)
 		sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
 		info := getReferenceInfo(ctx, nameNode, nameNode.AsIdentifier().Text, definition, rawSym, sym, ac)
+		// Upstream counts a later parameter as used only through a reference
+		// that is not type-only (typescript-eslint#12977).
 		for _, usage := range info.usages {
-			if usage.Pos() != nameNode.Pos() {
+			if usage.Pos() != nameNode.Pos() && !isTypeOnlyUsage(usage, sym) {
 				return true
 			}
 		}
@@ -1319,7 +1420,7 @@ func isExported(varInfo *VariableInfo, sym *ast.Symbol, localExportTargets map[*
 
 	if varInfo.Definition != nil {
 		modifierFlags := ast.GetCombinedModifierFlags(varInfo.Definition)
-		if modifierFlags&ast.ModifierFlagsExport != 0 {
+		if modifierFlags&ast.ModifierFlagsExport != 0 && !isMergedTypeDeclaration(sym, varInfo.Definition) {
 			return true
 		}
 
@@ -1327,6 +1428,9 @@ func isExported(varInfo *VariableInfo, sym *ast.Symbol, localExportTargets map[*
 		// the variable is considered exported (e.g., `interface Foo {} export const Foo = ...`)
 		if sym != nil && len(sym.Declarations) > 1 {
 			for _, decl := range sym.Declarations {
+				if isMergedTypeDeclaration(sym, decl) {
+					continue
+				}
 				if ast.GetCombinedModifierFlags(decl)&ast.ModifierFlagsExport != 0 {
 					return true
 				}
@@ -1449,69 +1553,79 @@ func buildRemoveUnusedVarMessage(varName string) rule.RuleMessage {
 	}
 }
 
-// getImportRemoveFix generates a fix that removes an unused import binding.
-// It handles four import kinds: ImportSpecifier, ImportClause (default import),
-// NamespaceImport, and ImportEqualsDeclaration.
+// getImportRemoveFix generates the edit that removes an unused import binding,
+// mirroring upstream's getImportFixer: a whole declaration when every binding
+// is unused, otherwise the binding with one adjacent comma.
 func getImportRemoveFix(ctx rule.RuleContext, definition *ast.Node, reportedUnused map[*ast.Node]bool) (fixes []rule.RuleFix, suggestionMsg rule.RuleMessage) {
 	file := ctx.SourceFile
 	switch definition.Kind {
 	case ast.KindImportEqualsDeclaration:
-		// import X = require('foo') → remove entire statement
-		return []rule.RuleFix{removeImportLine(file, definition)}, buildRemoveUnusedImportMessage()
+		// An import-equals declaration has exactly one binding.
+		return []rule.RuleFix{removeNodeWithTrailingNewline(file, definition)}, buildRemoveUnusedImportMessage()
 
 	case ast.KindNamespaceImport:
-		// import * as ns from 'foo' → remove entire import declaration
+		// Upstream always removes the whole declaration for a namespace import.
 		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
 		if importDecl != nil {
-			return []rule.RuleFix{removeImportLine(file, importDecl)}, buildRemoveUnusedImportMessage()
+			return []rule.RuleFix{removeNodeWithTrailingNewline(file, importDecl)}, buildRemoveUnusedImportMessage()
 		}
 
 	case ast.KindImportClause:
-		// import Foo from 'foo' (default import)
+		// Default import.
 		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
 		if importDecl == nil {
 			break
 		}
 		clause := definition.AsImportClause()
-		if clause == nil {
-			break
-		}
-		// If no named bindings, or all specifiers are unused → remove entire declaration
 		if clause.NamedBindings == nil || allImportSpecifiersUnused(clause, reportedUnused) {
-			return []rule.RuleFix{removeImportLine(file, importDecl)}, buildRemoveUnusedImportMessage()
+			return []rule.RuleFix{removeNodeWithTrailingNewline(file, importDecl)}, buildRemoveUnusedImportMessage()
 		}
-		// Otherwise remove just the default specifier and trailing comma
-		// `import Foo, { Used } from 'foo'` → `import { Used } from 'foo'`
+		// `import Unused, { Used } from 'm'` removes `Unused,` only.
 		nameNode := clause.Name()
-		if nameNode == nil {
+		comma, ok := utils.TokenAtOrAfter(file, nameNode.End())
+		if !ok || comma.Kind != ast.KindCommaToken {
 			break
 		}
-		// Find the comma after the default specifier
-		commaEnd := findCommaAfter(file, nameNode.End())
-		if commaEnd > 0 {
-			return []rule.RuleFix{rule.RuleFixRemoveRange(nameNode.Loc.WithEnd(commaEnd))}, buildRemoveUnusedVarMessage(nameNode.AsIdentifier().Text)
-		}
+		nameRange := utils.TrimNodeTextRange(file, nameNode)
+		return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(nameRange.Pos(), comma.End))}, buildRemoveUnusedVarMessage(nameNode.AsIdentifier().Text)
 
 	case ast.KindImportSpecifier:
-		// import { Foo } from 'foo' (named import specifier)
 		importDecl := ast.FindAncestorKind(definition, ast.KindImportDeclaration)
-		if importDecl == nil {
+		if importDecl == nil || importDecl.AsImportDeclaration().ImportClause == nil {
 			break
 		}
-		clause := importDecl.AsImportDeclaration().ImportClause
-		if clause == nil {
-			break
-		}
-		importClause := clause.AsImportClause()
-		if importClause == nil {
-			break
-		}
-		// If all specifiers in this declaration are unused → remove entire declaration
+		importClause := importDecl.AsImportDeclaration().ImportClause.AsImportClause()
 		if allImportSpecifiersUnused(importClause, reportedUnused) {
-			return []rule.RuleFix{removeImportLine(file, importDecl)}, buildRemoveUnusedImportMessage()
+			return []rule.RuleFix{removeNodeWithTrailingNewline(file, importDecl)}, buildRemoveUnusedImportMessage()
 		}
-		// Otherwise remove just this specifier with its leading or trailing comma
-		return []rule.RuleFix{removeSpecifierWithComma(file, definition)}, buildRemoveUnusedVarMessage(definition.AsImportSpecifier().Name().AsIdentifier().Text)
+		name := definition.AsImportSpecifier().Name().AsIdentifier().Text
+		namedImports := importClause.NamedBindings
+		usedNamed := false
+		for _, spec := range namedImports.AsNamedImports().Elements.Nodes {
+			if !reportedUnused[spec] {
+				usedNamed = true
+				break
+			}
+		}
+		if !usedNamed {
+			// Only the default import is used: remove `, { ... }`.
+			namedRange := utils.TrimNodeTextRange(file, namedImports)
+			comma, ok := utils.TokenBeforePosition(file, namedRange.Pos())
+			if !ok || comma.Kind != ast.KindCommaToken {
+				break
+			}
+			return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(comma.Start, namedRange.End()))}, buildRemoveUnusedVarMessage(name)
+		}
+		// Prefer the leading comma; the first specifier uses its trailing one.
+		specRange := utils.TrimNodeTextRange(file, definition)
+		if comma, ok := utils.TokenBeforePosition(file, specRange.Pos()); ok && comma.Kind == ast.KindCommaToken {
+			return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(comma.Start, specRange.End()))}, buildRemoveUnusedVarMessage(name)
+		}
+		comma, ok := utils.TokenAtOrAfter(file, specRange.End())
+		if !ok || comma.Kind != ast.KindCommaToken {
+			break
+		}
+		return []rule.RuleFix{rule.RuleFixRemoveRange(core.NewTextRange(specRange.Pos(), comma.End))}, buildRemoveUnusedVarMessage(name)
 	}
 	return nil, rule.RuleMessage{}
 }
@@ -1572,72 +1686,24 @@ func allImportSpecifiersUnused(clause *ast.ImportClause, reportedUnused map[*ast
 	return true
 }
 
-func removeImportLine(file *ast.SourceFile, node *ast.Node) rule.RuleFix {
-	// Remove the entire line including trailing newline
+// removeNodeWithTrailingNewline removes the whole lines that node occupies,
+// through the next line's start, when nothing else is on them; otherwise it
+// removes just the node. This matches upstream's helper of the same name.
+func removeNodeWithTrailingNewline(file *ast.SourceFile, node *ast.Node) rule.RuleFix {
 	text := file.Text()
-	start := node.Pos()
-	end := node.End()
-	// Expand to include trailing newline
-	if end < len(text) && text[end] == '\n' {
-		end++
-	} else if end+1 < len(text) && text[end] == '\r' && text[end+1] == '\n' {
-		end += 2
+	nodeRange := utils.TrimNodeTextRange(file, node)
+	lineStarts := file.ECMALineMap()
+	startLine := scanner.ComputeLineOfPosition(lineStarts, nodeRange.Pos())
+	endLine := scanner.ComputeLineOfPosition(lineStarts, nodeRange.End())
+	lineStart := int(lineStarts[startLine])
+	lineEnd := len(text)
+	if endLine+1 < len(lineStarts) {
+		lineEnd = int(lineStarts[endLine+1])
 	}
-	return rule.RuleFixRemoveRange(node.Loc.WithPos(start).WithEnd(end))
-}
-
-func findCommaAfter(file *ast.SourceFile, pos int) int {
-	text := file.Text()
-	for i := pos; i < len(text); i++ {
-		ch := text[i]
-		if ch == ',' {
-			return i + 1
-		}
-		if ch != ' ' && ch != '\t' {
-			break
-		}
+	if text[nodeRange.Pos():nodeRange.End()] == ecmascript.StringTrim(text[lineStart:lineEnd]) {
+		return rule.RuleFixRemoveRange(core.NewTextRange(lineStart, lineEnd))
 	}
-	return -1
-}
-
-func removeSpecifierWithComma(file *ast.SourceFile, specNode *ast.Node) rule.RuleFix {
-	text := file.Text()
-	start := specNode.Pos()
-	end := specNode.End()
-
-	// Skip leading trivia (whitespace) to get the actual text start
-	textStart := start
-	for textStart < end && (text[textStart] == ' ' || text[textStart] == '\t' || text[textStart] == '\n' || text[textStart] == '\r') {
-		textStart++
-	}
-
-	// Try to remove leading comma: `, Specifier` (preferred — avoids double space)
-	leadingComma := -1
-	for i := start - 1; i >= 0; i-- {
-		ch := text[i]
-		if ch == ',' {
-			leadingComma = i
-			break
-		}
-		if ch != ' ' && ch != '\t' && ch != '\n' && ch != '\r' {
-			break
-		}
-	}
-	if leadingComma >= 0 {
-		return rule.RuleFixRemoveRange(specNode.Loc.WithPos(leadingComma).WithEnd(end))
-	}
-	// Fallback: remove trailing comma: `Specifier, ` (for first specifier in list)
-	trailingEnd := findCommaAfter(file, end)
-	if trailingEnd > 0 {
-		// Also skip space after comma
-		for trailingEnd < len(text) && (text[trailingEnd] == ' ' || text[trailingEnd] == '\t') {
-			trailingEnd++
-		}
-		// Use textStart (not start) to preserve leading whitespace after `{`
-		return rule.RuleFixRemoveRange(specNode.Loc.WithPos(textStart).WithEnd(trailingEnd))
-	}
-	// Last resort: just remove the specifier
-	return rule.RuleFixRemoveRange(specNode.Loc.WithPos(textStart).WithEnd(end))
+	return rule.RuleFixRemoveRange(nodeRange)
 }
 
 // isPropertyNameLikePosition reports whether an identifier appears in a syntactic
@@ -1907,13 +1973,9 @@ func classifyReferenceNodes(refs []*ast.Node) referenceInfo {
 	for i, ref := range refs {
 		assignmentKind := classifyAssignmentReference(ref)
 		if assignmentKind == assignmentReferenceWriteOnly {
-			// In `({ x } = value)`, TypeScript exposes the shorthand node as
-			// the object's property symbol. Preserve the existing ESLint-
-			// compatible behavior: exclude it as a read, but report an unused
-			// local at its declaration rather than at this property-shaped write.
-			if ref.Parent == nil || ref.Parent.Kind != ast.KindShorthandPropertyAssignment {
-				info.writeRefs = append(info.writeRefs, ref)
-			}
+			// Upstream reports at a destructuring write, including the
+			// shorthand `a` in `({ a } = value)`.
+			info.writeRefs = append(info.writeRefs, ref)
 			if filtered == nil {
 				filtered = make([]*ast.Node, 0, len(refs)-1)
 				filtered = append(filtered, refs[:i]...)
@@ -2202,7 +2264,8 @@ func lastWriteInDeclarationScope(definition *ast.Node, refs []*ast.Node) *ast.No
 func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts *Config, ac *analysisContext) {
 	// Direct exports cannot be unused. Skip symbol/reference analysis entirely
 	// unless used ignored names must still be reported.
-	if !opts.ReportUsedIgnorePattern && isDirectlyExported(definition) {
+	if !opts.ReportUsedIgnorePattern && isDirectlyExported(definition) &&
+		!isMergedTypeDeclaration(binderSymbolForDefinition(nameNode, definition), definition) {
 		return
 	}
 	// Under after-used, a direct parameter before the last used/defaulted one
@@ -2233,6 +2296,21 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			ac.seenMergedSymbols = make(map[*ast.Symbol]bool)
 		}
 		ac.seenMergedSymbols[sym] = true
+		// A merged type and variable is analyzed as the variable: upstream
+		// reports its value declaration, and a type reference no longer marks
+		// it used (typescript-eslint#12892).
+		if variable := mergedVariableDeclaration(sym); variable != nil && hasTypeDeclaration(sym) {
+			definition = variable
+			// Upstream reports at the last write, here the initializer, or
+			// otherwise at the first declaration in source order.
+			if variable.Initializer() != nil && ast.IsIdentifier(variable.Name()) {
+				nameNode = variable.Name()
+			} else if first := sym.Declarations[0].Name(); first != nil && ast.IsIdentifier(first) {
+				nameNode = first
+			}
+			varInfo.Variable = nameNode
+			varInfo.Definition = definition
+		}
 	}
 
 	info := getReferenceInfo(ctx, nameNode, name, definition, rawSym, sym, ac)
@@ -2246,6 +2324,10 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		allDecls = sym.Declarations
 	}
 
+	// Upstream picks usedOnlyAsType when any reference is type-only, including
+	// one inside the variable's own declarations, such as the `typeof A` in
+	// `const A = 0; export type A = typeof A;`.
+	hasTypeOnlyReference := false
 	implicitlyUsed := false
 	if definition != nil && definition.Kind == ast.KindTypeParameter {
 		// Mapped-type keys are also marked as used by UnusedVarsVisitor.
@@ -2257,13 +2339,16 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		hasUsage := false
 		onlyUsedAsType := true
 		for _, usage := range info.usages {
+			if usage.Pos() != varInfo.Variable.Pos() && !hasTypeOnlyReference && isTypeOnlyUsage(usage, sym) {
+				hasTypeOnlyReference = true
+			}
 			if usage.Pos() == varInfo.Variable.Pos() ||
 				(len(info.writeRefs) != 0 && sym != nil && isSelfModifyingReference(usage, sym, ctx.TypeChecker, nameNode)) ||
 				isInsideAnyOwnDeclaration(usage, allDecls) {
 				continue
 			}
 			hasUsage = true
-			if !isTypeOnlyReference(usage) || isUsedInFunctionTypeSignatureParameter(usage) {
+			if !isTypeOnlyUsage(usage, sym) || isUsedInFunctionTypeSignatureParameter(usage) {
 				onlyUsedAsType = false
 				break
 			}
@@ -2328,6 +2413,16 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if varInfo.Used && !matchedPattern {
 		return
 	}
+	if !varInfo.Used && opts.IgnoreRestSiblings {
+		refs := append(append([]*ast.Node{}, info.usages...), info.writeRefs...)
+		if ctx.Refs != nil && rawSym != nil {
+			// Shorthand write targets are excluded from writeRefs.
+			refs = ctx.Refs.References(rawSym)
+		}
+		if hasRestSiblingReference(refs) {
+			return
+		}
+	}
 
 	if isExported(varInfo, sym, ac.localExportTargets) {
 		// Even exported variables should be reported if they match an ignore pattern
@@ -2363,7 +2458,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
 		additional := ignorePatternAdditional(matchedType, opts, true)
 		ctx.ReportNode(reportNode, buildUsedIgnoredVarMessage(name, additional))
-	} else if varInfo.OnlyUsedAsType && opts.Vars == "all" {
+	} else if (varInfo.OnlyUsedAsType || (!varInfo.Used && hasTypeOnlyReference)) && opts.Vars == "all" {
 		unusedAdditional := ignorePatternAdditional(definitionVariableType(definition, opts), opts, false)
 		ctx.ReportNode(reportNode, buildUsedOnlyAsTypeMessage(name, assigned, unusedAdditional))
 	} else if !varInfo.Used {
@@ -2474,6 +2569,11 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					ensureCollected(node)
 					nameNode := node.Name()
 					processVariable(ctx, nameNode, nameNode.Text(), node, &opts, ac)
+				}
+				// `/* global */` names have no declaration node. Upstream reports
+				// an unread one at its first name, regardless of `vars`.
+				for _, inlineGlobal := range coreNoUnusedVars.UnusedInlineGlobals(ctx) {
+					ctx.ReportRange(inlineGlobal.NameRanges[0], buildUnusedVarMessage(inlineGlobal.Name, false, ""))
 				}
 			},
 			ast.KindVariableDeclaration: func(node *ast.Node) {
