@@ -1,377 +1,721 @@
-import type {
-  InvalidTestCase,
-  ValidTestCase,
-} from '@typescript-eslint/rule-tester';
+// Upstream: @typescript-eslint/eslint-plugin v8.72.2.
+// All 286 valid and 351 invalid cases preserve their input and rule options.
+// Messages, complete ranges and suggestion outputs were recorded by running the
+// upstream suite with that exact version; the rule has no autofixes.
+// The upstream `unstrict` fixture directory is reproduced as `unstrict/`.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/tests/rules/prefer-nullish-coalescing.test.ts
+import { RuleTester } from '@rslint/rule-tester';
 
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import * as path from 'node:path';
-
-import type {
-  MessageIds,
-  Options,
-} from '../../src/rules/prefer-nullish-coalescing';
-
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
+const compilerOptions = {
+  jsx: 'preserve',
+  target: 'es2015',
+  module: 'commonjs',
+  lib: ['es2015', 'es2017', 'esnext'],
+  experimentalDecorators: true,
+};
 
 const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: { ...compilerOptions, strict: true, esModuleInterop: true },
+      include: ['file.ts'],
+    }),
+    'unstrict/tsconfig.json': JSON.stringify({
+      compilerOptions: { ...compilerOptions, strict: false },
+      include: ['file.ts'],
+    }),
   },
+  languageOptions: { parserOptions: { project: './tsconfig.json' } },
 });
-
-const types = ['string', 'number', 'boolean', 'object'];
-const nullishTypes = ['null', 'undefined', 'null | undefined'];
-const ignorablePrimitiveTypes = ['string', 'number', 'boolean', 'bigint'];
-
-function typeValidTest(
-  cb: (type: string, equals: '' | '=') => string | ValidTestCase<Options>,
-): (string | ValidTestCase<Options>)[] {
-  return [
-    ...types.map(type => cb(type, '')),
-    ...types.map(type => cb(type, '=')),
-  ];
-}
-
-const nullishTypeTest = <
-  T extends
-    | string
-    | InvalidTestCase<MessageIds, Options>
-    | ValidTestCase<Options>,
->(
-  cb: (nullish: string, type: string, equals: string) => T,
-): T[] =>
-  nullishTypes.flatMap(nullish =>
-    types.flatMap(type =>
-      ['', ...(cb.length === 3 ? ['='] : [])].map(equals =>
-        cb(nullish, type, equals),
-      ),
-    ),
-  );
 
 ruleTester.run('prefer-nullish-coalescing', {
   valid: [
-    ...typeValidTest(
-      (type, equals) => `
-declare let x: ${type};
-(x ||${equals} 'foo');
-      `,
-    ),
-    ...nullishTypeTest(
-      (nullish, type, equals) => `
-declare let x: ${type} | ${nullish};
-x ??${equals} 'foo';
-      `,
-    ),
+    `
+declare let x: string;
+x || 'foo';
+    `,
+    `
+declare let x: number;
+x || 'foo';
+    `,
+    `
+declare let x: boolean;
+x || 'foo';
+    `,
+    `
+declare let x: object;
+x || 'foo';
+    `,
+    `
+declare let x: string;
+x ||= 'foo';
+    `,
+    `
+declare let x: number;
+x ||= 'foo';
+    `,
+    `
+declare let x: boolean;
+x ||= 'foo';
+    `,
+    `
+declare let x: object;
+x ||= 'foo';
+    `,
+    `
+declare let x: string | null | undefined;
+x ?? 'foo';
+    `,
+    `
+declare let x: string | null | undefined;
+x ??= 'foo';
+    `,
+    `
+declare let x: number | null | undefined;
+x ?? 'foo';
+    `,
+    `
+declare let x: number | null | undefined;
+x ??= 'foo';
+    `,
+    `
+declare let x: boolean | null | undefined;
+x ?? 'foo';
+    `,
+    `
+declare let x: boolean | null | undefined;
+x ??= 'foo';
+    `,
+    `
+declare let x: object | null | undefined;
+x ?? 'foo';
+    `,
+    `
+declare let x: object | null | undefined;
+x ??= 'foo';
+    `,
 
     {
       code: 'x !== undefined && x !== null ? x : y;',
       options: [{ ignoreTernaryTests: true }],
     },
 
-    ...[
-      'x !== undefined && x !== null ? "foo" : "bar";',
-      'x !== null && x !== undefined && x !== 5 ? x : y',
-      'x === null || x === undefined || x === 5 ? x : y',
-      'x === undefined && x !== null ? x : y;',
-      'x === undefined && x === null ? x : y;',
-      'x !== undefined && x === null ? x : y;',
-      'x === undefined || x !== null ? x : y;',
-      'x === undefined || x === null ? x : y;',
-      'x !== undefined || x === null ? x : y;',
-      'x !== undefined || x === null ? y : x;',
-      'x === null || x === null ? y : x;',
-      'x === undefined || x === undefined ? y : x;',
-      'x == null ? x : y;',
-      'undefined == null ? x : y;',
-      'undefined != z ? x : y;',
-      'x == undefined ? x : y;',
-      'x != null ? y : x;',
-      'x != undefined ? y : x;',
-      'null == x ? x : y;',
-      'undefined == x ? x : y;',
-      'null != x ? y : x;',
-      'undefined != x ? y : x;',
-      `
+    {
+      code: "x !== undefined && x !== null ? 'foo' : 'bar';",
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== null && x !== undefined && x !== 5 ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || x === undefined || x === 5 ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined && x !== null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined && x === null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && x === null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || x !== null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || x === null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined || x === null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined || x === null ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || x === null ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || x === undefined ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined == null ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined != z ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != null ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null == x ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined == x ? x : y;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null != x ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined != x ? y : x;',
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 x !== 15 && x !== undefined ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 x !== undefined && x !== 15 ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 15 !== x && undefined !== x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 undefined !== x && 15 !== x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 15 !== x && x !== undefined ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number | undefined;
 undefined !== x && x !== 15 ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string | undefined;
 x !== 'foo' && x !== undefined ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 function test(value: number | undefined): number {
   return value !== foo() && value !== undefined ? value : 1;
 }
       `,
-      `
-const test = (value: boolean | undefined): boolean => value !== undefined && value !== false ? value : false;
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+const test = (value: boolean | undefined): boolean =>
+  value !== undefined && value !== false ? value : false;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string;
 x === null ? x : y;
       `,
-      `
-declare let x: string | undefined;
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: string | undefined | null;
 x === null ? x : y;
       `,
-      `
-declare let x: string | null;
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: string | undefined | null;
 x === undefined ? x : y;
       `,
-      `
-declare let x: string | undefined | null;
-x !== undefined ? x : y;
-      `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string | undefined | null;
 x !== null ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: string | undefined | null;
+x !== undefined ? x : y;
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T | undefined) {
+  return val !== undefined ? val : 'foo';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T | null) {
+  return val !== null ? val : 'foo';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T extends string | null>(val: T | undefined) {
+  return val !== undefined ? val : 'foo';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+class Property<T> {
+  value: T | undefined;
+  defaultValue!: T;
+
+  get(): T {
+    return this.value !== undefined ? this.value : this.defaultValue;
+  }
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T | undefined, fallback: T) {
+  if (val === undefined) {
+    val = fallback;
+  }
+  return val;
+}
+      `,
+      options: [{ ignoreIfStatements: false }],
+    },
+    {
+      code: `
+function test<T extends string | undefined>(val: T | null) {
+  return val !== null ? val : 'foo';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: NoInfer<T> | undefined, fallback: T): T {
+  if (val === undefined) {
+    val = fallback;
+  }
+  return val;
+}
+      `,
+      options: [{ ignoreIfStatements: false }],
+    },
+    {
+      code: `
+function test<T extends Record<string, null>, K extends keyof T>(
+  val: T[K] | undefined,
+) {
+  return val !== undefined ? val : 'fallback';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T) {
+  return val !== undefined ? val : 'fallback';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T extends unknown>(val: T | undefined) {
+  return val !== undefined ? val : 'fallback';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T, U extends T>(val: U | undefined) {
+  return val !== undefined ? val : 'fallback';
+}
+      `,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: any;
 x === null ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: unknown;
 x === null ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string | object;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string | object;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: number;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: bigint;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: bigint;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: boolean;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: boolean;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: object;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: object;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string[];
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: string[];
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: Function;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: Function;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string;
 !x ? y : x;
       `,
-      `
-declare let x: () => string | null;
-x ? x : y;
-      `,
-      `
-declare let x: () => string | null;
-!x ? y : x;
-      `,
-      `
-declare let x: () => string | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: () => string | undefined;
-!x ? y : x;
-      `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string | null | undefined;
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string | null | undefined;
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string | null;
 x() ? x() : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: () => string | null;
 !x() ? y : x();
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 const a = 'foo';
 declare let x: (a: string | null) => string | null;
 x(a) ? x(a) : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 const a = 'foo';
 declare let x: (a: string | null) => string | null;
 !x(a) ? y : x(a);
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string | object };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string | object };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: number };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: number };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: bigint };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: bigint };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: boolean };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: boolean };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: object };
 x ? x : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: object };
 !x ? y : x;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string[] };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: string[] };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: Function };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: Function };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: () => string };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: () => string };
 !x.n ? y : x.n;
       `,
-      `
-declare let x: { n: () => string | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: () => string | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: () => string | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: () => string | undefined };
-!x.n ? y : x.n;
-      `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: () => string | null | undefined };
 x.n ? x.n : y;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n: () => string | null | undefined };
 !x.n ? y : x.n;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: string;
 declare function makeFoo(): string;
 
@@ -381,7 +725,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
@@ -391,7 +738,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
@@ -401,7 +751,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
@@ -412,7 +765,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
@@ -424,7 +780,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
@@ -436,7 +795,10 @@ function lazyInitialize() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 function shadowed() {
@@ -445,7 +807,10 @@ function shadowed() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let foo: { foo: string } | null;
 declare function makeFoo(): { foo: { foo: string } };
 function weirdDestructuringAssignment() {
@@ -454,70 +819,85 @@ function weirdDestructuringAssignment() {
   }
 }
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject !== undefined && null !== null
-  ? nullOrObject
-  : 42;
+const test = nullOrObject !== undefined && null !== null ? nullOrObject : 42;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject !== undefined && null != null
-  ? nullOrObject
-  : 42;
+const test = nullOrObject !== undefined && null != null ? nullOrObject : 42;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject !== undefined && null != undefined
-  ? nullOrObject
-  : 42;
+const test =
+  nullOrObject !== undefined && null != undefined ? nullOrObject : 42;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject === undefined || null === null
-  ? 42
-  : nullOrObject;
+const test = nullOrObject === undefined || null === null ? 42 : nullOrObject;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject === undefined || null == null
-  ? 42
-  : nullOrObject;
+const test = nullOrObject === undefined || null == null ? 42 : nullOrObject;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare const nullOrObject: null | { a: string };
 
-const test = nullOrObject === undefined || null == undefined
-  ? 42
-  : nullOrObject;
+const test =
+  nullOrObject === undefined || null == undefined ? 42 : nullOrObject;
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 const a = 'b';
-declare let x: { a: string, b: string } | null
+declare let x: { a: string; b: string } | null;
 
-x?.a != null ? x[a] : 'foo'
+x?.a != null ? x[a] : 'foo';
       `,
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 const a = 'b';
-declare let x: { a: string, b: string } | null
+declare let x: { a: string; b: string } | null;
 
-x?.[a] != null ? x.a : 'foo'
+x?.[a] != null ? x.a : 'foo';
       `,
-      `
-declare let x: { a: string } | null
-declare let y: { a: string } | null
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { a: string } | null;
+declare let y: { a: string } | null;
 
-x?.a ? y?.a : 'foo'
+x?.a ? y?.a : 'foo';
       `,
-    ].map(code => ({
-      code,
-      options: [{ ignoreTernaryTests: false }] as const,
-    })),
+      options: [{ ignoreTernaryTests: false }],
+    },
     {
       code: `
 declare let foo: { a: string } | null;
@@ -544,165 +924,644 @@ function lazyInitialize() {
     },
 
     // ignoreConditionalTests
-    ...nullishTypeTest((nullish, type, equals) => ({
-      code: `
-declare let x: ${type} | ${nullish};
-(x ||${equals} 'foo') ? null : null;
-      `,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
-      code: `
-declare let x: ${type} | ${nullish};
-if ((x ||${equals} 'foo')) {}
-      `,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
-      code: `
-declare let x: ${type} | ${nullish};
-do {} while ((x ||${equals} 'foo'))
-      `,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
-      code: `
-declare let x: ${type} | ${nullish};
-for (;(x ||${equals} 'foo');) {}
-      `,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
-      code: `
-declare let x: ${type} | ${nullish};
-while ((x ||${equals} 'foo')) {}
-      `,
-    })),
+    `
+declare let x: string | null | undefined;
+x || 'foo' ? null : null;
+    `,
+    `
+declare let x: string | null | undefined;
+(x ||= 'foo') ? null : null;
+    `,
+    `
+declare let x: number | null | undefined;
+x || 'foo' ? null : null;
+    `,
+    `
+declare let x: number | null | undefined;
+(x ||= 'foo') ? null : null;
+    `,
+    `
+declare let x: boolean | null | undefined;
+x || 'foo' ? null : null;
+    `,
+    `
+declare let x: boolean | null | undefined;
+(x ||= 'foo') ? null : null;
+    `,
+    `
+declare let x: object | null | undefined;
+x || 'foo' ? null : null;
+    `,
+    `
+declare let x: object | null | undefined;
+(x ||= 'foo') ? null : null;
+    `,
+    `
+declare let x: string | null | undefined;
+if (x || 'foo') {
+}
+    `,
+    `
+declare let x: string | null | undefined;
+if ((x ||= 'foo')) {
+}
+    `,
+    `
+declare let x: number | null | undefined;
+if (x || 'foo') {
+}
+    `,
+    `
+declare let x: number | null | undefined;
+if ((x ||= 'foo')) {
+}
+    `,
+    `
+declare let x: boolean | null | undefined;
+if (x || 'foo') {
+}
+    `,
+    `
+declare let x: boolean | null | undefined;
+if ((x ||= 'foo')) {
+}
+    `,
+    `
+declare let x: object | null | undefined;
+if (x || 'foo') {
+}
+    `,
+    `
+declare let x: object | null | undefined;
+if ((x ||= 'foo')) {
+}
+    `,
+    `
+declare let x: string | null | undefined;
+do {} while (x || 'foo');
+    `,
+    `
+declare let x: string | null | undefined;
+do {} while ((x ||= 'foo'));
+    `,
+    `
+declare let x: number | null | undefined;
+do {} while (x || 'foo');
+    `,
+    `
+declare let x: number | null | undefined;
+do {} while ((x ||= 'foo'));
+    `,
+    `
+declare let x: boolean | null | undefined;
+do {} while (x || 'foo');
+    `,
+    `
+declare let x: boolean | null | undefined;
+do {} while ((x ||= 'foo'));
+    `,
+    `
+declare let x: object | null | undefined;
+do {} while (x || 'foo');
+    `,
+    `
+declare let x: object | null | undefined;
+do {} while ((x ||= 'foo'));
+    `,
+    `
+declare let x: string | null | undefined;
+for (; x || 'foo';) {}
+    `,
+    `
+declare let x: string | null | undefined;
+for (; (x ||= 'foo');) {}
+    `,
+    `
+declare let x: number | null | undefined;
+for (; x || 'foo';) {}
+    `,
+    `
+declare let x: number | null | undefined;
+for (; (x ||= 'foo');) {}
+    `,
+    `
+declare let x: boolean | null | undefined;
+for (; x || 'foo';) {}
+    `,
+    `
+declare let x: boolean | null | undefined;
+for (; (x ||= 'foo');) {}
+    `,
+    `
+declare let x: object | null | undefined;
+for (; x || 'foo';) {}
+    `,
+    `
+declare let x: object | null | undefined;
+for (; (x ||= 'foo');) {}
+    `,
+    `
+declare let x: string | null | undefined;
+while (x || 'foo') {}
+    `,
+    `
+declare let x: string | null | undefined;
+while ((x ||= 'foo')) {}
+    `,
+    `
+declare let x: number | null | undefined;
+while (x || 'foo') {}
+    `,
+    `
+declare let x: number | null | undefined;
+while ((x ||= 'foo')) {}
+    `,
+    `
+declare let x: boolean | null | undefined;
+while (x || 'foo') {}
+    `,
+    `
+declare let x: boolean | null | undefined;
+while ((x ||= 'foo')) {}
+    `,
+    `
+declare let x: object | null | undefined;
+while (x || 'foo') {}
+    `,
+    `
+declare let x: object | null | undefined;
+while ((x ||= 'foo')) {}
+    `,
 
     // ignoreMixedLogicalExpressions
-    ...nullishTypeTest((nullish, type) => ({
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-a || b && c;
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+a || (b && c);
       `,
       options: [{ ignoreMixedLogicalExpressions: true }],
-    })),
-    ...nullishTypeTest((nullish, type) => ({
+    },
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a || b || c && d;
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+a || (b && c);
       `,
       options: [{ ignoreMixedLogicalExpressions: true }],
-    })),
-    ...nullishTypeTest((nullish, type) => ({
+    },
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a && b || c || d;
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+a || (b && c);
       `,
       options: [{ ignoreMixedLogicalExpressions: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+a || (b && c);
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+a || b || (c && d);
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+a || b || (c && d);
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+a || b || (c && d);
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+a || b || (c && d);
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+(a && b) || c || d;
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+(a && b) || c || d;
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+(a && b) || c || d;
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+(a && b) || c || d;
+      `,
+      options: [{ ignoreMixedLogicalExpressions: true }],
+    },
+
+    // ignorePrimitives
+    {
+      code: `
+declare let x: string | undefined;
 x || y;
       `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
+declare let x: number | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: boolean | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: string | undefined;
 x || y;
       `,
       options: [{ ignorePrimitives: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+    },
+    {
       code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
-x || y;
-      `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
-      code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
+declare let x: number | undefined;
 x || y;
       `,
       options: [{ ignorePrimitives: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
+declare let x: boolean | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+x || y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: string | undefined;
 x ? x : y;
       `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
+declare let x: number | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: boolean | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: string | undefined;
 !x ? y : x;
       `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
+declare let x: number | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: boolean | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: string | undefined;
 x ? x : y;
       `,
       options: [{ ignorePrimitives: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+    },
+    {
       code: `
-declare let x: ${type} | undefined;
-!x ? y : x;
-      `,
-      options: [{ ignorePrimitives: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
-      code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
-x ? x : y;
-      `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
-      code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
-!x ? y : x;
-      `,
-      options: [{ ignorePrimitives: { [type]: true } }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
-      code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
+declare let x: number | undefined;
 x ? x : y;
       `,
       options: [{ ignorePrimitives: true }],
-    })),
-    ...ignorablePrimitiveTypes.map<ValidTestCase<Options>>(type => ({
+    },
+    {
       code: `
-declare let x: (${type} & { __brand?: any }) | undefined;
+declare let x: boolean | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: string | undefined;
 !x ? y : x;
       `,
       options: [{ ignorePrimitives: true }],
-    })),
+    },
+    {
+      code: `
+declare let x: number | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: boolean | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: bigint | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { string: true } }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { number: true } }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { boolean: true } }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: { bigint: true } }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+x ? x : y;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (string & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (number & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (boolean & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
+    {
+      code: `
+declare let x: (bigint & { __brand?: any }) | undefined;
+!x ? y : x;
+      `,
+      options: [{ ignorePrimitives: true }],
+    },
     `
-      declare let x: never;
-      declare let y: number;
-      x || y;
+declare let x: never;
+declare let y: number;
+x || y;
     `,
     `
-      declare let x: never;
-      declare let y: number;
-      x ? x : y;
+declare let x: never;
+declare let y: number;
+x ? x : y;
     `,
     `
-      declare let x: never;
-      declare let y: number;
-      !x ? y : x;
+declare let x: never;
+declare let y: number;
+!x ? y : x;
     `,
     `
 interface Box {
@@ -781,28 +1640,14 @@ x || y;
 declare let x: 0 | 'foo' | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            number: true,
-            string: true,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { number: true, string: true } }],
     },
     {
       code: `
 declare let x: 0 | 'foo' | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            number: true,
-            string: false,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { number: true, string: false } }],
     },
     {
       code: `
@@ -814,13 +1659,7 @@ enum Enum {
 declare let x: Enum | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            number: true,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { number: true } }],
     },
     {
       code: `
@@ -832,13 +1671,7 @@ enum Enum {
 declare let x: Enum.A | Enum.B | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            number: true,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { number: true } }],
     },
     {
       code: `
@@ -850,13 +1683,7 @@ enum Enum {
 declare let x: Enum | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            string: true,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { string: true } }],
     },
     {
       code: `
@@ -868,13 +1695,7 @@ enum Enum {
 declare let x: Enum.A | Enum.B | undefined;
 x || y;
       `,
-      options: [
-        {
-          ignorePrimitives: {
-            string: true,
-          },
-        },
-      ],
+      options: [{ ignorePrimitives: { string: true } }],
     },
     {
       code: `
@@ -1147,11 +1968,7 @@ let b: string | boolean | undefined;
 
 const x = Boolean(a || b);
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1161,11 +1978,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(a || b || c);
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1175,11 +1988,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(a || (b && c));
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1189,11 +1998,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean((a || b) ?? c);
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1203,11 +2008,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(a ?? (b || c));
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1217,11 +2018,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(a ? b || c : 'fail');
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1231,11 +2028,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(a ? 'success' : b || c);
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1245,19 +2038,8 @@ let c: string | boolean | undefined;
 
 const test = Boolean(((a = b), b || c));
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
-    // `Boolean((a ? a : b) || c)` / `Boolean(c || (!a ? b : a))` — ternary
-    // is wrapped by `||`, so its effective parent (after paren-skip) is the
-    // `||`, NOT `CallExpression`. The carve-out only fires when the ternary
-    // is the direct paren-stripped argument of `Boolean(...)`, so under
-    // `ignoreBooleanCoercion: true` these stay valid (verified against
-    // upstream byte-for-byte). The bare `Boolean(a ? a : b)` form IS
-    // reported and is in the `invalid` section below.
     {
       code: `
 let a: string | boolean | undefined;
@@ -1287,11 +2069,7 @@ let c: string | boolean | undefined;
 if (a || b || c) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1302,11 +2080,7 @@ let c: string | boolean | undefined;
 if (a || (b && c)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1317,11 +2091,7 @@ let c: string | boolean | undefined;
 if ((a || b) ?? c) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1332,11 +2102,7 @@ let c: string | boolean | undefined;
 if (a ?? (b || c)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1347,11 +2113,7 @@ let c: string | boolean | undefined;
 if (a ? b || c : 'fail') {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1362,11 +2124,7 @@ let c: string | boolean | undefined;
 if (a ? 'success' : b || c) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1377,11 +2135,7 @@ let c: string | boolean | undefined;
 if (((a = b), b || c)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1391,11 +2145,7 @@ let b: string | undefined;
 if (!(a || b)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1405,11 +2155,7 @@ let b: string | undefined;
 if (!!(a || b)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1419,11 +2165,7 @@ let b: string | boolean | undefined;
 if (a ? a : b) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1433,11 +2175,7 @@ let b: string | boolean | undefined;
 if (!a ? b : a) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1448,11 +2186,7 @@ let c: string | boolean | undefined;
 if ((a ? a : b) || c) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -1463,11 +2197,7 @@ let c: string | boolean | undefined;
 if (c || (!a ? b : a)) {
 }
       `,
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
 
     {
@@ -1476,11 +2206,7 @@ declare const a: any;
 declare const b: any;
 a ? a : b;
       `,
-      options: [
-        {
-          ignorePrimitives: true,
-        },
-      ],
+      options: [{ ignorePrimitives: true }],
     },
 
     {
@@ -1517,973 +2243,3835 @@ const b = a || 'bar';
   ],
 
   invalid: [
-    ...nullishTypeTest((nullish, type, equals) => ({
+    {
       code: `
-declare let x: ${type} | ${nullish};
-(x ||${equals} 'foo');
+declare let x: string | null | undefined;
+x || 'foo';
       `,
       errors: [
         {
-          column: 4,
-          endColumn: 6 + equals.length,
-          endLine: 3,
-          line: 3,
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let x: ${type} | ${nullish};
-(x ??${equals} 'foo');
+declare let x: string | null | undefined;
+x ?? 'foo';
       `,
             },
           ],
         },
       ],
-      output: null,
-    })),
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+x ||= 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: string | null | undefined;
+x ??= 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+x || 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+x ?? 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+x ||= 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+x ??= 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+x || 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+x ?? 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+x ||= 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+x ??= 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+x || 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+x ?? 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+x ||= 'foo';
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+x ??= 'foo';
+      `,
+            },
+          ],
+        },
+      ],
+    },
 
-    ...[
-      'x !== undefined && x !== null ? x : y;',
-      'x !== null && x !== undefined ? x : y;',
-      'x === undefined || x === null ? y : x;',
-      'x === null || x === undefined ? y : x;',
-      'undefined !== x && x !== null ? x : y;',
-      'null !== x && x !== undefined ? x : y;',
-      'undefined === x || x === null ? y : x;',
-      'null === x || x === undefined ? y : x;',
-      'x !== undefined && null !== x ? x : y;',
-      'x !== null && undefined !== x ? x : y;',
-      'x === undefined || null === x ? y : x;',
-      'x === null || undefined === x ? y : x;',
-      'undefined !== x && null !== x ? x : y;',
-      'null !== x && undefined !== x ? x : y;',
-      'undefined === x || null === x ? y : x;',
-      'null === x || undefined === x ? y : x;',
-      'x != undefined && x != null ? x : y;',
-      'x == undefined || x == null ? y : x;',
-      'x != undefined && x !== null ? x : y;',
-      'x == undefined || x === null ? y : x;',
-      'x !== undefined && x != null ? x : y;',
-      'undefined != x ? x : y;',
-      'null != x ? x : y;',
-      'undefined == x ? y : x;',
-      'null == x ? y : x;',
-      'x != undefined ? x : y;',
-      'x != null ? x : y;',
-      'x == undefined  ? y : x;',
-      'x == null ? y : x;',
-    ].flatMap(code => [
-      {
-        code,
-        errors: [
-          {
-            column: 1,
-            endColumn: code.length,
-            endLine: 1,
-            line: 1,
-            messageId: 'preferNullishOverTernary' as const,
-            suggestions: [
-              {
-                messageId: 'suggestNullish' as const,
-                output: 'x ?? y;',
-              },
-            ],
-          },
-        ],
-        options: [{ ignoreTernaryTests: false }] as const,
-        output: null,
-      },
-      {
-        code: code.replaceAll('x', 'x.z[1][this[this.o]]["3"][a.b.c]'),
-        errors: [
-          {
-            column: 1,
-            endColumn: code.replaceAll('x', 'x.z[1][this[this.o]]["3"][a.b.c]')
-              .length,
-            endLine: 1,
-            line: 1,
-            messageId: 'preferNullishOverTernary' as const,
-            suggestions: [
-              {
-                messageId: 'suggestNullish' as const,
-                output: 'x.z[1][this[this.o]]["3"][a.b.c] ?? y;',
-              },
-            ],
-          },
-        ],
-        options: [{ ignoreTernaryTests: false }] as const,
-        output: null,
-      },
-      {
-        code: code.replaceAll('y', '(z = y)'),
-        errors: [
-          {
-            column: 1,
-            endColumn: code.replaceAll('y', '(z = y)').length,
-            endLine: 1,
-            line: 1,
-            messageId: 'preferNullishOverTernary' as const,
-            suggestions: [
-              {
-                messageId: 'suggestNullish' as const,
-                output: 'x ?? (z = y);',
-              },
-            ],
-          },
-        ],
-        options: [{ ignoreTernaryTests: false }] as const,
-        output: null,
-      },
-    ]),
+    {
+      code: 'x !== undefined && x !== null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] !== undefined &&
+x.z[1][this[this.o]]['3'][a.b.c] !== null
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && x !== null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== null && x !== undefined ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] !== null &&
+x.z[1][this[this.o]]['3'][a.b.c] !== undefined
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== null && x !== undefined ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || x === null ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] === undefined ||
+x.z[1][this[this.o]]['3'][a.b.c] === null
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || x === null ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || x === undefined ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] === null ||
+x.z[1][this[this.o]]['3'][a.b.c] === undefined
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || x === undefined ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined !== x && x !== null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined !== x.z[1][this[this.o]]['3'][a.b.c] &&
+x.z[1][this[this.o]]['3'][a.b.c] !== null
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined !== x && x !== null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null !== x && x !== undefined ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+null !== x.z[1][this[this.o]]['3'][a.b.c] &&
+x.z[1][this[this.o]]['3'][a.b.c] !== undefined
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null !== x && x !== undefined ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined === x || x === null ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined === x.z[1][this[this.o]]['3'][a.b.c] ||
+x.z[1][this[this.o]]['3'][a.b.c] === null
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined === x || x === null ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null === x || x === undefined ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+null === x.z[1][this[this.o]]['3'][a.b.c] ||
+x.z[1][this[this.o]]['3'][a.b.c] === undefined
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null === x || x === undefined ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && null !== x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] !== undefined &&
+null !== x.z[1][this[this.o]]['3'][a.b.c]
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && null !== x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== null && undefined !== x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] !== null &&
+undefined !== x.z[1][this[this.o]]['3'][a.b.c]
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== null && undefined !== x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || null === x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] === undefined ||
+null === x.z[1][this[this.o]]['3'][a.b.c]
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === undefined || null === x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || undefined === x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] === null ||
+undefined === x.z[1][this[this.o]]['3'][a.b.c]
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x === null || undefined === x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined !== x && null !== x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined !== x.z[1][this[this.o]]['3'][a.b.c] &&
+null !== x.z[1][this[this.o]]['3'][a.b.c]
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined !== x && null !== x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null !== x && undefined !== x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+null !== x.z[1][this[this.o]]['3'][a.b.c] &&
+undefined !== x.z[1][this[this.o]]['3'][a.b.c]
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null !== x && undefined !== x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined === x || null === x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined === x.z[1][this[this.o]]['3'][a.b.c] ||
+null === x.z[1][this[this.o]]['3'][a.b.c]
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined === x || null === x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null === x || undefined === x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 38,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+null === x.z[1][this[this.o]]['3'][a.b.c] ||
+undefined === x.z[1][this[this.o]]['3'][a.b.c]
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null === x || undefined === x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 44,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined && x != null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] != undefined &&
+x.z[1][this[this.o]]['3'][a.b.c] != null
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined && x != null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined || x == null ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 36,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] == undefined ||
+x.z[1][this[this.o]]['3'][a.b.c] == null
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined || x == null ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 42,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined && x !== null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] != undefined &&
+x.z[1][this[this.o]]['3'][a.b.c] !== null
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined && x !== null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined || x === null ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] == undefined ||
+x.z[1][this[this.o]]['3'][a.b.c] === null
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined || x === null ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && x != null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] !== undefined &&
+x.z[1][this[this.o]]['3'][a.b.c] != null
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 5,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x !== undefined && x != null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 43,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined != x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined != x.z[1][this[this.o]]['3'][a.b.c]
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 4,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined != x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null != x ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: "null != x.z[1][this[this.o]]['3'][a.b.c] ? x.z[1][this[this.o]]['3'][a.b.c] : y;",
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 80,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x.z[1][this[this.o]]['3'][a.b.c] ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null != x ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined == x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+undefined == x.z[1][this[this.o]]['3'][a.b.c]
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 4,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'undefined == x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null == x ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: "null == x.z[1][this[this.o]]['3'][a.b.c] ? y : x.z[1][this[this.o]]['3'][a.b.c];",
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 80,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x.z[1][this[this.o]]['3'][a.b.c] ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'null == x ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] != undefined
+  ? x.z[1][this[this.o]]['3'][a.b.c]
+  : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 4,
+          endColumn: 6,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != undefined ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != null ? x : y;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: "x.z[1][this[this.o]]['3'][a.b.c] != null ? x.z[1][this[this.o]]['3'][a.b.c] : y;",
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 80,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x.z[1][this[this.o]]['3'][a.b.c] ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x != null ? x : (z = y);',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+x.z[1][this[this.o]]['3'][a.b.c] == undefined
+  ? y
+  : x.z[1][this[this.o]]['3'][a.b.c];
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 2,
+          column: 1,
+          endLine: 4,
+          endColumn: 37,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+x.z[1][this[this.o]]['3'][a.b.c] ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == undefined ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == null ? y : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: "x.z[1][this[this.o]]['3'][a.b.c] == null ? y : x.z[1][this[this.o]]['3'][a.b.c];",
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 80,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x.z[1][this[this.o]]['3'][a.b.c] ?? y;`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: 'x == null ? (z = y) : x;',
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 24,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `x ?? (z = y);`,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
 
     {
       code: 'this != undefined ? this : y;',
       errors: [
         {
-          column: 1,
-          endColumn: 29,
-          endLine: 1,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
           line: 1,
-          messageId: 'preferNullishOverTernary' as const,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
           suggestions: [
             {
-              messageId: 'suggestNullish' as const,
-              output: 'this ?? y;',
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `this ?? y;`,
             },
           ],
         },
       ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
+      options: [{ ignoreTernaryTests: false }],
     },
 
-    ...[
-      `
-declare let x: string | undefined;
-x !== undefined ? x : y;
-      `,
-      `
-declare let x: string | undefined;
-undefined !== x ? x : y;
-      `,
-      `
-declare let x: string | undefined;
-x === undefined ? y : x;
-      `,
-      `
-declare let x: string | undefined;
-undefined === x ? y : x;
-      `,
-      `
-declare let x: string | null;
-x !== null ? x : y;
-      `,
-      `
-declare let x: string | null;
-null !== x ? x : y;
-      `,
-      `
-declare let x: string | null;
-x === null ? y : x;
-      `,
-      `
-declare let x: string | null;
-null === x ? y : x;
-      `,
-      `
-declare let x: string | null;
-x ? x : y;
-      `,
-      `
-declare let x: string | null;
-!x ? y : x;
-      `,
-      `
-declare let x: string | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: string | undefined;
-!x ? y : x;
-      `,
-      `
+    {
+      code: `
 declare let x: string | null | undefined;
 x ? x : y;
       `,
-      `
-declare let x: string | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: string | object | null;
-x ? x : y;
-      `,
-      `
-declare let x: string | object | null;
-!x ? y : x;
-      `,
-      `
-declare let x: string | object | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: string | object | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: string | object | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: string | object | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: number | null;
-x ? x : y;
-      `,
-      `
-declare let x: number | null;
-!x ? y : x;
-      `,
-      `
-declare let x: number | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: number | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: number | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: number | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: bigint | null;
-x ? x : y;
-      `,
-      `
-declare let x: bigint | null;
-!x ? y : x;
-      `,
-      `
-declare let x: bigint | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: bigint | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: bigint | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: bigint | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: boolean | null;
-x ? x : y;
-      `,
-      `
-declare let x: boolean | null;
-!x ? y : x;
-      `,
-      `
-declare let x: boolean | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: boolean | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: boolean | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: boolean | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: string[] | null;
-x ? x : y;
-      `,
-      `
-declare let x: string[] | null;
-!x ? y : x;
-      `,
-      `
-declare let x: string[] | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: string[] | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: string[] | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: string[] | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: object | null;
-x ? x : y;
-      `,
-      `
-declare let x: object | null;
-!x ? y : x;
-      `,
-      `
-declare let x: object | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: object | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: object | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: object | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: Function | null;
-x ? x : y;
-      `,
-      `
-declare let x: Function | null;
-!x ? y : x;
-      `,
-      `
-declare let x: Function | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: Function | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: Function | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: Function | null | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: (() => string) | null;
-x ? x : y;
-      `,
-      `
-declare let x: (() => string) | null;
-!x ? y : x;
-      `,
-      `
-declare let x: (() => string) | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: (() => string) | undefined;
-!x ? y : x;
-      `,
-      `
-declare let x: (() => string) | null | undefined;
-x ? x : y;
-      `,
-      `
-declare let x: (() => string) | null | undefined;
-!x ? y : x;
-      `,
-    ].map(code => ({
-      code,
       errors: [
         {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
           line: 3,
-          messageId: 'preferNullishOverTernary' as const,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
-              messageId: 'suggestNullish' as const,
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-${code.split('\n')[1]}
+declare let x: string | null | undefined;
 x ?? y;
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
-
-    ...[
-      `
-declare let x: { n: string | null };
-x.n ? x.n : y;
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+!x ? y : x;
       `,
-      `
-declare let x: { n: string | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string | object | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string | object | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string | object | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string | object | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string | object | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string | object | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: number | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: number | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: number | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: number | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: number | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: number | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: bigint | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: bigint | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: bigint | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: bigint | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: bigint | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: bigint | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: boolean | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: boolean | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: boolean | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: boolean | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: boolean | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: boolean | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string[] | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string[] | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string[] | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string[] | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: string[] | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: string[] | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: object | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: object | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: object | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: object | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: object | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: object | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: Function | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: Function | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: Function | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: Function | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: Function | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: Function | null | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: (() => string) | null };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: (() => string) | null };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: (() => string) | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: (() => string) | undefined };
-!x.n ? y : x.n;
-      `,
-      `
-declare let x: { n: (() => string) | null | undefined };
-x.n ? x.n : y;
-      `,
-      `
-declare let x: { n: (() => string) | null | undefined };
-!x.n ? y : x.n;
-      `,
-    ].map(code => ({
-      code,
       errors: [
         {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
           line: 3,
-          messageId: 'preferNullishOverTernary' as const,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
-              messageId: 'suggestNullish' as const,
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-${code.split('\n')[1]}
+declare let x: string | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+x ? x : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+!x ? y : x;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+x ? x : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+!x ? y : x;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+x ? x : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+!x ? y : x;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+
+    {
+      code: `
+declare let x: { n: string | null | undefined };
+x.n ? x.n : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: string | null | undefined };
 x.n ?? y;
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: string | null | undefined };
+!x.n ? y : x.n;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: string | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: number | null | undefined };
+x.n ? x.n : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: number | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: number | null | undefined };
+!x.n ? y : x.n;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: number | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: boolean | null | undefined };
+x.n ? x.n : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: boolean | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: boolean | null | undefined };
+!x.n ? y : x.n;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: boolean | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: object | null | undefined };
+x.n ? x.n : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: object | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n: object | null | undefined };
+!x.n ? y : x.n;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n: object | null | undefined };
+x.n ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
 
-    ...[
-      `
+    {
+      code: `
 declare let x: { n?: { a?: string } };
 x.n?.a ? x?.n?.a : y;
       `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a !== undefined ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a !== undefined ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a !== undefined ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != undefined ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != undefined ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != undefined ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != null ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != null ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x.n?.a != null ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x.n?.a !== undefined && x.n.a !== null ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x.n?.a !== undefined && x.n.a !== null ? x.n.a : y;
-      `,
-    ].map(code => ({
-      code,
       errors: [
         {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
           line: 3,
-          messageId: 'preferNullishOverTernary' as const,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
           suggestions: [
             {
-              messageId: 'suggestNullish' as const,
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-${code.split('\n')[1]}
+declare let x: { n?: { a?: string } };
 x.n?.a ?? y;
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
-    ...[
-      `
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 19,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a !== undefined ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 35,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a !== undefined ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a !== undefined ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 33,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != undefined ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != undefined ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 33,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != undefined ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 32,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != null ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != null ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 28,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x.n?.a != null ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 27,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a !== undefined && x.n.a !== null ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 53,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a !== undefined && x.n.a !== null ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 51,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
 declare let x: { n?: { a?: string } };
 x?.n?.a ? x?.n?.a : y;
       `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a !== undefined ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a !== undefined ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a !== undefined ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a !== undefined ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != undefined ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != undefined ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != undefined ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != undefined ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != null ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != null ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != null ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string } };
-x?.n?.a != null ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? (x?.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? (x.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? (x?.n).a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-x?.n?.a !== undefined && x.n.a !== null ? (x.n).a : y;
-      `,
-    ].map(code => ({
-      code,
       errors: [
         {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
           line: 3,
-          messageId: 'preferNullishOverTernary' as const,
+          column: 1,
+          endLine: 3,
+          endColumn: 22,
           suggestions: [
             {
-              messageId: 'suggestNullish' as const,
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-${code.split('\n')[1]}
+declare let x: { n?: { a?: string } };
 x?.n?.a ?? y;
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
-    ...[
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? (x?.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? (x.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x?.n)?.a ? (x?.n).a : y;
-      `,
-    ].map(code => ({
-      code,
-      errors: [
-        {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverTernary' as const,
-          suggestions: [
-            {
-              messageId: 'suggestNullish' as const,
-              output: `
-${code.split('\n')[1]}
-(x?.n)?.a ?? y;
-      `,
-            },
-          ],
-        },
-      ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
-
-    ...[
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? x?.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? x.n?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? x?.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? x.n.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? (x?.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? (x.n)?.a : y;
-      `,
-      `
-declare let x: { n?: { a?: string | null } };
-(x.n)?.a ? (x?.n).a : y;
-      `,
-    ].map(code => ({
-      code,
-      errors: [
-        {
-          column: 1,
-          endColumn: code.split('\n')[2].length,
-          endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverTernary' as const,
-          suggestions: [
-            {
-              messageId: 'suggestNullish' as const,
-              output: `
-${code.split('\n')[1]}
-(x.n)?.a ?? y;
-      `,
-            },
-          ],
-        },
-      ],
-      options: [{ ignoreTernaryTests: false }] as const,
-      output: null,
-    })),
-
-    // noStrictNullCheck — SKIP: rslint-test-tools doesn't propagate per-test
-    // `parserOptions.tsconfigRootDir` to a different tsconfig, so the file is
-    // linted against the strict default and the noStrictNullCheck branch
-    // never fires.
+      options: [{ ignoreTernaryTests: false }],
+    },
     {
-      skip: true,
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a !== undefined ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 36,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a !== undefined ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 35,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a !== undefined ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 35,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a !== undefined ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != undefined ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 35,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != undefined ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != undefined ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 34,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != undefined ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 33,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != null ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 30,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != null ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != null ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 29,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string } };
+x?.n?.a != null ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 28,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a !== undefined && x.n.a !== null ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 54,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a !== undefined && x.n.a !== null ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 53,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a !== undefined && x.n.a !== null ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 53,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a !== undefined && x.n.a !== null ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 52,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 22,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x?.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ? x?.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 21,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ? x.n?.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ? x?.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ? x.n.a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 19,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ? (x?.n).a : y;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 22,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: { n?: { a?: string | null } };
+x.n?.a ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+
+    // noStrictNullCheck
+    {
       code: `
 declare let x: string[] | null;
 if (x) {
@@ -2491,363 +6079,2313 @@ if (x) {
       `,
       errors: [
         {
-          column: 1,
-          line: 0,
           messageId: 'noStrictNullCheck',
+          message: 'This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.',
+          // Upstream reports `loc: { line: 0, column: 0 }`, outside ESLint's
+          // 1-based lines, and expects line 0. rslint reports offset 0 of the
+          // file, which is 1:1.
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
         },
       ],
+      filename: 'unstrict/file.ts',
       languageOptions: {
-        parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
-        },
+        parserOptions: { project: './unstrict/tsconfig.json' },
       },
-      output: null,
     },
 
     // ignoreConditionalTests
-    ...nullishTypeTest((nullish, type, equals) => ({
+    {
       code: `
-declare let x: ${type} | ${nullish};
-(x ||${equals} 'foo') ? null : null;
+declare let x: string | null | undefined;
+x || 'foo' ? null : null;
       `,
       errors: [
         {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+x ?? 'foo' ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+(x ||= 'foo') ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
           column: 4,
-          endColumn: 6 + equals.length,
           endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverOr',
+          endColumn: 7,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
-declare let x: ${type} | ${nullish};
-(x ??${equals} 'foo') ? null : null;
+declare let x: string | null | undefined;
+(x ??= 'foo') ? null : null;
       `,
             },
           ],
         },
       ],
       options: [{ ignoreConditionalTests: false }],
-      output: null,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
+    },
+    {
       code: `
-declare let x: ${type} | ${nullish};
-if ((x ||${equals} 'foo')) {}
+declare let x: number | null | undefined;
+x || 'foo' ? null : null;
       `,
       errors: [
         {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+x ?? 'foo' ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+(x ||= 'foo') ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 7,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+(x ??= 'foo') ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+x || 'foo' ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+x ?? 'foo' ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+(x ||= 'foo') ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 7,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+(x ??= 'foo') ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+x || 'foo' ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+x ?? 'foo' ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+(x ||= 'foo') ? null : null;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 4,
+          endLine: 3,
+          endColumn: 7,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+(x ??= 'foo') ? null : null;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+if (x || 'foo') {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 9,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+if (x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+if ((x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
           column: 8,
-          endColumn: 10 + equals.length,
           endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverOr',
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
-declare let x: ${type} | ${nullish};
-if ((x ??${equals} 'foo')) {}
+declare let x: string | null | undefined;
+if ((x ??= 'foo')) {
+}
       `,
             },
           ],
         },
       ],
       options: [{ ignoreConditionalTests: false }],
-      output: null,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
+    },
+    {
       code: `
-declare let x: ${type} | ${nullish};
-do {} while ((x ||${equals} 'foo'))
+declare let x: number | null | undefined;
+if (x || 'foo') {
+}
       `,
       errors: [
         {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 9,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+if (x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+if ((x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+if ((x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if (x || 'foo') {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 9,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+if (x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if ((x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+if ((x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if (x || 'foo') {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 9,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+if (x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if ((x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+if ((x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+do {} while (x || 'foo');
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+do {} while (x ?? 'foo');
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+do {} while ((x ||= 'foo'));
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
           column: 17,
-          endColumn: 19 + equals.length,
           endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverOr',
+          endColumn: 20,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
-declare let x: ${type} | ${nullish};
-do {} while ((x ??${equals} 'foo'))
+declare let x: string | null | undefined;
+do {} while ((x ??= 'foo'));
       `,
             },
           ],
         },
       ],
       options: [{ ignoreConditionalTests: false }],
-      output: null,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
+    },
+    {
       code: `
-declare let x: ${type} | ${nullish};
-for (;(x ||${equals} 'foo');) {}
+declare let x: number | null | undefined;
+do {} while (x || 'foo');
       `,
       errors: [
         {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+do {} while (x ?? 'foo');
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+do {} while ((x ||= 'foo'));
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+do {} while ((x ??= 'foo'));
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+do {} while (x || 'foo');
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+do {} while (x ?? 'foo');
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+do {} while ((x ||= 'foo'));
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+do {} while ((x ??= 'foo'));
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+do {} while (x || 'foo');
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+do {} while (x ?? 'foo');
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+do {} while ((x ||= 'foo'));
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 20,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+do {} while ((x ??= 'foo'));
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+for (; x || 'foo';) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
           column: 10,
-          endColumn: 12 + equals.length,
           endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverOr',
+          endColumn: 12,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let x: ${type} | ${nullish};
-for (;(x ??${equals} 'foo');) {}
+declare let x: string | null | undefined;
+for (; x ?? 'foo';) {}
       `,
             },
           ],
         },
       ],
       options: [{ ignoreConditionalTests: false }],
-      output: null,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
+    },
+    {
       code: `
-declare let x: ${type} | ${nullish};
-while ((x ||${equals} 'foo')) {}
+declare let x: string | null | undefined;
+for (; (x ||= 'foo');) {}
       `,
       errors: [
         {
-          column: 11,
-          endColumn: 13 + equals.length,
-          endLine: 3,
-          line: 3,
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
-declare let x: ${type} | ${nullish};
-while ((x ??${equals} 'foo')) {}
+declare let x: string | null | undefined;
+for (; (x ??= 'foo');) {}
       `,
             },
           ],
         },
       ],
       options: [{ ignoreConditionalTests: false }],
-      output: null,
-    })),
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+for (; x || 'foo';) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+for (; x ?? 'foo';) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+for (; (x ||= 'foo');) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+for (; (x ??= 'foo');) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+for (; x || 'foo';) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+for (; x ?? 'foo';) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+for (; (x ||= 'foo');) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+for (; (x ??= 'foo');) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+for (; x || 'foo';) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+for (; x ?? 'foo';) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+for (; (x ||= 'foo');) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+for (; (x ??= 'foo');) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+while (x || 'foo') {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+while (x ?? 'foo') {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+while ((x ||= 'foo')) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: string | null | undefined;
+while ((x ??= 'foo')) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+while (x || 'foo') {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+while (x ?? 'foo') {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+while ((x ||= 'foo')) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+while ((x ??= 'foo')) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+while (x || 'foo') {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+while (x ?? 'foo') {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+while ((x ||= 'foo')) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+while ((x ??= 'foo')) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+while (x || 'foo') {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+while (x ?? 'foo') {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+while ((x ||= 'foo')) {}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+while ((x ??= 'foo')) {}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreConditionalTests: false }],
+    },
 
     // ignoreMixedLogicalExpressions
-    ...nullishTypeTest((nullish, type) => ({
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-a || b && c;
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+a || (b && c);
       `,
       errors: [
         {
-          column: 3,
-          endColumn: 5,
-          endLine: 5,
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
           line: 5,
-          messageId: 'preferNullishOverOr',
-          suggestions: [
-            {
-              messageId: 'suggestNullish',
-              output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-a ?? b && c;
-      `,
-            },
-          ],
-        },
-      ],
-      options: [{ ignoreMixedLogicalExpressions: false }],
-    })),
-    ...nullishTypeTest((nullish, type) => ({
-      code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a || b || c && d;
-      `,
-      errors: [
-        {
           column: 3,
+          endLine: 5,
           endColumn: 5,
-          endLine: 6,
-          line: 6,
-          messageId: 'preferNullishOverOr',
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-(a ?? b) || c && d;
-      `,
-            },
-          ],
-        },
-        {
-          column: 8,
-          endColumn: 10,
-          endLine: 6,
-          line: 6,
-          messageId: 'preferNullishOverOr',
-          suggestions: [
-            {
-              messageId: 'suggestNullish',
-              output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a || b ?? c && d;
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+a ?? (b && c);
       `,
             },
           ],
         },
       ],
       options: [{ ignoreMixedLogicalExpressions: false }],
-    })),
-    ...nullishTypeTest((nullish, type) => ({
+    },
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a && b || c || d;
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+a || (b && c);
       `,
       errors: [
         {
-          column: 8,
-          endColumn: 10,
-          endLine: 6,
-          line: 6,
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a && (b ?? c) || d;
-      `,
-            },
-          ],
-        },
-        {
-          column: 13,
-          endColumn: 15,
-          endLine: 6,
-          line: 6,
-          messageId: 'preferNullishOverOr',
-          suggestions: [
-            {
-              messageId: 'suggestNullish',
-              output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type} | ${nullish};
-declare let c: ${type} | ${nullish};
-declare let d: ${type} | ${nullish};
-a && b || c ?? d;
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+a ?? (b && c);
       `,
             },
           ],
         },
       ],
       options: [{ ignoreMixedLogicalExpressions: false }],
-    })),
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+a || (b && c);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+a ?? (b && c);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+a || (b && c);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+a ?? (b && c);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+a || b || (c && d);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+(a ?? b) || (c && d);
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+a || b ?? (c && d);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+a || b || (c && d);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+(a ?? b) || (c && d);
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+a || b ?? (c && d);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+a || b || (c && d);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+(a ?? b) || (c && d);
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+a || b ?? (c && d);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+a || b || (c && d);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+(a ?? b) || (c && d);
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 8,
+          endLine: 6,
+          endColumn: 10,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+a || b ?? (c && d);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+(a && b) || c || d;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 10,
+          endLine: 6,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+(a && (b) ?? c) || d;
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: string | null | undefined;
+declare let b: string | null | undefined;
+declare let c: string | null | undefined;
+declare let d: string | null | undefined;
+(a && b) || c ?? d;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+(a && b) || c || d;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 10,
+          endLine: 6,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+(a && (b) ?? c) || d;
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: number | null | undefined;
+declare let b: number | null | undefined;
+declare let c: number | null | undefined;
+declare let d: number | null | undefined;
+(a && b) || c ?? d;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+(a && b) || c || d;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 10,
+          endLine: 6,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+(a && (b) ?? c) || d;
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean | null | undefined;
+declare let c: boolean | null | undefined;
+declare let d: boolean | null | undefined;
+(a && b) || c ?? d;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+(a && b) || c || d;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 10,
+          endLine: 6,
+          endColumn: 12,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+(a && (b) ?? c) || d;
+      `,
+            },
+          ],
+        },
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object | null | undefined;
+declare let c: object | null | undefined;
+declare let d: object | null | undefined;
+(a && b) || c ?? d;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreMixedLogicalExpressions: false }],
+    },
 
     // should not false positive for functions inside conditional tests
-    ...nullishTypeTest((nullish, type, equals) => ({
+    {
       code: `
-declare let x: ${type} | ${nullish};
-if (() => (x ||${equals} 'foo')) {}
+declare let x: string | null | undefined;
+if (() => x || 'foo') {
+}
       `,
       errors: [
         {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+if (() => x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+if (() => (x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
           column: 14,
-          endColumn: 16 + equals.length,
           endLine: 3,
-          line: 3,
-          messageId: 'preferNullishOverOr',
+          endColumn: 17,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
-declare let x: ${type} | ${nullish};
-if (() => (x ??${equals} 'foo')) {}
+declare let x: string | null | undefined;
+if (() => (x ??= 'foo')) {
+}
       `,
             },
           ],
         },
       ],
-      output: null,
-    })),
-    ...nullishTypeTest((nullish, type, equals) => ({
+    },
+    {
       code: `
-declare let x: ${type} | ${nullish};
-if (function weird() { return (x ||${equals} 'foo') }) {}
+declare let x: number | null | undefined;
+if (() => x || 'foo') {
+}
       `,
       errors: [
         {
-          column: 34,
-          endColumn: 36 + equals.length,
-          endLine: 3,
-          line: 3,
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 15,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let x: ${type} | ${nullish};
-if (function weird() { return (x ??${equals} 'foo') }) {}
+declare let x: number | null | undefined;
+if (() => x ?? 'foo') {
+}
       `,
             },
           ],
         },
       ],
-      output: null,
-    })),
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1290
-    ...nullishTypeTest((nullish, type) => ({
+    },
+    {
       code: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type};
-declare let c: ${type};
+declare let x: number | null | undefined;
+if (() => (x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+if (() => (x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if (() => x || 'foo') {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+if (() => x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if (() => (x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+if (() => (x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if (() => x || 'foo') {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 15,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+if (() => x ?? 'foo') {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if (() => (x ||= 'foo')) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 17,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+if (() => (x ??= 'foo')) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+if (
+  function weird() {
+    return x || 'foo';
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: string | null | undefined;
+if (
+  function weird() {
+    return x ?? 'foo';
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: string | null | undefined;
+if (
+  function weird() {
+    return (x ||= 'foo');
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: string | null | undefined;
+if (
+  function weird() {
+    return (x ??= 'foo');
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+if (
+  function weird() {
+    return x || 'foo';
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: number | null | undefined;
+if (
+  function weird() {
+    return x ?? 'foo';
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: number | null | undefined;
+if (
+  function weird() {
+    return (x ||= 'foo');
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: number | null | undefined;
+if (
+  function weird() {
+    return (x ??= 'foo');
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if (
+  function weird() {
+    return x || 'foo';
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: boolean | null | undefined;
+if (
+  function weird() {
+    return x ?? 'foo';
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: boolean | null | undefined;
+if (
+  function weird() {
+    return (x ||= 'foo');
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: boolean | null | undefined;
+if (
+  function weird() {
+    return (x ??= 'foo');
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if (
+  function weird() {
+    return x || 'foo';
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 14,
+          endLine: 5,
+          endColumn: 16,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: object | null | undefined;
+if (
+  function weird() {
+    return x ?? 'foo';
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let x: object | null | undefined;
+if (
+  function weird() {
+    return (x ||= 'foo');
+  }
+) {
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 18,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+declare let x: object | null | undefined;
+if (
+  function weird() {
+    return (x ??= 'foo');
+  }
+) {
+}
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    // https://github.com/typescript-eslint/typescript-eslint/issues/1290
+    {
+      code: `
+declare let a: string | null | undefined;
+declare let b: string;
+declare let c: string;
 a || b || c;
       `,
       errors: [
         {
-          column: 3,
-          endColumn: 5,
-          endLine: 5,
-          line: 5,
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-declare let a: ${type} | ${nullish};
-declare let b: ${type};
-declare let c: ${type};
+declare let a: string | null | undefined;
+declare let b: string;
+declare let c: string;
 (a ?? b) || c;
       `,
             },
           ],
         },
       ],
-      output: null,
-    })),
+    },
+    {
+      code: `
+declare let a: number | null | undefined;
+declare let b: number;
+declare let c: number;
+a || b || c;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: number | null | undefined;
+declare let b: number;
+declare let c: number;
+(a ?? b) || c;
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let a: boolean | null | undefined;
+declare let b: boolean;
+declare let c: boolean;
+a || b || c;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: boolean | null | undefined;
+declare let b: boolean;
+declare let c: boolean;
+(a ?? b) || c;
+      `,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      code: `
+declare let a: object | null | undefined;
+declare let b: object;
+declare let c: object;
+a || b || c;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 3,
+          endLine: 5,
+          endColumn: 5,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let a: object | null | undefined;
+declare let b: object;
+declare let c: object;
+(a ?? b) || c;
+      `,
+            },
+          ],
+        },
+      ],
+    },
     // default for missing option
     {
       code: `
@@ -2857,9 +8395,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: string | undefined;
 x ?? y;
@@ -2869,11 +8413,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, boolean: true, number: true },
-        },
+        { ignorePrimitives: { bigint: true, boolean: true, number: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -2883,9 +8424,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: number | undefined;
 x ?? y;
@@ -2895,11 +8442,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, boolean: true, string: true },
-        },
+        { ignorePrimitives: { bigint: true, boolean: true, string: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -2909,9 +8453,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: boolean | undefined;
 x ?? y;
@@ -2921,11 +8471,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, number: true, string: true },
-        },
+        { ignorePrimitives: { bigint: true, number: true, string: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -2935,9 +8482,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: bigint | undefined;
 x ?? y;
@@ -2947,11 +8500,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { boolean: true, number: true, string: true },
-        },
+        { ignorePrimitives: { boolean: true, number: true, string: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -2961,9 +8511,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: string | undefined;
 x ?? y;
@@ -2973,11 +8529,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, boolean: true, number: true },
-        },
+        { ignorePrimitives: { bigint: true, boolean: true, number: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -2987,9 +8540,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: number | undefined;
 x ?? y;
@@ -2999,11 +8558,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, boolean: true, string: true },
-        },
+        { ignorePrimitives: { bigint: true, boolean: true, string: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -3013,9 +8569,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: boolean | undefined;
 x ?? y;
@@ -3025,11 +8587,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { bigint: true, number: true, string: true },
-        },
+        { ignorePrimitives: { bigint: true, number: true, string: true } },
       ],
-      output: null,
     },
     {
       code: `
@@ -3039,9 +8598,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: bigint | undefined;
 x ?? y;
@@ -3051,11 +8616,8 @@ x ?? y;
         },
       ],
       options: [
-        {
-          ignorePrimitives: { boolean: true, number: true, string: true },
-        },
+        { ignorePrimitives: { boolean: true, number: true, string: true } },
       ],
-      output: null,
     },
     // falsy
     {
@@ -3066,9 +8628,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: '' | undefined;
 x ?? y;
@@ -3087,7 +8655,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3097,9 +8664,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: \`\` | undefined;
 x ?? y;
@@ -3118,7 +8691,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3128,9 +8700,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | undefined;
 x ?? y;
@@ -3149,7 +8727,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3159,9 +8736,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0n | undefined;
 x ?? y;
@@ -3180,7 +8763,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3190,9 +8772,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: false | undefined;
 x ?? y;
@@ -3211,7 +8799,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3221,9 +8808,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: '' | undefined;
 x ?? y;
@@ -3242,7 +8835,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3252,9 +8844,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: \`\` | undefined;
 x ?? y;
@@ -3273,7 +8871,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3283,9 +8880,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | undefined;
 x ?? y;
@@ -3304,7 +8907,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3314,9 +8916,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0n | undefined;
 x ?? y;
@@ -3335,7 +8943,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3345,9 +8952,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: false | undefined;
 x ?? y;
@@ -3366,7 +8979,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     // truthy
     {
@@ -3377,9 +8989,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | undefined;
 x ?? y;
@@ -3398,7 +9016,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3408,9 +9025,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: \`hello\${'string'}\` | undefined;
 x ?? y;
@@ -3429,7 +9052,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3439,9 +9061,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | undefined;
 x ?? y;
@@ -3460,7 +9088,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3470,9 +9097,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | undefined;
 x ?? y;
@@ -3491,7 +9124,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3501,9 +9133,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | undefined;
 x ?? y;
@@ -3522,7 +9160,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3532,9 +9169,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | undefined;
 x ?? y;
@@ -3553,7 +9196,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3563,9 +9205,15 @@ declare let x: 'a' | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | undefined;
 x ?? y;
@@ -3584,7 +9232,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3594,9 +9241,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: \`hello\${'string'}\` | undefined;
 x ?? y;
@@ -3615,7 +9268,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3625,9 +9277,15 @@ declare let x: \`hello\${'string'}\` | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: \`hello\${'string'}\` | undefined;
 x ?? y;
@@ -3646,7 +9304,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3656,9 +9313,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | undefined;
 x ?? y;
@@ -3677,7 +9340,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3687,9 +9349,15 @@ declare let x: 1 | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | undefined;
 x ?? y;
@@ -3708,7 +9376,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3718,9 +9385,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | undefined;
 x ?? y;
@@ -3739,7 +9412,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3749,9 +9421,15 @@ declare let x: 1n | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | undefined;
 x ?? y;
@@ -3770,7 +9448,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3780,9 +9457,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | undefined;
 x ?? y;
@@ -3801,7 +9484,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3811,9 +9493,15 @@ declare let x: true | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | undefined;
 x ?? y;
@@ -3832,7 +9520,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     // Unions of same primitive
     {
@@ -3843,9 +9530,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | 'b' | undefined;
 x ?? y;
@@ -3864,7 +9557,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3874,9 +9566,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | \`b\` | undefined;
 x ?? y;
@@ -3895,7 +9593,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3905,9 +9602,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | 1 | undefined;
 x ?? y;
@@ -3926,7 +9629,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3936,9 +9638,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | 2 | 3 | undefined;
 x ?? y;
@@ -3957,7 +9665,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3967,9 +9674,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0n | 1n | undefined;
 x ?? y;
@@ -3988,7 +9701,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3998,9 +9710,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | 2n | 3n | undefined;
 x ?? y;
@@ -4019,7 +9737,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4029,9 +9746,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | undefined;
 x ?? y;
@@ -4050,7 +9773,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4060,40 +9782,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
-              output: `
-declare let x: 'a' | 'b' | undefined;
-x ?? y;
-      `,
-            },
-          ],
-        },
-      ],
-      options: [
-        {
-          ignorePrimitives: {
-            bigint: true,
-            boolean: true,
-            number: true,
-            string: false,
-          },
-        },
-      ],
-      output: null,
-    },
-    {
-      code: `
-declare let x: 'a' | 'b' | undefined;
-!x ? y : x;
-      `,
-      errors: [
-        {
-          messageId: 'preferNullishOverTernary',
-          suggestions: [
-            {
-              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | 'b' | undefined;
 x ?? y;
@@ -4112,7 +9809,42 @@ x ?? y;
           },
         },
       ],
-      output: null,
+    },
+    {
+      code: `
+declare let x: 'a' | 'b' | undefined;
+!x ? y : x;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: 'a' | 'b' | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [
+        {
+          ignorePrimitives: {
+            bigint: true,
+            boolean: true,
+            number: true,
+            string: false,
+          },
+        },
+      ],
     },
     {
       code: `
@@ -4122,9 +9854,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | \`b\` | undefined;
 x ?? y;
@@ -4143,7 +9881,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4153,9 +9890,15 @@ declare let x: 'a' | \`b\` | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 'a' | \`b\` | undefined;
 x ?? y;
@@ -4174,7 +9917,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4184,40 +9926,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
-              output: `
-declare let x: 0 | 1 | undefined;
-x ?? y;
-      `,
-            },
-          ],
-        },
-      ],
-      options: [
-        {
-          ignorePrimitives: {
-            bigint: true,
-            boolean: true,
-            number: false,
-            string: true,
-          },
-        },
-      ],
-      output: null,
-    },
-    {
-      code: `
-declare let x: 0 | 1 | undefined;
-!x ? y : x;
-      `,
-      errors: [
-        {
-          messageId: 'preferNullishOverTernary',
-          suggestions: [
-            {
-              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | 1 | undefined;
 x ?? y;
@@ -4236,7 +9953,42 @@ x ?? y;
           },
         },
       ],
-      output: null,
+    },
+    {
+      code: `
+declare let x: 0 | 1 | undefined;
+!x ? y : x;
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+declare let x: 0 | 1 | undefined;
+x ?? y;
+      `,
+            },
+          ],
+        },
+      ],
+      options: [
+        {
+          ignorePrimitives: {
+            bigint: true,
+            boolean: true,
+            number: false,
+            string: true,
+          },
+        },
+      ],
     },
     {
       code: `
@@ -4246,9 +9998,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | 2 | 3 | undefined;
 x ?? y;
@@ -4267,7 +10025,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4277,9 +10034,15 @@ declare let x: 1 | 2 | 3 | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1 | 2 | 3 | undefined;
 x ?? y;
@@ -4298,7 +10061,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4308,9 +10070,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0n | 1n | undefined;
 x ?? y;
@@ -4329,7 +10097,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4339,9 +10106,15 @@ declare let x: 0n | 1n | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0n | 1n | undefined;
 x ?? y;
@@ -4360,7 +10133,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4370,9 +10142,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | 2n | 3n | undefined;
 x ?? y;
@@ -4391,7 +10169,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4401,9 +10178,15 @@ declare let x: 1n | 2n | 3n | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 1n | 2n | 3n | undefined;
 x ?? y;
@@ -4422,7 +10205,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4432,9 +10214,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | undefined;
 x ?? y;
@@ -4453,7 +10241,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4463,9 +10250,15 @@ declare let x: true | false | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | undefined;
 x ?? y;
@@ -4484,7 +10277,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     // Mixed unions
     {
@@ -4495,9 +10287,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 x ?? y;
@@ -4516,7 +10314,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4526,9 +10323,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | null | undefined;
 x ?? y;
@@ -4547,7 +10350,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4557,9 +10359,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 x ?? y;
@@ -4578,7 +10386,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4588,9 +10395,15 @@ declare let x: 0 | 1 | 0n | 1n | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: 0 | 1 | 0n | 1n | undefined;
 x ?? y;
@@ -4609,7 +10422,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4619,9 +10431,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | null | undefined;
 x ?? y;
@@ -4640,7 +10458,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4650,9 +10467,15 @@ declare let x: true | false | null | undefined;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: true | false | null | undefined;
 x ?? y;
@@ -4671,7 +10494,6 @@ x ?? y;
           },
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4681,9 +10503,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: null;
 x ?? y;
@@ -4692,7 +10520,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4702,9 +10529,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 const x = undefined;
 x ?? y;
@@ -4713,7 +10546,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4722,9 +10554,15 @@ null || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 2,
+          column: 6,
+          endLine: 2,
+          endColumn: 8,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 null ?? y;
       `,
@@ -4732,7 +10570,6 @@ null ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4741,9 +10578,15 @@ undefined || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 2,
+          column: 11,
+          endLine: 2,
+          endColumn: 13,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 undefined ?? y;
       `,
@@ -4751,7 +10594,6 @@ undefined ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4766,9 +10608,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 enum Enum {
   A = 0,
@@ -4782,7 +10630,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4797,9 +10644,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 enum Enum {
   A = 0,
@@ -4813,7 +10666,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4828,9 +10680,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 enum Enum {
   A = 'a',
@@ -4844,7 +10702,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4859,9 +10716,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 8,
+          column: 3,
+          endLine: 8,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 enum Enum {
   A = 'a',
@@ -4875,7 +10738,6 @@ x ?? y;
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -4888,9 +10750,15 @@ const x = Boolean(a || b);
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 21,
+          endLine: 6,
+          endColumn: 23,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -4902,11 +10770,40 @@ const x = Boolean(a ?? b);
           ],
         },
       ],
-      options: [
+      options: [{ ignoreBooleanCoercion: false }],
+    },
+    {
+      code: `
+function outer() {
+  const Boolean = (x: unknown) => x;
+
+  return (a: string | null, b: string) => Boolean(a || b);
+}
+      `,
+      errors: [
         {
-          ignoreBooleanCoercion: false,
+          messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 53,
+          endLine: 5,
+          endColumn: 55,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+function outer() {
+  const Boolean = (x: unknown) => x;
+
+  return (a: string | null, b: string) => Boolean(a ?? b);
+}
+      `,
+            },
+          ],
         },
       ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -4918,9 +10815,15 @@ const x = String(a || b);
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 20,
+          endLine: 5,
+          endColumn: 22,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -4931,11 +10834,7 @@ const x = String(a ?? b);
           ],
         },
       ],
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -4947,9 +10846,15 @@ const x = Boolean(() => a || b);
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 27,
+          endLine: 5,
+          endColumn: 29,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -4960,11 +10865,7 @@ const x = Boolean(() => a ?? b);
           ],
         },
       ],
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -4978,9 +10879,15 @@ const x = Boolean(function weird() {
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 14,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -4993,11 +10900,7 @@ const x = Boolean(function weird() {
           ],
         },
       ],
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -5011,9 +10914,15 @@ const x = Boolean(f(a || b));
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 7,
+          column: 23,
+          endLine: 7,
+          endColumn: 25,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -5026,11 +10935,7 @@ const x = Boolean(f(a ?? b));
           ],
         },
       ],
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -5042,9 +10947,15 @@ const x = Boolean(1 + (a || b));
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 26,
+          endLine: 5,
+          endColumn: 28,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -5055,11 +10966,69 @@ const x = Boolean(1 + (a ?? b));
           ],
         },
       ],
-      options: [
+      options: [{ ignoreBooleanCoercion: true }],
+    },
+    {
+      code: `
+let a: string | true | undefined;
+let b: string | boolean | undefined;
+
+const x = Boolean(a ? a : b);
+      `,
+      errors: [
         {
-          ignoreBooleanCoercion: true,
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 5,
+          column: 19,
+          endLine: 5,
+          endColumn: 28,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+let a: string | true | undefined;
+let b: string | boolean | undefined;
+
+const x = Boolean(a ?? b);
+      `,
+            },
+          ],
         },
       ],
+      options: [{ ignoreBooleanCoercion: true }],
+    },
+    {
+      code: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+
+const test = Boolean(!a ? b : a);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 5,
+          column: 22,
+          endLine: 5,
+          endColumn: 32,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+
+const test = Boolean(a ?? b);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -5074,9 +11043,15 @@ if (f(a || b)) {
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 7,
+          column: 9,
+          endLine: 7,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | true | undefined;
 let b: string | boolean | undefined;
@@ -5090,11 +11065,7 @@ if (f(a ?? b)) {
           ],
         },
       ],
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -5107,9 +11078,15 @@ if (+(a || b)) {
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare const a: string | undefined;
 declare const b: string;
@@ -5121,11 +11098,7 @@ if (+(a ?? b)) {
           ],
         },
       ],
-      options: [
-        {
-          ignoreConditionalTests: true,
-        },
-      ],
+      options: [{ ignoreConditionalTests: true }],
     },
     {
       code: `
@@ -5140,9 +11113,15 @@ defaultBox || getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 8,
+          column: 12,
+          endLine: 8,
+          endColumn: 14,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5156,7 +11135,6 @@ defaultBox ?? getFallbackBox();
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5171,9 +11149,15 @@ defaultBox ? defaultBox : getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 43,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5188,7 +11172,6 @@ defaultBox ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5203,9 +11186,15 @@ defaultBoxOptional.a?.b != null ? defaultBoxOptional.a?.b : getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 77,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5220,7 +11209,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5231,9 +11219,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare const x: any;
 declare const y: any;
@@ -5254,9 +11248,15 @@ x || y;
       errors: [
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a logical or (`||`), as it is a safer operator.',
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 5,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare const x: unknown;
 declare const y: any;
@@ -5280,9 +11280,15 @@ defaultBoxOptional.a?.b != null ? defaultBoxOptional.a.b : getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 76,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5297,7 +11303,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5312,9 +11317,15 @@ defaultBoxOptional.a?.b ? defaultBoxOptional.a?.b : getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 69,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5329,7 +11340,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5344,9 +11354,15 @@ defaultBoxOptional.a?.b ? defaultBoxOptional.a.b : getFallbackBox();
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 8,
+          endColumn: 68,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5361,7 +11377,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5378,9 +11393,15 @@ defaultBoxOptional.a?.b !== undefined
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 10,
+          endColumn: 21,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5395,7 +11416,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5412,9 +11432,15 @@ defaultBoxOptional.a?.b !== undefined
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 10,
+          endColumn: 21,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5429,7 +11455,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5446,9 +11471,15 @@ defaultBoxOptional.a?.b !== undefined && defaultBoxOptional.a?.b !== null
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 10,
+          endColumn: 21,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5463,7 +11494,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5480,9 +11510,15 @@ defaultBoxOptional.a?.b !== undefined && defaultBoxOptional.a?.b !== null
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 8,
+          column: 1,
+          endLine: 10,
+          endColumn: 21,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 interface Box {
   value: string;
@@ -5497,7 +11533,6 @@ defaultBoxOptional.a?.b ?? getFallbackBox();
         },
       ],
       options: [{ ignoreTernaryTests: false }],
-      output: null,
     },
     {
       code: `
@@ -5508,9 +11543,15 @@ declare let y: number;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 11,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: unknown;
 declare let y: number;
@@ -5531,9 +11572,15 @@ x ? x : y;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 10,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: unknown;
 declare let y: number;
@@ -5553,9 +11600,15 @@ declare let x: { n: unknown };
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 15,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: { n: unknown };
 x.n ?? y;
@@ -5574,9 +11627,15 @@ x?.['a'] != null ? x['a'] : 'foo';
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 34,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: { a: string } | null;
 
@@ -5586,7 +11645,6 @@ x?.['a'] ?? 'foo';
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5597,9 +11655,15 @@ x?.['a'] != null ? x.a : 'foo';
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 31,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: { a: string } | null;
 
@@ -5609,7 +11673,6 @@ x?.['a'] ?? 'foo';
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5620,9 +11683,15 @@ x?.a != null ? x['a'] : 'foo';
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 30,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare let x: { a: string } | null;
 
@@ -5632,7 +11701,6 @@ x?.a ?? 'foo';
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5644,9 +11712,15 @@ x?.[a] != null ? x[a] : 'foo';
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 5,
+          column: 1,
+          endLine: 5,
+          endColumn: 30,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 const a = 'b';
 declare let x: { a: string; b: string } | null;
@@ -5657,7 +11731,6 @@ x?.[a] ?? 'foo';
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5673,9 +11746,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5688,7 +11767,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5704,9 +11782,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5719,7 +11803,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5735,9 +11818,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5750,8 +11839,9 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
+    // Multiple errors
+    /* eslint-disable @typescript-eslint/internal/no-multiple-lines-of-errors */
     {
       code: `
 declare let foo: { a: string } | null;
@@ -5766,9 +11856,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5782,9 +11878,15 @@ function lazyInitialize() {
         },
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 7,
+          column: 9,
+          endLine: 7,
+          endColumn: 12,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5799,8 +11901,8 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
+    /* eslint-enable @typescript-eslint/internal/no-multiple-lines-of-errors */
     {
       code: `
 declare let foo: { a: string } | null;
@@ -5815,9 +11917,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5830,7 +11938,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5846,9 +11953,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 36,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5863,7 +11976,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5879,9 +11991,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 38,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5896,7 +12014,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5912,9 +12029,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 6,
+          endColumn: 38,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5930,9 +12053,15 @@ function lazyInitialize() {
         },
         {
           messageId: 'preferNullishOverOr',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of a logical assignment (`||=`), as it is a safer operator.',
+          line: 6,
+          column: 24,
+          endLine: 6,
+          endColumn: 27,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
@@ -5947,7 +12076,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5963,9 +12091,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | undefined;
 declare function makeFoo(): { a: string };
@@ -5978,7 +12112,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -5994,9 +12127,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null | undefined;
 declare function makeFoo(): { a: string };
@@ -6009,7 +12148,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6025,9 +12163,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): string;
@@ -6040,7 +12184,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6056,9 +12199,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string } | null;
 declare function makeFoo(): string;
@@ -6071,7 +12220,6 @@ function lazyInitialize() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6088,9 +12236,15 @@ function lazyInitialize() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 9,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: string | null;
 declare function makeFoo(): string;
@@ -6104,7 +12258,6 @@ foo ??= makeFoo();
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6136,9 +12289,15 @@ if (foo == null) {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 5,
+          column: 1,
+          endLine: 25,
+          endColumn: 2,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: string | null;
 declare function makeFoo(): string;
@@ -6167,7 +12326,6 @@ foo ??= makeFoo(); // comment inline
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6179,9 +12337,15 @@ if (foo == null) /* comment before 1 */ /* comment before 2 */ foo = makeFoo(); 
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 5,
+          column: 1,
+          endLine: 5,
+          endColumn: 80,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: string | null;
 declare function makeFoo(): string;
@@ -6192,10 +12356,9 @@ declare function makeFoo(): string;
           ],
         },
       ],
-      output: null,
     },
     {
-      code: noFormat`
+      code: `
 declare let foo: { a: string | null };
 declare function makeString(): string;
 
@@ -6208,9 +12371,15 @@ function weirdParens() {
       errors: [
         {
           messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 6,
+          column: 3,
+          endLine: 8,
+          endColumn: 4,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
               output: `
 declare let foo: { a: string | null };
 declare function makeString(): string;
@@ -6223,7 +12392,6 @@ function weirdParens() {
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6235,9 +12403,15 @@ const foo = a ? a : b ? 1 : 2;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 30,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | undefined;
 let b: { message: string } | undefined;
@@ -6248,10 +12422,9 @@ const foo = a ?? (b ? 1 : 2);
           ],
         },
       ],
-      output: null,
     },
     {
-      code: noFormat`
+      code: `
 let a: string | undefined;
 let b: { message: string } | undefined;
 
@@ -6260,9 +12433,15 @@ const foo = a ? a : (b ? 1 : 2);
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 32,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 let a: string | undefined;
 let b: { message: string } | undefined;
@@ -6273,7 +12452,6 @@ const foo = a ?? (b ? 1 : 2);
           ],
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -6283,9 +12461,15 @@ c !== null ? c : c ? 1 : 2;
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn: 27,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
 declare const c: string | null;
 c ?? (c ? 1 : 2);
@@ -6294,69 +12478,184 @@ c ?? (c ? 1 : 2);
           ],
         },
       ],
-      output: null,
     },
-    // ignoreBooleanCoercion carve-out: a ConditionalExpression whose paren-
-    // stripped direct parent is `CallExpression` (i.e. ternary IS the bare
-    // argument of `Boolean(...)`) still reports even with
-    // ignoreBooleanCoercion: true. Verified against upstream byte-for-byte.
-    //
-    // Note the strictness of upstream's carve-out: when the ternary is
-    // wrapped in another expression like `Boolean((a ? a : b) || c)` or
-    // `Boolean(c || (!a ? b : a))`, the ternary's effective parent becomes
-    // the `||`, NOT `CallExpression`, so the carve-out does NOT apply and
-    // those cases are correctly silent (kept in `valid` above).
     {
       code: `
-let a: string | true | undefined;
-let b: string | boolean | undefined;
-
-const x = Boolean(a ? a : b);
+function test<T extends string>(val: T | undefined) {
+  return val !== undefined ? val : 'foo';
+}
       `,
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 41,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-let a: string | true | undefined;
-let b: string | boolean | undefined;
-
-const x = Boolean(a ?? b);
+function test<T extends string>(val: T | undefined) {
+  return val ?? 'foo';
+}
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreBooleanCoercion: true }],
-      output: null,
+      options: [{ ignoreTernaryTests: false }],
     },
     {
       code: `
-let a: string | boolean | undefined;
-let b: string | boolean | undefined;
-
-const test = Boolean(!a ? b : a);
+function test<T extends {}>(val: T | undefined) {
+  return val !== undefined ? val : 'fallback';
+}
       `,
       errors: [
         {
           messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 46,
           suggestions: [
             {
               messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
               output: `
-let a: string | boolean | undefined;
-let b: string | boolean | undefined;
-
-const test = Boolean(a ?? b);
+function test<T extends {}>(val: T | undefined) {
+  return val ?? 'fallback';
+}
       `,
             },
           ],
         },
       ],
-      options: [{ ignoreBooleanCoercion: true }],
-      output: null,
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T | undefined) {
+  return val != undefined ? val : 'fallback';
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 45,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+function test<T>(val: T | undefined) {
+  return val ?? 'fallback';
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T>(val: T | undefined) {
+  return val !== undefined && val !== null ? val : 'fallback';
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 62,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+function test<T>(val: T | undefined) {
+  return val ?? 'fallback';
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T extends string, U extends T>(val: U | undefined) {
+  return val !== undefined ? val : 'fallback';
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          message: 'Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.',
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 46,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??`).',
+              output: `
+function test<T extends string, U extends T>(val: U | undefined) {
+  return val ?? 'fallback';
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreTernaryTests: false }],
+    },
+    {
+      code: `
+function test<T extends string>(val: T | undefined, fallback: T) {
+  if (val === undefined) {
+    val = fallback;
+  }
+  return val;
+}
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverAssignment',
+          message: 'Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.',
+          line: 3,
+          column: 3,
+          endLine: 5,
+          endColumn: 4,
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              desc: 'Fix to nullish coalescing operator (`??=`).',
+              output: `
+function test<T extends string>(val: T | undefined, fallback: T) {
+  val ??= fallback;
+  return val;
+}
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreIfStatements: false }],
     },
   ],
 });
