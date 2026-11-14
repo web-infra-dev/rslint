@@ -457,10 +457,22 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 				Programs:         binding.Programs,
 				TargetsByProgram: binding.TargetsByProgram,
 				RulesForFile:     rulesForFile,
-				Cwd:              cwd,
-				TypeCheck:        typeCheck,
-				SingleThreaded:   singleThreaded,
-				Timing:           timingCollector,
+				DirectiveRuleExists: func(path, name string) bool {
+					return fileConfigResolver != nil && fileConfigResolver.DirectiveRuleExists(path, name)
+				},
+				UnusedDirectiveSeverity: func(path string) rule.DiagnosticSeverity {
+					if args.UnusedDirectiveSeverity != nil {
+						return *args.UnusedDirectiveSeverity
+					}
+					if fileConfigResolver == nil {
+						return rule.SeverityOff
+					}
+					return fileConfigResolver.UnusedDirectiveSeverityForSourcePath(path)
+				},
+				Cwd:            cwd,
+				TypeCheck:      typeCheck,
+				SingleThreaded: singleThreaded,
+				Timing:         timingCollector,
 			},
 			Target: linter.TargetProjection{
 				Path: targetPath,

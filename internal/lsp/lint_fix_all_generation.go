@@ -10,8 +10,10 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
+	"github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // speculativeLintEnvironment captures the base filesystem identity, process
@@ -85,7 +87,7 @@ func acquireSpeculativeGeneration(
 			}
 			return content, nil
 		}
-		return newLintGeneration(
+		generation := newLintGeneration(
 			program,
 			sourceFile,
 			target,
@@ -95,6 +97,13 @@ func acquireSpeculativeGeneration(
 			pluginFileConfigForLintSnapshot(snapshot),
 			readText,
 		)
+		generation.Native.DirectiveRuleExists = func(_ string, name string) bool {
+			return lint.DirectiveRuleExists(snapshot.ruleCatalog, snapshot.resolvedConfig.MergedConfig, name)
+		}
+		generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity {
+			return snapshot.resolvedConfig.MergedConfig.UnusedDirectiveSeverity()
+		}
+		return generation
 	}
 	if sourceFile == nil {
 		return emptyLintGeneration(environment.processCwd), nil, nil

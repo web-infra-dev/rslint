@@ -17,7 +17,8 @@ type RslintConfig []ConfigEntry
 
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
-	Name string `json:"name,omitempty"`
+	Name          string         `json:"name,omitempty"`
+	LinterOptions *LinterOptions `json:"linterOptions,omitempty"`
 	// BasePath is ESLint flat config's entry-local matching base. A pointer
 	// preserves the distinction between omission and an explicitly authored
 	// empty string; both are valid, but only the latter scopes the entry.
@@ -242,6 +243,9 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 				return fmt.Errorf("config entry at index %d: key \"basePath\": expected value to be a string", index)
 			}
 		}
+		if value, present := raw["linterOptions"]; present && string(value) == "null" {
+			return fmt.Errorf("config entry at index %d: linterOptions: expected an object", index)
+		}
 		if rawFiles, ok := raw["files"]; ok {
 			files, groups, err := decodeFilesSelectors(rawFiles, index)
 			if err != nil {
@@ -278,7 +282,7 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 				break
 			}
 		}
-		if hasNonGlobalKey && decoded.Files == nil && decoded.FilePatternGroups == nil && decoded.Rules == nil && decoded.Plugins == nil && decoded.Settings == nil && decoded.LanguageOptions == nil {
+		if hasNonGlobalKey && decoded.Files == nil && decoded.FilePatternGroups == nil && decoded.Rules == nil && decoded.Plugins == nil && decoded.Settings == nil && decoded.LanguageOptions == nil && decoded.LinterOptions == nil {
 			decoded.Settings = Settings{}
 		}
 		entries = append(entries, ConfigEntry(decoded))
@@ -338,6 +342,12 @@ func ValidateConfig(config RslintConfig) error {
 	for index, entry := range config {
 		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
+		}
+		if entry.LinterOptions != nil && entry.LinterOptions.ReportUnusedDisableDirectives != nil {
+			value := *entry.LinterOptions.ReportUnusedDisableDirectives
+			if value != "off" && value != "warn" && value != "error" {
+				return fmt.Errorf("config entry at index %d: invalid unused directive severity %q", index, value)
+			}
 		}
 		if err := validateLanguageOptions(entry.LanguageOptions); err != nil {
 			return fmt.Errorf("config entry at index %d: %w", index, err)
@@ -859,6 +869,7 @@ func (path *fileMatchPath) normalizedPaths() (string, string) {
 
 // MergedConfig is the final computed configuration for a single file
 type MergedConfig struct {
+	LinterOptions   *LinterOptions
 	Rules           map[string]*RuleConfig
 	Settings        Settings
 	LanguageOptions *LanguageOptions
@@ -959,6 +970,7 @@ func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 		entry.Plugins == nil &&
 		entry.Settings == nil &&
 		entry.LanguageOptions == nil &&
+		entry.LinterOptions == nil &&
 		len(entry.Ignores) > 0
 }
 

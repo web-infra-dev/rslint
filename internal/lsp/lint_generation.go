@@ -11,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/config/lint"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
@@ -83,7 +84,7 @@ func buildDocumentGeneration(
 	hasTypeInfo bool,
 	snapshot documentLintSnapshot,
 ) linter.Generation {
-	return newLintGeneration(
+	generation := newLintGeneration(
 		program,
 		sourceFile,
 		target,
@@ -93,6 +94,13 @@ func buildDocumentGeneration(
 		pluginFileConfigForLintSnapshot(snapshot),
 		nil,
 	)
+	generation.Native.DirectiveRuleExists = func(_ string, name string) bool {
+		return lint.DirectiveRuleExists(snapshot.ruleCatalog, snapshot.resolvedConfig.MergedConfig, name)
+	}
+	generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity {
+		return snapshot.resolvedConfig.MergedConfig.UnusedDirectiveSeverity()
+	}
+	return generation
 }
 
 func (p *documentGenerationProvider) AcquireGeneration(
@@ -242,6 +250,19 @@ func newLintGeneration(
 			TargetsByProgram: [][]string{{sourcePath}},
 			SingleThreaded:   true,
 			Cwd:              processCwd,
+			SkippedDirectiveRules: func(string) []string {
+				selected := map[string]bool{}
+				for _, r := range servedRules {
+					selected[r.Name] = true
+				}
+				var skipped []string
+				for _, r := range enabledRules {
+					if !selected[r.Name] {
+						skipped = append(skipped, r.Name)
+					}
+				}
+				return skipped
+			},
 			RulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 				return servedRules
 			},

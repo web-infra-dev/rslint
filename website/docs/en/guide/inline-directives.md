@@ -54,3 +54,48 @@ const y: any = fn();
 - Omitting rule names disables/enables all rules.
 - Multiple rule names can be separated by commas.
 - An inline description can be added after `--` (e.g., `rslint-disable-next-line no-console -- temporary workaround`).
+
+## Report unused directives
+
+Reporting is off by default. Enable it per file through your configuration:
+
+```ts
+export default [
+  {
+    files: ['**/*.ts'],
+    linterOptions: { reportUnusedDisableDirectives: 'warn' },
+  },
+];
+```
+
+The setting accepts `'off'`, `'warn'`, and `'error'`, or the corresponding
+numbers `0`, `1`, and `2`. For ESLint configuration compatibility, `true` means
+`'warn'` and `false` means `'off'`. Later matching entries override earlier
+explicit settings. The JS API uses the same configuration.
+
+Use `--report-unused-disable-directives` to report errors, or
+`--report-unused-disable-directives-severity warn` to choose a severity. Explicit
+CLI settings override configuration; the severity flag takes precedence over
+the boolean flag regardless of argument order. Pass
+`--report-unused-disable-directives=false` to turn reporting off.
+
+Native rules and JavaScript plugin rules share usage tracking. A comment with
+multiple rule names can be partially unused. `--fix` removes unused entries,
+or replaces an entirely unused comment with its line terminators (a space for a
+single-line comment). Both full and partial fixes preserve line terminators to
+avoid changing automatic semicolon insertion.
+Unused enable comments are reported when they do not undo a disable directive.
+The editor offers the same fixes through Quick Fix and Fix All.
+
+Repeated or overlapping directives follow ESLint 10.14.0 attribution: the last
+applicable block directive gets credit, and a line directive gets no credit
+when a block directive already suppressed the diagnostic. Rules skipped by
+execution policy exempt their entries and wildcard directives from unused
+reporting. Failed or incomplete file execution produces no unused reports.
+
+Both prefixes have identical behavior. Native and JavaScript plugin rules accept
+block disable/enable commands in `//` comments; ESLint requires `/* */` for those
+commands. The plugin SourceCode APIs expose these line comments as directives too.
+Native rules also retain permissive keyword parsing, including rule names
+immediately following `eslint-disable` without whitespace. JavaScript plugin
+rules recognize only complete directive keywords.

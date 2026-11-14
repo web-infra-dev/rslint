@@ -39,9 +39,10 @@ type programLintPlan struct {
 // checker policy as a coherent execution unit. Parallel
 // slices would allow these decisions to drift by index across plan reuse.
 type lintFilePlan struct {
-	file           *ast.SourceFile
-	rules          *preparedRuleSet
-	hasTypeChecker bool
+	unfilteredRules []rule.ConfiguredRule
+	file            *ast.SourceFile
+	rules           *preparedRuleSet
+	hasTypeChecker  bool
 }
 
 type lintPlanFileRef struct {
@@ -292,6 +293,13 @@ func resolveProgramLintPlanFile(
 	// configured rule set before planning without inspecting Program adapters.
 	filePlan.hasTypeChecker = opts.Program.CanProvideTypeChecker(file)
 	filePlan.rules = ruleSets.prepare(rules, filePlan.hasTypeChecker)
+
+	if !filePlan.hasTypeChecker {
+		// Borrow the original selection. Only enabled unused reporting needs
+		// to enumerate the type-aware rules skipped by this file.
+		filePlan.unfilteredRules = rules
+	}
+
 	return nil
 }
 

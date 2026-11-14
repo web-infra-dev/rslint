@@ -91,6 +91,7 @@ func prepareObservation(
 	if err != nil {
 		return preparedObservation{}, err
 	}
+	directives := prepareDirectiveStates(plan, generation, policy)
 	detachedPlugin := policy.Plugin != PluginConcurrentJoined
 	targetSyntaxBlocked := stopOnTargetSyntaxErrors && plan != nil && plan.HasSyntacticDiagnostics()
 	pluginWork := pluginTask{failure: policy.PluginFailure}
@@ -108,15 +109,35 @@ func prepareObservation(
 		return preparedObservation{}, err
 	}
 	nativeWork.execution.options.reservation = reservation
+	nativeWork.execution.options.directives = directives
+
+	var directivesByTarget map[string]*fileDirectives
+	if len(directives) > 0 {
+		directivesByTarget = make(map[string]*fileDirectives, len(directives))
+		for _, state := range directives {
+			directivesByTarget[state.path] = state
+		}
+	}
 	for index := range pluginWork.inputs {
 		input := &pluginWork.inputs[index]
+		input.directives = directivesByTarget[pluginWork.targetPathByWire[input.Path]]
+		if input.directives != nil {
+			input.directives.pluginDone = false
+		}
 		if input.SourceFile != nil {
 			input.DiagnosticSource = input.SourceFile
-			if !planChanges {
+			if !planChanges || input.directives != nil {
 				input.DiagnosticSource = diagnosticTextSource(input.SourceFile)
 			}
 		}
 	}
+	for index := range pluginWork.fixCandidates {
+		candidate := &pluginWork.fixCandidates[index]
+		if directivesByTarget[candidate.path] != nil {
+			candidate.source = diagnosticTextSource(candidate.source)
+		}
+	}
+
 	prepared := preparedObservation{
 		native:                nativeWork,
 		plugin:                pluginWork,

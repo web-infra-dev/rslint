@@ -662,3 +662,271 @@ func TestPipelinePluginFailureAppliesToAllLoadedUnits(t *testing.T) {
 		})
 	}
 }
+
+func TestPipelineUnusedDirectives(t *testing.T) {
+	for _, mode := range []PluginExecution{PluginConcurrentJoined, PluginAfterNativeJoined} {
+		for _, tc := range []struct {
+			name, source         string
+			native, plugin, fail bool
+			unused               int
+		}{
+			{name: "zero rules", source: "/* eslint-disable */\nconst x = 1;", unused: 1},
+			{name: "mixed used", source: "/* eslint-disable native/check, plugin/check */\ndebugger;", native: true, plugin: true},
+			{name: "plugin only", source: "/* eslint-disable plugin/check */\ndebugger;", plugin: true},
+			{name: "partial", source: "/* eslint-disable native/check, plugin/check, unused */\ndebugger;", native: true, plugin: true, unused: 1},
+			{name: "plugin failure", source: "/* eslint-disable unused */\ndebugger;", plugin: true, fail: true},
+		} {
+			t.Run(fmt.Sprintf("%d/%s", mode, tc.name), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				path := tspath.ResolvePath(root, "source.ts")
+				var rules []rule.ConfiguredRule
+				if tc.native {
+					rules = append(rules, rule.ConfiguredRule{Name: "native/check", Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return rule.RuleListeners{ast.KindDebuggerStatement: func(node *ast.Node) { ctx.ReportNode(node, rule.RuleMessage{Description: "native"}) }}
+					}})
+				}
+				var config *EslintPluginFileConfig
+				if tc.plugin {
+					rules = append(rules, rule.ConfiguredRule{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true})
+					config = &EslintPluginFileConfig{}
+				}
+				generation := pipelineTestGeneration(t, root, path, tc.source, rules, config)
+				generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+				dispatch := EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+					if tc.fail {
+						return nil, errors.New("plugin failed")
+					}
+					if !req.Files[0].CollectDirectiveUsage {
+						t.Fatal("missing per-file usage request")
+					}
+					name := "plugin/check"
+					return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, UsedDisableDirectives: []rule.DisableDirectiveUsage{{Line: 0, Column: 0, RuleID: &name}}}}}, nil
+				})
+				result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{Plugin: mode}, dispatch))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, _ := result.Observation.CompleteDiagnostics()
+				unused := 0
+				for _, d := range diagnostics {
+					if strings.HasPrefix(d.Message.Description, "Unused eslint-") {
+						unused++
+						if d.Severity != rule.SeverityWarning {
+							t.Fatal("wrong severity")
+						}
+					} else if !tc.fail {
+						t.Fatalf("unsuppressed diagnostic: %+v", d)
+					}
+				}
+				if unused != tc.unused {
+					t.Fatalf("got %d unused, want %d; diagnostics: %+v", unused, tc.unused, diagnostics)
+				}
+			})
+		}
+	}
+}
+
+func TestPipelineUnusedDirectivesSyntaxErrors(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, demand := range []rule.EditDemand{0, rule.EditDemandAutofix} {
+			t.Run(fmt.Sprintf("%s/demand=%d", prefix, demand), func(t *testing.T) {
+				root := tspath.NormalizePath(t.TempDir())
+				path := tspath.ResolvePath(root, "source.ts")
+				generation := pipelineTestGeneration(t, root, path, "/* "+prefix+"-disable */\n/*", nil, nil)
+				generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+				generation.Native.DirectiveRuleExists = func(string, string) bool { return true }
+				result, err := RunPipeline(t.Context(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{
+					Demand: ArtifactDemand{Native: demand},
+				}, nil))
+				if err != nil {
+					t.Fatal(err)
+				}
+				diagnostics, complete := result.Observation.CompleteDiagnostics()
+				if !complete || len(diagnostics) != 1 || diagnostics[0].RuleName != "TypeScript(TS1010)" {
+					t.Fatalf("expected only unterminated-comment diagnostic, complete=%v: %+v", complete, diagnostics)
+				}
+				if len(diagnostics[0].Fixes()) != 0 {
+					t.Fatal("syntax-error file produced fixes")
+				}
+			})
+		}
+	}
+}
+
+func TestUnusedDirectiveCompletion(t *testing.T) {
+	for _, nativeFirst := range []bool{false, true} {
+		for _, fail := range []bool{false, true} {
+			t.Run(fmt.Sprintf("nativeFirst=%v/failure=%v", nativeFirst, fail), func(t *testing.T) {
+				source := pluginSyntax("/test.ts", "/* eslint-disable unused */\ndebugger;")
+				manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
+				manager.Freeze(newTextSourceFile(source.Text()))
+				state := &fileDirectives{manager: manager, path: "/test.ts", severity: rule.SeverityWarning, demand: rule.EditDemandAutofix}
+				if got := state.complete(nativeFirst, false, "/test.ts"); len(got) != 0 {
+					t.Fatal("premature unused report")
+				}
+				got := state.complete(!nativeFirst, fail, "/test.ts")
+				want := 1
+				if fail {
+					want = 0
+				}
+				if len(got) != want {
+					t.Fatalf("got %d reports, want %d", len(got), want)
+				}
+				if got := state.complete(nativeFirst, false, "/test.ts"); len(got) != 0 {
+					t.Fatal("duplicate finalization")
+				}
+			})
+		}
+	}
+}
+
+func TestPipelineUnusedDirectiveUsageValidation(t *testing.T) {
+	name := "plugin/check"
+	for _, tc := range []struct {
+		name   string
+		usage  []rule.DisableDirectiveUsage
+		failed bool
+	}{
+		{"missing", nil, true},
+		{"empty", []rule.DisableDirectiveUsage{}, false},
+		{"unknown", []rule.DisableDirectiveUsage{{Line: 9, RuleID: &name}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			generation := pipelineTestGeneration(t, root, path, "/* eslint-disable plugin/check */\nx();", []rule.ConfiguredRule{{Name: name, Severity: rule.SeverityError, IsEslintPluginRule: true}}, &EslintPluginFileConfig{})
+			generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+			result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{Demand: ArtifactDemand{Native: rule.EditDemandAutofix}}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+				return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path, UsedDisableDirectives: tc.usage}}}, nil
+			})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics, _ := result.Observation.CompleteDiagnostics()
+			if len(diagnostics) != 1 {
+				t.Fatalf("diagnostics: %+v", diagnostics)
+			}
+			if tc.failed {
+				if diagnostics[0].RuleName != "rslint/plugin-lint-error" || len(diagnostics[0].Fixes()) != 0 {
+					t.Fatalf("unsafe failure result: %+v", diagnostics)
+				}
+			} else if diagnostics[0].RuleName != "" || len(diagnostics[0].Fixes()) != 1 {
+				t.Fatalf("missing unused fix: %+v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestPipelineUnusedReportingOffSkipsUsageState(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	path := tspath.ResolvePath(root, "source.ts")
+	generation := pipelineTestGeneration(t, root, path, "/* eslint-disable plugin/check */\nx();", []rule.ConfiguredRule{{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true}}, &EslintPluginFileConfig{})
+	generation.Native.DirectiveRuleExists = func(string, string) bool { t.Fatal("off reporting parsed directive state"); return false }
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if req.Files[0].CollectDirectiveUsage {
+			t.Fatal("off reporting requested usage")
+		}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path}}}, nil
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 0 {
+		t.Fatalf("off reporting emitted diagnostics: %+v", diagnostics)
+	}
+}
+
+func TestPipelineUnusedDirectivesIgnoreSkippedTypeRules(t *testing.T) {
+	for _, name := range []string{"only-skipped", "mixed"} {
+		mixed := name == "mixed"
+		t.Run(name, func(t *testing.T) {
+			root := tspath.NormalizePath(t.TempDir())
+			path := tspath.ResolvePath(root, "source.ts")
+			rules := []rule.ConfiguredRule{{Name: "needs-types", Severity: rule.SeverityError, RequiresTypeInfo: true}}
+			names := "needs-types"
+			if mixed {
+				names += ", plain"
+				rules = append(rules, rule.ConfiguredRule{Name: "plain", Severity: rule.SeverityError, Run: func(rule.RuleContext) rule.RuleListeners { return rule.RuleListeners{} }})
+			}
+			generation := pipelineTestGeneration(t, root, path, "/* eslint-disable "+names+" */\nx();", rules, nil)
+			generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+			result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			diagnostics, _ := result.Observation.CompleteDiagnostics()
+			if !mixed {
+				if len(diagnostics) != 0 {
+					t.Fatalf("skipped type rule reported as unused: %+v", diagnostics)
+				}
+			} else if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "'plain'") || strings.Contains(diagnostics[0].Message.Description, "'needs-types'") {
+				t.Fatalf("wrong unused entries for mixed rules: %+v", diagnostics)
+			}
+		})
+	}
+}
+
+func TestPipelineDirectiveUsageSelectionIsPerFile(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	onPath := tspath.ResolvePath(root, "on.ts")
+	offPath := tspath.ResolvePath(root, "off.ts")
+	source := "/* eslint-disable plugin/check */\nx();"
+	rules := []rule.ConfiguredRule{{Name: "plugin/check", Severity: rule.SeverityError, IsEslintPluginRule: true}}
+	generation := pipelineTestGeneration(t, root, onPath, source, rules, &EslintPluginFileConfig{})
+	generation.Native.Programs = append(generation.Native.Programs, pipelineTestProgram(t, root, offPath, source))
+	generation.Native.TargetsByProgram = append(generation.Native.TargetsByProgram, []string{offPath})
+	generation.Target.Path = nil
+	generation.Native.UnusedDirectiveSeverity = func(path string) rule.DiagnosticSeverity {
+		if path == onPath {
+			return rule.SeverityWarning
+		}
+		return rule.SeverityOff
+	}
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, EslintPluginDispatchFunc(func(_ context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		result := &EslintPluginLintResult{}
+		for _, file := range req.Files {
+			if file.CollectDirectiveUsage != (file.Path == onPath) {
+				t.Fatalf("wrong per-file collection: %+v", file)
+			}
+			row := EslintPluginFileResult{FilePath: file.Path}
+			if file.CollectDirectiveUsage {
+				row.UsedDisableDirectives = []rule.DisableDirectiveUsage{}
+			}
+			result.Results = append(result.Results, row)
+		}
+		return result, nil
+	})))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 1 || diagnostics[0].FilePath != onPath || diagnostics[0].RuleName != "" {
+		t.Fatalf("wrong per-file unused reports: %+v", diagnostics)
+	}
+}
+
+func TestPipelineUnusedDirectivePathProjectedOnce(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	sourcePath := tspath.ResolvePath(root, "source.ts")
+	targetPath := tspath.ResolvePath(root, "target.ts")
+	generation := pipelineTestGeneration(t, root, sourcePath, "/* eslint-disable */\nx();", nil, nil)
+	generation.Native.UnusedDirectiveSeverity = func(string) rule.DiagnosticSeverity { return rule.SeverityWarning }
+	generation.Target.Path = func(path string) string {
+		if path == sourcePath {
+			return targetPath
+		}
+		if path == targetPath {
+			return tspath.ResolvePath(root, "incorrect.ts")
+		}
+		return path
+	}
+	result, err := RunPipeline(context.Background(), NewLintRequest(pipelineTestProvider(generation, nil), ObservationPolicy{}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostics, _ := result.Observation.CompleteDiagnostics()
+	if len(diagnostics) != 1 || diagnostics[0].FilePath != targetPath {
+		t.Fatalf("unexpected projected diagnostics: %+v", diagnostics)
+	}
+}

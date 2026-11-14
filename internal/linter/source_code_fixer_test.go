@@ -1,6 +1,11 @@
 package linter
 
 import (
+	"fmt"
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/testutil/directivefixtures"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -253,8 +258,8 @@ func TestApplyRuleFixes(t *testing.T) {
 			name: "insertion followed by replacement starting at same position - should skip replacement",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
-				newMockDiagnostic(newInsertFix(0, "XXX")),      // Insert at 0
-				newMockDiagnostic(newReplaceFix(0, 3, "YYY")),  // Replace ABC with YYY
+				newMockDiagnostic(newInsertFix(0, "XXX")),     // Insert at 0
+				newMockDiagnostic(newReplaceFix(0, 3, "YYY")), // Replace ABC with YYY
 			},
 			expectedCode:        "XXXABCDEFGHIJ",
 			expectedUnapplied:   1,
@@ -441,5 +446,129 @@ func TestApplyRuleFixes_DuplicateInsertionRegression(t *testing.T) {
 	// Verify we don't have "async async async"
 	if result == " async  async  async function fetchData(): Promise<string> { return Promise.resolve('data'); }" {
 		t.Error("Regression: duplicate insertions were not prevented!")
+	}
+}
+
+func TestUnusedDirectiveESLintFixOutputs(t *testing.T) {
+	for _, file := range []string{"upstream.json", "source.json"} {
+		corpus := directivefixtures.Load(t, "../rule/testdata/eslint-directives/"+file)
+		for index, tc := range corpus.Cases {
+			t.Run(fmt.Sprintf("%s/%03d", file, index), func(t *testing.T) {
+				for _, prefix := range []string{"eslint", "rslint"} {
+					source := tc.Source
+					if prefix == "rslint" {
+						source = tc.RslintSource
+					}
+					sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/conformance.js", Path: "/conformance.js"}, source, core.ScriptKindJS)
+					for _, v := range tc.Variants {
+						t.Run(fmt.Sprintf("%s/%s/noFix=%v", prefix, v.Severity, v.DisableFixes), func(t *testing.T) {
+							manager := rule.NewDisableManager(sf, rule.NewCommentStore(sf))
+							invalid := map[string]bool{}
+							for _, name := range tc.InvalidRules {
+								invalid[name] = true
+							}
+							manager.ValidateRules(func(name string) bool { return !invalid[name] })
+							var diagnostics []rule.RuleDiagnostic
+							for _, report := range tc.Reports {
+								suppressed := manager.IsRuleDisabled(report.RuleID, directivefixtures.ByteOffset(t, source, report.Pos))
+								if suppressed != report.Suppressed {
+									t.Fatalf("%s: unexpected suppression for %s", tc.Name, report.RuleID)
+								}
+								if !suppressed && report.Fix != nil {
+									offset := func(pos int) int {
+										if pos == -1 {
+											return -1
+										}
+										return directivefixtures.ByteOffset(t, source, pos)
+									}
+									fixes := []rule.RuleFix{{Range: core.NewTextRange(offset(report.Fix.Range[0]), offset(report.Fix.Range[1])), Text: report.Fix.Text}}
+									diagnostics = append(diagnostics, rule.RuleDiagnostic{FixesPtr: &fixes})
+								}
+							}
+							ignored := map[string]bool{}
+							for _, name := range tc.Ignored {
+								ignored[name] = true
+							}
+							demand := rule.EditDemandAutofix
+							if v.DisableFixes {
+								demand = 0
+							}
+							// Retain ordinary-rule oracle fixes, then adapt only the
+							// original directive replacements that delete line breaks.
+							expectedDiagnostics := append([]rule.RuleDiagnostic(nil), diagnostics...)
+							linePreserving := false
+							for _, diagnostic := range v.Diagnostics {
+								if diagnostic.Fix == nil {
+									continue
+								}
+								fix := directivefixtures.LinePreservingFix(t, source, *diagnostic.Fix)
+								linePreserving = linePreserving || fix.Text != diagnostic.Fix.Text
+								fixes := []rule.RuleFix{{Range: core.NewTextRange(directivefixtures.ByteOffset(t, source, fix.Range[0]), directivefixtures.ByteOffset(t, source, fix.Range[1])), Text: fix.Text}}
+								expectedDiagnostics = append(expectedDiagnostics, rule.RuleDiagnostic{FixesPtr: &fixes})
+							}
+							diagnostics = append(diagnostics, manager.UnusedDiagnostics("/conformance.js", rule.ParseSeverity(v.Severity), demand, ignored)...)
+							code := source
+							if tc.BOM {
+								code = "\ufeff" + code
+							}
+							fixed, _, _ := ApplyRuleFixes(code, diagnostics)
+							want := v.Fixed
+							if prefix == "rslint" {
+								want = v.RslintFixed
+							}
+							// ESLint's later-round output is recorded only for adjacent deletions.
+							batched := v.BatchedFixed
+							if prefix == "rslint" {
+								batched = v.RslintBatchedFixed
+							}
+							if linePreserving {
+								want, _, _ = ApplyRuleFixes(code, expectedDiagnostics)
+								batched = nil
+							}
+							if fixed != want && (batched == nil || fixed != *batched) {
+								t.Fatalf("%s\nfixed: %q\nwant:  %q", tc.Name, fixed, want)
+							}
+						})
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestUnusedDirectiveAdjacentLineBreaks(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, tc := range []struct {
+			name, source, fixed string
+			usedRules           []string
+		}{
+			{"separate CR LF", "/* %[1]s-disable a\r*//* %[1]s-disable b\n*/x();", "\r  \nx();", nil},
+			{"original CRLF", "/* %[1]s-disable a\r\n*//* %[1]s-disable b\r\n*/x();", "\r\n\r\nx();", nil},
+			{"LF CR", "/* %[1]s-disable a\n*//* %[1]s-disable b\r*/x();", " \n\r x();", nil},
+			{"partial separate CR LF", "/* %[1]s-disable a, b\r, c\n, d */x();", "/* %[1]s-disable a\r \n, d */x();", []string{"a", "d"}},
+		} {
+			t.Run(prefix+"/"+tc.name, func(t *testing.T) {
+				source := fmt.Sprintf(tc.source, prefix)
+				expected := tc.fixed
+				if len(tc.usedRules) != 0 {
+					expected = fmt.Sprintf(expected, prefix)
+				}
+				sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/adjacent.js", Path: "/adjacent.js"}, source, core.ScriptKindJS)
+				manager := rule.NewDisableManager(sf, rule.NewCommentStore(sf))
+				for _, name := range tc.usedRules {
+					if !manager.IsRuleDisabled(name, strings.Index(source, "x();")) {
+						t.Fatalf("expected %s to be suppressed", name)
+					}
+				}
+				diagnostics := manager.UnusedDiagnostics("/adjacent.js", rule.SeverityWarning, rule.EditDemandAutofix, nil)
+				if len(diagnostics) != 2 {
+					t.Fatalf("got %d diagnostics, want 2", len(diagnostics))
+				}
+				fixed, unapplied, applied := ApplyRuleFixes(source, diagnostics)
+				if fixed != expected || !applied || len(unapplied) != 0 {
+					t.Fatalf("fixed = %q, want %q; applied = %v, unapplied = %d", fixed, expected, applied, len(unapplied))
+				}
+			})
+		}
 	}
 }

@@ -1457,10 +1457,41 @@ Rslint supports inline directives with both `rslint-` and `eslint-` prefixes:
 - `/* rslint-disable @typescript-eslint/no-unsafe-assignment */`
 - `// eslint-disable-next-line`
 
-The `DisableManager` in `internal/rule/disable_manager.go` applies these
-directives before diagnostics are emitted. It defers parsing until the first
-disable check and uses an exact directive-text candidate check, so files without a
-supported directive retain an empty manager without scanning comments.
+Native rules use a lazy Go `DisableManager`; Node plugin workers suppress
+reports before UTF-16-to-UTF-8 conversion and serialization. Both matchers use
+ESLint's block-before-line attribution and the same conformance corpus. Native
+line directives use a per-line lookup instead of scanning all directives for
+each report. With reporting off, Go retains only rule names and block events in
+file-local state, without a lock or tracked entries. Node uses the scalar-state
+suppression loop; only reporting-enabled requests track the owning directive.
+Both paths share directive parsing and conformance tests.
+
+Unused reporting creates a frozen, text-only Go state only for files whose
+effective severity is enabled and whose text contains a directive candidate.
+The plugin request's per-file `collectDirectiveUsage` asks Node to return a
+deduplicated `usedDisableDirectives` summary alongside visible diagnostics.
+Workers encode the summary before returning it to the host, so both structured
+cloning and JSON transport use `{ rules, entries }`. The per-file `rules` table
+contains declared rule IDs (`null` for a wildcard); each numeric entry is
+`[line, column, ruleIndex]`, identifying the original comment's zero-based
+ECMAScript line and UTF-16 column. An empty summary is `{ rules: [], entries: [] }`.
+The host forwards it without rebuilding the table. Go validates the wire shape,
+integer coordinates and table indices, reconstructs internal entries, and
+validates the entire summary against that file's parsed entries before marking
+usage. Missing, malformed or unknown summaries are visible protocol failures
+and suppress unused reports and their fixes for the file.
+
+Native and plugin completion join per file; finalization happens once, including
+zero-rule files. Failure, missing plugin results, and cancellation suppress
+unused reports. Each source-changing fix round creates new state. Progressive
+LSP continuations retain no Program or AST through this state and publish
+through the existing source-version checks.
+
+`linterOptions.reportUnusedDisableDirectives` is resolved per file independently
+of its enabled rules. Explicit CLI settings override it. Reporting defaults to
+off; the disabled path creates no unused-reporting state or usage summary.
+API protocol 6 and config-discovery protocol 4 require matching peers for the
+filtered plugin-result and usage-summary contract.
 
 ## 9. CLI Flow
 
@@ -1832,7 +1863,7 @@ inline as base64 through its existing JSON-RPC route. The host resolves bytes
 and forwards configuration keys; workers own configuration lookup. Neither the
 plugin adapter nor Node IPC performs a separate canonical base64 validation
 pass. Native mapping bounds, publication generations and exact release
-acknowledgements remain transport invariants. API protocol 5.0.0 requires
+acknowledgements remain transport invariants. API protocol 6.0.0 requires
 matching peers, with no old text-input negotiation or parser fallback. Detached
 LSP continuations contain owned frames, diagnostic text and cloned JSON
 metadata, with no SourceFile, checker, mutable observer or native rule graph.
@@ -2246,7 +2277,7 @@ String plugin declarations select bundled Go plugin namespaces. Live third-party
 ### Integration Points
 
 - **Language Server**: `internal/lsp` exposes diagnostics and code actions
-- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `3.1.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
+- **JavaScript API**: `packages/rslint` talks to the `internal/api/server` handler composed by `cmd/rslint --api` through the versioned `6.0.0` protocol; the handshake negotiates reverse `pluginLint` support before third-party rules run
 - **WASM Playground**: `packages/rslint-wasm` runs the API server in a browser worker
 - **Rust Client**: `crates/tsgo-client` consumes `cmd/tsgo`
 

@@ -1,0 +1,105 @@
+package linter
+
+import (
+	"sync"
+
+	"github.com/web-infra-dev/rslint/internal/rule"
+)
+
+// fileDirectives belongs to one execution round. It never retains syntax or
+// a generation lease; native and plugin completion can arrive in either order.
+type fileDirectives struct {
+	manager                                   *rule.DisableManager
+	path                                      string
+	severity                                  rule.DiagnosticSeverity
+	demand                                    rule.EditDemand
+	ignored                                   map[string]bool
+	mu                                        sync.Mutex
+	nativeDone, pluginDone, failed, finalized bool
+}
+
+func (f *fileDirectives) complete(native, failed bool, path string) []rule.RuleDiagnostic {
+	if f == nil {
+		return nil
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.failed = f.failed || failed
+	if native {
+		f.nativeDone = true
+	} else {
+		f.pluginDone = true
+	}
+	if !f.nativeDone || !f.pluginDone || f.finalized {
+		return nil
+	}
+	f.finalized = true
+	if f.failed {
+		return nil
+	}
+	return f.manager.UnusedDiagnostics(path, f.severity, f.demand, f.ignored)
+}
+
+func prepareDirectiveStates(plan *LintPlan, generation Generation, policy ObservationPolicy) map[string]*fileDirectives {
+	if plan == nil {
+		return nil
+	}
+	var syntaxErrors map[string]bool
+	for _, group := range plan.syntacticDiagnosticGroups {
+		for _, diagnostic := range group.diagnostics {
+			if syntaxErrors == nil {
+				syntaxErrors = make(map[string]bool)
+			}
+			syntaxErrors[diagnostic.FilePath] = true
+		}
+	}
+	var states map[string]*fileDirectives
+	for _, program := range plan.programs {
+		for _, file := range program.files {
+			source := file.file
+			// Malformed comments are unsafe to parse, and syntax-error files
+			// cannot establish directive usage through rule execution.
+			if syntaxErrors[source.FileName()] {
+				continue
+			}
+			severity := rule.SeverityOff
+			if generation.Native.UnusedDirectiveSeverity != nil {
+				severity = generation.Native.UnusedDirectiveSeverity(source.FileName())
+			}
+			// Suppression stays lazy in native execution and local to Node. Only
+			// unused reporting needs a frozen state shared across producers.
+			if severity == rule.SeverityOff || !rule.MayContainDisableDirective(source.Text()) {
+				continue
+			}
+			manager := rule.NewDisableManager(source, rule.NewCommentStore(source))
+			if generation.Native.DirectiveRuleExists != nil {
+				manager.ValidateRules(func(name string) bool { return generation.Native.DirectiveRuleExists(source.FileName(), name) })
+			}
+			manager.Freeze(diagnosticTextSource(source))
+			f := &fileDirectives{manager: manager, path: projectTargetPath(generation.Target.Path, source.FileName()), severity: severity, demand: policy.Demand.Native | policy.Demand.Plugin, pluginDone: file.rules == nil || len(file.rules.plugins) == 0}
+			for _, configured := range file.unfilteredRules {
+				if configured.RequiresTypeInfo {
+					if f.ignored == nil {
+						f.ignored = map[string]bool{}
+					}
+					f.ignored[configured.Name] = true
+				}
+			}
+			if generation.Native.SkippedDirectiveRules != nil {
+				for _, name := range generation.Native.SkippedDirectiveRules(source.FileName()) {
+					if f.ignored == nil {
+						f.ignored = map[string]bool{}
+					}
+					f.ignored[name] = true
+				}
+			}
+			if states == nil {
+				states = make(map[string]*fileDirectives)
+			}
+			states[source.FileName()] = f
+		}
+	}
+	return states
+}
+
+type directiveStates map[string]*fileDirectives

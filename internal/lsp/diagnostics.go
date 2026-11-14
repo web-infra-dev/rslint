@@ -130,6 +130,10 @@ func (s *Server) invalidateDocumentInputs(uri lsproto.DocumentUri, owners []lspr
 }
 
 func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, editorHasBOM bool) *lsproto.Diagnostic {
+	message := ruleDiag.Message.Description
+	if ruleDiag.RuleName != "" {
+		message = fmt.Sprintf("[%s] %s", ruleDiag.RuleName, message)
+	}
 	return &lsproto.Diagnostic{
 		Range: lsproto.Range{
 			Start: sourcePositionToLSP(ruleDiag.SourceFile, ruleDiag.Range.Pos(), editorHasBOM),
@@ -137,7 +141,7 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, editorHasBOM bool)
 		},
 		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
 		Source:   ptrTo("rslint"),
-		Message:  lsproto.StringOrMarkupContent{String: ptrTo(fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description))},
+		Message:  lsproto.StringOrMarkupContent{String: ptrTo(message)},
 	}
 }
 

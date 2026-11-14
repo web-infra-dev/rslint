@@ -209,7 +209,12 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       );
     }
 
-    for (const key of ['rules', 'languageOptions', 'settings'] as const) {
+    for (const key of [
+      'rules',
+      'languageOptions',
+      'linterOptions',
+      'settings',
+    ] as const) {
       if (
         Object.prototype.hasOwnProperty.call(entry, key) &&
         (entry[key] === null ||
@@ -222,6 +227,24 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       }
     }
 
+    if (
+      isRecord(entry.linterOptions) &&
+      Object.prototype.hasOwnProperty.call(
+        entry.linterOptions,
+        'reportUnusedDisableDirectives',
+      )
+    ) {
+      const severity = entry.linterOptions.reportUnusedDisableDirectives;
+      if (
+        ![false, true, 0, 1, 2, 'off', 'warn', 'error'].some(
+          (allowed) => allowed === severity,
+        )
+      ) {
+        throw new Error(
+          `[rslint] Config entry at index ${index}: "linterOptions.reportUnusedDisableDirectives" must be off, warn, error, 0, 1, 2, or a boolean`,
+        );
+      }
+    }
     if (isRecord(entry.rules)) {
       validateRules(entry.rules, index);
     }
@@ -320,6 +343,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
     const serializesNonGlobalKey =
       hasFiles ||
       entry.languageOptions !== undefined ||
+      entry.linterOptions !== undefined ||
       entry.rules !== undefined ||
       hasPlugins ||
       entry.settings !== undefined;
@@ -335,6 +359,9 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         ? { languageOptions: entry.languageOptions }
         : {}),
       ...(entry.rules !== undefined ? { rules: entry.rules } : {}),
+      ...(entry.linterOptions !== undefined
+        ? { linterOptions: entry.linterOptions }
+        : {}),
       ...(hasPlugins ? { plugins } : {}),
       ...(entry.settings !== undefined
         ? { settings: entry.settings }

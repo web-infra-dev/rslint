@@ -1,5 +1,5 @@
 /**
- * ESLint-v10-parity coverage for three SourceCode fixes:
+ * Coverage for SourceCode token padding and directive inspection:
  *
  *   #6 / #7  getTokens(node, before, after) and getTokensBetween(left,
  *            right, padding) accept NUMERIC padding args. ESLint routes
@@ -11,18 +11,11 @@
  *            normalizers), so a numeric padding arg was silently dropped
  *            and the padded call returned the unpadded slice.
  *
- *   #8       getInlineConfigNodes() gates Line comments. ESLint
- *            (`lib/languages/js/source-code/source-code.js`,
- *            getInlineConfigNodes) ends its filter with
- *            `comment.type !== "Line" || /^eslint-disable-(next-)?line$/u
- *            .test(label)` — a Line comment qualifies ONLY when its
- *            directive is `eslint-disable-line` / `eslint-disable-next-line`.
- *            Pre-fix rslint had no Line gate here, so `// eslint-disable foo`
- *            (Line, block-only directive) was returned by
- *            getInlineConfigNodes() while getDisableDirectives() (which
- *            re-applies the gate) dropped it — the two surfaces disagreed.
+ *   #8       Both directive APIs expose block disable/enable commands in
+ *            line comments, matching rslint suppression. This intentionally
+ *            extends ESLint's line-comment support.
  *
- * Counts / values below were cross-checked byte-for-byte against
+ * Token padding counts / values were cross-checked byte-for-byte against
  * eslint@9.32.0's actual `TokenStore` and `SourceCode` for the identical
  * input (the APIs are unchanged through v10.4.0, the review's oracle).
  */
@@ -184,12 +177,12 @@ describe('getTokensBetween numeric padding (PaddedTokenCursor parity) [#7]', () 
 });
 
 // ────────────────────────────────────────────────────────────────────
-// #8 — getInlineConfigNodes Line gate + getDisableDirectives consistency
+// #8 — getInlineConfigNodes + getDisableDirectives consistency
 // ────────────────────────────────────────────────────────────────────
 
-describe('getInlineConfigNodes Line-comment gate + getDisableDirectives consistency [#8]', () => {
+describe('getInlineConfigNodes + getDisableDirectives consistency [#8]', () => {
   // Three directive comments:
-  //   L1  `// eslint-disable foo`            Line, BLOCK-only directive → EXCLUDED
+  //   L1  `// eslint-disable foo`            Line, block directive      → INCLUDED
   //   L2  `// eslint-disable-next-line bar`  Line, line directive       → INCLUDED
   //   L3  `/* eslint-disable baz */`         Block (any label)          → INCLUDED
   const TEXT = [
@@ -199,28 +192,25 @@ describe('getInlineConfigNodes Line-comment gate + getDisableDirectives consiste
     'const a = 1;',
   ].join('\n');
 
-  test('getInlineConfigNodes excludes the Line non-line-directive, keeps the other two', () => {
+  test('getInlineConfigNodes includes all three disable comments', () => {
     const sc = mkSC(TEXT);
     const nodes = sc.getInlineConfigNodes();
-    // EXACTLY two qualifying nodes — the bad Line comment is gone.
-    expect(nodes.length).toBe(2);
+    expect(nodes.length).toBe(3);
     expect(nodes.map((c) => ({ type: c.type, value: c.value }))).toEqual([
+      { type: 'Line', value: ' eslint-disable foo' },
       { type: 'Line', value: ' eslint-disable-next-line bar' },
       { type: 'Block', value: ' eslint-disable baz ' },
     ]);
-    // The over-reported node must NOT be present.
-    expect(nodes.some((c) => c.value === ' eslint-disable foo')).toBe(false);
   });
 
   test('getDisableDirectives agrees with getInlineConfigNodes', () => {
     const sc = mkSC(TEXT);
     const dd = sc.getDisableDirectives();
     expect(dd.problems).toEqual([]);
-    // disable-next-line(bar) + disable(baz) — and crucially NOT a third
-    // directive for `// eslint-disable foo`.
     expect(
       dd.directives.map((d) => ({ type: d.type, value: d.value })),
     ).toEqual([
+      { type: 'disable', value: 'foo' },
       { type: 'disable-next-line', value: 'bar' },
       { type: 'disable', value: 'baz' },
     ]);

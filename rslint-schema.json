@@ -80,6 +80,10 @@
         "settings": {
           "type": "object",
           "description": "Shared settings exposed to enabled rules"
+        },
+        "linterOptions": {
+          "$ref": "#/definitions/LinterOptions",
+          "description": "Settings for directive reporting"
         }
       },
       "additionalProperties": false
@@ -92,10 +96,23 @@
           "description": "ECMAScript edition used for language globals. Omitted or \"latest\" follows the ESLint version targeted by rslint.",
           "default": "latest",
           "oneOf": [
-            { "const": "latest" },
-            { "type": "integer", "enum": [3, 5] },
-            { "type": "integer", "minimum": 6, "maximum": 17 },
-            { "type": "integer", "minimum": 2015, "maximum": 2026 }
+            {
+              "const": "latest"
+            },
+            {
+              "type": "integer",
+              "enum": [3, 5]
+            },
+            {
+              "type": "integer",
+              "minimum": 6,
+              "maximum": 17
+            },
+            {
+              "type": "integer",
+              "minimum": 2015,
+              "maximum": 2026
+            }
           ]
         },
         "sourceType": {
@@ -112,8 +129,12 @@
           "description": "Global variables available to rules for matching files. Null is readonly; \"off\" disables a global; all other accepted values declare it as readonly or writable.",
           "additionalProperties": {
             "oneOf": [
-              { "type": "boolean" },
-              { "type": "null" },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
               {
                 "type": "string",
                 "enum": [
@@ -356,6 +377,17 @@
           "enum": [0, 1, 2]
         }
       ]
+    },
+    "LinterOptions": {
+      "type": "object",
+      "properties": {
+        "reportUnusedDisableDirectives": {
+          "enum": ["off", "warn", "error", 0, 1, 2, false, true],
+          "default": "off",
+          "description": "Report unused disable and enable directives. true means warn; false means off."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "examples": [
@@ -373,7 +405,9 @@
           "@typescript-eslint/no-floating-promises": "warn",
           "@typescript-eslint/promise-function-async": [
             "warn",
-            { "allowAny": true }
+            {
+              "allowAny": true
+            }
           ]
         },
         "plugins": ["@typescript-eslint"]

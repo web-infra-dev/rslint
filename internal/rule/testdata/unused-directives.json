@@ -1,0 +1,239 @@
+[
+  {
+    "name": "wildcard",
+    "source": "/* eslint-disable */\nhit();",
+    "reports": [],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported).",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [0, 20],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": " \nhit();"
+  },
+  {
+    "name": "repeated",
+    "source": "/* eslint-disable test/a */\n/* eslint-disable test/a */\nhit();",
+    "reports": ["test/a"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [0, 27],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": " \n/* eslint-disable test/a */\nhit();"
+  },
+  {
+    "name": "block before line",
+    "source": "/* eslint-disable test/a */\nhit(); // eslint-disable-line test/a",
+    "reports": ["test/a"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 2,
+        "column": 8,
+        "severity": 1,
+        "fix": {
+          "range": [35, 64],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable test/a */\nhit();  "
+  },
+  {
+    "name": "next plus line",
+    "source": "// eslint-disable-next-line test/a\nhit(); // eslint-disable-line test/a",
+    "reports": ["test/a"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [0, 34],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": " \nhit(); // eslint-disable-line test/a"
+  },
+  {
+    "name": "partial first",
+    "source": "/* eslint-disable test/a, test/b -- reason */\nhit();",
+    "reports": ["test/b"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [18, 26],
+          "text": ""
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable test/b -- reason */\nhit();"
+  },
+  {
+    "name": "partial middle",
+    "source": "/* eslint-disable test/a , test/b , test/c -- reason */\nhit();",
+    "reports": ["test/a", "test/c"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/b').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [25, 34],
+          "text": ""
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable test/a , test/c -- reason */\nhit();"
+  },
+  {
+    "name": "partial last",
+    "source": "/* eslint-disable test/a, test/b -- reason */\nhit();",
+    "reports": ["test/a"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/b').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [24, 32],
+          "text": ""
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable test/a -- reason */\nhit();"
+  },
+  {
+    "name": "quoted",
+    "source": "/* eslint-disable \"test/a\", 'test/b' -- reason */\nhit();",
+    "reports": ["test/b"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [18, 28],
+          "text": ""
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable 'test/b' -- reason */\nhit();"
+  },
+  {
+    "name": "enable without disable",
+    "source": "/* eslint-enable test/a */\nhit();",
+    "reports": [],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'test/a').",
+        "line": 1,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [0, 26],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": " \nhit();"
+  },
+  {
+    "name": "repeated enables",
+    "source": "/* eslint-disable test/a */\nhit();\n/* eslint-enable test/a */\n/* eslint-enable test/a */",
+    "reports": ["test/a"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-enable directive (no matching eslint-disable directives were found for 'test/a').",
+        "line": 4,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [62, 88],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": "/* eslint-disable test/a */\nhit();\n/* eslint-enable test/a */\n "
+  },
+  {
+    "name": "wildcard enable",
+    "source": "/* eslint-disable test/a */\nhit();\n/* eslint-enable */",
+    "reports": ["test/a"],
+    "diagnostics": [],
+    "fixed": "/* eslint-disable test/a */\nhit();\n/* eslint-enable */"
+  },
+  {
+    "name": "enable specific under wildcard",
+    "source": "/* eslint-disable */\nhit();\n/* eslint-enable test/a */\n/* eslint-enable */",
+    "reports": ["test/a"],
+    "diagnostics": [],
+    "fixed": "/* eslint-disable */\nhit();\n/* eslint-enable test/a */\n/* eslint-enable */"
+  },
+  {
+    "name": "multiline next line",
+    "source": "/* eslint-disable-next-line\ntest/a */\nhit();",
+    "reports": ["test/a"],
+    "diagnostics": [],
+    "fixed": "/* eslint-disable-next-line\ntest/a */\nhit();"
+  },
+  {
+    "name": "unicode CRLF",
+    "source": "// 中文 😀\r\n/* eslint-disable test/a, test/b */\r\nhit();",
+    "reports": ["test/b"],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 2,
+        "column": 1,
+        "severity": 1,
+        "fix": {
+          "range": [28, 36],
+          "text": ""
+        }
+      }
+    ],
+    "fixed": "// 中文 😀\r\n/* eslint-disable test/b */\r\nhit();"
+  },
+  {
+    "name": "adjacent tokens",
+    "source": "let/* eslint-disable test/a */x;",
+    "reports": [],
+    "diagnostics": [
+      {
+        "message": "Unused eslint-disable directive (no problems were reported from 'test/a').",
+        "line": 1,
+        "column": 4,
+        "severity": 1,
+        "fix": {
+          "range": [3, 30],
+          "text": " "
+        }
+      }
+    ],
+    "fixed": "let x;"
+  }
+]

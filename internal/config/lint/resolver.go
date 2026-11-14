@@ -20,6 +20,7 @@ import (
 // Resolver maps Program source paths back to their selected lint targets and
 // resolves the effective configuration owned by those targets.
 type Resolver struct {
+	catalog              *rule.Catalog
 	configsByOwner       map[string]config.RslintConfig
 	config               config.RslintConfig
 	configDirectory      string
@@ -59,6 +60,7 @@ func NewResolver(options ResolverOptions) *Resolver {
 		panic("path-space snapshot is required")
 	}
 	resolver := &Resolver{
+		catalog:              options.Catalog,
 		configsByOwner:       options.ConfigsByOwner,
 		config:               options.Config,
 		configDirectory:      options.ConfigDirectory,
@@ -286,4 +288,45 @@ func (resolver *Resolver) EnabledRulesForSourcePath(sourcePath string) []rule.Co
 		return nil
 	}
 	return resolved.EnabledRules
+}
+
+// UnusedDirectiveSeverityForSourcePath resolves the setting independently of
+// enabled rules, including files with an empty rule set.
+func (resolver *Resolver) UnusedDirectiveSeverityForSourcePath(sourcePath string) rule.DiagnosticSeverity {
+	_, resolved, ok := resolver.ResolveSourcePath(sourcePath)
+	if !ok {
+		return rule.SeverityOff
+	}
+	return resolved.MergedConfig.UnusedDirectiveSeverity()
+}
+
+// DirectiveRuleExists checks availability, not enabled severity. Configured-off
+// rules can still have unused directives; unavailable names must not be deleted.
+func (resolver *Resolver) DirectiveRuleExists(sourcePath, name string) bool {
+	var merged *config.MergedConfig
+	if _, resolved, ok := resolver.ResolveSourcePath(sourcePath); ok {
+		merged = resolved.MergedConfig
+	}
+	return DirectiveRuleExists(resolver.catalog, merged, name)
+}
+
+// DirectiveRuleExists checks whether a directive names an available rule,
+// independently of its configured severity. A missing catalog preserves entries
+// when availability is unknown, as in editor generations without a catalog.
+func DirectiveRuleExists(catalog *rule.Catalog, merged *config.MergedConfig, name string) bool {
+	if catalog == nil {
+		return true
+	}
+	if _, ok := catalog.Lookup(name); !ok {
+		return false
+	}
+	namespace := rule.Namespace(name)
+	if namespace == "" {
+		return true
+	}
+	if merged == nil {
+		return false
+	}
+	_, declared := merged.Plugins[namespace]
+	return declared
 }

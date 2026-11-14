@@ -1572,15 +1572,9 @@ describe('WorkerPool init treats any rejection as fatal (no undefined sentinel)'
   });
 });
 
-// apply-disable-directives — line-comment carriers for `eslint-disable`
-// / `eslint-enable` are NOT directives (ESLint v10 only accepts
-// `disable-line` / `disable-next-line` in line comments).
-describe('line-comment eslint-disable / eslint-enable are NOT directives', () => {
-  test('`// eslint-disable no-debugger` does NOT suppress diagnostics on later lines', () => {
-    // ESLint v10's linter.js line 445: `if (comment.type === "Line" &&
-    //   !lineCommentSupported) return;` where lineCommentSupported is
-    //   /^eslint-disable-(next-)?line$/. So `// eslint-disable …` is
-    //   silently ignored (NOT a directive); the diagnostic still fires.
+// Rslint accepts block disable/enable commands in line comments in both engines.
+describe('line-comment eslint-disable / eslint-enable directives', () => {
+  test('`// eslint-disable` suppresses diagnostics on later lines', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1610,14 +1604,10 @@ describe('line-comment eslint-disable / eslint-enable are NOT directives', () =>
       loaded,
     );
     expect(result.parseError).toBeUndefined();
-    // Pre-fix: line-comment `eslint-disable` treated as block-disable →
-    //   suppresses → 0 diagnostics.
-    // Post-fix: only block comments carry `eslint-disable`; line carrier
-    //   is ignored → 1 diagnostic.
-    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics).toHaveLength(0);
   });
 
-  test('`// eslint-enable` does NOT re-open a block-disable region', () => {
+  test('`// eslint-enable` ends a block-disable region', () => {
     const loaded: LoadedPlugins = {
       plugins: [],
       rules: new Map<string, unknown>([
@@ -1650,11 +1640,7 @@ describe('line-comment eslint-disable / eslint-enable are NOT directives', () =>
       loaded,
     );
     expect(result.parseError).toBeUndefined();
-    // Pre-fix: line `eslint-enable` mis-classified as block-enable, re-
-    //   opens the region → 1 diagnostic.
-    // Post-fix: line-comment `eslint-enable` ignored; the block-disable
-    //   from line 1 stays in effect → 0 diagnostics.
-    expect(result.diagnostics).toHaveLength(0);
+    expect(result.diagnostics).toHaveLength(1);
   });
 
   test('`/* eslint-disable … */` block comment STILL suppresses (control)', () => {

@@ -2,6 +2,7 @@ import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import vm from 'node:vm';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
@@ -640,4 +641,313 @@ describe('eslint-disable comment directives', () => {
       await cleanupTempDir(tempDir);
     }
   });
+});
+
+describe('unused disable directives', () => {
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const { name, source, rules, fixed } of [
+      {
+        name: 'line disable suppresses native and plugin diagnostics',
+        source: `// ${prefix}-disable no-debugger, custom/check\ndebugger;\n`,
+        rules: [],
+      },
+      {
+        name: 'line enable ends block suppression',
+        source: `/* ${prefix}-disable no-debugger, custom/check */\n// ${prefix}-enable no-debugger, custom/check\ndebugger;\n`,
+        rules: ['', 'custom/check', 'no-debugger'],
+        fixed: ' \n \ndebugger;\n',
+      },
+      {
+        name: 'unused line disable is reported and removed',
+        source: `// ${prefix}-disable no-debugger, custom/check\nconst x = 1;\n`,
+        rules: [''],
+        fixed: ' \nconst x = 1;\n',
+      },
+      {
+        name: 'previous line expiration precedes next-line suppression',
+        source: `/* ${prefix}-disable-next-line no-debugger, custom/check */ /* ${prefix}-disable-line no-debugger, custom/check */\ndebugger;\n`,
+        rules: [''],
+        fixed: `/* ${prefix}-disable-next-line no-debugger, custom/check */  \ndebugger;\n`,
+      },
+      {
+        name: 'line suppression expires before a later next-line directive',
+        source: `/* ${prefix}-disable-line no-debugger, custom/check */ /* ${prefix}-disable-next-line no-debugger, custom/check */\ndebugger;\n`,
+        rules: [''],
+        fixed: `  /* ${prefix}-disable-next-line no-debugger, custom/check */\ndebugger;\n`,
+      },
+    ]) {
+      test(`${prefix}: ${name}`, async () => {
+        const tempDir = await createTempDir({
+          'test.ts': source,
+          'rslint.config.mjs': `export default [{
+            files: ['**/*.ts'],
+            linterOptions: { reportUnusedDisableDirectives: 'warn' },
+            plugins: { custom: { rules: { check: {
+              meta: { schema: [] },
+              create(context) { return { DebuggerStatement(node) { context.report({ node, message: 'plugin debugger' }); } }; }
+            } } } },
+            rules: { 'no-debugger': 'error', 'custom/check': 'error' }
+          }];`,
+        });
+        try {
+          for (const args of [[], ['--fix']]) {
+            const result = await runRslint(
+              [...args, '--format', 'jsonline', 'test.ts'],
+              tempDir,
+            );
+            const expectedRules = args.length
+              ? rules.filter((rule) => rule !== '')
+              : rules;
+            expect(result.exitCode).toBe(
+              expectedRules.some((rule) => rule !== '') ? 1 : 0,
+            );
+            const reportedRules = result.stdout
+              .split('\n')
+              .filter(Boolean)
+              .map(
+                (line) => (JSON.parse(line) as { ruleName: string }).ruleName,
+              )
+              .sort();
+            expect(reportedRules).toEqual(expectedRules);
+            expect(
+              await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8'),
+            ).toBe(args.length ? (fixed ?? source) : source);
+          }
+        } finally {
+          await cleanupTempDir(tempDir);
+        }
+      });
+    }
+  }
+
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const [name, newline] of Object.entries({
+      LF: '\n',
+      CRLF: '\r\n',
+      CR: '\r',
+      LS: '\u2028',
+      PS: '\u2029',
+    })) {
+      const retainedNewline = newline === '\r' ? '\r ' : newline;
+      const leadingNewline = newline === '\n' ? ' \n' : retainedNewline;
+      for (const [kind, names, remaining] of [
+        ['whole', `no-console${newline}`, leadingNewline],
+        [
+          'first',
+          `no-console,${newline}no-debugger`,
+          `/* ${prefix}-disable ${newline === '\n' ? ' \n' : newline}no-debugger */`,
+        ],
+        [
+          'last',
+          `no-debugger${newline}, no-console`,
+          `/* ${prefix}-disable no-debugger${retainedNewline} */`,
+        ],
+      ]) {
+        test(`preserves return behavior: ${prefix}/${name}/${kind}`, async () => {
+          const source = `function f() { return /* ${prefix}-disable ${names} */ 42; debugger; }\nf();`;
+          const expected = `function f() { return ${remaining} 42; debugger; }\nf();`;
+          expect(vm.runInNewContext(source)).toBeUndefined();
+          const tempDir = await createTempDir({
+            'test.ts': source,
+            'rslint.config.mjs': `export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error', 'no-debugger': 'error' } }];`,
+          });
+          try {
+            const result = await runRslint(
+              ['--report-unused-disable-directives', '--fix', 'test.ts'],
+              tempDir,
+            );
+            // Removing the whole directive exposes the debugger report.
+            expect(result.exitCode).toBe(kind === 'whole' ? 1 : 0);
+            const fixed = await fs.readFile(
+              path.join(tempDir, 'test.ts'),
+              'utf8',
+            );
+            expect(fixed).toBe(expected);
+            expect(vm.runInNewContext(fixed)).toBeUndefined();
+          } finally {
+            await cleanupTempDir(tempDir);
+          }
+        });
+      }
+    }
+  }
+
+  for (const prefix of ['eslint', 'rslint']) {
+    for (const kind of ['single', 'adjacent', 'ordinary']) {
+      test(`keeps separate CR and LF lines during ${prefix} directive cleanup (${kind})`, async () => {
+        const source =
+          kind === 'ordinary'
+            ? `/* ${prefix}-disable-next-line *//* ordinary\r*//* ${prefix}-disable no-alert -- TODO\n*/debugger;\n`
+            : kind === 'adjacent'
+              ? `/* ${prefix}-disable-next-line *//* ${prefix}-disable no-alert\r*//* ${prefix}-disable no-console -- TODO\n*/debugger;\n`
+              : `/* ${prefix}-disable-next-line */\r/* ${prefix}-disable no-alert -- TODO\n*/debugger;\n`;
+        const tempDir = await createTempDir({
+          'test.ts': source,
+          'rslint.config.mjs': `export default [{ files: ['**/*.ts'],
+          plugins: { custom: { rules: { clean: {
+            meta: { schema: [], fixable: 'code' },
+            create(context) { return { Program() {
+              for (const comment of context.sourceCode.getAllComments()) {
+                if (comment.value.startsWith(' ordinary')) context.report({
+                  node: comment, message: 'clean ordinary comment',
+                  fix(fixer) { return fixer.replaceText(comment, '\\r'); },
+                });
+              }
+            } }; }
+          } } } }, rules: {
+          'custom/clean': 'error',
+          'no-alert': 'error',
+          'no-console': 'error',
+          'no-debugger': 'error',
+          'no-warning-comments': ['error', { terms: ['todo'], location: 'anywhere' }],
+        } }];`,
+        });
+        try {
+          for (const args of [[], ['--fix']]) {
+            const result = await runRslint(
+              [
+                '--report-unused-disable-directives',
+                ...args,
+                '--format',
+                'jsonline',
+                'test.ts',
+              ],
+              tempDir,
+            );
+            expect(result.exitCode).toBe(1);
+            const diagnostics = result.stdout
+              .trim()
+              .split('\n')
+              .filter(Boolean)
+              .map(
+                (line) =>
+                  JSON.parse(line) as {
+                    ruleName: string;
+                    range: { start: { line: number } };
+                  },
+              );
+            expect(
+              diagnostics.filter((d) => d.ruleName === 'no-debugger'),
+            ).toMatchObject([{ range: { start: { line: 3 } } }]);
+          }
+          expect(await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8')).toBe(
+            kind === 'adjacent' ? ` \r  \ndebugger;\n` : ` \r \ndebugger;\n`,
+          );
+        } finally {
+          await cleanupTempDir(tempDir);
+        }
+      });
+    }
+  }
+
+  test('uses mixed native/plugin usage and fixes only unused entries', async () => {
+    const source =
+      '/* eslint-disable no-debugger, custom/check, no-console -- reason */\ndebugger;\n';
+    const tempDir = await createTempDir({
+      'test.ts': source,
+      'rslint.config.mjs': `export default [{
+        files: ['**/*.ts'],
+        linterOptions: { reportUnusedDisableDirectives: 'warn' },
+        plugins: { custom: { rules: { check: {
+          meta: { schema: [] },
+          create(context) { return { DebuggerStatement(node) { context.report({ node, message: 'plugin debugger' }); } }; }
+        } } } },
+        rules: { 'no-debugger': 'error', 'custom/check': 'error', 'no-console': 'off' }
+      }];`,
+    });
+    try {
+      const report = await runRslint(['test.ts'], tempDir);
+      expect(report.exitCode).toBe(0);
+      expect(report.stdout).toContain(
+        "Unused eslint-disable directive (no problems were reported from 'no-console').",
+      );
+      expect(report.stdout).not.toContain('plugin debugger');
+      const fixed = await runRslint(['--fix', 'test.ts'], tempDir);
+      expect(fixed.exitCode).toBe(0);
+      expect(await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8')).toBe(
+        '/* eslint-disable no-debugger, custom/check -- reason */\ndebugger;\n',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('per-file settings apply to zero-rule files and CLI severity overrides them', async () => {
+    const tempDir = await createTempDir({
+      'on.ts': '/* rslint-disable */\nconst x = 1;\n',
+      'off.ts': '/* rslint-disable */\nconst x = 1;\n',
+      'rslint.config.mjs': `export default [
+        { files: ['**/*.ts'], linterOptions: { reportUnusedDisableDirectives: 'error' } },
+        { files: ['off.ts'], linterOptions: { reportUnusedDisableDirectives: false } }
+      ];`,
+    });
+    try {
+      expect((await runRslint(['on.ts'], tempDir)).exitCode).toBe(1);
+      expect((await runRslint(['off.ts'], tempDir)).exitCode).toBe(0);
+      expect(
+        (
+          await runRslint(
+            [
+              '--report-unused-disable-directives-severity=warn',
+              '--report-unused-disable-directives',
+              'off.ts',
+            ],
+            tempDir,
+          )
+        ).exitCode,
+      ).toBe(0);
+      expect(
+        (
+          await runRslint(
+            ['--report-unused-disable-directives=false', 'on.ts'],
+            tempDir,
+          )
+        ).stdout,
+      ).not.toContain('Unused eslint-disable');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+});
+
+test('unused comment fixes preserve BOM, Unicode, and CRLF', async () => {
+  const tempDir = await createTempDir({
+    'test.ts': '\ufeff/* eslint-disable */\r\nconst note = "中文😀";\r\n',
+    'rslint.config.mjs': `export default [{ files: ['**/*.ts'], linterOptions: { reportUnusedDisableDirectives: true } }];`,
+  });
+  try {
+    const result = await runRslint(['--fix', 'test.ts'], tempDir);
+    expect(result.exitCode).toBe(0);
+    expect(await fs.readFile(path.join(tempDir, 'test.ts'), 'utf8')).toBe(
+      '\ufeff \r\nconst note = "中文😀";\r\n',
+    );
+  } finally {
+    await cleanupTempDir(tempDir);
+  }
+});
+
+test('unused directive settings follow each config directory', async () => {
+  const tempDir = await createTempDir({
+    'a/input.ts': '/* eslint-disable */\nconst x = 1;\n',
+    'b/input.ts': '/* eslint-disable */\nconst x = 1;\n',
+    'a/rslint.config.mjs': `export default [{ files: ['**/*.ts'], linterOptions: { reportUnusedDisableDirectives: 'error' } }];`,
+    'b/rslint.config.mjs': `export default [{ files: ['**/*.ts'], linterOptions: { reportUnusedDisableDirectives: 'off' } }];`,
+  });
+  try {
+    const report = await runRslint(['a/input.ts', 'b/input.ts'], tempDir);
+    expect(report.exitCode).toBe(1);
+    expect(
+      report.stdout.match(/Unused eslint-disable directive/g),
+    ).toHaveLength(1);
+    const overridden = await runRslint(
+      ['--report-unused-disable-directives', 'a/input.ts', 'b/input.ts'],
+      tempDir,
+    );
+    expect(overridden.exitCode).toBe(1);
+    expect(
+      overridden.stdout.match(/Unused eslint-disable directive/g),
+    ).toHaveLength(2);
+  } finally {
+    await cleanupTempDir(tempDir);
+  }
 });

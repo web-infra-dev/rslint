@@ -43,6 +43,7 @@ func validatePrograms(sourcePrograms []*program.Program) error {
 // programRunOptions contains the run-scoped sinks and scheduling knobs that do
 // not change a prepared plan's meaning.
 type programRunOptions struct {
+	directives           directiveStates
 	Cwd                  string
 	CollectExecutedRules bool
 	SingleThreaded       bool
@@ -154,12 +155,18 @@ func runLintRulesInProgram(plan *programLintPlan, opts programRunOptions, consum
 			ruleDurations = make([]time.Duration, len(rules))
 		}
 
-		// One lazy store is shared by directives, inline globals, and every
-		// comment-aware rule in this file. Most files never materialize it.
+		// One lazy store is shared by inline globals and every comment-aware
+		// native rule in this file. Most files never materialize it.
 		comments := rule.NewCommentStore(file)
 
-		// Directive parsing is itself lazy and only runs when a rule reports.
-		disableManager := rule.NewDisableManager(file, comments)
+		// Pipeline calls use the frozen state shared with plugin diagnostics.
+		// Standalone native calls retain lazy directive parsing.
+		var disableManager *rule.DisableManager
+		if state := opts.directives[file.FileName()]; state != nil {
+			disableManager = state.manager
+		} else {
+			disableManager = rule.NewSuppressionManager(file, comments)
+		}
 
 		// A cheap source-text check inside each parser avoids asking the store
 		// for all comments unless that inline directive is possible.

@@ -48,6 +48,7 @@ const CONFIG_OPTION_LINKS = {
   rules: '/config/rules',
   plugins: '/config/plugins',
   settings: '/config/settings',
+  linterOptions: '/guide/inline-directives',
   'languageOptions.ecmaVersion':
     '/config/language-options#languageoptionsecmaversion',
   'languageOptions.sourceType':
@@ -72,7 +73,12 @@ const OVERVIEW_GROUPS: Group[] = [
   {
     name: 'linting',
     icon: SlidersHorizontalIcon,
-    items: [option('rules'), option('plugins'), option('settings')],
+    items: [
+      option('rules'),
+      option('plugins'),
+      option('settings'),
+      option('linterOptions'),
+    ],
   },
   {
     name: 'languageOptions',

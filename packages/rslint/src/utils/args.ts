@@ -35,6 +35,7 @@ export function parseArgs(argv: string[]) {
       // mistaken for positional file/dir arguments.
       format: { type: 'string' },
       'max-warnings': { type: 'string' },
+      'report-unused-disable-directives-severity': { type: 'string' },
       rule: { type: 'string', multiple: true },
       trace: { type: 'string' },
       cpuprof: { type: 'string' },
@@ -76,6 +77,13 @@ export function parseArgs(argv: string[]) {
         } else {
           flags.push(token.rawName, 'all');
         }
+        continue;
+      }
+      if (
+        token.name === 'report-unused-disable-directives' &&
+        token.value != null
+      ) {
+        flags.push(`${token.rawName}=${token.value}`);
         continue;
       }
       flags.push(token.rawName);

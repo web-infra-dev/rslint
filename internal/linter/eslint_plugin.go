@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -33,12 +34,13 @@ type EslintPluginRuleConfig struct {
 }
 
 type EslintPluginLintFile struct {
-	Path            string         `json:"path"`
-	Frame           []byte         `json:"frame,omitempty"`
-	FrameAttachment *uint32        `json:"frameAttachment,omitempty"`
-	ConfigKey       string         `json:"configKey"`
-	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
-	Settings        map[string]any `json:"settings,omitempty"`
+	CollectDirectiveUsage bool           `json:"collectDirectiveUsage,omitempty"`
+	Path                  string         `json:"path"`
+	Frame                 []byte         `json:"frame,omitempty"`
+	FrameAttachment       *uint32        `json:"frameAttachment,omitempty"`
+	ConfigKey             string         `json:"configKey"`
+	LanguageOptions       map[string]any `json:"languageOptions,omitempty"`
+	Settings              map[string]any `json:"settings,omitempty"`
 }
 
 type EslintPluginLintRequest struct {
@@ -110,16 +112,64 @@ type EslintPluginRuleError struct {
 }
 
 type EslintPluginFileResult struct {
-	FilePath    string                   `json:"filePath"`
-	Diagnostics []EslintPluginDiagnostic `json:"diagnostics"`
-	ParseError  string                   `json:"parseError,omitempty"`
-	Cancelled   bool                     `json:"cancelled"`
-	RuleErrors  []EslintPluginRuleError  `json:"ruleErrors,omitempty"`
-	RuleTimes   map[string]float64       `json:"ruleTimes,omitempty"`
+	UsedDisableDirectives disableDirectiveUsageSummary `json:"usedDisableDirectives"`
+	FilePath              string                       `json:"filePath"`
+	Diagnostics           []EslintPluginDiagnostic     `json:"diagnostics"`
+	ParseError            string                       `json:"parseError,omitempty"`
+	Cancelled             bool                         `json:"cancelled"`
+	RuleErrors            []EslintPluginRuleError      `json:"ruleErrors,omitempty"`
+	RuleTimes             map[string]float64           `json:"ruleTimes,omitempty"`
 }
 
 type EslintPluginLintResult struct {
 	Results []EslintPluginFileResult `json:"results"`
+}
+
+// The wire summary shares one rule table across a file's numeric usage tuples.
+// Decode into the existing internal entries only after validating every tuple.
+type disableDirectiveUsageSummary []rule.DisableDirectiveUsage
+
+func (summary *disableDirectiveUsageSummary) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		*summary = nil
+		return nil
+	}
+	var wire struct {
+		Rules   []*string       `json:"rules"`
+		Entries json.RawMessage `json:"entries"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	if wire.Rules == nil || len(wire.Entries) == 0 {
+		return errors.New("disable directive usage requires rules and entries")
+	}
+	for _, name := range wire.Rules {
+		if name != nil && *name == "" {
+			return errors.New("disable directive usage ruleId must be nonempty or null")
+		}
+	}
+	// encoding/json accepts null as an int's zero value. Numeric tuples must
+	// reject it, including a null row, rather than aliasing line/column/index 0.
+	if bytes.Contains(wire.Entries, []byte("null")) {
+		return errors.New("disable directive usage entries must contain integer tuples")
+	}
+	var rows [][]int
+	if err := json.Unmarshal(wire.Entries, &rows); err != nil {
+		return err
+	}
+	if rows == nil {
+		return errors.New("disable directive usage requires entries")
+	}
+	entries := make(disableDirectiveUsageSummary, 0, len(rows))
+	for _, row := range rows {
+		if len(row) != 3 || row[0] < 0 || row[1] < 0 || row[2] < 0 || row[2] >= len(wire.Rules) {
+			return errors.New("invalid disable directive usage tuple")
+		}
+		entries = append(entries, rule.DisableDirectiveUsage{Line: row[0], Column: row[1], RuleID: wire.Rules[row[2]]})
+	}
+	*summary = entries
+	return nil
 }
 
 // EslintPluginDispatcher opens an output/dispatch scope for each request to the Node host
@@ -165,7 +215,8 @@ var errPluginWindowFull = errors.New("plugin ESTree window is full")
 // EslintPluginFileInput is the linter's generation-local representation of one
 // plugin-lint input before wire batching.
 type EslintPluginFileInput struct {
-	Path string
+	directives *fileDirectives
+	Path       string
 	// Text is the complete generation snapshot, including its original BOM.
 	// It stays Go-local for projection validation and detached diagnostics.
 	Text *string
@@ -823,11 +874,12 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, collectFixes bool, 
 	wireFiles := make([]EslintPluginLintFile, 0, len(batch))
 	for _, f := range batch {
 		wireFiles = append(wireFiles, EslintPluginLintFile{
-			Path:            f.Path,
-			Frame:           f.Frame[:len(f.Frame):len(f.Frame)],
-			ConfigKey:       f.ConfigKey,
-			LanguageOptions: f.LanguageOptions,
-			Settings:        f.Settings,
+			CollectDirectiveUsage: f.directives != nil,
+			Path:                  f.Path,
+			Frame:                 f.Frame[:len(f.Frame):len(f.Frame)],
+			ConfigKey:             f.ConfigKey,
+			LanguageOptions:       f.LanguageOptions,
+			Settings:              f.Settings,
 		})
 	}
 	return EslintPluginLintRequest{
@@ -853,6 +905,7 @@ func applyEslintPluginResults(
 	for _, f := range batch {
 		fr, ok := byPath[f.Path]
 		if !ok {
+			f.directives.complete(false, true, f.Path)
 			if onNotice != nil {
 				onNotice(EslintPluginProtocolNotice{
 					Kind:     EslintPluginMissingFileResult,
@@ -862,6 +915,7 @@ func applyEslintPluginResults(
 			continue
 		}
 		if fr.Cancelled {
+			f.directives.complete(false, true, f.Path)
 			return context.Canceled
 		}
 		if timing != nil && len(fr.RuleTimes) > 0 {
@@ -900,6 +954,7 @@ func applyEslintPluginResults(
 		// use this existing error field and must remain visible. The sole benign
 		// value is the "shutdown" sentinel (graceful pool teardown racing a task).
 		if fr.ParseError != "" {
+			f.directives.complete(false, true, f.Path)
 			if fr.ParseError != eslintPluginShutdownSentinel {
 				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf,
 					"rslint/plugin-lint-error", "ESLint plugin lint failed: "+fr.ParseError))
@@ -911,6 +966,19 @@ func applyEslintPluginResults(
 		for _, re := range fr.RuleErrors {
 			onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, re.Rule,
 				"rule error: "+re.Message))
+		}
+		directiveFailure := len(fr.RuleErrors) > 0
+		if f.directives != nil && !directiveFailure {
+			var usageErr error
+			if fr.UsedDisableDirectives == nil {
+				usageErr = errors.New("missing disable directive usage summary")
+			} else {
+				usageErr = f.directives.manager.MarkUsedDirectives(fr.UsedDisableDirectives)
+			}
+			if usageErr != nil {
+				directiveFailure = true
+				onDiagnostic(makeEslintPluginErrorDiagnostic(f.Path, tsf, "rslint/plugin-lint-error", "ESLint plugin directive usage failed: "+usageErr.Error()))
+			}
 		}
 
 		for _, d := range fr.Diagnostics {
@@ -941,6 +1009,9 @@ func applyEslintPluginResults(
 				Suggestions: rebuildEslintPluginSuggestions(d.Suggestions, text, clamp),
 			}
 			onDiagnostic(rd)
+		}
+		for _, diagnostic := range f.directives.complete(false, directiveFailure, f.Path) {
+			onDiagnostic(diagnostic)
 		}
 	}
 	return nil
