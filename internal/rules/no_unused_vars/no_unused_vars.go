@@ -2747,3 +2747,49 @@ func newRule() rule.Rule {
 
 // NoUnusedVarsRule implements ESLint core's no-unused-vars rule.
 var NoUnusedVarsRule = newRule()
+
+// UnusedInlineGlobals returns the `/* global */` declarations in ctx's file
+// that are never read, using this rule's reference semantics. Each returned
+// declaration's first name range is where ESLint reports it. Rules that share
+// ESLint's handling of explicit globals, such as
+// @typescript-eslint/no-unused-vars, call it instead of re-deriving it.
+func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
+	if ctx.SourceFile == nil {
+		return nil
+	}
+	inlineGlobals := ctx.Globals.InlineDeclarations()
+	refsByName := map[string][]*ast.Node{}
+	for _, inlineGlobal := range inlineGlobals {
+		if inlineGlobal.Access.IsDeclared() && len(inlineGlobal.NameRanges) != 0 {
+			refsByName[inlineGlobal.Name] = nil
+		}
+	}
+	if len(refsByName) == 0 {
+		return nil
+	}
+	sourceFile := ctx.SourceFile
+	var walk func(*ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
+			if _, tracked := refsByName[node.Text()]; tracked {
+				sym := binderReferenceSymbol(node)
+				if sym == nil || sym.Flags&ast.SymbolFlagsModuleExports != 0 || !utils.IsSymbolDeclaredInFile(sym, sourceFile) {
+					refsByName[node.Text()] = append(refsByName[node.Text()], node)
+				}
+			}
+		}
+		return node.ForEachChild(walk)
+	}
+	sourceFile.AsNode().ForEachChild(walk)
+	var unused []rule.InlineGlobal
+	for _, inlineGlobal := range inlineGlobals {
+		references, tracked := refsByName[inlineGlobal.Name]
+		if !tracked || !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
+			continue
+		}
+		if !hasInlineGlobalUse(sourceFile, ctx.Refs, inlineGlobal.Name, references) {
+			unused = append(unused, inlineGlobal)
+		}
+	}
+	return unused
+}

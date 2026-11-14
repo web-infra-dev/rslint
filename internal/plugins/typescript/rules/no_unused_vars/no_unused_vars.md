@@ -99,4 +99,4 @@ scope, so their top-level bindings can be marked by the comment.
 ## Original Documentation
 
 - [typescript-eslint: no-unused-vars](https://typescript-eslint.io/rules/no-unused-vars)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.69.0/packages/eslint-plugin/src/rules/no-unused-vars.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.1/packages/eslint-plugin/src/rules/no-unused-vars.ts)
