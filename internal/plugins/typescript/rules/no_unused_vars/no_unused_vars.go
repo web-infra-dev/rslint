@@ -552,7 +552,7 @@ func isSelfModifyingReference(node *ast.Node, sym *ast.Symbol, checker *checker.
 	// Case 3: cb = (function(a) { return cb(1+a); })() — identifier inside IIFE body
 	// that's assigned back to the same variable. Walk up from the identifier to find
 	// if it's inside a function whose call result is assigned to the same variable.
-	if isInsideFunctionAssignedToSelf(node, sym, checker) {
+	if isInsideFunctionAssignedToSelf(node, sym, checker, declNode) {
 		return true
 	}
 
@@ -744,65 +744,44 @@ func isMethodCallOnSameSymbol(callee *ast.Node, sym *ast.Symbol, checker *checke
 	return objSym == sym
 }
 
-// isInsideFunctionAssignedToSelf checks if the identifier is inside a function expression
-// whose result (directly or via IIFE) is assigned to the same variable.
-// Covers: `cb = (function(a) { return cb(1+a); })()` (IIFE)
-//
-//	`cb = (0, function(a) { cb(1+a); })` (non-IIFE, assigned directly)
-//	`cb = (function(a) { cb(1+a); }, cb)` (discarded in comma left operand)
-//
-// Like upstream's isInsideOfStorableFunction, only the nearest enclosing
-// function is examined. A function declaration, or a function stored or passed
-// as an argument, can run later, so its reads are real uses even inside an
-// IIFE assigned back to the variable.
-func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
-	current := node
-	for current != nil {
-		if ast.IsFunctionLike(current) && !ast.IsFunctionExpressionOrArrowFunction(current) {
-			return false
+// isInsideFunctionAssignedToSelf checks reads inside a function against the
+// enclosing self-assignment's entire RHS. Nested IIFEs and expression wrappers
+// retain that RHS, but a containing callback can still escape and run later.
+func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker, declNode *ast.Node) bool {
+	function := ast.FindAncestor(node.Parent, func(current *ast.Node) bool {
+		return ast.IsFunctionLike(current)
+	})
+	if function == nil || declNode == nil {
+		return false
+	}
+	for ancestor := function.Parent; ancestor != nil; ancestor = ancestor.Parent {
+		if ancestor.Kind != ast.KindBinaryExpression {
+			continue
 		}
-		if ast.IsFunctionExpressionOrArrowFunction(current) {
-			// Walk up from the function expression through parens, commas, and calls
-			// to find the enclosing assignment.
-			ancestor := current.Parent
-			for ancestor != nil {
-				if ancestor.Kind == ast.KindParenthesizedExpression {
-					ancestor = ancestor.Parent
-					continue
-				}
-				if ancestor.Kind == ast.KindBinaryExpression {
-					bin := ancestor.AsBinaryExpression()
-					if bin != nil && bin.OperatorToken.Kind == ast.KindCommaToken {
-						// Comma expression: continue walking up
-						ancestor = ancestor.Parent
-						continue
-					}
-					if bin != nil && ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
-						lhsSym := checker.GetSymbolAtLocation(bin.Left)
-						if lhsSym == sym {
-							return isUnusedExpression(ancestor)
-						}
-					}
-					break
-				}
-				if ancestor.Kind == ast.KindCallExpression {
-					ce := ancestor.AsCallExpression()
-					// Only walk through IIFE (function is the callee), not function-as-argument
-					callee := ce.Expression
-					for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-						callee = callee.AsParenthesizedExpression().Expression
-					}
-					if callee == current {
-						ancestor = ancestor.Parent
-						continue
-					}
-					break
-				}
-				break
+		bin := ancestor.AsBinaryExpression()
+		if !ast.IsAssignmentOperator(bin.OperatorToken.Kind) ||
+			!ast.IsNodeDescendantOf(function, bin.Right) ||
+			!isUnusedExpression(ancestor) || isInsideLoop(ancestor) ||
+			ast.GetContainingFunction(ancestor) != ast.GetContainingFunction(declNode) {
+			continue
+		}
+		// Match a direct binding, not a property whose symbol happens to agree.
+		left := ast.SkipParentheses(bin.Left)
+		if left == nil || !ast.IsIdentifier(left) || checker.GetSymbolAtLocation(left) != sym {
+			continue
+		}
+		// Preserve reads in stored callbacks even when they contain an IIFE.
+		// Upstream checks only the nearest function and incorrectly reports
+		// `value = register(() => (() => value)())` as unused.
+		for enclosing := function; enclosing != nil && ast.IsNodeDescendantOf(enclosing, bin.Right); {
+			if coreNoUnusedVars.IsStorableFunction(enclosing, bin.Right) {
+				return false
 			}
-			return false
+			enclosing = ast.FindAncestor(enclosing.Parent, func(current *ast.Node) bool {
+				return ast.IsFunctionLike(current)
+			})
 		}
-		current = current.Parent
+		return true
 	}
 	return false
 }
@@ -2570,8 +2549,9 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					nameNode := node.Name()
 					processVariable(ctx, nameNode, nameNode.Text(), node, &opts, ac)
 				}
-				// `/* global */` names have no declaration node. Upstream reports
-				// an unread one at its first name, regardless of `vars`.
+				// Only comment globals without an authored global definition reach
+				// this path. Upstream reports an unread one at its first name,
+				// regardless of `vars`.
 				for _, inlineGlobal := range coreNoUnusedVars.UnusedInlineGlobals(ctx) {
 					ctx.ReportRange(inlineGlobal.NameRanges[0], buildUnusedVarMessage(inlineGlobal.Name, false, ""))
 				}

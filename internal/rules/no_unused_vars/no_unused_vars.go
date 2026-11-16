@@ -687,10 +687,12 @@ func isInsideOfStorableFunction(node *ast.Node, rhs *ast.Node) bool {
 	function := ast.FindAncestor(node.Parent, func(current *ast.Node) bool {
 		return ast.IsFunctionLike(current)
 	})
-	return function != nil && ast.IsNodeDescendantOf(function, rhs) && isStorableFunction(function, rhs)
+	return function != nil && ast.IsNodeDescendantOf(function, rhs) && IsStorableFunction(function, rhs)
 }
 
-func isStorableFunction(function *ast.Node, rhs *ast.Node) bool {
+// IsStorableFunction reports whether a function inside rhs can be stored or
+// passed elsewhere. Both no-unused-vars rules share this value-path analysis.
+func IsStorableFunction(function *ast.Node, rhs *ast.Node) bool {
 	node := function
 	for parent := function.Parent; parent != nil && ast.IsNodeDescendantOf(parent, rhs); parent = parent.Parent {
 		switch parent.Kind {
@@ -2347,9 +2349,6 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	}
 }
 
-// NOTE: Unlike ESLint, `/* exported name */` comments do not mark bindings as
-// used. This legacy script-only directive is intentionally outside the initial
-// port scope.
 func newRule() rule.Rule {
 	return rule.Rule{
 		Name:   "no-unused-vars",
@@ -2365,7 +2364,7 @@ func newRule() rule.Rule {
 			var globalRefsByName map[string][]*ast.Node
 			if opts.Vars != "local" {
 				for _, inlineGlobal := range inlineGlobals {
-					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
+					if !shouldCheckInlineGlobal(ctx, inlineGlobal) {
 						continue
 					}
 					if globalRefsByName == nil {
@@ -2715,7 +2714,7 @@ func newRule() rule.Rule {
 			ensureCollected(ctx.SourceFile.AsNode())
 			if opts.Vars != "local" {
 				for _, inlineGlobal := range inlineGlobals {
-					if !inlineGlobal.Access.IsDeclared() || len(inlineGlobal.NameRanges) == 0 {
+					if _, tracked := ac.globalRefsByName[inlineGlobal.Name]; !tracked {
 						continue
 					}
 					if hasInlineGlobalUse(ctx.SourceFile, ctx.Refs, inlineGlobal.Name, ac.globalRefsByName[inlineGlobal.Name]) {
@@ -2728,16 +2727,11 @@ func newRule() rule.Rule {
 				}
 			}
 
-			statements := ctx.SourceFile.Statements
-			if statements == nil || len(statements.Nodes) == 0 {
+			// A trailing JSDoc comment can be attached to a synthetic statement
+			// which the linter does not visit. Flush at EOF rather than depending
+			// on the last statement, including in files with only directives.
+			listeners[rule.ListenerOnExit(ast.KindEndOfFile)] = func(*ast.Node) {
 				reporter.flush(ac)
-			} else {
-				lastTopLevelNode := statements.Nodes[len(statements.Nodes)-1]
-				listeners[rule.ListenerOnExit(lastTopLevelNode.Kind)] = func(node *ast.Node) {
-					if node == lastTopLevelNode {
-						reporter.flush(ac)
-					}
-				}
 			}
 
 			return listeners
@@ -2749,8 +2743,9 @@ func newRule() rule.Rule {
 var NoUnusedVarsRule = newRule()
 
 // UnusedInlineGlobals returns the `/* global */` declarations in ctx's file
-// that are never read, using this rule's reference semantics. Each returned
-// declaration's first name range is where ESLint reports it. Rules that share
+// that have no authored global definition and are never used, using this
+// rule's reference semantics. Each declaration's first name range is where
+// ESLint reports it. Rules that share
 // ESLint's handling of explicit globals, such as
 // @typescript-eslint/no-unused-vars, call it instead of re-deriving it.
 func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
@@ -2760,7 +2755,7 @@ func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
 	inlineGlobals := ctx.Globals.InlineDeclarations()
 	refsByName := map[string][]*ast.Node{}
 	for _, inlineGlobal := range inlineGlobals {
-		if inlineGlobal.Access.IsDeclared() && len(inlineGlobal.NameRanges) != 0 {
+		if shouldCheckInlineGlobal(ctx, inlineGlobal) {
 			refsByName[inlineGlobal.Name] = nil
 		}
 	}
@@ -2792,4 +2787,14 @@ func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
 		}
 	}
 	return unused
+}
+
+// An authored global and its directive are one binding. The ordinary variable
+// path owns its options, uses, and report location; only globals without a
+// definition are reported at the comment. Explicit globals live in the outer
+// global scope even in modules, so exported applies to them in every source
+// goal without marking same-name module or wrapper locals as used.
+func shouldCheckInlineGlobal(ctx rule.RuleContext, global rule.InlineGlobal) bool {
+	return global.Access.IsDeclared() && len(global.NameRanges) != 0 &&
+		!ctx.Exported.Has(global.Name) && !ctx.Refs.HasGlobalDeclaration(global.Name)
 }

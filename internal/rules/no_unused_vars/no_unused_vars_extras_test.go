@@ -629,3 +629,130 @@ func extraUsedIgnoredError(name string, additional string, line int, column int,
 		EndColumn: endColumn,
 	}
 }
+
+// TestNoUnusedVarsInlineGlobalBindings distinguishes authored global bindings
+// from comment-only globals and same-name local declarations.
+// Expectations were checked with typescript-eslint v8.72.1 and ESLint 10.14.0;
+// JavaScript files use Espree and TypeScript files use the TypeScript parser.
+// TypeScript listeners emit declaration diagnostics before EOF comment reports;
+// public API diagnostics are sorted by source position.
+func TestNoUnusedVarsInlineGlobalBindings(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// used var value = 1;
+			{
+				Code:            "/* global value */\nvar value = 1;\nconsume(value);",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			// used { var value = 1; }
+			{
+				Code:            "/* global value */\n{ var value = 1; }\nconsume(value);",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			// exported comment
+			{
+				Code:            "/* global value:writable */\n/* exported value */\nvalue = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			// exported reverse order
+			{
+				Code:            "/* exported value */\n/* global value */",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			// exported authored
+			{
+				Code:            "/* global value */\n/* exported value */\nvar value = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+			},
+			// authored local option
+			{
+				Code:            "/* global value */\nvar value = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Options:         map[string]interface{}{"vars": "local"},
+			},
+			// comment local option
+			{
+				Code:            "/* global value */",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Options:         map[string]interface{}{"vars": "local"},
+			},
+			// commonjs file.js exported global
+			{
+				Code:            "/* global value */\n/* exported value */\nvalue = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				TSConfig:        "tsconfig.allow-js.json",
+				FileName:        "inline-global.js",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// A file containing only directives and JSDoc still flushes reports.
+			{
+				Code:            "/* global value */\n/** @typedef {number} value */",
+				FileName:        "inline-global.js",
+				TSConfig:        "tsconfig.allow-js.json",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'value' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 16}},
+			},
+
+			// unused var value = 1;
+			{
+				Code:            "/* global value */\nvar value = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is assigned a value but never used.", Line: 2, Column: 5, EndLine: 2, EndColumn: 10, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "removeVar", Output: "/* global value */\n"}}},
+				},
+			},
+			// duplicate comments
+			{
+				Code:            "/* global value */\n/* global value:writable */",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
+				},
+			},
+			// block shadow
+			{
+				Code:            "/* global value */\n{ let value = 1; consume(value); }",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
+				},
+			},
+			// exported shadow unused
+			{
+				Code:            "/* global value */\n/* exported value */\n{ let value = 1; }",
+				LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is assigned a value but never used.", Line: 3, Column: 7, EndLine: 3, EndColumn: 12, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "removeVar", Output: "/* global value */\n/* exported value */\n{  }"}}},
+				},
+			},
+			// module file.ts local unused
+			{
+				Code:            "/* global value */\nvar value = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
+					{MessageId: "unusedVar", Message: "'value' is assigned a value but never used.", Line: 2, Column: 5, EndLine: 2, EndColumn: 10, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "removeVar", Output: "/* global value */\n"}}},
+				},
+			},
+			// module file.ts exported local
+			{
+				Code:            "/* global value */\n/* exported value */\nvar value = 1;",
+				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is assigned a value but never used.", Line: 3, Column: 5, EndLine: 3, EndColumn: 10, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "removeVar", Output: "/* global value */\n/* exported value */\n"}}},
+				},
+			},
+			// commonjs file.js local read
+			{
+				Code:            "/* global value */\nvar value = 1; consume(value);",
+				LanguageOptions: rule.LanguageOptions{SourceType: "commonjs"},
+				TSConfig:        "tsconfig.allow-js.json",
+				FileName:        "inline-global.js",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'value' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 16},
+				},
+			},
+		},
+	)
+}
