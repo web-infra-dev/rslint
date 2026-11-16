@@ -2,6 +2,8 @@
 // All 286 valid and 351 invalid cases preserve their input and rule options.
 // Messages, complete ranges and suggestion outputs were recorded by running the
 // upstream suite with that exact version; the rule has no autofixes.
+// Logical suggestions preserve the original grouping and required parentheses
+// instead of reproducing v8.72.2 outputs that mix ?? with ||/&& illegally.
 // The upstream `unstrict` fixture directory is reproduced as `unstrict/`.
 // https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/tests/rules/prefer-nullish-coalescing.test.ts
 import { RuleTester } from '@rslint/rule-tester';
@@ -7360,12 +7362,13 @@ declare let d: string | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `,
             },
           ],
@@ -7414,12 +7417,13 @@ declare let d: number | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `,
             },
           ],
@@ -7468,12 +7472,13 @@ declare let d: boolean | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `,
             },
           ],
@@ -7522,12 +7527,13 @@ declare let d: object | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `,
             },
           ],
@@ -7555,12 +7561,13 @@ declare let d: string | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `,
             },
           ],
@@ -7576,12 +7583,13 @@ declare let d: string | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `,
             },
           ],
@@ -7609,12 +7617,13 @@ declare let d: number | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `,
             },
           ],
@@ -7630,12 +7639,13 @@ declare let d: number | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `,
             },
           ],
@@ -7663,12 +7673,13 @@ declare let d: boolean | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `,
             },
           ],
@@ -7684,12 +7695,13 @@ declare let d: boolean | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `,
             },
           ],
@@ -7717,12 +7729,13 @@ declare let d: object | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `,
             },
           ],
@@ -7738,12 +7751,13 @@ declare let d: object | null | undefined;
             {
               messageId: 'suggestNullish',
               desc: 'Fix to nullish coalescing operator (`??`).',
+              // Safety difference: preserve grouping and required parentheses.
               output: `
 declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `,
             },
           ],

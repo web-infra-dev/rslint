@@ -14,9 +14,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// Cases beyond the upstream suite. Except for rslintOnlyInvalid, every
-// expectation below matches typescript-eslint v8.72.2 run with this package's
-// fixture tsconfig: messages, complete ranges and suggestion outputs.
+// Cases beyond the upstream suite. Safety differences from typescript-eslint
+// v8.72.2 are noted beside the affected cases; other expectations preserve
+// upstream messages, complete ranges and suggestion outputs.
 func TestPreferNullishCoalescingExtras(t *testing.T) {
 	valid := append(append([]rule_tester.ValidTestCase{}, regressionValid...), earlierValid...)
 	invalid := append(append(append([]rule_tester.InvalidTestCase{}, regressionInvalid...), earlierInvalid...), rslintOnlyInvalid...)
@@ -28,6 +28,18 @@ func TestPreferNullishCoalescingExtras(t *testing.T) {
 // arguments, generic constraints, comments kept by the if-statement
 // suggestion and the precedence of the nullish branch.
 var regressionValid = []rule_tester.ValidTestCase{
+	// Safety differences from v8.72.2: dynamic keys and compound assignments
+	// must not be treated as equivalent nullish rewrites.
+	{
+		Code: `declare let foo: string | undefined;
+if (foo == null) foo += 'x';
+`,
+	},
+	{
+		Code: `declare let a: Record<string, string | undefined>; declare let b: { c: string }; declare let c: 'c';
+a[b.c] !== undefined ? a[b[c]] : 'y';
+`,
+	},
 	// non-null in test
 	{
 		Code: `declare let a: { b: string | undefined };
@@ -298,6 +310,7 @@ a ||= b ?? c;
 		},
 	},
 	// paren left in chain
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `declare let a: string | null, c: string, d: string;
 ( a ) || c || d;
@@ -309,25 +322,7 @@ a ||= b ?? c;
 				Line:      2, Column: 7, EndLine: 2, EndColumn: 9,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let a: string | null, c: string, d: string;
-( (a ) ?? c) || d;
-`},
-				},
-			},
-		},
-	},
-	// computed member key vs nested
-	{
-		Code: `declare let a: Record<string, string | undefined>; declare let b: { c: string }; declare let c: 'c';
-a[b.c] !== undefined ? a[b[c]] : 'y';
-`,
-		Errors: []rule_tester.InvalidTestCaseError{
-			{
-				MessageId: "preferNullishOverTernary",
-				Message:   "Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.",
-				Line:      2, Column: 1, EndLine: 2, EndColumn: 37,
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "suggestNullish", Output: `declare let a: Record<string, string | undefined>; declare let b: { c: string }; declare let c: 'c';
-a[b.c] ?? 'y';
+(( a ) ?? c) || d;
 `},
 				},
 			},
@@ -591,24 +586,6 @@ if (foo == null) (foo = 'x');
 				MessageId: "preferNullishOverAssignment",
 				Message:   "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
 				Line:      2, Column: 1, EndLine: 2, EndColumn: 30,
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "suggestNullish", Output: `declare let foo: string | undefined;
-foo ??= 'x';
-`},
-				},
-			},
-		},
-	},
-	// if compound assign
-	{
-		Code: `declare let foo: string | undefined;
-if (foo == null) foo += 'x';
-`,
-		Errors: []rule_tester.InvalidTestCaseError{
-			{
-				MessageId: "preferNullishOverAssignment",
-				Message:   "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-				Line:      2, Column: 1, EndLine: 2, EndColumn: 29,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let foo: string | undefined;
 foo ??= 'x';
@@ -1053,6 +1030,7 @@ function f(Boolean: (x: unknown) => boolean) { return Boolean(a ?? b); }
 		},
 	},
 	// chain && left
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `declare let a: boolean, b: string | null, c: string, d: string;
 a && b || c || d;
@@ -1064,13 +1042,14 @@ a && b || c || d;
 				Line:      2, Column: 8, EndLine: 2, EndColumn: 10,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let a: boolean, b: string | null, c: string, d: string;
-a && (b ?? c) || d;
+((a && b) ?? c) || d;
 `},
 				},
 			},
 		},
 	},
 	// chain || left
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `declare let a: string | null, b: string | null, c: string, d: string;
 a || b || c || d;
@@ -1092,13 +1071,14 @@ a || b || c || d;
 				Line:      2, Column: 8, EndLine: 2, EndColumn: 10,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let a: string | null, b: string | null, c: string, d: string;
-a || (b ?? c) || d;
+((a || b) ?? c) || d;
 `},
 				},
 			},
 		},
 	},
 	// chain ?? left
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `declare let a: string | null, b: string | null, c: string, d: string;
 (a ?? b) || c || d;
@@ -1110,13 +1090,14 @@ a || (b ?? c) || d;
 				Line:      2, Column: 10, EndLine: 2, EndColumn: 12,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let a: string | null, b: string | null, c: string, d: string;
-(a ?? (b) ?? c) || d;
+((a ?? b) ?? c) || d;
 `},
 				},
 			},
 		},
 	},
 	// chain paren && left
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `declare let a: boolean, b: string | null, c: string, d: string;
 (a && b) || c || d;
@@ -1128,7 +1109,7 @@ a || (b ?? c) || d;
 				Line:      2, Column: 10, EndLine: 2, EndColumn: 12,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "suggestNullish", Output: `declare let a: boolean, b: string | null, c: string, d: string;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
 `},
 				},
 			},
@@ -1205,6 +1186,7 @@ if (foo.a == null) { (foo.a) = 'x'; }
 		},
 	},
 	// if comments around paren assignment
+	// Safety difference from v8.72.2: Keep the diagnostic without a suggestion that would discard comments.
 	{
 		Code: `declare let foo: string | undefined;
 if (!foo) {
@@ -1216,12 +1198,6 @@ if (!foo) {
 				MessageId: "preferNullishOverAssignment",
 				Message:   "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
 				Line:      2, Column: 1, EndLine: 4, EndColumn: 2,
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "suggestNullish", Output: `declare let foo: string | undefined;
-/* b */
-foo ??= 'x'; // d
-`},
-				},
 			},
 		},
 	},
@@ -1264,6 +1240,7 @@ if (!foo) /* a */ /* b */ foo = 'x'
 		},
 	},
 	// if comments in test are dropped
+	// Safety difference from v8.72.2: Keep the diagnostic without a suggestion that would discard comments.
 	{
 		Code: `declare let foo: string | undefined;
 if (/* t */ !foo) {
@@ -1275,11 +1252,6 @@ if (/* t */ !foo) {
 				MessageId: "preferNullishOverAssignment",
 				Message:   "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
 				Line:      2, Column: 1, EndLine: 4, EndColumn: 2,
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "suggestNullish", Output: `declare let foo: string | undefined;
-foo ??= 'x';
-`},
-				},
 			},
 		},
 	},
@@ -5302,6 +5274,7 @@ const test = Boolean(a ?? b);
 			},
 		},
 	},
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: string | null | undefined;
@@ -5321,7 +5294,7 @@ declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string;
 
-((a ?? b)) || c;
+(a ?? b) || c;
 `},
 				},
 			},
@@ -5341,6 +5314,7 @@ declare let c: string;
 			},
 		},
 	},
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: string | null | undefined;
@@ -5361,7 +5335,7 @@ declare let a: string | null | undefined;
 declare let b: string;
 declare let c: string;
 
-a ?? b && c;
+a ?? (b && c);
 `},
 				},
 			},
@@ -6047,6 +6021,7 @@ foo ??= makeFoo(); /* tail */
 			},
 		},
 	},
+	// Safety difference from v8.72.2: Preserve line breaks when moving comments.
 	{
 		Code: `
 declare let foo: string | null;
@@ -6065,7 +6040,8 @@ foo = makeFoo();
 declare let foo: string | null;
 declare function makeFoo(): string;
 
-// pre foo ??= makeFoo();
+// pre
+foo ??= makeFoo();
 `},
 				},
 			},

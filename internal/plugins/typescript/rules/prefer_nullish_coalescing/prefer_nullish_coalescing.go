@@ -178,7 +178,12 @@ func isMemberAccessLike(node *ast.Node) bool {
 }
 
 func isNullLiteralOrUndefinedIdentifier(node *ast.Node) bool {
-	return utils.IsNullLiteral(node) || utils.IsUndefinedIdentifier(node)
+	return utils.IsNullLiteral(node) || isGlobalUndefined(node)
+}
+
+// A local binding named undefined is not a nullish value.
+func isGlobalUndefined(node *ast.Node) bool {
+	return utils.IsUndefinedIdentifier(node) && !utils.IsShadowed(node, "undefined")
 }
 
 func isNodeNullishComparisonBinary(bin *ast.BinaryExpression) bool {
@@ -300,14 +305,6 @@ func logicalExpression(node *ast.Node) *ast.BinaryExpression {
 	return bin
 }
 
-// isLogicalOrExpression mirrors upstream's isLogicalOrOperator: a
-// `LogicalExpression` whose operator is `||`. `||=` is an
-// AssignmentExpression in ESTree and does not match.
-func isLogicalOrExpression(node *ast.Node) bool {
-	bin := logicalExpression(node)
-	return bin != nil && bin.OperatorToken.Kind == ast.KindBarBarToken
-}
-
 // isMixedLogicalExpression mirrors upstream's BFS over parent + left + right
 // looking for an `&&` operator. Parentheses are transparent, and only
 // `LogicalExpression` nodes are expanded; `||=` is not one.
@@ -395,11 +392,10 @@ func memberProperty(node *ast.Node) (*ast.Node, bool) {
 	return nil, false
 }
 
-// isNodeEqual mirrors typescript-eslint's isNodeEqual, which only compares
-// ThisExpression, Literal, Identifier and MemberExpression nodes. Template
-// literals are not ESTree `Literal`s, and member expressions compare their
-// object and property without regard to `computed`. Every other kind is
-// unequal.
+// isNodeEqual compares expressions used as computed keys. Unlike the tested
+// access chain, these expressions must preserve computed access and optional
+// chain boundaries. Upstream's isNodeEqual drops computed, equating b.c with
+// b[c]; it rejects ChainExpression nodes, which tsgo represents with flags.
 func isNodeEqual(a, b *ast.Node) bool {
 	a = ast.SkipParentheses(a)
 	b = ast.SkipParentheses(b)
@@ -407,9 +403,12 @@ func isNodeEqual(a, b *ast.Node) bool {
 		return false
 	}
 	if isMemberExpressionLike(a) && isMemberExpressionLike(b) {
-		aProp, _ := memberProperty(a)
-		bProp, _ := memberProperty(b)
-		return isNodeEqual(aProp, bProp) &&
+		if ast.IsOptionalChain(a) || ast.IsOptionalChain(b) {
+			return false
+		}
+		aProp, aComputed := memberProperty(a)
+		bProp, bComputed := memberProperty(b)
+		return aComputed == bComputed && isNodeEqual(aProp, bProp) &&
 			isNodeEqual(utils.AccessExpressionObject(a), utils.AccessExpressionObject(b))
 	}
 	if a.Kind != b.Kind {
@@ -649,25 +648,28 @@ func reportPreferNullishOverOr(ctx rule.RuleContext, opts *Options, pending *pen
 	})
 }
 
-// addOrParenFixes mirrors upstream's paren-adding logic when the ESTree parent
-// is a `||` LogicalExpression: `&&` and `??` cannot be mixed without
-// parentheses. Parentheses are transparent as in ESTree, so `node.left`,
-// `node.right` and `node.parent` refer to the nodes inside them; `||=` is an
-// AssignmentExpression and is not a `||` parent.
+// addOrParenFixes preserves the original expression tree when replacing ||.
+// Both operands and the parent may require parentheses: JavaScript forbids
+// mixing ?? with || or && without an explicit grouping boundary. Use authored
+// nodes, including their parentheses, rather than inserting inside an operand.
 func addOrParenFixes(sf *ast.SourceFile, node *ast.Node, fixes *[]rule.RuleFix) {
-	if !isLogicalOrExpression(utils.ESTreeParent(node)) {
-		return
-	}
 	bin := node.AsBinaryExpression()
-	left := utils.ESTreeRuntimeExpression(bin.Left)
-	right := utils.ESTreeRuntimeExpression(bin.Right)
-	if leftLogical := logicalExpression(left); leftLogical != nil &&
-		!isLogicalOrExpression(utils.ESTreeRuntimeExpression(leftLogical.Left)) {
-		*fixes = append(*fixes, rule.RuleFixInsertBefore(sf, utils.ESTreeRuntimeExpression(leftLogical.Right), "("))
-	} else {
-		*fixes = append(*fixes, rule.RuleFixInsertBefore(sf, left, "("))
+	if bin.OperatorToken.Kind == ast.KindBarBarEqualsToken {
+		return // ??= accepts a logical expression as its RHS without parentheses.
 	}
-	*fixes = append(*fixes, rule.RuleFixInsertAfter(right, ")"))
+	wrap := func(n *ast.Node) {
+		*fixes = append(*fixes, rule.RuleFixInsertBefore(sf, n, "("), rule.RuleFixInsertAfter(n, ")"))
+	}
+	for _, operand := range []*ast.Node{bin.Left, bin.Right} {
+		if logical := logicalExpression(operand); logical != nil &&
+			(logical.OperatorToken.Kind == ast.KindBarBarToken || logical.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) {
+			wrap(operand)
+		}
+	}
+	if parent := logicalExpression(node.Parent); parent != nil &&
+		(parent.OperatorToken.Kind == ast.KindBarBarToken || parent.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) {
+		wrap(node)
+	}
 }
 
 // reportPreferNullishOverTernary reports on a ConditionalExpression whose test
@@ -689,6 +691,9 @@ func reportPreferNullishOverTernary(ctx rule.RuleContext, opts *Options, pending
 
 	pending.add(utils.TrimNodeTextRange(ctx.SourceFile, node).Pos(), func() {
 		ctx.ReportNodeWithDeferredSuggestions(node, buildPreferNullishOverTernaryMessage(""), func() []rule.RuleSuggestion {
+			if hasUnpreservedComments(ctx, node, utils.TrimNodeTextRange(ctx.SourceFile, preservedExpression(leftNode)), utils.TrimNodeTextRange(ctx.SourceFile, preservedExpression(nullishBranch))) {
+				return nil
+			}
 			replacement := getTextWithParentheses(ctx.SourceFile, leftNode) + " ?? " + getRightTextForTernary(ctx.SourceFile, nullishBranch)
 			return []rule.RuleSuggestion{{
 				Message:  buildSuggestNullishMessage(""),
@@ -706,6 +711,10 @@ func reportPreferNullishOverTernary(ctx rule.RuleContext, opts *Options, pending
 // from the outermost wrapper to the innermost paren layer and emit its text.
 // That is: `(((foo).a))` becomes `((foo).a)` — exactly one paren preserved.
 func getTextWithParentheses(sf *ast.SourceFile, node *ast.Node) string {
+	return utils.TrimmedNodeText(sf, preservedExpression(node))
+}
+
+func preservedExpression(node *ast.Node) *ast.Node {
 	current := node
 	var lastParen *ast.Node
 	for current != nil && current.Kind == ast.KindParenthesizedExpression {
@@ -713,9 +722,29 @@ func getTextWithParentheses(sf *ast.SourceFile, node *ast.Node) string {
 		current = current.AsParenthesizedExpression().Expression
 	}
 	if lastParen != nil {
-		return utils.TrimmedNodeText(sf, lastParen)
+		return lastParen
 	}
-	return utils.TrimmedNodeText(sf, node)
+	return node
+}
+
+// Do not offer a destructive suggestion when comments in removed syntax cannot
+// be retained. The diagnostic remains useful, but the user must rewrite it.
+func hasUnpreservedComments(ctx rule.RuleContext, node *ast.Node, kept ...core.TextRange) bool {
+	span := utils.TrimNodeTextRange(ctx.SourceFile, node)
+	for _, comment := range ctx.Comments.All() {
+		if comment.Pos() < span.Pos() {
+			continue
+		}
+		if comment.Pos() >= span.End() {
+			break
+		}
+		if !slices.ContainsFunc(kept, func(r core.TextRange) bool {
+			return r.Pos() <= comment.Pos() && comment.End() <= r.End()
+		}) {
+			return true
+		}
+	}
+	return false
 }
 
 // getRightTextForTernary mirrors upstream: a parenthesized nullish branch keeps
@@ -794,9 +823,11 @@ func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, pending *pen
 		return
 	}
 	bin := assignmentExprStripped.AsBinaryExpression()
-	// Accept any assignment-shaped operator (`=`, `||=`, `??=`, `+=`, …) — in
-	// ESTree this is one AssignmentExpression node.
-	if !ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+	// Arithmetic/bitwise assignments and &&= cannot be replaced with ??=:
+	// their operation on a nullish value must not disappear.
+	switch bin.OperatorToken.Kind {
+	case ast.KindEqualsToken, ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+	default:
 		return
 	}
 	if !isMemberAccessLike(ast.SkipParentheses(bin.Left)) {
@@ -828,14 +859,21 @@ func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, pending *pen
 			if isConsequentBlock {
 				separator = "\n"
 			}
-			commentsBefore := formatComments(ctx.SourceFile, comments, assignmentExprStripped.Pos(), scanner.SkipTrivia(ctx.SourceFile.Text(), assignmentExprStripped.Pos()), separator)
+			before := core.NewTextRange(assignmentExprStripped.Pos(), scanner.SkipTrivia(ctx.SourceFile.Text(), assignmentExprStripped.Pos()))
+			after := core.NewTextRange(0, 0)
+			commentsBefore, _ := formatComments(ctx.SourceFile, comments, before.Pos(), before.End(), separator)
 			commentsAfter := ""
+			endsWithLineComment := false
 			if isConsequentBlock {
 				exprStmt := is.ThenStatement.AsBlock().Statements.Nodes[0]
 				// The closing `}` is the token after the statement.
-				commentsAfter = formatComments(ctx.SourceFile, comments, exprStmt.End(), is.ThenStatement.End()-1, "\n")
+				after = core.NewTextRange(exprStmt.End(), is.ThenStatement.End()-1)
+				commentsAfter, endsWithLineComment = formatComments(ctx.SourceFile, comments, after.Pos(), after.End(), "\n")
 			}
 
+			if hasUnpreservedComments(ctx, node, before, after, utils.TrimNodeTextRange(ctx.SourceFile, preservedExpression(leftAssignment)), utils.TrimNodeTextRange(ctx.SourceFile, preservedExpression(rightAssignment))) {
+				return nil
+			}
 			replacement := getTextWithParentheses(ctx.SourceFile, leftAssignment) + " ??= " + getTextWithParentheses(ctx.SourceFile, rightAssignment) + ";"
 			fixes := []rule.RuleFix{}
 			if commentsBefore != "" {
@@ -843,8 +881,13 @@ func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, pending *pen
 			}
 			fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 			if commentsAfter != "" {
-				// Upstream drops the final separator: `commentsAfter.slice(0, -1)`.
-				fixes = append(fixes, rule.RuleFixInsertAfter(node, " "+strings.TrimSuffix(commentsAfter, "\n")))
+				// Keep the newline after trailing line comments, so following code
+				// cannot become part of the comment.
+				suffix := strings.TrimLeft(ctx.SourceFile.Text()[node.End():], " \t")
+				if !endsWithLineComment || suffix == "" || strings.HasPrefix(suffix, "\n") || strings.HasPrefix(suffix, "\r") || strings.HasPrefix(suffix, "\u2028") || strings.HasPrefix(suffix, "\u2029") {
+					commentsAfter = strings.TrimSuffix(commentsAfter, "\n")
+				}
+				fixes = append(fixes, rule.RuleFixInsertAfter(node, " "+commentsAfter))
 			}
 			return []rule.RuleSuggestion{{
 				Message:  buildSuggestNullishMessage("="),
@@ -854,9 +897,11 @@ func reportPreferNullishOverIf(ctx rule.RuleContext, opts *Options, pending *pen
 	})
 }
 
-// formatComments mirrors upstream's formatComments for the comments lying
-// within [start, end): each comment's source text followed by `separator`.
-func formatComments(sf *ast.SourceFile, comments []*ast.CommentRange, start, end int, separator string) string {
+// formatComments retains comments within [start, end), using separator after
+// block comments and a newline after line comments. The boolean identifies
+// a final line comment whose newline may be required by following code.
+func formatComments(sf *ast.SourceFile, comments []*ast.CommentRange, start, end int, separator string) (string, bool) {
+	endsWithLineComment := false
 	var out strings.Builder
 	text := sf.Text()
 	for _, comment := range comments {
@@ -867,9 +912,14 @@ func formatComments(sf *ast.SourceFile, comments []*ast.CommentRange, start, end
 			break
 		}
 		out.WriteString(text[comment.Pos():comment.End()])
-		out.WriteString(separator)
+		endsWithLineComment = comment.Kind == ast.KindSingleLineCommentTrivia
+		if endsWithLineComment {
+			out.WriteString("\n")
+		} else {
+			out.WriteString(separator)
+		}
 	}
-	return out.String()
+	return out.String(), endsWithLineComment
 }
 
 // getNullishCoalescingParams matches typescript-eslint's getNullishCoalescingParams
@@ -915,7 +965,7 @@ func getNullishCoalescingParams(
 			tnSkipped := ast.SkipParentheses(tn)
 			if utils.IsNullLiteral(tnSkipped) {
 				hasNullCheck = true
-			} else if utils.IsUndefinedIdentifier(tnSkipped) {
+			} else if isGlobalUndefined(tnSkipped) {
 				hasUndefinedCheck = true
 			} else if areNodesSimilarMemberAccess(tn, nonNullishNode) {
 				if nullishCoalescingLeftNode == nil {

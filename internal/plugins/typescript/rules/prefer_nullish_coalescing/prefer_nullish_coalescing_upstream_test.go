@@ -1,6 +1,7 @@
 // Cases from the typescript-eslint v8.72.2 prefer-nullish-coalescing test suite.
 // Messages, complete ranges and suggestion outputs were recorded by running
-// that suite with the same version. The rule has no autofixes.
+// that suite with the same version. Safety differences are noted beside the
+// affected cases. The rule has no autofixes.
 // https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/tests/rules/prefer-nullish-coalescing.test.ts
 
 package prefer_nullish_coalescing
@@ -6356,6 +6357,7 @@ a ?? (b && c);
 		},
 	},
 	// invalid[200]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: string | null | undefined;
@@ -6390,13 +6392,14 @@ declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `},
 				},
 			},
 		},
 	},
 	// invalid[201]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: number | null | undefined;
@@ -6431,13 +6434,14 @@ declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `},
 				},
 			},
 		},
 	},
 	// invalid[202]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: boolean | null | undefined;
@@ -6472,13 +6476,14 @@ declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `},
 				},
 			},
 		},
 	},
 	// invalid[203]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: object | null | undefined;
@@ -6513,13 +6518,14 @@ declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-a || b ?? (c && d);
+(a || b) ?? (c && d);
       `},
 				},
 			},
 		},
 	},
 	// invalid[204]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: string | null | undefined;
@@ -6540,7 +6546,7 @@ declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `},
 				},
 			},
@@ -6554,13 +6560,14 @@ declare let a: string | null | undefined;
 declare let b: string | null | undefined;
 declare let c: string | null | undefined;
 declare let d: string | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `},
 				},
 			},
 		},
 	},
 	// invalid[205]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: number | null | undefined;
@@ -6581,7 +6588,7 @@ declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `},
 				},
 			},
@@ -6595,13 +6602,14 @@ declare let a: number | null | undefined;
 declare let b: number | null | undefined;
 declare let c: number | null | undefined;
 declare let d: number | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `},
 				},
 			},
 		},
 	},
 	// invalid[206]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: boolean | null | undefined;
@@ -6622,7 +6630,7 @@ declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `},
 				},
 			},
@@ -6636,13 +6644,14 @@ declare let a: boolean | null | undefined;
 declare let b: boolean | null | undefined;
 declare let c: boolean | null | undefined;
 declare let d: boolean | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `},
 				},
 			},
 		},
 	},
 	// invalid[207]
+	// Safety difference from v8.72.2: Preserve expression grouping and required parentheses.
 	{
 		Code: `
 declare let a: object | null | undefined;
@@ -6663,7 +6672,7 @@ declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-(a && (b) ?? c) || d;
+((a && b) ?? c) || d;
       `},
 				},
 			},
@@ -6677,7 +6686,7 @@ declare let a: object | null | undefined;
 declare let b: object | null | undefined;
 declare let c: object | null | undefined;
 declare let d: object | null | undefined;
-(a && b) || c ?? d;
+((a && b) || c) ?? d;
       `},
 				},
 			},

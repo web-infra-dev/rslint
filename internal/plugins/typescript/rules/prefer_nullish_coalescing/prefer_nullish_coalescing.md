@@ -85,7 +85,15 @@ Default: `false`. By default the rule errors on every file when `strictNullCheck
 
 ## Differences from upstream
 
-When the suggestion for a ternary moves a `||` or `&&` expression to the right of `??`, rslint wraps it in parentheses. For `a !== null ? a : b || 'z'`, rslint suggests `a ?? (b || 'z')`; typescript-eslint v8.72.2 suggests `a ?? b || 'z'`, which is a syntax error because `??` cannot be mixed with `||` or `&&` without parentheses. The diagnostic itself is the same.
+Rslint preserves syntax and expression boundaries where typescript-eslint v8.72.2 can produce an unsafe suggestion:
+
+- **Logical expressions:** suggestions preserve the original grouping and add parentheses wherever `??` would otherwise mix with `||` or `&&`. Replacing the last `||` in `a ||= b || c || d` produces `a ||= (b || c) ?? d`. A ternary such as `a !== null ? a : b || 'z'` becomes `a ?? (b || 'z')`.
+- **Computed keys:** `b.c` and `b[c]` are distinct expressions when used as keys. Rslint does not simplify `a[b.c] !== undefined ? a[b[c]] : 'fallback'`, because the accesses can return different values. Literal property access such as `a.x` and `a['x']` remains supported.
+- **Assignment operators:** an `if` body using an arithmetic or bitwise assignment, or `&&=`, is not simplified to `??=`. For example, replacing `if (a === undefined) a += 'x'` would discard the addition. Simple `=`, `||=`, and `??=` assignments remain eligible.
+- **Shadowed names:** a parameter or local binding named `undefined` is not treated as the global nullish value.
+- **Comments:** moved line comments retain their line breaks. If a ternary or `if` rewrite would discard a comment in removed syntax, Rslint reports the diagnostic without a suggestion so the comment can be preserved manually.
+
+Computed keys containing optional chains are compared conservatively; the rule does not treat `b?.c` and `b.c` as interchangeable key expressions. This is separate from matching optional chains along the member access being checked.
 
 ## Original Documentation
 
