@@ -63,7 +63,7 @@ func reportAssertCalls(ctx rule.RuleContext, binding *ast.Node) {
 	}
 }
 
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/rules/consistent-assert.js
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/consistent-assert.js
 var ConsistentAssertRule = rule.Rule{
 	Name:   "unicorn/consistent-assert",
 	Schema: rule.EmptyArraySchema,

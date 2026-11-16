@@ -1,5 +1,5 @@
-// Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/test/consistent-assert.js
+// Ported from eslint-plugin-unicorn v80.0.0; see LICENSE.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/test/consistent-assert.js
 import {
   RuleTester,
   type InvalidTestCase,
@@ -72,7 +72,8 @@ const validCases: ValidTestCase[] = [
   valid(
     'import type {strict as assert} from "node:assert/strict";\nassert();',
     'src/virtual.ts',
-  ),
+  ), // Not the `assert` module
+  valid("import assert from 'node:fs';\nassert(foo);"),
 ];
 
 const multipleCode =

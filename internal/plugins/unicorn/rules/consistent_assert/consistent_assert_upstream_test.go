@@ -1,5 +1,5 @@
-// Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/test/consistent-assert.js
+// Ported from eslint-plugin-unicorn v80.0.0; see LICENSE.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/test/consistent-assert.js
 package consistent_assert_test
 
 import (
@@ -75,6 +75,8 @@ func TestConsistentAssertUpstream(t *testing.T) {
 	for _, code := range typeOnlyForms {
 		validCases = append(validCases, validTS(code), validTS(code+"\nassert();"))
 	}
+	// Not the `assert` module
+	validCases = append(validCases, valid("import assert from 'node:fs';\nassert(foo);"))
 
 	allCases := "import a, {strict as b, default as c} from 'node:assert';\n" +
 		"import d, {strict as e, default as f} from 'assert';\n" +
@@ -139,7 +141,7 @@ func TestConsistentAssertUpstream(t *testing.T) {
 		),
 	}
 
-	if len(validCases) != 18 || len(invalidCases) != 12 {
+	if len(validCases) != 19 || len(invalidCases) != 12 {
 		t.Fatalf("upstream coverage accounting changed: valid=%d invalid=%d", len(validCases), len(invalidCases))
 	}
 

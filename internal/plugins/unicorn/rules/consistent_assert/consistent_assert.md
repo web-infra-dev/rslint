@@ -26,5 +26,5 @@ Only direct calls to the imported binding are changed. Other references, namespa
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn: consistent-assert](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/docs/rules/consistent-assert.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/rules/consistent-assert.js)
+- [eslint-plugin-unicorn: consistent-assert](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/docs/rules/consistent-assert.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/consistent-assert.js)
