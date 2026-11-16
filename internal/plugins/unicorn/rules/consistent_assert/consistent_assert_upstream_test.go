@@ -3,7 +3,6 @@
 package consistent_assert_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
@@ -30,42 +29,9 @@ func validTS(code string) rule_tester.ValidTestCase {
 	}
 }
 
-func location(code, target string, occurrence int) (line, column, endLine, endColumn int) {
-	searchFrom := 0
-	start := -1
-	for range occurrence + 1 {
-		relative := strings.Index(code[searchFrom:], target)
-		if relative < 0 {
-			panic("target not found in consistent-assert fixture: " + target)
-		}
-		start = searchFrom + relative
-		searchFrom = start + len(target)
-	}
-
-	line = strings.Count(code[:start], "\n") + 1
-	lineStart := strings.LastIndex(code[:start], "\n") + 1
-	column = start - lineStart + 1
-	end := start + len(target)
-	endLine = strings.Count(code[:end], "\n") + 1
-	endLineStart := strings.LastIndex(code[:end], "\n") + 1
-	endColumn = end - endLineStart + 1
-	return
-}
-
-func expectedError(code, name string, occurrence int) rule_tester.InvalidTestCaseError {
-	line, column, endLine, endColumn := location(code, name, occurrence)
-	return rule_tester.InvalidTestCaseError{
-		MessageId: messageID,
-		Message:   "Prefer `" + name + ".ok(…)` over `" + name + "(…)`.",
-		Line:      line,
-		Column:    column,
-		EndLine:   endLine,
-		EndColumn: endColumn,
-	}
-}
-
-func expectedFooCallError(code, name string) rule_tester.InvalidTestCaseError {
-	line, column, _, _ := location(code, name+"(foo)", 0)
+// expectedError reports a diagnostic on the callee identifier `name` at the
+// given 1-based line and column.
+func expectedError(name string, line, column int) rule_tester.InvalidTestCaseError {
 	return rule_tester.InvalidTestCaseError{
 		MessageId: messageID,
 		Message:   "Prefer `" + name + ".ok(…)` over `" + name + "(…)`.",
@@ -76,13 +42,13 @@ func expectedFooCallError(code, name string) rule_tester.InvalidTestCaseError {
 	}
 }
 
-func invalid(code, output, name string, occurrence int) rule_tester.InvalidTestCase {
+func invalid(code, output, name string, line, column int) rule_tester.InvalidTestCase {
 	return rule_tester.InvalidTestCase{
 		Code:            code,
 		FileName:        "file.js",
 		LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 		Output:          []string{output},
-		Errors:          []rule_tester.InvalidTestCaseError{expectedError(code, name, occurrence)},
+		Errors:          []rule_tester.InvalidTestCaseError{expectedError(name, line, column)},
 	}
 }
 
@@ -124,18 +90,18 @@ func TestConsistentAssertUpstream(t *testing.T) {
 	multiple := "import assert from 'assert';\nassert(foo)\nassert(bar)\nassert(baz)"
 	multipleOutput := "import assert from 'assert';\nassert.ok(foo)\nassert.ok(bar)\nassert.ok(baz)"
 	multipleErrors := []rule_tester.InvalidTestCaseError{
-		expectedError(multiple, "assert", 1),
-		expectedError(multiple, "assert", 2),
-		expectedError(multiple, "assert", 3),
+		expectedError("assert", 2, 1),
+		expectedError("assert", 3, 1),
+		expectedError("assert", 4, 1),
 	}
 
 	invalidCases := []rule_tester.InvalidTestCase{
-		invalid("import assert from 'assert';\nassert(foo)", "import assert from 'assert';\nassert.ok(foo)", "assert", 1),
-		invalid("import assert from 'node:assert';\nassert(foo)", "import assert from 'node:assert';\nassert.ok(foo)", "assert", 1),
-		invalid("import assert from 'assert/strict';\nassert(foo)", "import assert from 'assert/strict';\nassert.ok(foo)", "assert", 1),
-		invalid("import assert from 'node:assert/strict';\nassert(foo)", "import assert from 'node:assert/strict';\nassert.ok(foo)", "assert", 1),
-		invalid("import customAssert from 'assert';\ncustomAssert(foo)", "import customAssert from 'assert';\ncustomAssert.ok(foo)", "customAssert", 1),
-		invalid("import customAssert from 'node:assert';\ncustomAssert(foo)", "import customAssert from 'node:assert';\ncustomAssert.ok(foo)", "customAssert", 1),
+		invalid("import assert from 'assert';\nassert(foo)", "import assert from 'assert';\nassert.ok(foo)", "assert", 2, 1),
+		invalid("import assert from 'node:assert';\nassert(foo)", "import assert from 'node:assert';\nassert.ok(foo)", "assert", 2, 1),
+		invalid("import assert from 'assert/strict';\nassert(foo)", "import assert from 'assert/strict';\nassert.ok(foo)", "assert", 2, 1),
+		invalid("import assert from 'node:assert/strict';\nassert(foo)", "import assert from 'node:assert/strict';\nassert.ok(foo)", "assert", 2, 1),
+		invalid("import customAssert from 'assert';\ncustomAssert(foo)", "import customAssert from 'assert';\ncustomAssert.ok(foo)", "customAssert", 2, 1),
+		invalid("import customAssert from 'node:assert';\ncustomAssert(foo)", "import customAssert from 'node:assert';\ncustomAssert.ok(foo)", "customAssert", 2, 1),
 		{
 			Code:            multiple,
 			FileName:        "file.js",
@@ -143,32 +109,33 @@ func TestConsistentAssertUpstream(t *testing.T) {
 			Output:          []string{multipleOutput},
 			Errors:          multipleErrors,
 		},
-		invalid("import {strict} from 'assert';\nstrict(foo)", "import {strict} from 'assert';\nstrict.ok(foo)", "strict", 1),
-		invalid("import {strict as assert} from 'assert';\nassert(foo)", "import {strict as assert} from 'assert';\nassert.ok(foo)", "assert", 1),
+		invalid("import {strict} from 'assert';\nstrict(foo)", "import {strict} from 'assert';\nstrict.ok(foo)", "strict", 2, 1),
+		invalid("import {strict as assert} from 'assert';\nassert(foo)", "import {strict as assert} from 'assert';\nassert.ok(foo)", "assert", 2, 1),
 		{
 			Code:            allCases,
 			FileName:        "file.js",
 			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 			Output:          []string{allOutput},
 			Errors: []rule_tester.InvalidTestCaseError{
-				expectedFooCallError(allCases, "a"),
-				expectedFooCallError(allCases, "b"),
-				expectedFooCallError(allCases, "c"),
-				expectedFooCallError(allCases, "d"),
-				expectedFooCallError(allCases, "e"),
-				expectedFooCallError(allCases, "f"),
-				expectedFooCallError(allCases, "g"),
-				expectedFooCallError(allCases, "h"),
-				expectedFooCallError(allCases, "i"),
-				expectedFooCallError(allCases, "j"),
+				expectedError("a", 5, 1),
+				expectedError("b", 6, 1),
+				expectedError("c", 7, 1),
+				expectedError("d", 8, 1),
+				expectedError("e", 9, 1),
+				expectedError("f", 10, 1),
+				expectedError("g", 11, 1),
+				expectedError("h", 12, 1),
+				expectedError("i", 13, 1),
+				expectedError("j", 14, 1),
 			},
 		},
-		invalid("import assert from 'node:assert';\nassert?.(foo)", "import assert from 'node:assert';\nassert.ok?.(foo)", "assert", 1),
+		invalid("import assert from 'node:assert';\nassert?.(foo)", "import assert from 'node:assert';\nassert.ok?.(foo)", "assert", 2, 1),
 		invalid(
 			"import assert from 'assert';\n\n((\n\t/* comment */ ((\n\t\t/* comment */\n\t\tassert\n\t\t/* comment */\n\t\t)) /* comment */\n\t\t(/* comment */ typeof foo === 'string', 'foo must be a string' /** after comment */)\n));",
 			"import assert from 'assert';\n\n((\n\t/* comment */ ((\n\t\t/* comment */\n\t\tassert.ok\n\t\t/* comment */\n\t\t)) /* comment */\n\t\t(/* comment */ typeof foo === 'string', 'foo must be a string' /** after comment */)\n));",
 			"assert",
-			1,
+			6,
+			3,
 		),
 	}
 
@@ -208,7 +175,7 @@ func TestConsistentAssertDocumentation(t *testing.T) {
 	invalidCases := make([]rule_tester.InvalidTestCase, 0, len(cases))
 	validCases := make([]rule_tester.ValidTestCase, 0, len(cases))
 	for _, testCase := range cases {
-		invalidCases = append(invalidCases, invalid(testCase.code, testCase.output, "assert", 3))
+		invalidCases = append(invalidCases, invalid(testCase.code, testCase.output, "assert", 5, 1))
 		validCases = append(validCases, valid(testCase.output))
 	}
 

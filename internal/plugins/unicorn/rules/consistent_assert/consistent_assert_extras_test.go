@@ -33,13 +33,14 @@ func TestConsistentAssertExtras(t *testing.T) {
 				FileName:        "file.js",
 				LanguageOptions: rule.LanguageOptions{SourceType: "module"},
 				Output:          []string{aliasOutput},
-				Errors:          []rule_tester.InvalidTestCaseError{expectedError(aliasCode, "verify", 1)},
+				Errors:          []rule_tester.InvalidTestCaseError{expectedError("verify", 2, 1)},
 			},
 			invalid(
 				"import assert from 'node:assert';\n((assert))(value);",
 				"import assert from 'node:assert';\n((assert.ok))(value);",
 				"assert",
-				1,
+				2,
+				3,
 			),
 		},
 	)
