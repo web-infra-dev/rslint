@@ -1,6 +1,8 @@
 package no_duplicate_set_values_test
 
 import (
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
@@ -84,6 +86,36 @@ func TestNoDuplicateSetValuesExtras(t *testing.T) {
 
 			// Like upstream, a shadowed `Set` is still checked.
 			invalid(`function f(Set) { return new Set([1, 1]); }`, duplicate(1, 38, 39, "1")),
+		},
+	)
+}
+
+// TestNoDuplicateSetValuesLargeLiteral covers the indexed comparison path: a
+// generated allowlist of distinct static values reports only the real
+// duplicates, including a static value that repeats an unresolved reference.
+func TestNoDuplicateSetValuesLargeLiteral(t *testing.T) {
+	var elements []string
+	for i := range 10_000 {
+		elements = append(elements, strconv.Itoa(i))
+	}
+	elements = append(elements, "foo", "1e3", "foo")
+	code := "new Set([" + strings.Join(elements, ", ") + "]);"
+	column := func(element string) int { return strings.LastIndex(code, element) + 1 }
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t,
+		&no_duplicate_set_values.NoDuplicateSetValuesRule,
+		nil,
+		[]rule_tester.InvalidTestCase{
+			invalid(code,
+				duplicate(1, column("1e3"), column("1e3")+len("1e3"), "1e3"),
+				duplicate(1, column("foo"), column("foo")+len("foo"), "foo"),
+			),
+			// A static value never matches an unresolved reference by identity.
+			invalid("const foo = 1;\nnew Set([bar, foo, bar, 1]);",
+				duplicate(2, 20, 23, "bar"),
+				duplicate(2, 25, 26, "1"),
+			),
 		},
 	)
 }

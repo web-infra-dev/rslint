@@ -8,10 +8,11 @@ import (
 )
 
 // element is one checked array element. node is the ESTree element (nil for
-// a hole); value holds its comparable static value when known.
+// a hole); key is the SameValueZero key of its comparable static value when
+// known.
 type element struct {
 	node  *ast.Node
-	value any
+	key   any
 	known bool
 }
 
@@ -21,14 +22,20 @@ var NoDuplicateSetValuesRule = rule.Rule{
 	Schema: rule.EmptyArraySchema,
 	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		var evaluator *utils.StaticStringEvaluator
+		// staticValue returns the SameValueZero key of a side-effect-free
+		// comparable primitive (upstream isComparableStaticValue).
 		staticValue := func(node *ast.Node) (any, bool) {
 			if evaluator == nil {
 				evaluator = utils.NewStaticStringEvaluatorWithReferenceResolver(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
 				evaluator.GlobalAccess = ctx.Globals.Access
 			}
 			value, known := evaluator.EvalValueIfNoSideEffects(node)
-			return value, known && utils.IsPrimitiveStaticValue(value)
+			if !known {
+				return nil, false
+			}
+			return utils.StaticValueSameValueZeroKey(value)
 		}
+		undefinedKey, _ := utils.StaticValueSameValueZeroKey(utils.StaticUndefinedValue())
 
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
@@ -46,38 +53,74 @@ var NoDuplicateSetValuesRule = rule.Rule{
 					return
 				}
 
-				var checked []element
+				// Known primitives are indexed by their SameValueZero key, so a
+				// distinct static value costs O(1). Same-reference comparison only
+				// runs when one side has no static value: a known element checks
+				// the unresolved references, an unresolved one checks all.
+				var checked comparisons
 				for _, child := range array.AsArrayLiteralExpression().Elements.Nodes {
 					if ast.IsSpreadElement(child) {
 						continue
 					}
-					current := element{known: true, value: utils.StaticUndefinedValue()}
+					current := element{known: true, key: undefinedKey}
 					if !ast.IsOmittedExpression(child) {
 						current.node = utils.ESTreeRuntimeExpression(child)
-						current.value, current.known = staticValue(current.node)
+						current.key, current.known = staticValue(current.node)
 					}
-					for _, previous := range checked {
-						if isDuplicate(previous, current) {
-							report(ctx, iterable, current.node)
-							break
-						}
+					if checked.isDuplicate(current) {
+						report(ctx, iterable, current.node)
 					}
-					checked = append(checked, current)
+					checked.add(current)
 				}
 			},
 		}
 	},
 }
 
-func isDuplicate(left, right element) bool {
-	if left.known && right.known {
-		equal, _ := utils.StaticValuesSameValueZero(left.value, right.value)
-		return equal
+// comparisons holds the earlier elements of one array literal.
+type comparisons struct {
+	keys map[any]struct{}
+	// references are the earlier non-Literal expressions; unresolved is the
+	// subset without a static value.
+	references, unresolved []*ast.Node
+}
+
+func (c *comparisons) add(current element) {
+	if current.known {
+		if c.keys == nil {
+			c.keys = make(map[any]struct{})
+		}
+		c.keys[current.key] = struct{}{}
 	}
-	if left.node == nil || right.node == nil || isLiteral(left.node) || isLiteral(right.node) {
+	if current.node == nil || isLiteral(current.node) {
+		return
+	}
+	c.references = append(c.references, current.node)
+	if !current.known {
+		c.unresolved = append(c.unresolved, current.node)
+	}
+}
+
+// isDuplicate mirrors upstream isDuplicateValue against every earlier element:
+// two static values compare with SameValueZero, otherwise two non-Literal
+// expressions compare by reference.
+func (c *comparisons) isDuplicate(current element) bool {
+	candidates := c.references
+	if current.known {
+		if _, ok := c.keys[current.key]; ok {
+			return true
+		}
+		candidates = c.unresolved
+	}
+	if current.node == nil || isLiteral(current.node) {
 		return false
 	}
-	return unicornutil.IsSameReference(left.node, right.node)
+	for _, previous := range candidates {
+		if unicornutil.IsSameReference(previous, current.node) {
+			return true
+		}
+	}
+	return false
 }
 
 // isLiteral reports whether node is an ESTree Literal.

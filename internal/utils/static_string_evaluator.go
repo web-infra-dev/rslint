@@ -2431,6 +2431,58 @@ func staticValueKindOf(value any) staticValueKind {
 	return staticKindUnknown
 }
 
+// staticSameValueZeroKey is a comparable map key for a folded primitive.
+type staticSameValueZeroKey struct {
+	kind  staticValueKind
+	value any
+}
+
+// StaticValueSameValueZeroKey returns a comparable key such that two folded
+// primitives have equal keys exactly when StaticValuesSameValueZero reports
+// them equal, so callers can index values instead of comparing pairwise. It
+// reports false for values without a modeled primitive identity.
+func StaticValueSameValueZeroKey(value any) (any, bool) {
+	kind := staticValueKindOf(value)
+	switch kind {
+	case staticKindBigInt:
+		integer, ok := value.(*big.Int)
+		if !ok {
+			return nil, false
+		}
+		return staticSameValueZeroKey{kind, integer.String()}, true
+	case staticKindString:
+		text, _ := staticValueAsString(value)
+		return staticSameValueZeroKey{kind, text}, true
+	case staticKindNumber:
+		number, ok := staticValueToNumber(value)
+		if !ok {
+			return nil, false
+		}
+		if math.IsNaN(number) {
+			return staticSameValueZeroKey{kind, "NaN"}, true
+		}
+		if number == 0 {
+			number = 0 // SameValueZero: -0 and +0 share a key.
+		}
+		return staticSameValueZeroKey{kind, number}, true
+	case staticKindBoolean:
+		flag, ok := value.(bool)
+		if !ok {
+			return nil, false
+		}
+		return staticSameValueZeroKey{kind, flag}, true
+	case staticKindSymbol:
+		symbol, ok := value.(staticSymbolValue)
+		if !ok {
+			return nil, false
+		}
+		return staticSameValueZeroKey{kind, symbol}, true
+	case staticKindNull, staticKindUndefined:
+		return staticSameValueZeroKey{kind: kind}, true
+	}
+	return nil, false
+}
+
 // StaticValuesSameValueZero compares two folded primitives as JavaScript Map
 // keys. Aggregate values have no modeled identity.
 func StaticValuesSameValueZero(left, right any) (equal, known bool) {
