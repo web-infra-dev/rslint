@@ -42,7 +42,13 @@ No fix or suggestion is offered when the logical expression contains a comment o
 
 No fix or suggestion is offered either when the logical expression is called, used as a template tag, or deleted, such as `(object.method || object.method)()`. There the expression is a plain value, while the retained operand would be a reference that changes `this`, direct `eval` or `delete` behavior. A `new` target is still fixed.
 
+No fix or suggestion is offered when the retained operand would become the bare identifier operand of `typeof`, such as `typeof (missing || missing)`: the original throws a `ReferenceError` for an undeclared global, while `typeof missing` evaluates to `"undefined"`.
+
 The rule skips calls, optional chains, assignments, updates, complex computed keys, and code inside `with` statements because removing one side could change runtime behavior.
+
+## Differences from upstream
+
+eslint-plugin-unicorn v80.0.0 autofixes `typeof (missing || missing)` to `typeof (missing)`, which changes a `ReferenceError` into `"undefined"` when `missing` is not declared. Rslint still reports the duplicate but withholds the edit when the retained operand is a bare identifier under `typeof`. Member operands such as `typeof (a.b || a.b)` keep their suggestion.
 
 ## Original Documentation
 

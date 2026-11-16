@@ -72,6 +72,21 @@ func adjacentLeftOperand(expression *ast.BinaryExpression) *ast.Node {
 	return expression.Left
 }
 
+// exposesIdentifierToTypeof reports whether fixing node would leave a bare
+// identifier as the operand of `typeof`. `typeof (missing || missing)` throws a
+// ReferenceError for an undeclared global, while `typeof missing` evaluates to
+// "undefined", so that edit changes behavior. Upstream v80.0.0 does not guard
+// this; member operands are unaffected because `typeof a.b` still throws.
+func exposesIdentifierToTypeof(node *ast.Node, retained *ast.Node) bool {
+	if ast.SkipOuterExpressions(retained, typeScriptWrappers).Kind != ast.KindIdentifier {
+		return false
+	}
+	for node.Parent != nil && ast.IsOuterExpression(node.Parent, typeScriptWrappers) {
+		node = node.Parent
+	}
+	return node.Parent != nil && node.Parent.Kind == ast.KindTypeOfExpression
+}
+
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/no-duplicate-logical-operands.js
 var NoDuplicateLogicalOperandsRule = rule.Rule{
 	Name:   "unicorn/no-duplicate-logical-operands",
@@ -102,6 +117,7 @@ var NoDuplicateLogicalOperandsRule = rule.Rule{
 					// In a call, tag or delete position the logical expression is a
 					// value, while the retained operand would be a reference.
 					if unicornutil.IsReferenceContext(node) ||
+						exposesIdentifierToTypeof(node, expression.Left) ||
 						utils.HasCommentInSpan(ctx.Comments.All(), leftRange.End(), nodeRange.End()) {
 						return nil
 					}

@@ -104,6 +104,17 @@ func TestNoDuplicateLogicalOperandsExtras(t *testing.T) {
 			reported(`(object.method || object.method)<string>()`, "file.ts", 19, 32),
 			reported("(object.tag && object.tag)!`text`", "file.ts", 16, 26),
 			reported(`delete (value || value)!`, "file.ts", 18, 23),
+			// rslint difference: `typeof` hides a ReferenceError from a bare
+			// identifier, so `typeof (missing || missing)` is not fixed to
+			// `typeof (missing)`.
+			reported(`typeof (missing || missing)`, "file.js", 20, 27),
+			reported(`typeof (missing && missing);`, "file.js", 20, 27),
+			reported(`typeof ((missing || missing) as unknown)`, "file.ts", 21, 28),
+			// Member reads still throw under `typeof`, and a nested pair keeps a
+			// logical expression as the `typeof` operand.
+			suggested(`typeof (a.b || a.b)`, "file.js", `typeof (a.b)`, 16, 19),
+			fixed(`typeof (x || x || y)`, "file.js", `typeof (x || y)`, 14, 15),
+			fixed(`typeof (missing || missing).length`, "file.js", `typeof (missing).length`, 20, 27),
 			// Other operand positions keep their edits.
 			fixed(`call(foo || foo)`, "file.js", `call(foo)`, 13, 16),
 			{
