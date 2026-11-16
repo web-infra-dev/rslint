@@ -50,7 +50,8 @@ const y: any = fn();
 ## Notes
 
 - `eslint-disable` / `eslint-enable` and their variants are also supported for ESLint compatibility. The two prefixes can be mixed freely (e.g. `rslint-disable` paired with `eslint-enable`).
-- Both single-line (`//`) and multi-line (`/* */`) comment styles are supported.
+- Use block comments (`/* */`) for `disable` and `enable`. Line directives can also use `//` comments.
+- A `disable-line` comment must stay on one line. A `disable-next-line` block comment applies to the line after its closing `*/`.
 - Omitting rule names disables/enables all rules.
 - Multiple rule names can be separated by commas.
-- An inline description can be added after `--` (e.g., `rslint-disable-next-line no-console -- temporary workaround`).
+- To add a description, use two or more hyphens with whitespace on both sides (for example, `rslint-disable-next-line no-console -- temporary workaround`). In a block comment, the description can span lines or be empty.
