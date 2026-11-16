@@ -7,13 +7,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+// typeScriptWrappers mirrors upstream unwrapTypeScriptExpression: parentheses,
+// `as`, `<T>x`, `!`, `satisfies` and instantiation expressions such as `foo<T>`.
+const typeScriptWrappers = ast.OEKParentheses | ast.OEKAssertions | ast.OEKExpressionsWithTypeArguments
+
 // element is one checked array element. node is the ESTree element (nil for
-// a hole); key is the SameValueZero key of its comparable static value when
+// a hole), reported as authored; value is node without TypeScript wrappers,
+// which upstream compares through; key is the SameValueZero key of its comparable static value when
 // known.
 type element struct {
-	node  *ast.Node
-	key   any
-	known bool
+	node, value *ast.Node
+	key         any
+	known       bool
 }
 
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/no-duplicate-set-values.js
@@ -48,7 +53,7 @@ var NoDuplicateSetValuesRule = rule.Rule{
 				// A duplicate hole is reported on the authored argument, TypeScript
 				// wrappers included; the elements come from the unwrapped array.
 				iterable := utils.ESTreeRuntimeExpression(expression.Arguments.Nodes[0])
-				array := utils.SkipAssertionsAndParens(iterable)
+				array := ast.SkipOuterExpressions(iterable, typeScriptWrappers)
 				if !ast.IsArrayLiteralExpression(array) {
 					return
 				}
@@ -65,7 +70,8 @@ var NoDuplicateSetValuesRule = rule.Rule{
 					current := element{known: true, key: undefinedKey}
 					if !ast.IsOmittedExpression(child) {
 						current.node = utils.ESTreeRuntimeExpression(child)
-						current.key, current.known = staticValue(current.node)
+						current.value = ast.SkipOuterExpressions(current.node, typeScriptWrappers)
+						current.key, current.known = staticValue(current.value)
 					}
 					if checked.isDuplicate(current) {
 						report(ctx, iterable, current.node)
@@ -95,9 +101,9 @@ func (c *comparisons) add(current element) {
 	if current.node == nil || isLiteral(current.node) {
 		return
 	}
-	c.references = append(c.references, current.node)
+	c.references = append(c.references, current.value)
 	if !current.known {
-		c.unresolved = append(c.unresolved, current.node)
+		c.unresolved = append(c.unresolved, current.value)
 	}
 }
 
@@ -116,7 +122,7 @@ func (c *comparisons) isDuplicate(current element) bool {
 		return false
 	}
 	for _, previous := range candidates {
-		if unicornutil.IsSameReference(previous, current.node) {
+		if unicornutil.IsSameReference(previous, current.value) {
 			return true
 		}
 	}

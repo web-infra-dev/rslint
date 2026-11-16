@@ -90,6 +90,28 @@ func TestNoDuplicateSetValuesExtras(t *testing.T) {
 	)
 }
 
+// TestNoDuplicateSetValuesInstantiationExpressions covers TypeScript
+// instantiation expressions, which upstream unwraps like other TypeScript
+// wrappers around the argument, static values and references.
+func TestNoDuplicateSetValuesInstantiationExpressions(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(), "tsconfig.json", t,
+		&no_duplicate_set_values.NoDuplicateSetValuesRule,
+		[]rule_tester.ValidTestCase{
+			validTS(`new Set([foo<A>, bar<A>]);`),
+		},
+		[]rule_tester.InvalidTestCase{
+			invalidTS(`new Set([foo<string>, foo]);`, duplicate(1, 23, 26, "foo")),
+			invalidTS(`new Set([foo.bar<T>, foo.bar]);`, duplicate(1, 22, 29, "foo.bar")),
+			invalidTS(`new Set([foo<A>, foo<B>]);`, duplicate(1, 18, 24, "foo<B>")),
+			invalidTS(`new Set([foo?.bar<T>, foo.bar]);`, duplicate(1, 23, 30, "foo.bar")),
+			invalidTS(`const a = 1; new Set([a<T>, 1]);`, duplicate(1, 29, 30, "1")),
+			invalidTS(`new Set([1, 1]<string>);`, duplicate(1, 13, 14, "1")),
+			invalidTS(`new Set([,,]<x>);`, duplicate(1, 9, 16, "undefined")),
+		},
+	)
+}
+
 // TestNoDuplicateSetValuesLargeLiteral covers the indexed comparison path: a
 // generated allowlist of distinct static values reports only the real
 // duplicates, including a static value that repeats an unresolved reference.
