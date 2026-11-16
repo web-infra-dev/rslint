@@ -193,8 +193,6 @@ Promise.resolve().catch((err: unknown) => {
         let method = 'catch';
         Promise.resolve()[method]((error: Error) => {});
       `,
-			// TODO(port): method's type is string. So getAccessedPropertyName doesn't support it. Do we even need to support such cases?
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "useUnknown",

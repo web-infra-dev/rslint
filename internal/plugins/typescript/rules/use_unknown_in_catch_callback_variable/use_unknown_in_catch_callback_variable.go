@@ -61,6 +61,7 @@ var UseUnknownInCatchCallbackVariableRule = rule.CreateRule(rule.Rule{
 	Schema:           rule.EmptyArraySchema,
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		var evaluator *utils.StaticStringEvaluator
 		var collectFlaggedNodes func(node *ast.Node) []*ast.Node
 
 		isFlaggableHandlerType := func(t *checker.Type) bool {
@@ -117,15 +118,25 @@ var UseUnknownInCatchCallbackVariableRule = rule.CreateRule(rule.Rule{
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				expr := node.AsCallExpression()
-				callee := expr.Expression
+				callee := ast.SkipParentheses(expr.Expression)
 
 				if !ast.IsAccessExpression(callee) {
 					return
 				}
 
-				propertyName, found := checker.Checker_getAccessedPropertyName(ctx.TypeChecker, callee)
+				// Match the statically evaluated key, not just its TypeScript type.
+				// A stable let binding can have type string but value "catch";
+				// an ambient literal-typed binding has no known runtime value.
+				propertyName, found := utils.AccessExpressionStaticName(callee)
 				if !found {
-					return
+					if evaluator == nil {
+						evaluator = utils.NewStaticStringEvaluatorWithCallEscapes(ctx.TypeChecker, ctx.SourceFile, ctx.Refs)
+						evaluator.GlobalAccess = ctx.Globals.Access
+					}
+					propertyName, found = evaluator.EvalAccessExpressionName(callee)
+					if !found {
+						return
+					}
 				}
 
 				var method string

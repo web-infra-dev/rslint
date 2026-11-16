@@ -23,6 +23,29 @@ promise.then(undefined, (err: unknown) => {});
 promise.catch((...args: [unknown]) => {});
 ```
 
+## Differences from Upstream
+
+Rslint avoids evaluating array and string spreads with the default iterator when
+the corresponding prototype may have been modified. typescript-eslint v8.67.0
+can still use the default iterator and mistake a fulfillment callback for a
+rejection callback in this situation:
+
+```typescript
+Array.prototype[Symbol.iterator] = function* () {
+  yield 'then';
+  return undefined;
+};
+const names = [...['catch']];
+const key = names[0];
+Promise.resolve(1)[key as 'then'](
+  (value: number) => value + 1,
+  (error: unknown) => {},
+);
+```
+
+The call executes `then`, so Rslint does not suggest changing `value` to `unknown`.
+The same safeguard applies to a modified `String.prototype[Symbol.iterator]`.
+
 ## Original Documentation
 
 - [typescript-eslint: use-unknown-in-catch-callback-variable](https://typescript-eslint.io/rules/use-unknown-in-catch-callback-variable)

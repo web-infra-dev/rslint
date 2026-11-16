@@ -825,6 +825,161 @@ const selfRead = selfMutating[0];`
 	})
 }
 
+func TestStaticStringEvaluatorCallEscapes(t *testing.T) {
+	for _, test := range []struct {
+		name, operation, expression string
+		known                       bool
+	}{
+		{"captured prototype reference", "const holder = {__proto__: methods}; unknown(methods);", "holder.current", false},
+		{"captured quoted prototype reference", "const holder = {\"__proto__\": methods}; unknown(methods);", "holder.current", false},
+		{"captured prototype alias", "const proto = methods; const holder = {__proto__: proto}; unknown(methods);", "holder.current", false},
+		{"captured nested prototype", "const holder = {__proto__: {__proto__: methods}}; unknown(methods);", "holder.current", false},
+		{"stable prototype reference", "const holder = {__proto__: methods};", "holder.current", true},
+		{"primitive copied from prototype", "const holder = {__proto__: methods}; const key = holder.current; unknown(methods);", "key", true},
+		{"null prototype capture", "const holder = {__proto__: null, current: methods.current}; unknown(methods);", "holder.current", true},
+		{"ignored primitive prototype", "const holder = {__proto__: 1, current: methods.current}; unknown(methods);", "holder.current", true},
+		{"own property shadows prototype", "const holder = {__proto__: methods, current: \"catch\"}; unknown(methods);", "holder.current", true},
+		{"object spread omits prototype", "const holder = {__proto__: methods, current: \"catch\"}; unknown({...holder});", "methods.current", true},
+		{"computed proto is own reference", "const holder = {[\"__proto__\"]: methods}; unknown(methods);", "holder.__proto__.current", false},
+		{"nested array capture after iterator mutation", "Array.prototype[Symbol.iterator] = function*() { yield \"then\"; }; const copy = [...[\"catch\"]]; const key = copy[0];", "key", false},
+		{"nested string capture after iterator mutation", "String.prototype[Symbol.iterator] = function*() { yield \"then\"; }; const copy = [...\"catch\"]; const key = copy;", "key.join(\"\")", false},
+		{"nested array capture with ordinary iterator", "const copy = [...[\"catch\"]]; const key = copy[0];", "key", true},
+		{"nested string capture with ordinary iterator", "const copy = [...\"catch\"]; const key = copy;", "key.join(\"\")", true},
+		{"array capture with unrelated string iterator mutation", "String.prototype[Symbol.iterator] = function*() { yield \"then\"; }; const copy = [...[\"catch\"]]; const key = copy[0];", "key", true},
+		{"binding transfer in argument", "let holder = {}; unknown(holder, (holder = methods, 0));", "methods.current", false},
+		{"property transfer in argument", "const holder = {}; unknown(holder, (holder.item = methods, 0));", "methods.current", false},
+		{"assign transfer in argument", "const holder = {}; unknown(holder, (Object.assign(holder, {methods}), 0));", "methods.current", false},
+		{"define property transfer in argument", "const holder = {}; unknown(holder, (Object.defineProperty(holder, \"item\", {value: methods}), 0));", "methods.current", false},
+		{"define properties transfer in argument", "const holder = {}; unknown(holder, (Object.defineProperties(holder, {item: {value: methods}}), 0));", "methods.current", false},
+		{"reflect set transfer in argument", "const holder = {}; unknown(holder, (Reflect.set(holder, \"item\", methods), 0));", "methods.current", false},
+		{"reflect define transfer in argument", "const holder = {}; unknown(holder, (Reflect.defineProperty(holder, \"item\", {value: methods}), 0));", "methods.current", false},
+		{"builtin alias transfer in argument", "const holder = {}; const assign = Object.assign; unknown(holder, (assign(holder, {methods}), 0));", "methods.current", false},
+		{"computed builtin transfer in argument", "const holder = {}; const key = \"assign\"; unknown(holder, (Object[key](holder, {methods}), 0));", "methods.current", false},
+		{"transfer in constructor argument", "const holder = {}; new callable(holder, (Object.assign(holder, {methods}), 0));", "methods.current", false},
+		{"transfer in template substitution", "const holder = {}; callable`${holder}${(Object.assign(holder, {methods}), 0)}`;", "methods.current", false},
+		{"transfer in callee expression", "const holder = {}; (Object.assign(holder, {methods}), unknown)(holder);", "methods.current", false},
+		{"transfer in optional call argument", "const holder = {}; callable?.(holder, (Object.assign(holder, {methods}), 0));", "methods.current", false},
+		{"nested transfer under argument", "const holder = {}; unknown(holder, callable((Object.assign(holder, {methods}), 0)));", "methods.current", false},
+		{"primitive assign in argument", "const holder = {}; unknown(holder, (Object.assign(holder, methods), 0));", "methods.current", true},
+		{"transfer in following argument after earlier call", "const holder = {}; function noop(...args: any[]) {} noop(unknown(holder), (Object.assign(holder, {methods}), 0));", "methods.current", true},
+		{"transfer after invocation in same expression", "const holder = {}; (unknown(holder), Object.assign(holder, {methods}));", "methods.current", true},
+		{"transfer before invocation in same expression", "const holder = {}; (Object.assign(holder, {methods}), unknown(holder));", "methods.current", false},
+		{"set prototype transfer", `const holder = {}; Object.setPrototypeOf(holder, {methods}); unknown(holder);`, `methods.current`, false},
+		{"reflect prototype transfer", `const holder = {}; Reflect.setPrototypeOf(holder, {methods}); unknown(holder);`, `methods.current`, false},
+		{"prototype transfer in argument", `const holder = {}; unknown(holder, (Object.setPrototypeOf(holder, {methods}), 0));`, `methods.current`, false},
+		{"prototype transfer after call", `const holder = {}; unknown(holder); Object.setPrototypeOf(holder, {methods});`, `methods.current`, true},
+		{"own captured property shadows prototype", `const holder = {__proto__: methods, current: methods.current}; unknown(methods);`, `holder.current`, true},
+		{"own captured property through alias", `const holder = {__proto__: methods, current: methods.current}; const alias = holder; unknown(methods);`, `alias.current`, true},
+		{"own captured property mutated through alias", `const holder = {__proto__: methods, current: methods.current}; const alias = holder; unknown(alias);`, `holder.current`, false},
+		{"own captured property with spread", `const holder = {__proto__: methods, ...{current: methods.current}}; unknown(methods);`, `holder.current`, true},
+		{"parameter mutation", `function change(holder: typeof methods) { holder.current = "then"; } change(methods);`, `methods.current`, false},
+		{"unknown function", `unknown(methods);`, `methods.current`, false},
+		{"alias", `const alias = methods; unknown(alias);`, `methods.current`, false},
+		{"later binding transfer", `let alias = {current: "then"}; alias = methods; unknown(alias);`, `methods.current`, false},
+		{"conditional binding transfer", `let alias = {current: "then"}; if (condition) alias = methods; unknown(alias);`, `methods.current`, false},
+		{"binding transfer after call", `let alias = {current: "then"}; unknown(alias); alias = methods;`, `methods.current`, true},
+		{"overwritten binding transfer", `let alias = {current: "then"}; alias = methods; alias = {current: "then"}; unknown(alias);`, `methods.current`, true},
+		{"captured primitive", `const key = methods.current; unknown(methods);`, `key`, true},
+		{"captured primitive alias", `const key = methods.current; unknown(methods); const second = key;`, `second`, true},
+		{"captured primitive derived value", `const key = methods.current; unknown(methods); const second = key + "";`, `second`, true},
+		{"primitive captured in container", `const holder = {key: methods.current}; unknown(methods);`, `holder.key`, true},
+		{"reference retained in container", `const holder = {methods}; unknown(methods);`, `holder.methods.current`, false},
+		{"capture after mutation", `unknown(methods); const key = methods.current;`, `key`, false},
+		{"assigned container transfer", `const holder = {}; Object.assign(holder, {methods}); unknown(holder);`, `methods.current`, false},
+		{"reassigned holder transfer", `const holder = {}; let alias = {}; alias = holder; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"holder transfer after unrelated call", `const holder = {}; let alias = {}; unknown(holder); alias = holder; alias.item = methods;`, `methods.current`, true},
+		{"defined container transfer", `const holder = {}; Object.defineProperty(holder, "item", {value: methods}); unknown(holder);`, `methods.current`, false},
+		{"reflect container transfer", `const holder = {}; Reflect.defineProperty(holder, "item", {value: methods}); unknown(holder);`, `methods.current`, false},
+		{"copied primitive container", `const holder = {}; Object.assign(holder, methods); unknown(holder);`, `methods.current`, true},
+		{"object wrapper", `unknown({methods});`, `methods.current`, false},
+		{"array wrapper", `unknown([methods]);`, `methods.current`, false},
+		{"nested wrapper", `unknown({nested: [methods]});`, `methods.current`, false},
+		{"destructured alias", `const {item: alias} = {item: methods}; unknown(alias);`, `methods.current`, false},
+		{"conditional argument", `unknown(condition ? methods : {});`, `methods.current`, false},
+		{"logical argument", `unknown(methods || {});`, `methods.current`, false},
+		{"sequence argument", `unknown((0, methods));`, `methods.current`, false},
+		{"method argument", `callable.change(methods);`, `methods.current`, false},
+		{"method receiver", `methods.change();`, `methods.current`, false},
+		{"call receiver", `callable.call(methods);`, `methods.current`, false},
+		{"apply arguments", `callable.apply(null, [methods]);`, `methods.current`, false},
+		{"bound argument", `callable.bind(null, methods);`, `methods.current`, false},
+		{"constructor", `new callable(methods);`, `methods.current`, false},
+		{"spread arguments", `unknown(...[methods]);`, `methods.current`, false},
+		{"optional call", `callable?.(methods);`, `methods.current`, false},
+		{"tagged template", "callable`key ${methods}`;", `methods.current`, false},
+		{"array argument", `unknown(names);`, `names[0]`, false},
+		{"shallow freeze", `unknown(Object.freeze({methods}));`, `methods.current`, false},
+		{"object rest nested reference", `const {...copy} = {methods}; unknown(copy);`, `methods.current`, false},
+		{"spread nested reference", `unknown({...{methods}});`, `methods.current`, false},
+		{"factory nested reference", `unknown(Array.of(methods));`, `methods.current`, false},
+		{"assign nested reference", `unknown(Object.assign({}, {methods}));`, `methods.current`, false},
+		{"returned closure reference", `unknown(() => methods);`, `methods.current`, false},
+		{"function declaration reference", `function get() { return methods; } unknown(get);`, `methods.current`, false},
+		{"nested returned callback", `unknown(() => () => methods);`, `methods.current`, false},
+		{"stored after initializer", `const holder = {}; holder.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through holder alias", `const holder = {}; const alias = holder; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through destructured alias", `const holder = {}; const {item: alias} = {item: holder}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through default alias", `const holder = {}; const {alias = holder} = {}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through nested default alias", `const holder = {}; const {outer: {alias} = {alias: holder}} = {}; alias.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through nested holder", `const holder = {nested: {}}; holder.nested.item = methods; unknown(holder);`, `methods.current`, false},
+		{"stored through referenced member", `const other = {current: "catch"}; const holder = {nested: other}; holder.nested.item = methods; unknown(other);`, `methods.current`, false},
+		{"callback publishes reference", `unknown((holder: any) => { holder.item = methods; });`, `methods.current`, false},
+		{"callback throws reference", `unknown(() => { throw methods; });`, `methods.current`, false},
+		{"generator yields reference", `unknown(function*() { yield methods; });`, `methods.current`, false},
+		{"class returns reference", `class Factory { constructor() { return methods; } } unknown(new Factory());`, `methods.current`, false},
+		{"getter exposes reference", `unknown({get item() { return methods; }});`, `methods.current`, false},
+		{"primitive binding", `let key = "catch"; unknown(key);`, `key`, true},
+		{"primitive member argument", `unknown(methods.current);`, `methods.current`, true},
+		{"primitive callback result", `unknown(() => methods.current);`, `methods.current`, true},
+		{"unused nested function", `unknown(() => { function unused() { return methods; } });`, `methods.current`, true},
+		{"primitive object spread", `unknown({...methods});`, `methods.current`, true},
+		{"primitive array spread", `unknown([...names]);`, `names[0]`, true},
+		{"primitive object rest", `const {...copy} = methods; unknown(copy);`, `methods.current`, true},
+		{"primitive array rest", `const [...copy] = names; unknown(copy);`, `names[0]`, true},
+		{"primitive array factory copy", `unknown(Array.of(...names));`, `names[0]`, true},
+		{"primitive assign copy", `unknown(Object.assign({}, methods));`, `methods.current`, true},
+		{"private stored reference", `const holder = {}; holder.item = methods;`, `methods.current`, true},
+		{"store into fresh rest copy", `const holder = {}; const {...copy} = holder; copy.item = methods; unknown(holder);`, `methods.current`, true},
+		{"string conversion", `const key = String(names);`, `key`, true},
+		{"array join", `const key = names.join("");`, `key`, true},
+		{"empty function", `function noop(value: unknown) {} noop(methods);`, `methods.current`, true},
+		{"empty method", `const handler = {noop(value: unknown) {}}; handler.noop(methods);`, `methods.current`, true},
+		{"overwritten empty function", `let noop = (value: unknown) => {}; noop = callable; noop(methods);`, `methods.current`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := fixtures.GetRootDir()
+			filePath := tspath.ResolvePath(root.Dir, "call-escape.ts")
+			code := `const methods = {current: "catch"}; const names = ["catch"];
+declare function unknown(...args: any[]): any;
+declare const callable: any;
+declare const condition: boolean;
+` + test.operation + ` const result = ` + test.expression + `;`
+			fs := NewOverlayVFS(root.FS, map[string]string{filePath: code})
+			program, err := CreateProgram(true, fs, root.Dir, "tsconfig.json", CreateCompilerHost(root.Dir, fs))
+			assert.NilError(t, err)
+			sourceFile := program.GetSourceFile(filePath)
+			assert.Assert(t, sourceFile != nil)
+			typeChecker, done := program.GetTypeChecker(t.Context())
+			defer done()
+			for _, resolution := range []string{"checker", "references"} {
+				t.Run(resolution, func(t *testing.T) {
+					evaluator := NewStaticStringEvaluatorWithCallEscapes(typeChecker, sourceFile, nil)
+					if resolution == "references" {
+						resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: sourceFile.Locals}}
+						evaluator = NewStaticStringEvaluatorWithCallEscapes(nil, sourceFile, resolver)
+					}
+					for range 2 {
+						value, known := evaluator.Eval(findVariableInitializer(t, sourceFile, "result"))
+						if known != test.known || known && value != "catch" {
+							t.Fatalf("result = (%q, %v), want known = %v", value, known, test.known)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestStaticStringEvaluatorIteratorPrototypeMutations(t *testing.T) {
 	for _, test := range []struct {
 		name, mutation              string
