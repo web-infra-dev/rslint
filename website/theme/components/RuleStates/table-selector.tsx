@@ -75,7 +75,6 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
   statuses = [
     { value: 'full', label: 'Full' },
     { value: 'partial-impl', label: 'Partial Implemented' },
-    { value: 'partial-test', label: 'Partial Tested' },
     { value: 'total', label: 'Total' },
   ],
   presetOptions = [],

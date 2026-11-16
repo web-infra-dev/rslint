@@ -12,13 +12,9 @@ const MANIFEST_PATH = path.join(
 );
 
 function getCoreRuleEntries(coreRulesDir) {
-  // Collect rule directories from internal/rules/*
-  if (!fs.existsSync(coreRulesDir)) return [];
-
-  return fs
-    .readdirSync(coreRulesDir, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
-    .map((d) => ({ rule: d.name, group: 'eslint', pluginDir: null }));
+  return getRuleDirectories(coreRulesDir)
+    .filter((rule) => !rule.includes('/'))
+    .map((rule) => ({ rule, group: 'eslint', pluginDir: null }));
 }
 
 function getPluginRuleEntries(pluginsDir) {
@@ -82,9 +78,7 @@ function getIncludedRuleTests(ruleEntries, configPath, testsBaseDir) {
   // so the returned map lives entirely in the `group` namespace.
   const testDirToGroup = new Map(groups.map((g) => [groupToTestDir(g), g]));
   // Fail loudly if a group's expected test directory is missing: otherwise
-  // every rule in that group silently degrades to partial-test, and because
-  // the manifest is gitignored and built at site-build time the flip would
-  // never surface in a diff.
+  // skipped cases could silently disappear from the generated manifest.
   for (const [testDir] of testDirToGroup) {
     const dir = path.join(testsBaseDir, testDir);
     if (!fs.existsSync(dir)) {
@@ -333,9 +327,7 @@ function buildManifest(repoRoot = REPO_ROOT) {
       let failing_case = [];
       const group = entry.group;
       const testFiles = included.get(ruleKey(group, rule));
-      if (!testFiles) {
-        status = 'partial-test';
-      } else {
+      if (testFiles) {
         const skipCases = Array.from(testFiles).flatMap((file) =>
           getSkipCases(file, repoRoot),
         );
