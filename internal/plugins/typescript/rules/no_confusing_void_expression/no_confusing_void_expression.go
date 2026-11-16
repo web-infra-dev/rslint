@@ -2,6 +2,7 @@ package no_confusing_void_expression
 
 import (
 	_ "embed"
+	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -84,6 +85,75 @@ func parseOptions(options []any) NoConfusingVoidExpressionOptions {
 		opts.IgnoreVoidReturningFunctions = value
 	}
 	return opts
+}
+
+// statementExpression converts an expression to statement position without
+// reprinting its contents. Parentheses inside callees/receivers are significant:
+// GetLeftmostExpression deliberately stops at those authored parentheses.
+func statementExpression(file *ast.SourceFile, expression *ast.Node) (string, ast.Kind) {
+	inner := ast.SkipParentheses(expression)
+	outerRange := utils.TrimNodeTextRange(file, expression)
+	innerRange := utils.TrimNodeTextRange(file, inner)
+	text := file.Text()
+	leftmost := ast.GetLeftmostExpression(inner, false)
+	needsParens := false
+	switch leftmost.Kind {
+	case ast.KindFunctionExpression, ast.KindClassExpression, ast.KindObjectLiteralExpression:
+		needsParens = true
+	case ast.KindIdentifier:
+		// `let [` is a lexical declaration in statement position, even if
+		// the original expression was an element access on an identifier.
+		if leftmost.AsIdentifier().Text == "let" {
+			needsParens = scanner.ScanTokenAtPosition(file, leftmost.End()) == ast.KindOpenBracketToken
+		}
+	}
+
+	if expression != inner {
+		// Only grouping delimiters and trivia are outside the inner node;
+		// a slash in either span belongs to a comment, not a string/regexp.
+		hasComment := strings.Contains(text[outerRange.Pos():innerRange.Pos()], "/") ||
+			strings.Contains(text[innerRange.End():outerRange.End()], "/")
+		if needsParens || hasComment {
+			return text[outerRange.Pos():outerRange.End()], ast.KindOpenParenToken
+		}
+	}
+
+	expressionText := text[innerRange.Pos():innerRange.End()]
+	if needsParens {
+		return "(" + expressionText + ")", ast.KindOpenParenToken
+	}
+	return expressionText, scanner.ScanTokenAtPosition(file, innerRange.Pos())
+}
+
+func needsStatementSeparator(firstToken ast.Kind) bool {
+	switch firstToken {
+	case ast.KindOpenParenToken, ast.KindOpenBracketToken,
+		ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateHead,
+		ast.KindPlusToken, ast.KindMinusToken, ast.KindPlusPlusToken, ast.KindMinusMinusToken,
+		ast.KindSlashToken, ast.KindSlashEqualsToken, ast.KindRegularExpressionLiteral,
+		ast.KindLessThanToken:
+		return true
+	}
+	return false
+}
+
+func returnStatementText(file *ast.SourceFile, statement *ast.Node) string {
+	expression := statement.AsReturnStatement().Expression
+	expressionText, firstToken := statementExpression(file, expression)
+	expressionRange := utils.TrimNodeTextRange(file, expression)
+	keyword := scanner.GetRangeOfTokenAtPosition(file, statement.Pos())
+	// Remove the keyword and its whitespace, retaining comments on either
+	// side of the expression and every line break after a line comment.
+	triviaStart := scanner.SkipTriviaEx(file.Text(), keyword.End(), &scanner.SkipTriviaOptions{StopAtComments: true})
+	text := file.Text()[triviaStart:expressionRange.Pos()] + expressionText +
+		file.Text()[expressionRange.End():statement.End()]
+	if file.Text()[statement.End()-1] != ';' {
+		text += ";"
+	}
+	if needsStatementSeparator(firstToken) {
+		text = ";" + text
+	}
+	return text
 }
 
 var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
@@ -248,9 +318,9 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 				var fixes []rule.RuleFix
 				body := invalidAncestor.Body()
 				if !ast.IsBlock(body) && canFix(body) {
-					withoutParens := ast.SkipParentheses(body)
+					bodyText, _ := statementExpression(ctx.SourceFile, body)
 					fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, body,
-						"{ "+utils.TrimmedNodeText(ctx.SourceFile, withoutParens)+"; }")}
+						"{ "+bodyText+"; }")}
 				}
 
 				ctx.ReportNodeWithFixes(node, buildInvalidVoidExprArrowMessage(), fixes...)
@@ -272,29 +342,25 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 				}
 
 				expr := invalidAncestor.AsReturnStatement().Expression
-				// ESTree excludes grouping parentheses from the return argument.
-				expr = ast.SkipParentheses(expr)
-				replacement := utils.TrimmedNodeText(ctx.SourceFile, expr) + ";"
-				token := scanner.ScanTokenAtPosition(ctx.SourceFile, expr.Pos())
-				if token == ast.KindOpenParenToken || token == ast.KindOpenBracketToken || token == ast.KindBacktickToken {
-					replacement = ";" + replacement
-				}
-
-				if isFinalReturn(invalidAncestor) {
-					var fixes []rule.RuleFix
-					if canFix(expr) {
-						fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, invalidAncestor, replacement)}
+				finalReturn := isFinalReturn(invalidAncestor)
+				var fixes []rule.RuleFix
+				// Every value-discarding rewrite needs this guard, including
+				// early returns whose other branch may return a non-void value.
+				if canFix(expr) {
+					replacement := returnStatementText(ctx.SourceFile, invalidAncestor)
+					if !finalReturn {
+						replacement += " return;"
+						if !ast.IsBlock(invalidAncestor.Parent) {
+							replacement = "{ " + replacement + " }"
+						}
 					}
+					fixes = []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, invalidAncestor, replacement)}
+				}
+				if finalReturn {
 					ctx.ReportNodeWithFixes(node, buildInvalidVoidExprReturnLastMessage(), fixes...)
-					return
+				} else {
+					ctx.ReportNodeWithFixes(node, buildInvalidVoidExprReturnMessage(), fixes...)
 				}
-
-				replacement += " return;"
-				if !ast.IsBlock(invalidAncestor.Parent) {
-					replacement = "{ " + replacement + " }"
-				}
-				fixes := []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, invalidAncestor, replacement)}
-				ctx.ReportNodeWithFixes(node, buildInvalidVoidExprReturnMessage(), fixes...)
 				return
 			}
 
