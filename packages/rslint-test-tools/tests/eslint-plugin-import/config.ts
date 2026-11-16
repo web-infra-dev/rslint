@@ -96,9 +96,11 @@ export function fixtureUpperRoot(root: string): string {
 export function resolveFixturePaths<T>(value: T, root: string): T {
   const resolve = (item: unknown): unknown => {
     if (typeof item === 'string')
-      return item
-        .replaceAll('<fixture-upper>', fixtureUpperRoot(root))
-        .replaceAll('<fixture>', root.replaceAll(path.sep, '/'));
+      return item.replace(/<fixture(?:-upper)?>/g, (placeholder) =>
+        placeholder === '<fixture-upper>'
+          ? fixtureUpperRoot(root)
+          : root.replaceAll(path.sep, '/'),
+      );
     if (Array.isArray(item)) return item.map(resolve);
     if (item && typeof item === 'object')
       return Object.fromEntries(
@@ -107,4 +109,19 @@ export function resolveFixturePaths<T>(value: T, root: string): T {
     return item;
   };
   return resolve(value) as T;
+}
+
+// Source literals need escaping; diagnostic messages keep the actual path spelling.
+export function fixturePathLiteral(
+  value: string,
+  root: string,
+  quote: "'" | '"' = '"',
+): string {
+  const escaped = JSON.stringify(resolveFixturePaths(value, root))
+    .slice(1, -1)
+    .replaceAll('\u2028', '\\u2028')
+    .replaceAll('\u2029', '\\u2029');
+  return quote === '"'
+    ? `"${escaped}"`
+    : `'${escaped.replaceAll('\\"', '"').replaceAll("'", "\\'")}'`;
 }

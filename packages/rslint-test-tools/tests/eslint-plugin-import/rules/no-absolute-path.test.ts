@@ -1,7 +1,7 @@
 // Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
 // Assertions record current native output; skipped inputs retain their upstream assertions.
 import { RuleTester } from '@rslint/rule-tester';
-import { fixtureConfig, resolveFixturePaths } from '../config';
+import { fixtureConfig, fixturePathLiteral } from '../config';
 new RuleTester(fixtureConfig()).run('no-absolute-path', {
   valid: [
     {
@@ -144,9 +144,10 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
     {
       name: 'run 0 invalid 0',
       create(root: string) {
-        const code = resolveFixturePaths('import f from "<fixture>/foo"', root);
+        const literal = fixturePathLiteral('<fixture>/foo', root);
+        const code = `import f from ${literal}`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -155,22 +156,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 21 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from ".."', root),
+          output: 'import f from ".."',
         };
       },
     },
     {
       name: 'run 0 invalid 1',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import f from "<fixture>/foo/bar/baz.js"',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo/bar/baz.js', root);
+        const code = `import f from ${literal}`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -179,22 +178,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 32 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "./baz.js"', root),
+          output: 'import f from "./baz.js"',
         };
       },
     },
     {
       name: 'run 0 invalid 2',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import f from "<fixture>/foo/path"',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo/path', root);
+        const code = `import f from ${literal}`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -203,22 +200,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 26 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "../path"', root),
+          output: 'import f from "../path"',
         };
       },
     },
     {
       name: 'run 0 invalid 3',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import f from "<fixture>/some/path"',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `import f from ${literal}`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -227,22 +222,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 27 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "../../some/path"', root),
+          output: 'import f from "../../some/path"',
         };
       },
     },
     {
       name: 'run 0 invalid 4',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import f from "<fixture>/some/path"',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `import f from ${literal}`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           options: [
             {
@@ -256,22 +249,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 27 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "../../some/path"', root),
+          output: 'import f from "../../some/path"',
         };
       },
     },
     {
       name: 'run 0 invalid 5',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'var f = require("<fixture>/foo")',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo', root);
+        const code = `var f = require(${literal})`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -280,22 +271,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 23 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths('var f = require("..")', root),
+          output: 'var f = require("..")',
         };
       },
     },
     {
       name: 'run 0 invalid 6',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'var f = require("<fixture>/foo/path")',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo/path', root);
+        const code = `var f = require(${literal})`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -304,22 +293,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 28 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths('var f = require("../path")', root),
+          output: 'var f = require("../path")',
         };
       },
     },
     {
       name: 'run 0 invalid 7',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'var f = require("<fixture>/some/path")',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `var f = require(${literal})`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -328,25 +315,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 29 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'var f = require("../../some/path")',
-            root,
-          ),
+          output: 'var f = require("../../some/path")',
         };
       },
     },
     {
       name: 'run 0 invalid 8',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'var f = require("<fixture>/some/path")',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `var f = require(${literal})`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           options: [
             {
@@ -360,25 +342,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 29 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'var f = require("../../some/path")',
-            root,
-          ),
+          output: 'var f = require("../../some/path")',
         };
       },
     },
     {
       name: 'run 0 invalid 9',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'require(["<fixture>/some/path"], function (f) { /* ... */ })',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `require([${literal}], function (f) { /* ... */ })`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           options: [
             {
@@ -392,25 +369,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 10,
               endLine: 1,
-              endColumn: 22 + 1 * root.length,
+              endColumn: 10 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'require(["../../some/path"], function (f) { /* ... */ })',
-            root,
-          ),
+          output: 'require(["../../some/path"], function (f) { /* ... */ })',
         };
       },
     },
     {
       name: 'run 0 invalid 10',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'define(["<fixture>/some/path"], function (f) { /* ... */ })',
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root);
+        const code = `define([${literal}], function (f) { /* ... */ })`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           options: [
             {
@@ -424,25 +396,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 9,
               endLine: 1,
-              endColumn: 21 + 1 * root.length,
+              endColumn: 9 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'define(["../../some/path"], function (f) { /* ... */ })',
-            root,
-          ),
+          output: 'define(["../../some/path"], function (f) { /* ... */ })',
         };
       },
     },
     {
       name: 'run 0 invalid 11',
       create(root: string) {
-        const code = resolveFixturePaths(
-          "import f from '<fixture>/foo';",
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo', root, "'");
+        const code = `import f from ${literal};`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -451,22 +418,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 21 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "..";', root),
+          output: 'import f from "..";',
         };
       },
     },
     {
       name: 'run 0 invalid 12',
       create(root: string) {
-        const code = resolveFixturePaths(
-          "import f from '<fixture>/some/path';",
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root, "'");
+        const code = `import f from ${literal};`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -475,22 +440,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 15,
               endLine: 1,
-              endColumn: 27 + 1 * root.length,
+              endColumn: 15 + literal.length,
             },
           ],
-          output: resolveFixturePaths('import f from "../../some/path";', root),
+          output: 'import f from "../../some/path";',
         };
       },
     },
     {
       name: 'run 0 invalid 13',
       create(root: string) {
-        const code = resolveFixturePaths(
-          "var f = require('<fixture>/foo');",
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo', root, "'");
+        const code = `var f = require(${literal});`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -499,22 +462,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 23 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths('var f = require("..");', root),
+          output: 'var f = require("..");',
         };
       },
     },
     {
       name: 'run 0 invalid 14',
       create(root: string) {
-        const code = resolveFixturePaths(
-          "var f = require('<fixture>/some/path');",
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/some/path', root, "'");
+        const code = `var f = require(${literal});`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           errors: [
             {
@@ -523,25 +484,20 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 29 + 1 * root.length,
+              endColumn: 17 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'var f = require("../../some/path");',
-            root,
-          ),
+          output: 'var f = require("../../some/path");',
         };
       },
     },
     {
       name: 'run 0 invalid 15',
       create(root: string) {
-        const code = resolveFixturePaths(
-          "define(['<fixture>/foo'], function (foo) { /*...*/ })\nrequire(['<fixture>/foo'], function (foo) { /*...*/ })\nconst foo = require('<fixture>/foo')",
-          root,
-        );
+        const literal = fixturePathLiteral('<fixture>/foo', root, "'");
+        const code = `define([${literal}], function (foo) { /*...*/ })\nrequire([${literal}], function (foo) { /*...*/ })\nconst foo = require(${literal})`;
         return {
-          code: code,
+          code,
           filename: 'foo/bar/index.js',
           options: [
             {
@@ -556,7 +512,7 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 1,
               column: 9,
               endLine: 1,
-              endColumn: 15 + 1 * root.length,
+              endColumn: 9 + literal.length,
             },
             {
               messageId: '',
@@ -564,13 +520,10 @@ new RuleTester(fixtureConfig()).run('no-absolute-path', {
               line: 2,
               column: 10,
               endLine: 2,
-              endColumn: 16 + 1 * root.length,
+              endColumn: 10 + literal.length,
             },
           ],
-          output: resolveFixturePaths(
-            'define([".."], function (foo) { /*...*/ })\nrequire([".."], function (foo) { /*...*/ })\nconst foo = require(\'<fixture>/foo\')',
-            root,
-          ),
+          output: `define([".."], function (foo) { /*...*/ })\nrequire([".."], function (foo) { /*...*/ })\nconst foo = require(${literal})`,
         };
       },
     },

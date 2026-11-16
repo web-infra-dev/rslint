@@ -6,7 +6,7 @@ import { RuleTester } from '@rslint/rule-tester';
 import {
   fixtureConfig,
   resolveFixturePaths,
-  fixtureUpperRoot,
+  fixturePathLiteral,
   caseSensitiveFileSystem,
 } from '../config';
 new RuleTester(
@@ -694,10 +694,11 @@ new RuleTester(
         ? 'This case checks incorrect path casing on a case-insensitive filesystem; the fixture filesystem is case-sensitive.'
         : undefined,
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+        const literal = fixturePathLiteral(
+          '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
           root,
         );
+        const code = `import foo from ${literal}`;
         return {
           code: code,
           filename: 'input.ts',
@@ -1424,10 +1425,11 @@ new RuleTester(
       name: 'run 7 valid 0',
       skip: 'The case requires a webpack JavaScript resolver; the native Import runtime supports Node and TypeScript resolvers.',
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+        const literal = fixturePathLiteral(
+          '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
           root,
         );
+        const code = `import foo from ${literal}`;
         return {
           code: code,
           filename: 'input.ts',
@@ -2362,10 +2364,11 @@ new RuleTester(
         ? 'This case checks incorrect path casing on a case-insensitive filesystem; the fixture filesystem is case-sensitive.'
         : undefined,
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+        const literal = fixturePathLiteral(
+          '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
           root,
         );
+        const code = `import foo from ${literal}`;
         return {
           code: code,
           filename: 'input.ts',
@@ -2396,7 +2399,7 @@ new RuleTester(
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 149 + 1 * (fixtureUpperRoot(root).length - 104),
+              endColumn: 17 + literal.length,
             },
           ],
         };
@@ -2408,10 +2411,11 @@ new RuleTester(
         ? 'This case checks incorrect path casing on a case-insensitive filesystem; the fixture filesystem is case-sensitive.'
         : undefined,
       create(root: string) {
-        const code = resolveFixturePaths(
-          'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+        const literal = fixturePathLiteral(
+          '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
           root,
         );
+        const code = `import foo from ${literal}`;
         return {
           code: code,
           filename: 'input.ts',
@@ -2443,7 +2447,7 @@ new RuleTester(
               line: 1,
               column: 17,
               endLine: 1,
-              endColumn: 149 + 1 * (fixtureUpperRoot(root).length - 104),
+              endColumn: 17 + literal.length,
             },
           ],
         };
@@ -3145,10 +3149,11 @@ const skippedInvalidCases = [
     name: 'run 7 invalid 0',
     skip: 'The case requires a webpack JavaScript resolver; the native Import runtime supports Node and TypeScript resolvers.',
     create(root: string) {
-      const code = resolveFixturePaths(
-        'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+      const literal = fixturePathLiteral(
+        '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
         root,
       );
+      const code = `import foo from ${literal}`;
       return {
         code: code,
         filename: 'input.ts',
@@ -3179,10 +3184,11 @@ const skippedInvalidCases = [
     name: 'run 7 invalid 1',
     skip: 'The case requires a webpack JavaScript resolver; the native Import runtime supports Node and TypeScript resolvers.',
     create(root: string) {
-      const code = resolveFixturePaths(
-        'import foo from "<fixture-upper>/jsx/MyUnCoolComponent.jsx"',
+      const literal = fixturePathLiteral(
+        '<fixture-upper>/jsx/MyUnCoolComponent.jsx',
         root,
       );
+      const code = `import foo from ${literal}`;
       return {
         code: code,
         filename: 'input.ts',
