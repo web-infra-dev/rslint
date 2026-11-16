@@ -20,6 +20,20 @@ func TestRequireArraySortCompareExtras(t *testing.T) {
 			invalid(`((array)).sort()`, "sort", "file.js", true),
 			invalid(`((array)).toSorted()`, "toSorted", "file.js", true),
 			invalid(`array.sort(/* before */ undefined /* after */)`, "sort", "file.js", false),
+			{
+				// Upstream replaceArgument replaces the parenthesized argument range.
+				Code:     `array.sort(((undefined)))`,
+				FileName: "file.js",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: messageID,
+					Message:   message,
+					Line:      1, Column: 7, EndLine: 1, EndColumn: 11,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: numericSuggestionID, Output: "array.sort(" + numericCompare + ")"},
+						{MessageId: stringSuggestionID, Output: "array.sort(" + stringCompare + ")"},
+					},
+				}},
+			},
 		},
 	)
 }

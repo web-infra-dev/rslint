@@ -62,8 +62,8 @@ func invalid(code, method, filename string, suggestions bool) rule_tester.Invali
 		FileName: filename,
 		Errors: []rule_tester.InvalidTestCaseError{{
 			MessageId: messageID,
-			Message: message,
-			Line: line, Column: column, EndLine: line, EndColumn: column + len(method),
+			Message:   message,
+			Line:      line, Column: column, EndLine: line, EndColumn: column + len(method),
 			Suggestions: expectedSuggestions,
 		}},
 	}

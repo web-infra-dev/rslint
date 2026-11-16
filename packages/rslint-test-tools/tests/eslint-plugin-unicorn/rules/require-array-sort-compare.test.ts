@@ -28,7 +28,10 @@ const invalid = (
 const validCases: ValidTestCase[] = [
   valid('function f(foo: Int8Array) { foo.sort(); }', 'src/virtual.ts'),
   valid('const foo = new Int8Array(); foo.sort();', 'src/virtual.ts'),
-  valid('declare function getBytes(): Int8Array; getBytes().sort();', 'src/virtual.ts'),
+  valid(
+    'declare function getBytes(): Int8Array; getBytes().sort();',
+    'src/virtual.ts',
+  ),
   valid('array.sort(compareFunction)'),
   valid('array.toSorted(compareFunction)'),
   valid('array.sort((a, b) => a - b)'),
@@ -56,7 +59,10 @@ const validCases: ValidTestCase[] = [
   valid('const object = {}; object.toSorted()'),
   valid('const function_ = () => {}; function_.sort()'),
   valid('const array: string = ""; array.sort()', 'src/virtual.ts'),
-  valid('declare function getCollection(): {sort(): void}; getCollection().sort();', 'src/virtual.ts'),
+  valid(
+    'declare function getCollection(): {sort(): void}; getCollection().sort();',
+    'src/virtual.ts',
+  ),
 ];
 
 const invalidCases: InvalidTestCase[] = [
@@ -77,7 +83,10 @@ const invalidCases: InvalidTestCase[] = [
   invalid('const array = Array.of(3, 2, 1); array.toSorted()'),
   invalid('array.sort(/* comment */)'),
   invalid('const array: string[] = []; array.sort()', 'src/virtual.ts'),
-  invalid('const array: Array<string> = []; array.toSorted()', 'src/virtual.ts'),
+  invalid(
+    'const array: Array<string> = []; array.toSorted()',
+    'src/virtual.ts',
+  ),
   invalid('(value as string[]).sort()', 'src/virtual.ts'),
   invalid('(<string[]>value).toSorted()', 'src/virtual.ts'),
 ];

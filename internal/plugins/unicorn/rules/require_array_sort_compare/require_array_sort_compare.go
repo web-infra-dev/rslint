@@ -68,11 +68,13 @@ var RequireArraySortCompareRule = rule.Rule{
 					return
 				}
 
+				// compareArgument keeps the authored argument, parentheses included,
+				// because upstream replaceArgument replaces the parenthesized range.
 				var compareArgument *ast.Node
 				arguments := node.Arguments()
 				if len(arguments) == 1 {
-					compareArgument = utils.ESTreeRuntimeExpression(arguments[0])
-					if !utils.IsUndefinedIdentifier(compareArgument) {
+					compareArgument = arguments[0]
+					if !utils.IsUndefinedIdentifier(utils.ESTreeRuntimeExpression(compareArgument)) {
 						return
 					}
 				}
