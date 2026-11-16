@@ -19,7 +19,12 @@ func TestRequireArraySortCompareExtras(t *testing.T) {
 		[]rule_tester.InvalidTestCase{
 			invalid(`((array)).sort()`, "sort", "file.js", true),
 			invalid(`((array)).toSorted()`, "toSorted", "file.js", true),
-			invalid(`array.sort(/* before */ undefined /* after */)`, "sort", "file.js", false),
+			// Comments outside the replaced argument range are preserved.
+			commentCase(`array.sort(/* before */ undefined /* after */)`, "sort", "file.js", 1, 7, `array.sort(/* before */ COMPARATOR /* after */)`),
+			commentCase("array.sort(\n\t// keep\n)", "sort", "file.js", 1, 7, "array.sort(\n\t// keep\nCOMPARATOR)"),
+			// The JSDoc cast comment sits outside the parenthesized argument.
+			commentCase(`array.sort(/** @type {any} */ (undefined))`, "sort", "file.js", 1, 7, `array.sort(/** @type {any} */ COMPARATOR)`),
+			commentCase(`array.sort((undefined /* keep */))`, "sort", "file.js", 1, 7, ""),
 			{
 				// Upstream replaceArgument replaces the parenthesized argument range.
 				Code:     `array.sort(((undefined)))`,

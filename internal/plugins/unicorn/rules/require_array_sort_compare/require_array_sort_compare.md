@@ -26,5 +26,5 @@ Typed arrays are intentionally not reported because `TypedArray#sort()` already 
 
 ## Original Documentation
 
-- [eslint-plugin-unicorn: require-array-sort-compare](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/docs/rules/require-array-sort-compare.md)
-- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/rules/require-array-sort-compare.js)
+- [eslint-plugin-unicorn: require-array-sort-compare](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/docs/rules/require-array-sort-compare.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/require-array-sort-compare.js)

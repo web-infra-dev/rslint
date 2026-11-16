@@ -1,5 +1,5 @@
-// Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/test/require-array-sort-compare.js
+// Ported from eslint-plugin-unicorn v80.0.0; see LICENSE.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/test/require-array-sort-compare.js
 import {
   RuleTester,
   type InvalidTestCase,
@@ -63,6 +63,9 @@ const validCases: ValidTestCase[] = [
     'declare function getCollection(): {sort(): void}; getCollection().sort();',
     'src/virtual.ts',
   ),
+  valid('new Uint8Array([/* keep */ 2, 1]).sort();'),
+  valid('values.sort?.(/* keep */);'),
+  valid('values.toSorted(... /* keep */ arguments_);'),
 ];
 
 const invalidCases: InvalidTestCase[] = [
@@ -89,6 +92,17 @@ const invalidCases: InvalidTestCase[] = [
   ),
   invalid('(value as string[]).sort()', 'src/virtual.ts'),
   invalid('(<string[]>value).toSorted()', 'src/virtual.ts'),
+  invalid('values /* keep */.sort();'),
+  invalid('values.toSorted(/* keep */);'),
+  invalid('values.sort(/* keep */ undefined);'),
+  invalid('values.sort(undefined /* keep */);'),
+  invalid('getValues(/* keep */).toSorted(undefined);'),
+  invalid('values./* keep */sort();'),
+  invalid('values.sort(// keep\r\n);'),
+  invalid('values?.toSorted(/* keep */);'),
+  invalid('(values as /* keep */ number[]).sort();', 'src/virtual.ts'),
+  invalid('values.sort((/* keep */ undefined));'),
+  invalid('values.toSorted(((undefined /* keep */)));'),
 ];
 
 new RuleTester().run('require-array-sort-compare', {} as never, {

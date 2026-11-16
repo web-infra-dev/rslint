@@ -21,8 +21,11 @@ var missingCompareMessage = rule.RuleMessage{
 	Description: "Pass a compare function to avoid sorting elements as strings.",
 }
 
-func hasCommentsInside(ctx rule.RuleContext, node *ast.Node) bool {
-	textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+// wouldRemoveComments reports whether replacing the authored argument,
+// parentheses included, would drop a comment (upstream wouldRemoveComments
+// over getParenthesizedRange).
+func wouldRemoveComments(ctx rule.RuleContext, argument *ast.Node) bool {
+	textRange := utils.TrimNodeTextRange(ctx.SourceFile, argument)
 	return utils.HasCommentInSpan(ctx.Comments.All(), textRange.Pos(), textRange.End())
 }
 
@@ -50,7 +53,7 @@ func compareSuggestion(
 	}
 }
 
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/rules/require-array-sort-compare.js
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/rules/require-array-sort-compare.js
 var RequireArraySortCompareRule = rule.Rule{
 	Name:   "unicorn/require-array-sort-compare",
 	Schema: rule.EmptyArraySchema,
@@ -84,7 +87,7 @@ var RequireArraySortCompareRule = rule.Rule{
 				}
 
 				ctx.ReportNodeWithDeferredSuggestions(call.Property, missingCompareMessage, func() []rule.RuleSuggestion {
-					if hasCommentsInside(ctx, node) {
+					if compareArgument != nil && wouldRemoveComments(ctx, compareArgument) {
 						return nil
 					}
 					return []rule.RuleSuggestion{

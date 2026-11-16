@@ -1,5 +1,5 @@
-// Ported from eslint-plugin-unicorn v75.0.0; see LICENSE.
-// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v75.0.0/test/require-array-sort-compare.js
+// Ported from eslint-plugin-unicorn v80.0.0; see LICENSE.
+// https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/test/require-array-sort-compare.js
 package require_array_sort_compare_test
 
 import (
@@ -69,6 +69,29 @@ func invalid(code, method, filename string, suggestions bool) rule_tester.Invali
 	}
 }
 
+// commentCase asserts the diagnostic on `method` at an explicit line/column.
+// template is the suggested output with COMPARATOR standing for the inserted
+// compare function; an empty template expects no suggestions.
+func commentCase(code, method, filename string, line, column int, template string) rule_tester.InvalidTestCase {
+	suggestions := []rule_tester.InvalidTestCaseSuggestion{}
+	if template != "" {
+		suggestions = []rule_tester.InvalidTestCaseSuggestion{
+			{MessageId: numericSuggestionID, Output: strings.Replace(template, "COMPARATOR", numericCompare, 1)},
+			{MessageId: stringSuggestionID, Output: strings.Replace(template, "COMPARATOR", stringCompare, 1)},
+		}
+	}
+	return rule_tester.InvalidTestCase{
+		Code:     code,
+		FileName: filename,
+		Errors: []rule_tester.InvalidTestCaseError{{
+			MessageId: messageID,
+			Message:   message,
+			Line:      line, Column: column, EndLine: line, EndColumn: column + len(method),
+			Suggestions: suggestions,
+		}},
+	}
+}
+
 func TestRequireArraySortCompareUpstream(t *testing.T) {
 	validCases := []rule_tester.ValidTestCase{
 		valid(`function f(foo: Int8Array) { foo.sort(); }`, "file.ts"),
@@ -119,7 +142,7 @@ func TestRequireArraySortCompareUpstream(t *testing.T) {
 		invalid(`const array = []; array.sort()`, "sort", "file.js", true),
 		invalid(`const array = Array.from(iterable); array.sort()`, "sort", "file.js", true),
 		invalid(`const array = Array.of(3, 2, 1); array.toSorted()`, "toSorted", "file.js", true),
-		invalid(`array.sort(/* comment */)`, "sort", "file.js", false),
+		commentCase(`array.sort(/* comment */)`, "sort", "file.js", 1, 7, `array.sort(/* comment */COMPARATOR)`),
 		invalid(`const array: string[] = []; array.sort()`, "sort", "file.ts", true),
 		invalid(`const array: Array<string> = []; array.toSorted()`, "toSorted", "file.ts", true),
 		invalid(`(value as string[]).sort()`, "sort", "file.ts", true),
@@ -127,6 +150,32 @@ func TestRequireArraySortCompareUpstream(t *testing.T) {
 	}
 	if len(validCases) != 31 || len(invalidCases) != 20 {
 		t.Fatalf("upstream coverage accounting changed: valid=%d invalid=%d", len(validCases), len(invalidCases))
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &require_array_sort_compare.RequireArraySortCompareRule, validCases, invalidCases)
+}
+
+// Comment-preserving suggestion cases added upstream in v80.0.0. The
+// upstream node:test runtime check (suggestions evaluate the receiver once
+// and keep `getValues(/* keep */)`) is covered by the asserted suggestion
+// output for that receiver below.
+func TestRequireArraySortCompareUpstreamComments(t *testing.T) {
+	validCases := []rule_tester.ValidTestCase{
+		valid(`new Uint8Array([/* keep */ 2, 1]).sort();`, "file.js"),
+		valid(`values.sort?.(/* keep */);`, "file.js"),
+		valid(`values.toSorted(... /* keep */ arguments_);`, "file.js"),
+	}
+	invalidCases := []rule_tester.InvalidTestCase{
+		commentCase(`values /* keep */.sort();`, "sort", "file.js", 1, 19, `values /* keep */.sort(COMPARATOR);`),
+		commentCase(`values.toSorted(/* keep */);`, "toSorted", "file.js", 1, 8, `values.toSorted(/* keep */COMPARATOR);`),
+		commentCase(`values.sort(/* keep */ undefined);`, "sort", "file.js", 1, 8, `values.sort(/* keep */ COMPARATOR);`),
+		commentCase(`values.sort(undefined /* keep */);`, "sort", "file.js", 1, 8, `values.sort(COMPARATOR /* keep */);`),
+		commentCase(`getValues(/* keep */).toSorted(undefined);`, "toSorted", "file.js", 1, 23, `getValues(/* keep */).toSorted(COMPARATOR);`),
+		commentCase(`values./* keep */sort();`, "sort", "file.js", 1, 18, `values./* keep */sort(COMPARATOR);`),
+		commentCase("values.sort(// keep\r\n);", "sort", "file.js", 1, 8, "values.sort(// keep\r\nCOMPARATOR);"),
+		commentCase(`values?.toSorted(/* keep */);`, "toSorted", "file.js", 1, 9, `values?.toSorted(/* keep */COMPARATOR);`),
+		commentCase(`(values as /* keep */ number[]).sort();`, "sort", "file.ts", 1, 33, `(values as /* keep */ number[]).sort(COMPARATOR);`),
+		commentCase(`values.sort((/* keep */ undefined));`, "sort", "file.js", 1, 8, ""),
+		commentCase(`values.toSorted(((undefined /* keep */)));`, "toSorted", "file.js", 1, 8, ""),
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &require_array_sort_compare.RequireArraySortCompareRule, validCases, invalidCases)
 }
