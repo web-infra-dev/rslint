@@ -1,18 +1,16 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-import { getFixturesRootDir } from '../RuleTester';
-
-const ruleTester = new RuleTester({
+new RuleTester({
+  ...config,
   languageOptions: {
+    ...config.languageOptions,
     parserOptions: {
+      ...config.languageOptions?.parserOptions,
       project: './tsconfig.noImplicitThis.json',
-      projectService: false,
-      tsconfigRootDir: getFixturesRootDir(),
     },
   },
-});
-
-ruleTester.run('no-unsafe-assignment', {
+}).run('no-unsafe-assignment', {
   valid: [
     'const x = 1;',
     'const x: number = 1;',
@@ -56,8 +54,8 @@ class Foo {
     'const x = new Set<any>();',
     'const x = { y: 1 };',
     // Invalid TypeScript syntax; typescript-go exposes its error type to the rule.
-    { code: 'const x = { y = 1 };', skip: true },
-    noFormat`const x = { y(){} };`,
+    'const x = { y = 1 };',
+    'const x = { y(){} };',
     'const x: { y: number } = { y: 1 };',
     'const x = [...[1, 2, 3]];',
     'const [{ [`x${1}`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
@@ -78,8 +76,8 @@ declare function Foo(props: Props): never;
           },
         },
       },
+      filename: 'react.tsx',
     },
-
     {
       code: `
 declare function Foo(props: { a: string }): never;
@@ -92,6 +90,7 @@ declare function Foo(props: { a: string }): never;
           },
         },
       },
+      filename: 'react.tsx',
     },
     {
       code: `
@@ -105,6 +104,7 @@ declare function Foo(props: { a: string }): never;
           },
         },
       },
+      filename: 'react.tsx',
     },
     'const x: unknown = y as any;',
     'const x: unknown[] = y as any[];',
@@ -120,18 +120,45 @@ const foo: Foo = { bar };
   invalid: [
     {
       code: 'const x = 1 as any;',
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: `
 const x = 1 as any,
   y = 1;
       `,
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: 'function foo(a = 1 as any) {}',
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
     {
       code: `
@@ -139,7 +166,16 @@ class Foo {
   constructor(private a = 1 as any) {}
 }
       `,
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: `
@@ -147,7 +183,16 @@ class Foo {
   private a = 1 as any;
 }
       `,
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
@@ -155,7 +200,16 @@ class Foo {
   accessor a = 1 as any;
 }
       `,
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: `
@@ -163,8 +217,12 @@ const [x] = spooky;
       `,
       errors: [
         {
-          data: { receiver: 'error typed', sender: 'error typed' },
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 19,
         },
       ],
     },
@@ -174,8 +232,13 @@ const [[[x]]] = [spooky];
       `,
       errors: [
         {
-          data: { receiver: 'error typed', sender: 'error typed' },
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an error typed value.',
+          line: 2,
+          column: 8,
+          endLine: 2,
+          endColumn: 13,
         },
       ],
     },
@@ -187,12 +250,21 @@ const {
       `,
       errors: [
         {
-          data: { receiver: 'error typed', sender: 'error typed' },
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an error typed value.',
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 14,
         },
         {
-          data: { receiver: 'error typed', sender: 'error typed' },
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
+          line: 4,
+          column: 7,
+          endLine: 4,
+          endColumn: 16,
         },
       ],
     },
@@ -204,10 +276,12 @@ value = spooky;
       `,
       errors: [
         {
-          data: {
-            sender: 'error typed',
-          },
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an error typed value.',
+          line: 4,
+          column: 1,
+          endLine: 4,
+          endColumn: 15,
         },
       ],
     },
@@ -215,24 +289,43 @@ value = spooky;
       code: `
 const [x] = 1 as any;
       `,
-      errors: [{ messageId: 'anyAssignment' }],
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: `
 const [x] = [] as any[];
       `,
-      errors: [{ messageId: 'unsafeArrayPattern' }],
+      errors: [
+        {
+          messageId: 'unsafeArrayPattern',
+          message: 'Unsafe array destructuring of an `any` array value.',
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 10,
+        },
+      ],
     },
-
     {
       code: 'const x: Set<string> = new Set<any>();',
       errors: [
         {
-          data: {
-            receiver: '`Set<string>`',
-            sender: '`Set<any>`',
-          },
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<any>` to a variable of type `Set<string>`.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 38,
         },
       ],
     },
@@ -240,11 +333,13 @@ const [x] = [] as any[];
       code: 'const x: Map<string, string> = new Map<string, any>();',
       errors: [
         {
-          data: {
-            receiver: '`Map<string, string>`',
-            sender: '`Map<string, any>`',
-          },
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 54,
         },
       ],
     },
@@ -252,11 +347,13 @@ const [x] = [] as any[];
       code: 'const x: Set<string[]> = new Set<any[]>();',
       errors: [
         {
-          data: {
-            receiver: '`Set<string[]>`',
-            sender: '`Set<any[]>`',
-          },
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<any[]>` to a variable of type `Set<string[]>`.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 42,
         },
       ],
     },
@@ -264,23 +361,27 @@ const [x] = [] as any[];
       code: 'const x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>();',
       errors: [
         {
-          data: {
-            receiver: '`Set<Set<Set<string>>>`',
-            sender: '`Set<Set<Set<any>>>`',
-          },
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 58,
         },
       ],
     },
-
     {
       code: 'const [x] = [1] as [any];',
       errors: [
         {
-          column: 8,
-          endColumn: 9,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 9,
         },
       ],
     },
@@ -288,10 +389,13 @@ const [x] = [] as any[];
       code: 'function foo([x] = [1] as [any]) {}',
       errors: [
         {
-          column: 15,
-          endColumn: 16,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 16,
         },
       ],
     },
@@ -299,10 +403,13 @@ const [x] = [] as any[];
       code: '[x] = [1] as [any];',
       errors: [
         {
-          column: 2,
-          endColumn: 3,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 3,
         },
       ],
     },
@@ -310,10 +417,13 @@ const [x] = [] as any[];
       code: 'const [[[[x]]]] = [[[[1 as any]]]];',
       errors: [
         {
-          column: 11,
-          endColumn: 12,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
@@ -321,10 +431,13 @@ const [x] = [] as any[];
       code: 'function foo([[[[x]]]] = [[[[1 as any]]]]) {}',
       errors: [
         {
-          column: 18,
-          endColumn: 19,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -332,10 +445,13 @@ const [x] = [] as any[];
       code: '[[[[x]]]] = [[[[1 as any]]]];',
       errors: [
         {
-          column: 5,
-          endColumn: 6,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 6,
         },
       ],
     },
@@ -343,10 +459,13 @@ const [x] = [] as any[];
       code: 'const [[[[x]]]] = [1 as any];',
       errors: [
         {
-          column: 8,
-          endColumn: 15,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 15,
         },
       ],
     },
@@ -354,10 +473,13 @@ const [x] = [] as any[];
       code: 'function foo([[[[x]]]] = [1 as any]) {}',
       errors: [
         {
-          column: 15,
-          endColumn: 22,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -365,10 +487,13 @@ const [x] = [] as any[];
       code: 'const [{ x }] = [{ x: 1 }] as [{ x: any }];',
       errors: [
         {
-          column: 10,
-          endColumn: 11,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 11,
         },
       ],
     },
@@ -376,10 +501,13 @@ const [x] = [] as any[];
       code: 'function foo([{ x }] = [{ x: 1 }] as [{ x: any }]) {}',
       errors: [
         {
-          column: 17,
-          endColumn: 18,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
         },
       ],
     },
@@ -387,10 +515,13 @@ const [x] = [] as any[];
       code: '[{ x }] = [{ x: 1 }] as [{ x: any }];',
       errors: [
         {
-          column: 4,
-          endColumn: 5,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 5,
         },
       ],
     },
@@ -398,10 +529,13 @@ const [x] = [] as any[];
       code: "const [{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
       errors: [
         {
-          column: 17,
-          endColumn: 18,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
         },
       ],
     },
@@ -409,10 +543,13 @@ const [x] = [] as any[];
       code: "function foo([{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }]) {}",
       errors: [
         {
-          column: 24,
-          endColumn: 25,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -420,10 +557,13 @@ const [x] = [] as any[];
       code: "[{ ['x']: x }] = [{ ['x']: 1 }] as [{ ['x']: any }];",
       errors: [
         {
-          column: 11,
-          endColumn: 12,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
@@ -431,10 +571,13 @@ const [x] = [] as any[];
       code: 'const [{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
       errors: [
         {
-          column: 17,
-          endColumn: 18,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
         },
       ],
     },
@@ -442,10 +585,13 @@ const [x] = [] as any[];
       code: 'function foo([{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }]) {}',
       errors: [
         {
-          column: 24,
-          endColumn: 25,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
     },
@@ -453,47 +599,72 @@ const [x] = [] as any[];
       code: '[{ [`x`]: x }] = [{ [`x`]: 1 }] as [{ [`x`]: any }];',
       errors: [
         {
-          column: 11,
-          endColumn: 12,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 12,
         },
       ],
     },
+    // TS treats the assignment pattern weirdly in this case
     {
-      // TS treats the assignment pattern weirdly in this case
       code: '[[[[x]]]] = [1 as any];',
       errors: [
         {
-          column: 1,
-          endColumn: 23,
-          line: 1,
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `[any]` to a variable of type `[[[[any]]]]`.',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
         },
       ],
     },
-
     {
       code: `
 const x = [...(1 as any)];
       `,
-      errors: [{ messageId: 'unsafeArraySpread' }],
+      errors: [
+        {
+          messageId: 'unsafeArraySpread',
+          message: 'Unsafe spread of an `any` value in an array.',
+          line: 2,
+          column: 12,
+          endLine: 2,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: `
 const x = [...([] as any[])];
       `,
-      errors: [{ messageId: 'unsafeArraySpread' }],
+      errors: [
+        {
+          messageId: 'unsafeArraySpread',
+          message: 'Unsafe spread of an `any` value in an array.',
+          line: 2,
+          column: 12,
+          endLine: 2,
+          endColumn: 28,
+        },
+      ],
     },
-
     {
       code: 'const { x } = { x: 1 } as { x: any };',
       errors: [
         {
-          column: 9,
-          endColumn: 10,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 10,
         },
       ],
     },
@@ -501,10 +672,13 @@ const x = [...([] as any[])];
       code: 'function foo({ x } = { x: 1 } as { x: any }) {}',
       errors: [
         {
-          column: 16,
-          endColumn: 17,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
@@ -512,10 +686,13 @@ const x = [...([] as any[])];
       code: '({ x } = { x: 1 } as { x: any });',
       errors: [
         {
-          column: 4,
-          endColumn: 5,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 5,
         },
       ],
     },
@@ -523,10 +700,13 @@ const x = [...([] as any[])];
       code: 'const { x: y } = { x: 1 } as { x: any };',
       errors: [
         {
-          column: 12,
-          endColumn: 13,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 13,
         },
       ],
     },
@@ -534,10 +714,13 @@ const x = [...([] as any[])];
       code: 'function foo({ x: y } = { x: 1 } as { x: any }) {}',
       errors: [
         {
-          column: 19,
-          endColumn: 20,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
         },
       ],
     },
@@ -545,10 +728,13 @@ const x = [...([] as any[])];
       code: '({ x: y } = { x: 1 } as { x: any });',
       errors: [
         {
-          column: 7,
-          endColumn: 8,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 8,
         },
       ],
     },
@@ -560,10 +746,13 @@ const {
       `,
       errors: [
         {
-          column: 8,
-          endColumn: 9,
-          line: 3,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 9,
         },
       ],
     },
@@ -571,10 +760,13 @@ const {
       code: 'function foo({ x: { y } } = { x: { y: 1 } } as { x: { y: any } }) {}',
       errors: [
         {
-          column: 21,
-          endColumn: 22,
-          line: 1,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -586,10 +778,13 @@ const {
       `,
       errors: [
         {
-          column: 8,
-          endColumn: 9,
-          line: 3,
           messageId: 'unsafeObjectPattern',
+          message:
+            'Unsafe object destructuring of a property with an `any` value.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 9,
         },
       ],
     },
@@ -601,10 +796,13 @@ const {
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 8,
-          line: 3,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 8,
         },
       ],
     },
@@ -612,10 +810,13 @@ const {
       code: 'function foo({ x: [y] } = { x: { y: 1 } } as { x: [any] }) {}',
       errors: [
         {
-          column: 20,
-          endColumn: 21,
-          line: 1,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 21,
         },
       ],
     },
@@ -627,21 +828,26 @@ const {
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 8,
-          line: 3,
           messageId: 'unsafeArrayPatternFromTuple',
+          message:
+            'Unsafe array destructuring of a tuple element with an `any` value.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 8,
         },
       ],
     },
-
     {
       code: 'const x = { y: 1 as any };',
       errors: [
         {
-          column: 13,
-          endColumn: 24,
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 24,
         },
       ],
     },
@@ -649,9 +855,12 @@ const {
       code: 'const x = { y: { z: 1 as any } };',
       errors: [
         {
-          column: 18,
-          endColumn: 29,
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 29,
         },
       ],
     },
@@ -659,42 +868,36 @@ const {
       code: 'const x: { y: Set<Set<Set<string>>> } = { y: new Set<Set<Set<any>>>() };',
       errors: [
         {
-          column: 43,
-          data: {
-            receiver: '`Set<Set<Set<string>>>`',
-            sender: '`Set<Set<Set<any>>>`',
-          },
-          endColumn: 70,
           messageId: 'unsafeAssignment',
+          message:
+            'Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.',
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 70,
         },
       ],
     },
+    // spreading an any widens the object type to any
     {
       code: 'const x = { ...(1 as any) };',
       errors: [
         {
-          // spreading an any widens the object type to any
-          column: 7,
-          endColumn: 28,
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
     },
-
     {
       code: `
 type Props = { a: string };
 declare function Foo(props: Props): never;
 <Foo a={1 as any} />;
       `,
-      errors: [
-        {
-          column: 9,
-          endColumn: 17,
-          line: 4,
-          messageId: 'anyAssignment',
-        },
-      ],
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
@@ -702,6 +905,17 @@ declare function Foo(props: Props): never;
           },
         },
       },
+      filename: 'react.tsx',
+      errors: [
+        {
+          messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 4,
+          column: 9,
+          endLine: 4,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: `
@@ -711,10 +925,13 @@ function foo() {
       `,
       errors: [
         {
-          column: 9,
-          endColumn: 19,
-          line: 3,
           messageId: 'anyAssignmentThis',
+          message:
+            'Unsafe assignment of an `any` value. `this` is typed as `any`.\nYou can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 19,
         },
       ],
     },
@@ -725,10 +942,12 @@ const test: T = ['string', []] as any;
       `,
       errors: [
         {
-          column: 7,
-          endColumn: 38,
-          line: 3,
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 38,
         },
       ],
     },
@@ -740,10 +959,12 @@ const foo: Foo = { bar };
       `,
       errors: [
         {
-          column: 20,
-          endColumn: 23,
-          line: 4,
           messageId: 'anyAssignment',
+          message: 'Unsafe assignment of an `any` value.',
+          line: 4,
+          column: 20,
+          endLine: 4,
+          endColumn: 23,
         },
       ],
     },

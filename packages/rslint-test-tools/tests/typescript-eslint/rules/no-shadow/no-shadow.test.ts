@@ -1,1029 +1,32 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
-import { AST_NODE_TYPES } from '@typescript-eslint/utils';
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../../config';
 
-
-
-const ruleTester = new RuleTester();
-
-ruleTester.run('no-shadow', {
-  invalid: [
-    {
-      code: 'const f = (function f() {} as unknown);',
-      errors: [
-        {
-          data: {
-            name: 'f',
-            shadowedColumn: 7,
-            shadowedLine: 1,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: 'enum A { A }',
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 1,
-          },
-          messageId: 'noEnumShadow',
-        },
-      ],
-    },
-    {
-      code: 'function fn(Record: number) {}',
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      code: 'function fn() { type Record = string; }',
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [
-        {
-          builtinGlobals: true,
-          ignoreTypeValueShadow: false,
-        },
-      ],
-    },
-    {
-      code: "import type { Record } from 'pkg';",
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      code: 'type Fn = (Record: number) => void;',
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      code: 'interface Record {} namespace Record { export const value = 1; }',
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      code: 'class C { static method<Record>() {} }',
-      errors: [
-        {
-          data: { name: 'Record' },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      options: [
-        {
-          builtinGlobals: true,
-          ignoreTypeValueShadow: false,
-        },
-      ],
-    },
-    {
-      code: `
-import { request, type Server } from 'node:http';
-function use(request: unknown) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'request',
-            shadowedColumn: 10,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: `
-type T = 1;
-{
-  type T = 2;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'T',
-            shadowedColumn: 6,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: `
-type T = 1;
-function foo<T>(arg: T) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'T',
-            shadowedColumn: 6,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: `
-function foo<T>() {
-  return function <T>() {};
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'T',
-            shadowedColumn: 14,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: `
-type T = string;
-function foo<T extends (arg: any) => void>(arg: T) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'T',
-            shadowedColumn: 6,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-    },
-    {
-      code: `
-const x = 1;
-{
-  type x = string;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'x',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreTypeValueShadow: false }],
-    },
-    {
-      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
-      skip: true,
-      code: `
-type Foo = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'Foo',
-          },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      languageOptions: {
-        globals: {
-          Foo: 'writable',
-        },
-      },
-      options: [
-        {
-          builtinGlobals: true,
-          ignoreTypeValueShadow: false,
-        },
-      ],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/2447
-    {
-      code: `
-const test = 1;
-type Fn = (test: string) => typeof test;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'test',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
-      skip: true,
-      code: `
-type Fn = (Foo: string) => typeof Foo;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'Foo',
-          },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      languageOptions: {
-        globals: {
-          Foo: 'writable',
-        },
-      },
-      options: [
-        {
-          builtinGlobals: true,
-          ignoreFunctionTypeParameterNameValueShadow: false,
-        },
-      ],
-    },
-
-    // https://github.com/typescript-eslint/typescript-eslint/issues/6098
-    {
-      code: `
-const arg = 0;
-
-interface Test {
-  (arg: string): typeof arg;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-interface Test {
-  p1(arg: string): typeof arg;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-declare function test(arg: string): typeof arg;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-declare const test: (arg: string) => typeof arg;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-declare class Test {
-  p1(arg: string): typeof arg;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-declare const Test: {
-  new (arg: string): typeof arg;
-};
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-type Bar = new (arg: number) => typeof arg;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-const arg = 0;
-
-declare namespace Lib {
-  function test(arg: string): typeof arg;
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-            shadowedColumn: 7,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
-    },
-    {
-      code: `
-import type { foo } from './foo';
-function doThing(foo: number) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'foo',
-            shadowedColumn: 15,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ ignoreTypeValueShadow: false }],
-    },
-    {
-      code: `
-import { type foo } from './foo';
-function doThing(foo: number) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'foo',
-            shadowedColumn: 15,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ ignoreTypeValueShadow: false }],
-    },
-    {
-      code: `
-import { foo } from './foo';
-function doThing(foo: number, bar: number) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'foo',
-            shadowedColumn: 10,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ ignoreTypeValueShadow: true }],
-    },
-    {
-      code: `
-interface Foo {}
-
-declare module 'bar' {
-  export interface Foo {
-    x: string;
-  }
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'Foo',
-            shadowedColumn: 11,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-    },
-    {
-      code: `
-import type { Foo } from 'bar';
-
-declare module 'baz' {
-  export interface Foo {
-    x: string;
-  }
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'Foo',
-            shadowedColumn: 15,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-    },
-    {
-      code: `
-import { type Foo } from 'bar';
-
-declare module 'baz' {
-  export interface Foo {
-    x: string;
-  }
-}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'Foo',
-            shadowedColumn: 15,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-    },
-    {
-      code: `
-let x = foo((x, y) => {});
-let y;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'x',
-            shadowedColumn: 5,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-        {
-          data: {
-            name: 'y',
-            shadowedColumn: 5,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-let x = foo((x, y) => {});
-let y;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'x',
-            shadowedColumn: 5,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
-      options: [{ hoist: 'functions' }],
-    },
-    {
-      code: `
-type Foo<A> = 1;
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-    {
-      code: `
-type Foo<A> = 1;
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-    {
-      code: `
-{
-  type A = 1;
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-    {
-      code: `
-{
-  interface A {}
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'types' }],
-    },
-
-    {
-      code: `
-type Foo<A> = 1;
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-type Foo<A> = 1;
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-{
-  type A = 1;
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-    {
-      code: `
-{
-  interface A {}
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'all' }],
-    },
-
-    {
-      code: `
-type Foo<A> = 1;
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-    {
-      code: `
-interface Foo<A> {}
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-    {
-      code: `
-type Foo<A> = 1;
-interface A {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 11,
-            shadowedLine: 3,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-    {
-      code: `
-{
-  type A = 1;
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-    {
-      code: `
-{
-  interface A {}
-}
-type A = 1;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'A',
-            shadowedColumn: 6,
-            shadowedLine: 5,
-          },
-          messageId: 'noShadow',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
-      options: [{ hoist: 'functions-and-types' }],
-    },
-
-    {
-      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
-      skip: true,
-      code: `
-function foo<T extends (...args: any[]) => any>(fn: T, args: any[]) {}
-      `,
-      errors: [
-        {
-          data: {
-            name: 'args',
-            shadowedColumn: 5,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      languageOptions: {
-        globals: {
-          args: 'writable',
-        },
-      },
-      options: [
-        {
-          builtinGlobals: true,
-          ignoreTypeValueShadow: false,
-        },
-      ],
-    },
-    {
-      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
-      skip: true,
-      code: `
-declare const has = (environment: 'dev' | 'prod' | 'test') => boolean;
-      `,
-      errors: [
-        {
-          data: {
-            name: 'has',
-          },
-          messageId: 'noShadowGlobal',
-        },
-      ],
-      languageOptions: {
-        globals: {
-          has: false,
-        },
-      },
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
-      skip: true,
-      code: `
-declare const has: (environment: 'dev' | 'prod' | 'test') => boolean;
-const fn = (has: string) => {};
-      `,
-      errors: [
-        {
-          data: {
-            name: 'has',
-            shadowedColumn: 15,
-            shadowedLine: 2,
-          },
-          messageId: 'noShadow',
-        },
-      ],
-      filename: 'foo.d.ts',
-      languageOptions: {
-        globals: {
-          has: false,
-        },
-      },
-      options: [{ builtinGlobals: true }],
-    },
-  ],
+// Preserve the existing Go binding ranges and enum-shadow diagnostic while strengthening the assertions.
+new RuleTester(config).run('no-shadow', {
   valid: [
     {
       code: 'function fn() { type Record = string; }',
-      options: [{ builtinGlobals: true }],
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
     },
     {
       code: 'function fn(Record: number) {}',
-      options: [{ builtinGlobals: false }],
+      options: [
+        {
+          builtinGlobals: false,
+        },
+      ],
     },
     {
       code: 'function fn(NodeListOf: number, HTMLElement: number) {}',
-      options: [{ builtinGlobals: true }],
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
     },
     'function foo<T = (arg: any) => any>(arg: T) {}',
     'function foo<T = ([arg]: [any]) => any>(arg: T) {}',
@@ -1110,28 +113,32 @@ const x = 1;
       code: `
 type Foo = 1;
       `,
+      options: [
+        {
+          ignoreTypeValueShadow: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foo: 'writable',
         },
       },
-      options: [{ ignoreTypeValueShadow: true }],
     },
     {
       code: `
 type Foo = 1;
       `,
-      languageOptions: {
-        globals: {
-          Foo: 'writable',
-        },
-      },
       options: [
         {
           builtinGlobals: false,
           ignoreTypeValueShadow: false,
         },
       ],
+      languageOptions: {
+        globals: {
+          Foo: 'writable',
+        },
+      },
     },
     // https://github.com/typescript-eslint/typescript-eslint/issues/2360
     `
@@ -1146,23 +153,27 @@ enum Direction {
 const test = 1;
 type Fn = (test: string) => typeof test;
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
 type Fn = (Foo: string) => typeof Foo;
       `,
-      languageOptions: {
-        globals: {
-          Foo: 'writable',
-        },
-      },
       options: [
         {
           builtinGlobals: false,
           ignoreFunctionTypeParameterNameValueShadow: true,
         },
       ],
+      languageOptions: {
+        globals: {
+          Foo: 'writable',
+        },
+      },
     },
     // https://github.com/typescript-eslint/typescript-eslint/issues/6098
     {
@@ -1173,7 +184,11 @@ interface Test {
   (arg: string): typeof arg;
 }
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1183,7 +198,11 @@ interface Test {
   p1(arg: string): typeof arg;
 }
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1191,7 +210,11 @@ const arg = 0;
 
 declare function test(arg: string): typeof arg;
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1199,7 +222,11 @@ const arg = 0;
 
 declare const test: (arg: string) => typeof arg;
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1209,7 +236,11 @@ declare class Test {
   p1(arg: string): typeof arg;
 }
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1219,7 +250,11 @@ declare const Test: {
   new (arg: string): typeof arg;
 };
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1227,7 +262,11 @@ const arg = 0;
 
 type Bar = new (arg: number) => typeof arg;
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1237,7 +276,11 @@ declare namespace Lib {
   function test(arg: string): typeof arg;
 }
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: true }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: true,
+        },
+      ],
     },
     // https://github.com/typescript-eslint/typescript-eslint/issues/2724
     {
@@ -1247,7 +290,11 @@ declare namespace Lib {
         }
         export {};
       `,
-      options: [{ builtinGlobals: true }],
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
     },
     `
       declare global {
@@ -1270,7 +317,11 @@ declare namespace Lib {
         }
         export {};
       `,
-      options: [{ ignoreTypeValueShadow: false }],
+      options: [
+        {
+          ignoreTypeValueShadow: false,
+        },
+      ],
     },
     {
       code: `
@@ -1280,7 +331,11 @@ declare namespace Lib {
         }
         export {};
       `,
-      options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
     },
     `
 export class Wrapper<Wrapped> {
@@ -1306,8 +361,8 @@ function makeA() {
   };
 }
     `,
+    // https://github.com/typescript-eslint/typescript-eslint/issues/3862
     {
-      // https://github.com/typescript-eslint/typescript-eslint/issues/3862
       code: `
 import type { foo } from './foo';
 type bar = number;
@@ -1316,7 +371,11 @@ type bar = number;
 // 'bar' is fine
 function doThing(foo: number, bar: number) {}
       `,
-      options: [{ ignoreTypeValueShadow: true }],
+      options: [
+        {
+          ignoreTypeValueShadow: true,
+        },
+      ],
     },
     {
       code: `
@@ -1325,11 +384,19 @@ import { type foo } from './foo';
 // 'foo' is already declared in the upper scope
 function doThing(foo: number) {}
       `,
-      options: [{ ignoreTypeValueShadow: true }],
+      options: [
+        {
+          ignoreTypeValueShadow: true,
+        },
+      ],
     },
     {
       code: 'const a = [].find(a => a);',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
@@ -1337,37 +404,65 @@ const a = [].find(function (a) {
   return a;
 });
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const [a = [].find(a => true)] = dummy;',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const { a = [].find(a => true) } = dummy;',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'function func(a = [].find(a => true)) {}',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
 for (const a in [].find(a => true)) {
 }
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
 for (const a of [].find(a => true)) {
 }
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: "const a = [].map(a => true).filter(a => a === 'b');",
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
@@ -1376,11 +471,19 @@ const a = []
   .filter(a => a === 'b')
   .find(a => a === 'c');
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const { a } = (({ a }) => ({ a }))();',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
@@ -1389,23 +492,43 @@ const person = people.find(item => {
   return person === 'foo';
 });
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var y = bar || foo(y => y);',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var y = bar && foo(y => y);',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var z = bar(foo(z => z));',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var z = boo(bar(foo(z => z)));',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
@@ -1414,20 +537,38 @@ var match = function (person) {
 };
 const person = [].find(match);
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const a = foo(x || (a => {}));',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const { a = 1 } = foo(a => {});',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: "const person = { ...people.find(person => person.firstName.startsWith('s')) };",
-      languageOptions: { parserOptions: { ecmaVersion: 2021 } },
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2021,
+      },
     },
     {
       code: `
@@ -1437,8 +578,14 @@ const person = {
     .map(person => person.firstName)[0],
 };
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 2021 } },
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2021,
+      },
     },
     {
       code: `
@@ -1446,27 +593,51 @@ const person = {
   const y = foo(y => y);
 };
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const x = (x => x)();',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var y = bar || (y => y)();',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var y = bar && (y => y)();',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'var x = (x => x)((y => y)());',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: 'const { a = 1 } = (a => {})();',
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
     {
       code: `
@@ -1474,37 +645,56 @@ const person = {
   const y = (y => y)();
 };
       `,
-      options: [{ ignoreOnInitialization: true }],
+      options: [
+        {
+          ignoreOnInitialization: true,
+        },
+      ],
     },
-    { code: 'const [x = y => y] = [].map(y => y);' },
-
+    'const [x = y => y] = [].map(y => y);',
     {
       code: `
 type Foo<A> = 1;
 type A = 1;
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
     {
       code: `
 interface Foo<A> {}
 type A = 1;
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
     {
       code: `
 interface Foo<A> {}
 interface A {}
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
     {
       code: `
 type Foo<A> = 1;
 interface A {}
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
     {
       code: `
@@ -1513,7 +703,11 @@ interface A {}
 }
 type A = 1;
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
     {
       code: `
@@ -1522,36 +716,55 @@ type A = 1;
 }
 type A = 1;
       `,
-      options: [{ hoist: 'never' }],
+      options: [
+        {
+          hoist: 'never',
+        },
+      ],
     },
-
     {
       code: `
 type Foo<A> = 1;
 type A = 1;
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
     {
       code: `
 interface Foo<A> {}
 type A = 1;
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
     {
       code: `
 interface Foo<A> {}
 interface A {}
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
     {
       code: `
 type Foo<A> = 1;
 interface A {}
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
     {
       code: `
@@ -1560,7 +773,11 @@ interface A {}
 }
 type A = 1;
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
     {
       code: `
@@ -1569,19 +786,20 @@ type A = 1;
 }
 type A = 1;
       `,
-      options: [{ hoist: 'functions' }],
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
     },
-    {
-      code: `
+    `
 import type { Foo } from 'bar';
 
 declare module 'bar' {
   export type Foo = string;
 }
       `,
-    },
-    {
-      code: `
+    `
 import type { Foo } from 'bar';
 
 declare module 'bar' {
@@ -1590,18 +808,14 @@ declare module 'bar' {
   }
 }
       `,
-    },
-    {
-      code: `
+    `
 import { type Foo } from 'bar';
 
 declare module 'bar' {
   export type Foo = string;
 }
       `,
-    },
-    {
-      code: `
+    `
 import { type Foo } from 'bar';
 
 declare module 'bar' {
@@ -1610,18 +824,14 @@ declare module 'bar' {
   }
 }
       `,
-    },
-    {
-      code: `
+    `
 import { type Foo } from 'bar';
 
 declare module 'bar' {
   type Foo = string;
 }
       `,
-    },
-    {
-      code: `
+    `
 import { type Foo } from 'bar';
 
 declare module 'bar' {
@@ -1630,54 +840,69 @@ declare module 'bar' {
   }
 }
       `,
-    },
     {
       code: `
 declare const foo1: boolean;
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           foo1: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
 declare let foo2: boolean;
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           foo2: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
 declare var foo3: boolean;
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           foo3: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
 function foo4(name: string): void;
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           foo4: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
@@ -1685,13 +910,17 @@ declare class Foopy1 {
   name: string;
 }
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foopy1: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
@@ -1699,13 +928,17 @@ declare interface Foopy2 {
   name: string;
 }
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foopy2: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
@@ -1713,13 +946,17 @@ declare type Foopy3 = {
   x: number;
 };
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foopy3: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
@@ -1727,38 +964,1248 @@ declare enum Foopy4 {
   x,
 }
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foopy4: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
 declare namespace Foopy5 {}
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           Foopy5: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
     },
     {
       code: `
 declare;
 foo5: boolean;
       `,
-      filename: 'baz.d.ts',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
       languageOptions: {
         globals: {
           foo5: false,
         },
       },
-      options: [{ builtinGlobals: true }],
+      filename: 'decl.d.ts',
+    },
+  ],
+  invalid: [
+    {
+      code: 'const f = (function f() {} as unknown);',
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'f' is already declared in the upper scope on line 1 column 7.",
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: 'enum A { A }',
+      errors: [
+        {
+          messageId: 'noEnumShadow',
+          message:
+            "Enum members are added to the enum scope, so references to 'A' in enum member initializers resolve to this member instead of the declaration in the upper scope on line 1 column 6.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: 'function fn(Record: number) {}',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: 'function fn() { type Record = string; }',
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: "import type { Record } from 'pkg';",
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: 'type Fn = (Record: number) => void;',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: 'interface Record {} namespace Record { export const value = 1; }',
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: 'class C { static method<Record>() {} }',
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Record' is already a global variable.",
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
+    {
+      code: `
+import { request, type Server } from 'node:http';
+function use(request: unknown) {}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'request' is already declared in the upper scope on line 2 column 10.",
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: `
+type T = 1;
+{
+  type T = 2;
+}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'T' is already declared in the upper scope on line 2 column 6.",
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+type T = 1;
+function foo<T>(arg: T) {}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'T' is already declared in the upper scope on line 2 column 6.",
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: `
+function foo<T>() {
+  return function <T>() {};
+}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'T' is already declared in the upper scope on line 2 column 14.",
+          line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: `
+type T = string;
+function foo<T extends (arg: any) => void>(arg: T) {}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'T' is already declared in the upper scope on line 2 column 6.",
+          line: 3,
+          column: 14,
+          endLine: 3,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: `
+const x = 1;
+{
+  type x = string;
+}
+      `,
+      options: [
+        {
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'x' is already declared in the upper scope on line 2 column 7.",
+          line: 4,
+          column: 8,
+          endLine: 4,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo = 1;
+      `,
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      languageOptions: {
+        globals: {
+          Foo: 'writable',
+        },
+      },
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Foo' is already a global variable.",
+          line: 2,
+          column: 6,
+          endLine: 2,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+const test = 1;
+type Fn = (test: string) => typeof test;
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'test' is already declared in the upper scope on line 2 column 7.",
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+type Fn = (Foo: string) => typeof Foo;
+      `,
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      languageOptions: {
+        globals: {
+          Foo: 'writable',
+        },
+      },
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'Foo' is already a global variable.",
+          line: 2,
+          column: 12,
+          endLine: 2,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+interface Test {
+  (arg: string): typeof arg;
+}
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 5,
+          column: 4,
+          endLine: 5,
+          endColumn: 7,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+interface Test {
+  p1(arg: string): typeof arg;
+}
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 5,
+          column: 6,
+          endLine: 5,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+declare function test(arg: string): typeof arg;
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 4,
+          column: 23,
+          endLine: 4,
+          endColumn: 26,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+declare const test: (arg: string) => typeof arg;
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+declare class Test {
+  p1(arg: string): typeof arg;
+}
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 5,
+          column: 6,
+          endLine: 5,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+declare const Test: {
+  new (arg: string): typeof arg;
+};
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 5,
+          column: 8,
+          endLine: 5,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+type Bar = new (arg: number) => typeof arg;
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: `
+const arg = 0;
+
+declare namespace Lib {
+  function test(arg: string): typeof arg;
+}
+      `,
+      options: [
+        {
+          ignoreFunctionTypeParameterNameValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'arg' is already declared in the upper scope on line 2 column 7.",
+          line: 5,
+          column: 17,
+          endLine: 5,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: `
+import type { foo } from './foo';
+function doThing(foo: number) {}
+      `,
+      options: [
+        {
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'foo' is already declared in the upper scope on line 2 column 15.",
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: `
+import { type foo } from './foo';
+function doThing(foo: number) {}
+      `,
+      options: [
+        {
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'foo' is already declared in the upper scope on line 2 column 15.",
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: `
+import { foo } from './foo';
+function doThing(foo: number, bar: number) {}
+      `,
+      options: [
+        {
+          ignoreTypeValueShadow: true,
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'foo' is already declared in the upper scope on line 2 column 10.",
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 21,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo {}
+
+declare module 'bar' {
+  export interface Foo {
+    x: string;
+  }
+}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'Foo' is already declared in the upper scope on line 2 column 11.",
+          line: 5,
+          column: 20,
+          endLine: 5,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: `
+import type { Foo } from 'bar';
+
+declare module 'baz' {
+  export interface Foo {
+    x: string;
+  }
+}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'Foo' is already declared in the upper scope on line 2 column 15.",
+          line: 5,
+          column: 20,
+          endLine: 5,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: `
+import { type Foo } from 'bar';
+
+declare module 'baz' {
+  export interface Foo {
+    x: string;
+  }
+}
+      `,
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'Foo' is already declared in the upper scope on line 2 column 15.",
+          line: 5,
+          column: 20,
+          endLine: 5,
+          endColumn: 23,
+        },
+      ],
+    },
+    {
+      code: `
+let x = foo((x, y) => {});
+let y;
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 6,
+      },
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'x' is already declared in the upper scope on line 2 column 5.",
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 15,
+        },
+        {
+          messageId: 'noShadow',
+          message:
+            "'y' is already declared in the upper scope on line 3 column 5.",
+          line: 2,
+          column: 17,
+          endLine: 2,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: `
+let x = foo((x, y) => {});
+let y;
+      `,
+      options: [
+        {
+          hoist: 'functions',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 6,
+      },
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'x' is already declared in the upper scope on line 2 column 5.",
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 15,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  type A = 1;
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  interface A {}
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  type A = 1;
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  interface A {}
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'all',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 6.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+interface Foo<A> {}
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `
+type Foo<A> = 1;
+interface A {}
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 3 column 11.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 11,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  type A = 1;
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: `
+{
+  interface A {}
+}
+type A = 1;
+      `,
+      options: [
+        {
+          hoist: 'functions-and-types',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'A' is already declared in the upper scope on line 5 column 6.",
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `
+function foo<T extends (...args: any[]) => any>(fn: T, args: any[]) {}
+      `,
+      options: [
+        {
+          builtinGlobals: true,
+          ignoreTypeValueShadow: false,
+        },
+      ],
+      languageOptions: {
+        globals: {
+          args: 'writable',
+        },
+      },
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'args' is already a global variable.",
+          line: 2,
+          column: 56,
+          endLine: 2,
+          endColumn: 60,
+        },
+      ],
+    },
+    {
+      code: `
+declare const has = (environment: 'dev' | 'prod' | 'test') => boolean;
+      `,
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      languageOptions: {
+        globals: {
+          has: false,
+        },
+      },
+      errors: [
+        {
+          messageId: 'noShadowGlobal',
+          message: "'has' is already a global variable.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: `
+declare const has: (environment: 'dev' | 'prod' | 'test') => boolean;
+const fn = (has: string) => {};
+      `,
+      options: [
+        {
+          builtinGlobals: true,
+        },
+      ],
+      languageOptions: {
+        globals: {
+          has: false,
+        },
+      },
+      filename: 'decl.d.ts',
+      errors: [
+        {
+          messageId: 'noShadow',
+          message:
+            "'has' is already declared in the upper scope on line 2 column 15.",
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 16,
+        },
+      ],
     },
   ],
 });

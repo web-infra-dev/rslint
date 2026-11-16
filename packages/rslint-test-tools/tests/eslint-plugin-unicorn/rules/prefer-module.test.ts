@@ -1,78 +1,40 @@
 // Upstream tests and documentation: eslint-plugin-unicorn v79.0.0.
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v79.0.0/test/prefer-module.js
-import assert from 'node:assert/strict';
-import path from 'node:path';
-import { lint } from '@rslint/core/internal';
-import type { RslintConfigEntry } from '@rslint/core';
+import { describe } from 'rstack/test';
+import { RuleTester } from '@rslint/rule-tester';
 
-interface Case {
-  code: string;
-  filename: string;
-  languageOptions: RslintConfigEntry['languageOptions'];
-  errors: {
-    messageId: string;
-    message: string;
-    line: number;
-    column: number;
-    endLine: number;
-    endColumn: number;
-    suggestions: { messageId: string; desc: string; output: string }[];
-  }[];
-  output: string | null;
-}
+const ruleTester = new RuleTester({
+  plugin: 'unicorn',
+  filename: 'upstream.js',
+  languageOptions: {
+    globals: {
+      exports: 'readonly',
+      require: 'readonly',
+      module: 'readonly',
+      __filename: 'readonly',
+      __dirname: 'readonly',
+    },
+    parserOptions: {
+      project: false,
+      projectService: false,
+    },
+  },
+});
 
-const globals = {
-  exports: 'readonly',
-  require: 'readonly',
-  module: 'readonly',
-  __filename: 'readonly',
-  __dirname: 'readonly',
-} as const;
-const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
-  {
-    name: 'Strict mode',
+describe('Strict mode', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const foo = "use strict";',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: '("use strict")',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: '"use strong";',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'eval("\'use strict\'; var x = 42; x;");',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'new Function("\'use strict\'; var x = 42; return x;");',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
+      'const foo = "use strict";',
+      '("use strict")',
+      '"use strong";',
+      'eval("\'use strict\'; var x = 42; x;");',
+      'new Function("\'use strict\'; var x = 42; return x;");',
     ],
     invalid: [
       {
-        code: "'use strict';\n\nconsole.log(1);",
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `'use strict';
+
+console.log(1);`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -90,12 +52,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: '"use strict";\n\nconsole.log(1);',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `"use strict";
+
+console.log(1);`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -113,12 +74,12 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'function foo () {\n\t"use strict";\n\tconsole.log(1);\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function foo () {
+	"use strict";
+	console.log(1);
+}`,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -131,17 +92,19 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
               {
                 messageId: 'suggestion/use-strict-directive',
                 desc: 'Remove "use strict" directive.',
-                output: 'function foo () {\n\tconsole.log(1);\n}',
+                output: `function foo () {
+	console.log(1);
+}`,
               },
             ],
           },
         ],
-        output: null,
       },
       {
-        code: "'use strict';\n\nconsole.log(1);",
+        code: `'use strict';
+
+console.log(1);`,
         filename: 'example.mjs',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -156,24 +119,23 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         output: 'console.log(1);',
       },
     ],
-  },
-  {
-    name: 'Global return',
-    // rslint already parses top-level returns without Espree's
-    // ecmaFeatures.globalReturn parser flag.
+  });
+});
+
+// rslint already parses top-level returns without Espree's
+// ecmaFeatures.globalReturn parser flag.
+describe('Global return', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'function a() {\n\treturn;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
+      `function a() {
+	return;
+}`,
     ],
     invalid: [
       {
-        code: 'if (foo) {\n\treturn;\n}',
-        filename: 'upstream.js',
+        code: `if (foo) {
+	return;
+}`,
         languageOptions: {
           sourceType: 'script',
         },
@@ -188,47 +150,24 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: '__dirname and __filename',
+  });
+});
+
+describe('__dirname and __filename', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const __filename = 1;\nconst foo = __filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const __dirname = 1;\nconst foo = __dirname;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'import {__filename as filename} from "foo.mjs"',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const foo = 1;export {foo as __dirname}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
+      `const __filename = 1;
+const foo = __filename;`,
+      `const __dirname = 1;
+const foo = __dirname;`,
+      'import {__filename as filename} from "foo.mjs"',
+      'const foo = 1;export {foo as __dirname}',
     ],
     invalid: [
       {
         code: 'const dirname = __dirname;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -252,12 +191,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const dirname = __filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -280,12 +216,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = { __dirname};',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -309,12 +242,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = {__filename, };',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -338,12 +268,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'if (__dirname.startsWith("/project/src/")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -368,12 +295,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'if (__filename.endsWith(".js")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -397,40 +321,29 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'require',
+  });
+});
+
+describe('require', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'import {createRequire} from \'module\';\nconst require = createRequire(import.meta.url);\nconst foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const require = function require(require, id) {\n\treturn require(id);\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const require = class A {\n\trequire(require) {\n\t\treturn require(id);\n\t}\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
+      `import {createRequire} from 'module';
+const require = createRequire(import.meta.url);
+const foo = require("foo");`,
+      `const require = function require(require, id) {
+	return require(id);
+}`,
+      `const require = class A {
+	require(require) {
+		return require(id);
+	}
+}`,
     ],
     invalid: [
       {
         code: 'require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -448,12 +361,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "require('foo');",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -471,12 +381,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -494,12 +401,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -517,12 +421,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -540,12 +441,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -563,12 +461,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require.resolve("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -580,12 +475,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'const foo\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -603,12 +497,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -626,12 +517,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -649,12 +537,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -672,12 +557,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -695,12 +577,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -718,12 +597,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const {foo}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -741,12 +619,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -764,12 +639,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -787,12 +659,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -810,12 +679,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -833,12 +699,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -856,12 +719,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const {foo: foo}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo: foo}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -879,12 +741,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -902,12 +761,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -925,12 +781,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -948,12 +801,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: foo} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -971,12 +821,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -994,12 +841,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const {foo:bar}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {foo:bar}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1017,12 +863,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1040,12 +883,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1063,12 +903,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1086,12 +923,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo:bar} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1109,12 +943,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz}=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1133,12 +964,15 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const {\n\ta   :foo,\n\tb:   bar,\n\tdefault   :   baz,\n}\n\t=\n\trequire("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const {
+	a   :foo,
+	b:   bar,
+	default   :   baz,
+}
+	=
+	require("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1151,18 +985,18 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
               {
                 messageId: 'suggestion/import',
                 desc: 'Switch to `import`.',
-                output:
-                  'import {\n\ta as foo,\n\tb as bar,\n\tdefault as baz,\n} from "foo";',
+                output: `import {
+	a as foo,
+	b as bar,
+	default as baz,
+} from "foo";`,
               },
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1181,12 +1015,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = require( (("foo")) );',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1205,12 +1036,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = ((require))("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1229,12 +1057,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {a   :foo, b:   bar, default   :   baz} = (( require("foo") ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1253,12 +1078,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1276,12 +1098,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const{   }=require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1299,12 +1118,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const r = require;\nconst foo = r("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const r = require;
+const foo = r("foo");`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1316,12 +1133,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'new require("foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1333,12 +1147,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require("foo", extraArgument)',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1350,12 +1161,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const a = require()',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1367,12 +1175,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require(..."foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1384,12 +1189,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require("../" + "file.js")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1401,12 +1203,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'require(file)',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1418,12 +1217,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'a = require("foo")',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1435,12 +1231,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'function a(a = require("foo")) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1452,12 +1245,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'let foo = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1469,12 +1259,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo"), bar = require("bar");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1495,12 +1282,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {[foo]: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1512,12 +1296,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {["foo"]: foo} = require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1529,12 +1310,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'if (foo) require("foo");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1546,12 +1324,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require`foo`;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1563,12 +1338,11 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'function loadModule() {\n\treturn require("foo");\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function loadModule() {
+	return require("foo");
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1580,12 +1354,12 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'function loadModule() {\n\tconst foo = require("foo");\n\treturn foo;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function loadModule() {
+	const foo = require("foo");
+	return foo;
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -1597,12 +1371,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = require("foo"), bar = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1614,61 +1385,27 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'exports and module',
+  });
+});
+
+describe('exports and module', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'function exports(exports) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'function module(module) {}',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const exports = foo;\nexports.bar = bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const exports = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const module = foo;\nmodule.exports = bar;\nmodule.exports.bar = bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
-      {
-        code: 'const module = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        errors: [],
-        output: null,
-      },
+      'function exports(exports) {}',
+      'function module(module) {}',
+      `const exports = foo;
+exports.bar = bar;`,
+      'const exports = 1;',
+      `const module = foo;
+module.exports = bar;
+module.exports.bar = bar;`,
+      'const module = 1;',
     ],
     invalid: [
       {
         code: 'exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1686,12 +1423,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1709,12 +1443,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( ((exports)) = ((foo)) ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1732,12 +1463,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: '(( ((module.exports)) = ((foo)) ));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1755,12 +1483,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1778,12 +1503,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;module.exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1801,12 +1523,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports["foo"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1818,12 +1537,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports["foo"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1835,12 +1551,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = exports;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1852,12 +1565,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = exports.foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1869,12 +1579,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.exports;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1886,12 +1593,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.exports.foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1903,12 +1607,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module["exports"] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1920,12 +1621,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module[exports] = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1946,12 +1644,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports.foo.bar = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1963,12 +1658,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;exports.default = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -1986,12 +1678,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = 1;module.exports.default = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2009,12 +1698,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports.foo.bar = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2026,12 +1712,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'exports = 1;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2049,12 +1732,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'exports.foo = [];',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2066,12 +1746,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports = function() {};',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2089,12 +1766,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'module.exports.foo = foo || bar;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2106,12 +1780,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'exports += foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2123,12 +1794,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const foo = module.children',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2140,12 +1808,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const parentModule = module.parent',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2157,12 +1822,12 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'function foo() {\n\texports.foo = foo;\n\tmodule.exports.foo = foo;\n}',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `function foo() {
+	exports.foo = foo;
+	module.exports.foo = foo;
+}`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2183,61 +1848,43 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'TypeScript',
+  });
+});
+
+describe('TypeScript', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: 'type module = number[];',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'const module = 1; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type module = number[]; type ModuleRegistry = { [module: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type Data = { [module in keyof string]: number; };',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: 'type ModuleRegistry = { [exports: string]: string };',
         filename: 'upstream.ts',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
     ],
     invalid: [
       {
         code: 'const foo: Foo = require("foo");',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2249,12 +1896,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo}: Foo = require("foo");',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2266,18 +1911,17 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'JSON modules',
+  });
+});
+
+describe('JSON modules', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
         code: 'const data = require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2295,12 +1939,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2318,12 +1959,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "const data = (require(('./a.json')));",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2341,12 +1979,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo} = require("./a.json");',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2358,33 +1993,28 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: '.cjs files',
+  });
+});
+
+describe('.cjs files', () => {
+  ruleTester.run('prefer-module', {
     valid: [
       {
         code: '__dirname',
         filename: 'foo.cjs',
-        languageOptions: {},
-        errors: [],
-        output: null,
       },
       {
         code: '__dirname',
         filename: 'foo.cjS',
-        languageOptions: {},
-        errors: [],
-        output: null,
+        skip: 'The native compiler excludes mixed-case .cjS filenames before rule execution; Go extras cover the suffix behavior.',
       },
     ],
     invalid: [
       {
         code: '__filename',
         filename: 'foo.mjs',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2407,12 +2037,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("lodash")',
         filename: 'foo.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2430,12 +2058,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require("lodash")',
         filename: 'foo.cjs/foo.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2453,18 +2079,18 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Comments in named exports',
+  });
+});
+
+describe('Comments in named exports', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
-        code: 'const foo = 1;\nexports /* note */ .foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports /* note */ .foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2476,12 +2102,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'const foo = 1;\nexports./* c */foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports./* c */foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2493,12 +2117,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'const foo = 1;\nexports.foo /* c */ = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+exports.foo /* c */ = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2510,12 +2132,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
-        code: 'const foo = 1;\nmodule.exports /* c */ .foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const foo = 1;
+module.exports /* c */ .foo = foo;`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2527,17 +2147,17 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Constructor callees',
+  });
+});
+
+describe('Constructor callees', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
         code: 'new __filename.constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __filename: 'readonly',
@@ -2566,11 +2186,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new (__filename).constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __filename: 'readonly',
@@ -2599,7 +2217,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __filename.constructor("text");',
@@ -2632,7 +2249,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __filename!.constructor("text");',
@@ -2665,11 +2281,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname.constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __dirname: 'readonly',
@@ -2698,11 +2312,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new (__dirname).constructor("text");',
-        filename: 'upstream.js',
         languageOptions: {
           globals: {
             __dirname: 'readonly',
@@ -2731,7 +2343,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname.constructor("text");',
@@ -2764,7 +2375,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'new __dirname!.constructor("text");',
@@ -2797,18 +2407,17 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Static template module sources',
+  });
+});
+
+describe('Static template module sources', () => {
+  ruleTester.run('prefer-module', {
     valid: [],
     invalid: [
       {
         code: 'const file = require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2826,12 +2435,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2849,12 +2455,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./file.json`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2872,12 +2475,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const {foo: bar} = require(`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2895,12 +2495,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: "const file = require(`./it's.js`);",
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2918,12 +2515,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
-        code: 'const file = require(`./line\nfile.js`);',
-        filename: 'upstream.js',
-        languageOptions: {},
+        code: `const file = require(\`./line
+file.js\`);`,
         errors: [
           {
             messageId: 'error/identifier',
@@ -2941,12 +2536,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./back\\`tick.js`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2964,12 +2556,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`./fi\\u006ce`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -2987,12 +2576,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(/* keep */ (`file`));',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3010,12 +2596,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             ],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(`${name}`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3027,12 +2610,9 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const file = require(tag`file`);',
-        filename: 'upstream.js',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3044,12 +2624,10 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
       {
         code: 'const file: Foo = require(`file`);',
         filename: 'upstream.ts',
-        languageOptions: {},
         errors: [
           {
             messageId: 'error/identifier',
@@ -3061,97 +2639,39 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
             suggestions: [],
           },
         ],
-        output: null,
       },
     ],
-  },
-  {
-    name: 'Documentation examples',
+  });
+});
+
+describe('Documentation examples', () => {
+  ruleTester.run('prefer-module', {
     valid: [
-      {
-        code: 'const __dirname = import.meta.dirname;\nconst __filename = import.meta.filename;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "import {fileURLToPath} from 'node:url';\nimport path from 'node:path';\nconst __filename = fileURLToPath(import.meta.url);\nconst __dirname = path.dirname(fileURLToPath(import.meta.url));",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "import {fileURLToPath} from 'node:url';\nconst foo = fileURLToPath(new URL('foo.js', import.meta.url));",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "const foo = new URL('foo.js', import.meta.url);",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: 'function run() {\n\tif (foo) {\n\t\treturn;\n\t}\n}\nrun();',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "const file = path.join(import.meta.dirname, 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "const file = path.join(path.dirname(url.fileURLToPath(import.meta.url)), 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "const content = fs.readFileSync(import.meta.filename, 'utf8');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: "import {fromPairs} from 'lodash-es';",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: 'export default foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
-      {
-        code: 'const foo = 1;export {foo};',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
-        errors: [],
-      },
+      `const __dirname = import.meta.dirname;
+const __filename = import.meta.filename;`,
+      `import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));`,
+      `import {fileURLToPath} from 'node:url';
+const foo = fileURLToPath(new URL('foo.js', import.meta.url));`,
+      "const foo = new URL('foo.js', import.meta.url);",
+      `function run() {
+	if (foo) {
+		return;
+	}
+}
+run();`,
+      "const file = path.join(import.meta.dirname, 'foo.js');",
+      "const file = path.join(path.dirname(url.fileURLToPath(import.meta.url)), 'foo.js');",
+      "const content = fs.readFileSync(import.meta.filename, 'utf8');",
+      "import {fromPairs} from 'lodash-es';",
+      'export default foo;',
+      'const foo = 1;export {foo};',
     ],
     invalid: [
       {
         code: "'use strict';",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/use-strict-directive',
@@ -3171,12 +2691,12 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         ],
       },
       {
-        code: 'if (foo) {\n\treturn;\n}',
-        filename: 'upstream.js',
+        code: `if (foo) {
+	return;
+}`,
         languageOptions: {
           sourceType: 'script',
         },
-        output: null,
         errors: [
           {
             messageId: 'error/global-return',
@@ -3191,9 +2711,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
       },
       {
         code: "const file = path.join(__dirname, 'foo.js');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3221,9 +2738,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
       },
       {
         code: "const content = fs.readFileSync(__filename, 'utf8');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3251,9 +2765,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
       },
       {
         code: "const {fromPairs} = require('lodash');",
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3274,9 +2785,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
       },
       {
         code: 'module.exports = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3297,9 +2805,6 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
       },
       {
         code: 'exports.foo = foo;',
-        filename: 'upstream.js',
-        languageOptions: {},
-        output: null,
         errors: [
           {
             messageId: 'error/identifier',
@@ -3319,90 +2824,5 @@ const groups: { name: string; valid: Case[]; invalid: Case[] }[] = [
         ],
       },
     ],
-  },
-];
-
-for (const group of groups) {
-  describe(group.name, () => {
-    test('valid', async () => {
-      for (const item of group.valid) {
-        // The compiler's file selection does not accept this extension. The
-        // case remains here and Go extras check the rule's suffix handling.
-        if (item.filename.endsWith('.cjS')) continue;
-        const result = await run(item);
-        assert.deepEqual(result.diagnostics, [], item.code);
-      }
-    });
-    test('diagnostics and edits', async () => {
-      for (const item of group.invalid) {
-        const result = await run(item);
-        assert.equal(result.diagnostics.length, item.errors.length, item.code);
-        for (const [index, diagnostic] of result.diagnostics.entries()) {
-          const expected = item.errors[index];
-          assert.equal(diagnostic.ruleName, 'unicorn/prefer-module', item.code);
-          assert.equal(diagnostic.messageId, expected.messageId, item.code);
-          assert.equal(diagnostic.message, expected.message, item.code);
-          assert.equal(diagnostic.severity, 'error', item.code);
-          assert.deepEqual(
-            diagnostic.range,
-            {
-              start: { line: expected.line, column: expected.column },
-              end: { line: expected.endLine, column: expected.endColumn },
-            },
-            item.code,
-          );
-          assert.deepEqual(
-            (diagnostic.suggestions ?? []).map((s) => ({
-              messageId: s.messageId,
-              desc: s.message,
-              output: apply(item.code, s.fixes ?? []),
-            })),
-            expected.suggestions,
-            item.code,
-          );
-        }
-        const fixes = result.diagnostics.flatMap((d) => d.fixes ?? []);
-        assert.equal(
-          fixes.length ? apply(item.code, fixes) : null,
-          item.output,
-          item.code,
-        );
-      }
-    });
   });
-}
-
-it.skip('mixed-case foo.cjS is excluded by compiler file selection', () => {});
-
-async function run(item: Case) {
-  const filename = path.resolve(import.meta.dirname, item.filename);
-  const result = await lint({
-    config: [
-      {
-        plugins: ['unicorn'],
-        languageOptions: {
-          ...item.languageOptions,
-          globals: { ...globals, ...item.languageOptions?.globals },
-          parserOptions: { project: false, projectService: false },
-        },
-        rules: { 'unicorn/prefer-module': 'error' },
-      },
-    ],
-    configDirectory: import.meta.dirname,
-    workingDirectory: process.cwd(),
-    fileContents: { [filename]: item.code },
-  });
-  assert.equal(result.fileCount, 1, item.code);
-  assert.equal(result.ruleCount, 1, item.code);
-  return result;
-}
-
-function apply(
-  code: string,
-  fixes: { startPos: number; endPos: number; text: string }[],
-) {
-  for (const fix of [...fixes].sort((a, b) => b.startPos - a.startPos)) {
-    code = code.slice(0, fix.startPos) + fix.text + code.slice(fix.endPos);
-  }
-  return code;
-}
+});

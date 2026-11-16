@@ -677,77 +677,91 @@ const number = 12_345_678.12345678e12_345_678;`,
 });
 
 // The Go upstream suite checks the rule directly on these recovered literals.
-describe.skip('Legacy leading-zero literals are rejected by tsgo', () => {
+describe('Legacy leading-zero literals are rejected by tsgo', () => {
   tester.run(ruleName, {
     valid: [
       {
         code: 'const foo = 0777777',
         languageOptions: { sourceType: 'script' },
+        skip: 'The native TypeScript parser rejects this legacy octal literal; Go source-only tests cover the recovered literal.',
       },
       {
         code: 'var foo = 0999999',
         languageOptions: { sourceType: 'script' },
+        skip: 'The native TypeScript parser rejects this legacy leading-zero decimal literal; Go source-only tests cover the recovered literal.',
       },
       {
         code: 'let foo = 0111222',
         languageOptions: { sourceType: 'script' },
+        skip: 'The native TypeScript parser rejects this legacy octal literal; Go source-only tests cover the recovered literal.',
       },
     ],
     invalid: [],
   });
 });
 
-describe.skip('TOML and SOML require ESLint language plugins', () => {
+describe('TOML and SOML require ESLint language plugins', () => {
   tester.run(ruleName, {
     valid: [
       // TOML cases.
       {
         code: 'value = 1_000_000',
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = [-1234, +1234, -12_345, +12_345]',
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = [inf, +inf, -inf, nan, +nan, -nan]',
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = ["1234567", 1979-05-27T07:32:00Z, 1979-05-27, 07:32:00]',
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = [0xAB_CD, 0o1234_5670, 0b1010_1010]',
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = [1234567, 0xABCDEF]',
         options: [{ onlyIfContainsSeparator: true }],
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value = [-12345, +12345]',
         options: [{ number: { minimumDigits: 6 } }],
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       // SOML cases.
       {
         code: 'value: [1_000_000, 0xAB_CD, 0b1010_1010, 0o1234_5670]',
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value: [infinity, -infinity]',
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: "value: ['1234567', 2026-09-19T14:00:00Z, 12345s]",
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         code: 'value: 1234567',
         options: [{ onlyIfContainsSeparator: true }],
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
     ],
     invalid: [
@@ -759,6 +773,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [[1, 9, 16]],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -770,6 +785,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -778,6 +794,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [[1, 9, 28]],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -790,6 +807,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -802,6 +820,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -813,6 +832,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -822,6 +842,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [{ number: { groupLength: 4, fractionGroupLength: 3 } }],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -834,6 +855,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [{ number: { minimumDigits: 0, groupLength: 1 } }],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -851,6 +873,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'example.toml',
+        skip: "TOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       // SOML cases.
       {
@@ -858,6 +881,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [1, 8, 15],
         ]),
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -869,6 +893,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -881,12 +906,14 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           ],
         ),
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid('value: 1_2_345.123_456e-12', 'value: 12_345.123456e-12', [
           [1, 8, 27],
         ]),
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
       {
         ...invalid(
@@ -896,6 +923,7 @@ describe.skip('TOML and SOML require ESLint language plugins', () => {
           [{ number: { groupLength: 4, fractionGroupLength: 3 } }],
         ),
         filename: 'input.soml',
+        skip: "SOML requires an ESLint language plugin and is outside Rslint's supported JavaScript/TypeScript languages.",
       },
     ],
   });
