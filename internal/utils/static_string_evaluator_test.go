@@ -1628,6 +1628,34 @@ func TestStaticStringEvaluatorControlFlowNullish(t *testing.T) {
 	}
 }
 
+func TestStaticUndefinedValue(t *testing.T) {
+	for _, test := range []struct {
+		expression string
+		equal      bool
+	}{
+		{"undefined", true},
+		{"void 0", true},
+		{"null", false},
+		{"0", false},
+		{"''", false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/undefined.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			value, known := NewStaticStringEvaluator(nil).EvalValue(findVariableInitializer(t, source, "value"))
+			if !known {
+				t.Fatalf("EvalValue(%s) is unknown", test.expression)
+			}
+			equal, comparable := StaticValuesSameValueZero(StaticUndefinedValue(), value)
+			if equal != test.equal || !comparable {
+				t.Fatalf("StaticValuesSameValueZero = (%v, %v), want (%v, true)", equal, comparable, test.equal)
+			}
+		})
+	}
+	if !IsNullishStaticValue(StaticUndefinedValue()) {
+		t.Fatal("StaticUndefinedValue is not nullish")
+	}
+}
+
 func TestStaticStringEvaluatorTypeof(t *testing.T) {
 	for _, test := range []struct {
 		expression, want string
