@@ -105,10 +105,9 @@ func TestNoArrayFillWithReferenceTypeExtras(t *testing.T) {
 			{Code: "`value`.fill({})", FileName: "file.js"},
 			{Code: `class Items extends Array<object> {} const items = new Items(); items.fill({});`, FileName: "file.ts", Tsx: false},
 			{Code: `function f(foo: Set<object> | Map<object, object>) { foo.fill({}); }`, FileName: "file.ts", Tsx: false},
-			// Interface heritage is followed only through an explicit binding
-			// annotation. Type information for other receiver shapes must not
-			// widen through the interface's base types.
-			{Code: `interface Items extends Array<object> {} declare function get(): Items; get().fill({})`, FileName: "file.ts", Tsx: false},
+			// A local function's return annotation resolves the module-local Array
+			// interface, which does not extend the standard one.
+			{Code: `export {}; interface Array<T> { fill(v: object): void } declare function get(): Array<object>; get().fill({})`, FileName: "file.ts", Tsx: false},
 			{Code: `interface Items extends Array<object> {} declare const o: {items: Items}; o.items.fill({})`, FileName: "file.ts", Tsx: false},
 			{Code: `namespace N { export interface Items extends Array<object> {} } declare const i: N.Items; i.fill({})`, FileName: "file.ts", Tsx: false},
 			// A function declaration's return type is not a type annotation on
@@ -167,9 +166,9 @@ func TestNoArrayFillWithReferenceTypeExtras(t *testing.T) {
 			// for mixed unions.
 			{Code: `function f(foo: object[] | undefined) { foo!.fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 51, 1, 53)}},
 			{Code: `function f(foo: object[] | Set<object>) { foo.fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 52, 1, 54)}},
-			// The type-information path classifies by symbol name, even when a
-			// module-local declaration shadows the standard Array interface.
-			{Code: `export {}; interface Array<T> { fill(v: object): void } declare function get(): Array<object>; get().fill({})`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 107, 1, 109)}},
+			// A local function's return annotation follows interface heritage,
+			// as Unicorn's getTypeFromFunctionCall does.
+			{Code: `interface Items extends Array<object> {} declare function get(): Items; get().fill({})`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 84, 1, 86)}},
 			{Code: `function f(foo: Uint8Array) { (foo as object[]).fill({}); }`, FileName: "file.ts", Tsx: false, Errors: []rule_tester.InvalidTestCaseError{extraError(1, 54, 1, 56)}},
 			{Code: `Array.of(1, 2, 3).fill({})`, FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{extraError(1, 24, 1, 26)}},
 			{Code: `const array = []; array.fill({})`, FileName: "file.js", Errors: []rule_tester.InvalidTestCaseError{extraError(1, 30, 1, 32)}},

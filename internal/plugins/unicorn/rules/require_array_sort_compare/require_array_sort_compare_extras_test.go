@@ -20,10 +20,33 @@ func TestRequireArraySortCompareExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			valid(`new Uint8Array().toSorted()`, "file.js"),
 			valid(`array["toSorted"]()`, "file.js"),
+			// Unicorn reads a plain assignment's right-hand side and a declaration's
+			// JSDoc @type.
+			valid(`(a = new Set()).sort()`, "file.js"),
+			valid(`/** @type {Set<number>} */ const s = x; s.sort()`, "file.js"),
+			valid(`/** @type {Set<number>} */ let s; s.sort()`, "file.js"),
+			valid(`Object.freeze({}).sort()`, "file.js"),
+			// TypeScript files classify through the type checker, matching Unicorn
+			// with type information.
+			valid(`declare const x: object; x.sort()`, "file.ts"),
+			valid(`declare const x: Function; x.sort()`, "file.ts"),
+			valid(`declare const x: typeof Array; x.sort()`, "file.ts"),
+			valid(`enum E { A } E.sort()`, "file.ts"),
+			valid(`class A { s: Set<number>; f() { this.s.sort() } }`, "file.ts"),
 		},
 		[]rule_tester.InvalidTestCase{
 			invalid(`((array)).sort()`, "sort", "file.js", true),
 			invalid(`((array)).toSorted()`, "toSorted", "file.js", true),
+			// A call has no static value unless it is Object.freeze, seal, or
+			// preventExtensions of one.
+			invalid(`BigInt(1).sort()`, "sort", "file.js", true),
+			invalid(`Number(1).sort()`, "sort", "file.js", true),
+			invalid(`Object.freeze([]).sort()`, "sort", "file.js", true),
+			// ESTree has no node for a JSDoc cast, and a statement's JSDoc
+			// describes a declaration only when it declares one binding.
+			invalid(`const s = /** @type {Set<number>} */ (x); s.sort()`, "sort", "file.js", true),
+			invalid(`/** @type {Set<number>} */ var s, t; s.sort()`, "sort", "file.js", true),
+			invalid(`/** @type {*} */ const s = new Set(); s.sort()`, "sort", "file.js", true),
 			// Comments outside the replaced argument range are preserved.
 			commentCase(`array.sort(/* before */ undefined /* after */)`, "sort", "file.js", 1, 7, `array.sort(/* before */ COMPARATOR /* after */)`),
 			commentCase("array.sort(\n\t// keep\n)", "sort", "file.js", 1, 7, "array.sort(\n\t// keep\nCOMPARATOR)"),

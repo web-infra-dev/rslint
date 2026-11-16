@@ -58,7 +58,6 @@ function add(stream) {
 			{FileName: "case.js", Code: `/** @returns {Array<number>} */ function* load() { yield 1; } const stream = load(); const length = stream.push(1);`},
 			{FileName: "case.js", Code: `/** @type {() => Array<number>} */ const load = async () => []; const stream = load(); const length = stream.push(1);`},
 			{FileName: "case.ts", Code: `function run() { return (items?.push!)(1); }`},
-			{FileName: "case.js", Code: queueCast},
 			{FileName: "case.js", Code: inferredStream},
 			{FileName: "case.js", Code: `/** @param {function(): void} queue */
 function add(queue) { return queue.push(1); }`},
@@ -126,6 +125,8 @@ function add(stream) { return stream?.push(1); }`},
 			invalidCase("case.ts", `function make<T>(value: T): number[] { return []; } const stream = make(1); const length = stream.push(1);`, "push", 1, 99, ""),
 			invalidCase("case.jsx", "function run() { setup = <View />\nreturn [items].push(1); }", "push", 2, 16, "function run() { setup = <View />\n;[items].push(1); return; }"),
 			invalidCase("case.js", "/** @returns {number[]} */\n"+inferredStream, "push", 7, 23, ""),
+			// ESTree has no node for a JSDoc cast, so Unicorn does not read its @type.
+			invalidCase("case.js", queueCast, "push", 8, 21, ""),
 			invalidCase("case.js", sameLineArray, "push", 3, 17, `setup(); /** @param {Array<number>} stream */
 function add(stream) {
   stream.push(1); return;

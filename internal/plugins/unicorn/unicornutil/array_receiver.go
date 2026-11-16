@@ -14,13 +14,18 @@ import (
 // IsKnownNonArray reports whether node is definitely not an Array or
 // ReadonlyArray. Typed arrays and keyed collections are non-arrays. Unknown
 // receivers return false so syntactic array rules can still report them.
+//
+// It follows Unicorn v80's isKnownNonArray defaults: JSDoc annotations, plain
+// assignment and logical operands, and array producers are read, and a call
+// has a static value only through Object.freeze/preventExtensions/seal.
 func IsKnownNonArray(ctx rule.RuleContext, node *ast.Node) bool {
-	if isSourceOnlyFile(ctx) {
-		return classifySourceOnlyArrayReceiver(
-			ctx, node, arrayTargets, knownNonArrayNames,
-		) == arrayClassNonTarget
-	}
-	return classifyArrayReceiver(ctx, node, arrayTargets, knownNonArrayNames) == arrayClassNonTarget
+	return classifyArrayReceiverWithOptions(ctx, node, arrayTargets, knownNonArrayNames, knownNonArrayOptions) == arrayClassNonTarget
+}
+
+var knownNonArrayOptions = ArrayReceiverOptions{
+	CheckArrayProducers:      true,
+	ReadJSDoc:                true,
+	sideEffectFreeStaticCall: true,
 }
 
 // IsKnownNonIndexedCollection reports whether node is definitely outside the
@@ -52,6 +57,10 @@ type ArrayReceiverOptions struct {
 	TreatMixedUnionAsNonTarget bool
 	preferKnownAnnotationNames bool
 	treatMixedUnionAsTarget    bool
+	// sideEffectFreeStaticCall mirrors getStaticValueForControlFlow (Unicorn
+	// v77+), which rejects every call flagged by eslint-utils' hasSideEffect.
+	// Older ports read built-in call results such as Number(1).
+	sideEffectFreeStaticCall bool
 }
 
 // IsKnownNonIndexedCollectionWithOptions applies rule-specific receiver
@@ -216,7 +225,9 @@ func classifyArrayReceiverInner(
 		)
 	}
 	if node.Kind == ast.KindAsExpression || node.Kind == ast.KindTypeAssertionExpression {
-		if state.useTypeInformation || state.options.ReadJSDoc && utils.IsJSDocTypeCastWrapper(node) {
+		// ESTree has no node for a JSDoc cast, so Unicorn classifies the
+		// parenthesized expression without reading its @type.
+		if state.useTypeInformation && !utils.IsJSDocTypeCastWrapper(node) {
 			if class := ClassifyTypeAnnotation(ctx, node.Type(), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
@@ -288,7 +299,7 @@ func classifyArrayReceiverInner(
 	// return types cannot classify arbitrary user calls.
 	classifyArrays := targetNames.Has("Array")
 	if classifyArrays && !state.useTypeInformation && ast.IsCallExpression(node) {
-		if class := classifySourceOnlyStaticCall(ctx, node); class != arrayClassUnknown {
+		if class := classifySourceOnlyStaticCall(ctx, node, state.options.sideEffectFreeStaticCall); class != arrayClassUnknown {
 			return class
 		}
 	} else if classifyArrays && !ast.IsIdentifier(node) && !ast.IsAccessExpression(node) {
@@ -369,6 +380,7 @@ const maxSourceStaticNodeCount = 256
 func classifySourceOnlyStaticCall(
 	ctx rule.RuleContext,
 	node *ast.Node,
+	sideEffectFree bool,
 ) arrayClass {
 	call := node.AsCallExpression()
 	if call == nil {
@@ -377,10 +389,19 @@ func classifySourceOnlyStaticCall(
 	evaluator := arrayReceiverStaticEvaluator(ctx)
 	bounded := isBoundedSourceStaticExpression(ctx, node)
 	root, method, builtin := staticBuiltinCall(ctx, call.Expression)
+	arguments := node.Arguments()
+	if sideEffectFree {
+		// Only Unicorn's isSafeStaticPassThroughCall escapes hasSideEffect.
+		if !builtin || root != "Object" || !isStaticPassThroughMethod(method) || len(arguments) != 1 ||
+			!ast.IsPropertyAccessExpression(ast.SkipOuterExpressions(call.Expression, ast.OEKParentheses|ast.OEKAssertions)) ||
+			ast.IsOptionalChain(node) {
+			return arrayClassUnknown
+		}
+		builtin = false
+	}
 	if !bounded && !builtin {
 		return arrayClassUnknown
 	}
-	arguments := node.Arguments()
 	if !staticCallArgumentsKnown(ctx, evaluator, arguments) {
 		return arrayClassUnknown
 	}
@@ -560,6 +581,10 @@ func isUnshadowedGlobal(ctx rule.RuleContext, identifier *ast.Node) bool {
 		ctx.Refs.IsGlobalNameReference(identifier, name, staticCallGlobalMeaning)
 }
 
+func isStaticPassThroughMethod(name string) bool {
+	return name == "freeze" || name == "preventExtensions" || name == "seal"
+}
+
 func isStaticMathMethod(name string) bool {
 	switch name {
 	case "abs", "acos", "acosh", "asin", "asinh", "atan", "atan2", "atanh",
@@ -614,6 +639,9 @@ func classifyArrayIdentifier(
 		var optional bool
 		if state.options.ReadJSDoc && (declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter) {
 			annotation, optional = valueTypeAnnotation(ctx, declaration, true)
+			if isSharedStatementJSDoc(declaration, annotation) {
+				annotation, optional = nil, false
+			}
 		}
 		options := arrayTypeOptions(targetNames, nonTargetNames, state.options)
 		class := ClassifyTypeAnnotation(ctx, annotation, options)
@@ -646,6 +674,16 @@ func classifyArrayIdentifier(
 		state.memo[symbol] = class
 	}
 	return class
+}
+
+// isSharedStatementJSDoc reports a JSDoc annotation written before a variable
+// statement that declares several bindings. tsgo attaches it to the first
+// declarator, while Unicorn reads statement JSDoc only for a single binding.
+func isSharedStatementJSDoc(declaration, annotation *ast.Node) bool {
+	list := declaration.Parent
+	return annotation != nil && ast.IsVariableDeclaration(declaration) && utils.IsJSDocSyntaxNode(annotation) &&
+		list != nil && ast.IsVariableDeclarationList(list) && len(list.AsVariableDeclarationList().Declarations.Nodes) > 1 &&
+		annotation.Pos() < declaration.Pos()
 }
 
 // arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in

@@ -112,6 +112,71 @@ func TestArrayFactoryReturnAnnotationsWithoutChecker(t *testing.T) {
 	}
 }
 
+// TestIsKnownNonArrayUnicornDefaults covers the v80 isKnownNonArray policies:
+// plain assignments and JSDoc declarations are read, JSDoc casts are not, and a
+// call has a static value only through Object.freeze/preventExtensions/seal.
+func TestIsKnownNonArrayUnicornDefaults(t *testing.T) {
+	for _, test := range []struct {
+		name, code, file string
+		nonArray, skip   bool
+	}{
+		{"assignment", "let a; check((a = new Set()));", "case.js", true, false},
+		{"assignment-array", "let a; check((a = []));", "case.js", false, false},
+		{"compound-assignment", "let a; check((a += new Set()));", "case.js", false, false},
+		{"logical", "check(new Map() || new Set());", "case.js", true, false},
+		{"logical-unknown", "check(x || new Set());", "case.js", false, false},
+		{"jsdoc-const", "/** @type {Set<number>} */ const s = x; check(s);", "case.js", true, false},
+		{"jsdoc-let", "/** @type {Set<number>} */ let s; check(s);", "case.js", true, false},
+		{"jsdoc-unknown", "/** @type {Foo} */ const s = new Set(); check(s);", "case.js", false, true},
+		{"jsdoc-statement-list", "/** @type {Set<number>} */ var s, t; check(s);", "case.js", false, false},
+		{"jsdoc-declarator-list", "var /** @type {Set<number>} */ s, t; check(s);", "case.js", true, false},
+		{"jsdoc-cast", "check(/** @type {Set<number>} */ (x));", "case.js", false, false},
+		{"jsdoc-cast-const", "const s = /** @type {Set<number>} */ (x); check(s);", "case.js", false, false},
+		{"bigint", "check(BigInt(1));", "case.js", false, true},
+		{"number", "check(Number(1));", "case.js", false, true},
+		{"math", "check(Math.abs(1));", "case.js", false, true},
+		{"object", "check(Object());", "case.js", false, true},
+		{"local-call", "check(make(1));", "case.js", false, false},
+		{"freeze-object", "check(Object.freeze({}));", "case.js", true, true},
+		{"seal-string", "check(Object.seal('a'));", "case.js", true, true},
+		{"prevent-extensions-array", "check(Object.preventExtensions([]));", "case.js", false, false},
+		{"freeze-computed", "check(Object['freeze']({}));", "case.js", false, true},
+		{"freeze-optional", "check(Object.freeze?.({}));", "case.js", false, true},
+		{"freeze-arguments", "check(Object.freeze({}, {}));", "case.js", false, true},
+		{"assign", "check(Object.assign({}));", "case.js", false, false},
+		{"typescript-assignment", "let a: unknown; check((a = new Set()));", "case.ts", true, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			testRule := rule.Rule{Name: "test/known-non-array", Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
+				seen := false
+				return rule.RuleListeners{
+					ast.KindCallExpression: func(node *ast.Node) {
+						callee := node.Expression()
+						if !ast.IsIdentifier(callee) || callee.Text() != "check" || len(node.Arguments()) != 1 {
+							return
+						}
+						seen = true
+						argument := node.Arguments()[0]
+						if IsKnownNonArray(ctx, argument) != test.nonArray {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "classification", Description: "Incorrect known non-array classification."})
+						}
+						// Ports of older Unicorn versions keep their static-value policy.
+						if ShouldSkipKnownNonArrayReceiver(ctx, argument) != test.skip {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "skip", Description: "Incorrect known non-array receiver skip."})
+						}
+					},
+					rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
+						if !seen {
+							ctx.ReportNode(node, rule.RuleMessage{Id: "missing", Description: "Missing classification input."})
+						}
+					},
+				}
+			}}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testRule, []rule_tester.ValidTestCase{{Code: test.code, FileName: test.file}}, nil)
+		})
+	}
+}
+
 func parseTestSource(code string) *ast.SourceFile {
 	return parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
