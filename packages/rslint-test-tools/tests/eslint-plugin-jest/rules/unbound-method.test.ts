@@ -206,21 +206,6 @@ jest.mocked(service.method, { shallow: true });`,
         },
       },
     })),
-    // TODO: Restore upstream 29.16.6's invalid classification after supplying
-    // the fixture's matcher method types. The missing expect return type makes
-    // this a false pass, not an intentional native difference. With the matcher
-    // declared as an interface method, both linters report unboundWithoutThisAnnotation.
-    {
-      name: 'upstream unbound-method jest edition / invalid 1',
-      code: 'expect(Console.prototype.log).toHaveBeenCalledTimes',
-      filename: 'fixtures/upstream/file.ts',
-      languageOptions: {
-        sourceType: 'module',
-        parserOptions: {
-          project: ['fixtures/upstream/tsconfig.json'],
-        },
-      },
-    },
     ...(
       [
         'Promise.resolve().then(console.log);',
@@ -887,6 +872,16 @@ If your function does not access \`this\`, you can annotate it with \`this: void
           9,
           12,
           33,
+        ],
+        // This reads the matcher method without calling it. The fixture must
+        // declare expect's return type as an interface with a method; otherwise
+        // an any result makes both linters falsely accept this upstream case.
+        [
+          'expect(Console.prototype.log).toHaveBeenCalledTimes',
+          'upstream unbound-method jest edition / invalid 1',
+          1,
+          1,
+          52,
         ],
         [
           `expect(() => {

@@ -8,9 +8,6 @@
     "lib": ["es2015", "es2017", "esnext"],
     "experimentalDecorators": true
   },
-  "files": ["estree.ts"],
-  "include": [
-    "file.ts",
-    "react.tsx"
-  ]
+  "files": ["jest-matchers.d.ts"],
+  "include": ["file.ts", "react.tsx"]
 }
