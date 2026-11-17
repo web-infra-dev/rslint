@@ -37,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_constant_zero_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_double_comparison"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_logical_operands"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_loops"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_empty_file"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
@@ -185,6 +186,7 @@ func GetAllRules() []rule.Rule {
 		no_constant_zero_expression.NoConstantZeroExpressionRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_double_comparison.NoDoubleComparisonRule,
+		no_duplicate_logical_operands.NoDuplicateLogicalOperandsRule,
 		no_duplicate_loops.NoDuplicateLoopsRule,
 		no_empty_file.NoEmptyFileRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
