@@ -1646,9 +1646,9 @@ func TestStaticUndefinedValue(t *testing.T) {
 			if !known {
 				t.Fatalf("EvalValue(%s) is unknown", test.expression)
 			}
-			equal, comparable := StaticValuesSameValueZero(StaticUndefinedValue(), value)
-			if equal != test.equal || !comparable {
-				t.Fatalf("StaticValuesSameValueZero = (%v, %v), want (%v, true)", equal, comparable, test.equal)
+			equal, ok := StaticValuesSameValueZero(StaticUndefinedValue(), value)
+			if equal != test.equal || !ok {
+				t.Fatalf("StaticValuesSameValueZero = (%v, %v), want (%v, true)", equal, ok, test.equal)
 			}
 		})
 	}
