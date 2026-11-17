@@ -3,7 +3,11 @@
 // Inputs, options and all diagnostic ranges are preserved. Messages are rendered
 // from upstream data. This rule has no autofixes or suggestions; their absence
 // is checked by the shared tester.
-import { RuleTester } from '@rslint/rule-tester';
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
 import { noFormat } from '@typescript-eslint/rule-tester';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -63,7 +67,16 @@ const ruleTester = new RuleTester({
   languageOptions: { parserOptions: { project: './tsconfig.json' } },
 });
 
-ruleTester.run('no-deprecated', {
+// Preserve upstream's historical minimum TypeScript versions as metadata.
+// Rslint's pinned compiler supports each of them, so every case runs.
+type UpstreamMetadata = {
+  dependencyConstraints?: { typescript: '4.9' | '5.2' | '5.6' };
+};
+
+const cases: {
+  valid: (string | (ValidTestCase & UpstreamMetadata))[];
+  invalid: (TestCase & UpstreamMetadata)[];
+} = {
   valid: [
     '/** @deprecated */ var a;',
     '/** @deprecated */ var a = 1;',
@@ -4637,4 +4650,6 @@ void { normalVariable };
       ],
     },
   ],
-});
+};
+
+ruleTester.run('no-deprecated', cases);
