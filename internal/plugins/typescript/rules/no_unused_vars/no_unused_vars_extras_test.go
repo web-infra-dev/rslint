@@ -1103,3 +1103,53 @@ func TestNoUnusedVarsNestedSelfAssignedFunctions(t *testing.T) {
 		},
 	)
 }
+
+// TestNoUnusedVarsReturnedCallbacks keeps concise arrow returns equivalent to
+// block returns. typescript-eslint v8.72.1 shares the concise-return false
+// positive; these callbacks can be retained and invoked after registration.
+func TestNoUnusedVarsReturnedCallbacks(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{{Code: `
+const callbacks: Array<() => string> = [];
+function register(handler: () => string) {
+  callbacks.push(handler);
+  return () => "cancelled";
+}
+let cancel = () => "";
+cancel = register((() => () => cancel())());
+console.log(callbacks[0]());
+`}}
+	for _, expression := range []string{
+		`(() => () => cancel())()`,
+		`(() => { return () => cancel(); })()`,
+		`(() => (() => cancel()))()`,
+		`(() => (() => cancel()) as (() => string))()`,
+		`(() => (() => cancel()) satisfies (() => string))()`,
+		`(() => condition ? () => cancel() : () => "")()`,
+		`(() => (touch(), () => cancel()))()`,
+		`(() => ({ handler: () => cancel() }))()`,
+		`(() => [() => cancel()])()`,
+		`(() => (() => () => cancel())())()`,
+		`(() => function () { return cancel(); })()`,
+	} {
+		valid = append(valid, rule_tester.ValidTestCase{
+			Code: "let cancel = () => \"\";\ncancel = register(" + expression + ");",
+		})
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		`(() => (() => value + 1)())()`,
+		`(() => { return (() => value + 1)(); })()`,
+		`(() => (touch(), (() => value + 1)()))()`,
+		`(() => condition ? (() => value + 1)() : 0)()`,
+		`(() => (() => value, 0))()`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code: "let value = 0;\nvalue = " + expression + ";",
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unusedVar", Message: "'value' is assigned a value but never used.",
+				Line: 2, Column: 1, EndLine: 2, EndColumn: 6,
+			}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}

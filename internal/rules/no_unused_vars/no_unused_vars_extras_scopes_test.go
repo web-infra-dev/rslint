@@ -76,6 +76,13 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 			// A callback passed through the RHS can execute later and stores its read.
 			{Code: `let x; x = consume(() => x);`},
 
+			// A concise arrow returns the callback, just like an explicit return.
+			// ESLint's nearest-call shortcut misclassifies these escaping values.
+			{Code: `let x; x = consume((() => () => x)());`},
+			{Code: `let x; x = consume((() => { return () => x; })());`},
+			{Code: `let x; x = consume((() => ({ read: () => x }))());`},
+			{Code: `let x; x = consume((() => (() => () => x)())());`},
+
 			// Local shadows do not consume an inline global, but a real global read does.
 			{Code: `/*global foo*/ function f(foo) { return foo; } consume(foo); f(1);`},
 			{Code: `/*global foo*/ consume(foo);`},

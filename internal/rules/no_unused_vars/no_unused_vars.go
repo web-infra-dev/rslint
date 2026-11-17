@@ -708,6 +708,13 @@ func IsStorableFunction(function *ast.Node, rhs *ast.Node) bool {
 					return true
 				}
 			}
+		case ast.KindArrowFunction:
+			// A concise body is an implicit return. Be as conservative as an
+			// explicit ReturnStatement: the returned callback may escape. A
+			// call of this enclosing arrow does not invoke that callback.
+			if parent.Body() == node {
+				return true
+			}
 		case ast.KindCallExpression:
 			return parent.AsCallExpression().Expression != node
 		case ast.KindNewExpression:
