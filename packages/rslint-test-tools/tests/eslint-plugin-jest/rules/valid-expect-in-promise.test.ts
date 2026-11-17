@@ -1257,10 +1257,14 @@ it('it1', () => {
         },
       ],
     })),
-    // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+    // Upstream 29.16.0 accepts these seven cases. Rslint's documented promise
+    // tracking requires the test to wait for assertions and propagate failures;
+    // the cases below explain why each original input lacks that guarantee.
     ...(
       [
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // Destructuring a promise directly throws, but the assertion chain has
+        // already been created and remains unconsumed. Upstream stops tracking
+        // at the destructuring pattern; Rslint still reports the floating chain.
         [
           `test('that we bailout if destructuring is used', () => {
   const [promise] = something().then(value => {
@@ -1273,7 +1277,8 @@ it('it1', () => {
           4,
           5,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // The array element becomes a local promise, but the test never awaits
+        // or returns it. The callback can finish before its assertion runs.
         [
           `test('that we bailout if destructuring is used', () => {
   const [promise] = [
@@ -1288,7 +1293,8 @@ it('it1', () => {
           5,
           7,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // Object destructuring binds the promise without consuming it. The test
+        // returns synchronously and cannot propagate the later assertion failure.
         [
           `test('that we bailout if destructuring is used', () => {
   const {promise} = {
@@ -1303,7 +1309,9 @@ it('it1', () => {
           5,
           7,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // An arbitrary helper call is not a proven promise sink. This test does
+        // not return or await the helper's result; Rslint intentionally requires
+        // explicit consumption instead of upstream's bailout for this shape.
         [
           `test('that we bailout in complex cases', () => {
   promiseSomething({
@@ -1319,7 +1327,8 @@ it('it1', () => {
           6,
           7,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // Promise.reject(p) rejects immediately with p as its reason; it does
+        // not adopt or wait for p. Returning it does not propagate the assertion.
         [
           `test('promise test', async function () {
   const somePromise = getPromise().then((data) => {
@@ -1334,7 +1343,8 @@ it('it1', () => {
           4,
           5,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // Awaiting Promise.reject(p) throws p itself before p settles. It does
+        // not wait for the assertion or propagate that assertion's failure.
         [
           `test('promise test', async function () {
   const somePromise = getPromise().then((data) => {
@@ -1349,7 +1359,9 @@ it('it1', () => {
           4,
           5,
         ],
-        // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+        // allSettled waits but converts assertion rejection into a fulfilled
+        // results array. Rslint requires assertion failures to reach the test;
+        // Promise.all is the failure-propagating control.
         [
           `test('later return', async () => {
   const onePromise = something().then(value => {

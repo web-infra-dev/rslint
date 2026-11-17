@@ -206,7 +206,10 @@ jest.mocked(service.method, { shallow: true });`,
         },
       },
     })),
-    // Upstream 29.16.6 classifies this as invalid; current native behavior is valid.
+    // TODO: Restore upstream 29.16.6's invalid classification after supplying
+    // the fixture's matcher method types. The missing expect return type makes
+    // this a false pass, not an intentional native difference. With the matcher
+    // declared as an interface method, both linters report unboundWithoutThisAnnotation.
     {
       name: 'upstream unbound-method jest edition / invalid 1',
       code: 'expect(Console.prototype.log).toHaveBeenCalledTimes',

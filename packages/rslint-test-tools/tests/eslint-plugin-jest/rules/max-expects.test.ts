@@ -463,7 +463,9 @@ const myHelper2 = function() {
         ecmaVersion: 2017,
       },
     },
-    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
+    // Upstream 29.16.0 reports this, but each(table, callback) does not register
+    // a test: the returned function is never called. Rslint counts assertions in
+    // registered callbacks; each(table)(title, callback) still reports the excess.
     {
       name: 'upstream max-expects / invalid 12',
       code:

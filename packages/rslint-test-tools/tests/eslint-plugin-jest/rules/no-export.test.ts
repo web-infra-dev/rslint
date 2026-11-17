@@ -64,7 +64,8 @@ test('a test', () => {
         ecmaVersion: 2015,
       },
     })),
-    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
+    // Upstream reports this, but module.export (without the final s) is an
+    // ordinary property, not CommonJS module.exports. This is not an export.
     {
       name: 'upstream no-export / invalid 9',
       code: 'module.export.invalid = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
@@ -73,7 +74,9 @@ test('a test', () => {
         ecmaVersion: 2015,
       },
     },
-    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
+    // This invalid case comes from upstream 29.16.6; 29.16.0 does not report it.
+    // Assigning module["export"] does not change module.exports, so Rslint accepts
+    // it. The corresponding module["exports"] assignment is checked separately.
     {
       name: 'upstream no-export / invalid 12',
       code: 'module["export"] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',

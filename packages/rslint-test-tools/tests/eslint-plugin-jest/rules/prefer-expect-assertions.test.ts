@@ -764,7 +764,9 @@ describe('my tests', () => {
         ecmaVersion: 2017,
       },
     })),
-    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
+    // Upstream 29.16.0 checks source order and reports the first test. Jest
+    // collects the whole suite before execution, so this later beforeEach hook
+    // sets hasAssertions for both tests. Rslint intentionally accepts both.
     {
       name: 'upstream prefer-expect-assertions / invalid 8',
       code: `describe('some tests', () => {
@@ -3146,7 +3148,9 @@ it('only returns numbers that are less than 100', () => {expect.assertions();
         ],
       }),
     ),
-    // Upstream 29.16.0 classifies this as valid; current native behavior is invalid.
+    // Upstream 29.16.0 counts the nested hasAssertions call as hook coverage.
+    // The timer may run after the test has finished, leaving an empty loop with
+    // no assertion guard. Rslint therefore reports the missing guard.
     {
       name: 'upstream prefer-expect-assertions / valid 27',
       code: `beforeEach(() => {

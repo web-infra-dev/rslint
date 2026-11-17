@@ -365,18 +365,17 @@ aVariable.mockImplementation(function() {
         ecmaVersion: 2020,
       },
     })),
-    // Upstream 29.16.1 classifies this as invalid; current native behavior is valid.
+    // Upstream 29.16.1 rewrites all four forms to mockReturnValue(Promise.reject(...)).
+    // That creates a rejected promise while configuring the mock, even if it is
+    // never called. Keep rejection creation inside the callback to avoid an
+    // unhandled rejection; mockRejectedValue is handled by the promise rule.
     ...(
       [
-        // Upstream 29.16.1 classifies this as invalid; current native behavior is valid.
         'jest.fn().mockImplementation(() => Promise.reject(13))',
-        // Upstream 29.16.1 classifies this as invalid; current native behavior is valid.
         `jest.fn().mockImplementation(() => {
   return Promise.reject(13);
 })`,
-        // Upstream 29.16.1 classifies this as invalid; current native behavior is valid.
         'aVariable.mockImplementation(() => Promise.reject(13))',
-        // Upstream 29.16.1 classifies this as invalid; current native behavior is valid.
         `aVariable.mockImplementation(() => {
   return Promise.reject(13);
 })`,
