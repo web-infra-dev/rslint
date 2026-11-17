@@ -4,10 +4,7 @@ import {
   type ValidTestCase as RslintValidTestCase,
 } from '@rslint/rule-tester';
 
-import type {
-  MessageIds,
-  Options,
-} from '../../../../src/rules/naming-convention';
+import type { Options } from '../../../../src/rules/naming-convention';
 import type {
   PredefinedFormatsString,
   Selector,
@@ -27,6 +24,8 @@ const messages = {
   unexpectedUnderscore:
     '{{type}} name `{{name}}` must not have a {{position}} underscore.',
 };
+
+type MessageIds = keyof typeof messages;
 
 export const formatTestNames: Readonly<
   Record<PredefinedFormatsString, Record<'invalid' | 'valid', string[]>>
