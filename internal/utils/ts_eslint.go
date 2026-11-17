@@ -1039,20 +1039,28 @@ func FindFunctionKeywordPos(sourceFile *ast.SourceFile, node *ast.Node) int {
 
 var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}
 
+// IsArrayMethodCallWithPredicate recognizes array predicate methods after
+// transparent parentheses. When supplied, the evaluator resolves computed keys
+// from their runtime values rather than TypeScript property-name syntax alone.
 func IsArrayMethodCallWithPredicate(
 	typeChecker *checker.Checker,
 	node *ast.CallExpression,
+	staticEvaluator *StaticStringEvaluator,
 ) bool {
-	if !ast.IsAccessExpression(node.Expression) {
+	callee := ast.SkipParentheses(node.Expression)
+	if !ast.IsAccessExpression(callee) {
 		return false
 	}
 
-	propertyName, ok := checker.Checker_getAccessedPropertyName(typeChecker, node.Expression)
+	propertyName, ok := checker.Checker_getAccessedPropertyName(typeChecker, callee)
+	if staticEvaluator != nil {
+		propertyName, ok = staticEvaluator.EvalAccessExpressionName(callee)
+	}
 	if !ok || !slices.Contains(arrayPredicateFunctions, propertyName) {
 		return false
 	}
 
-	t := GetConstrainedTypeAtLocation(typeChecker, node.Expression.Expression())
+	t := GetConstrainedTypeAtLocation(typeChecker, callee.Expression())
 	return TypeRecurser(t, func(t *checker.Type) bool {
 		return checker.Checker_isArrayOrTupleType(typeChecker, t)
 	})

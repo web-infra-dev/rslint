@@ -137,6 +137,30 @@ Default: `false`. By default the rule emits a file-level `noStrictNullCheck` dia
 
 If your codebase does not rely on JavaScript truthiness coercion in boolean positions, or you prefer the conciseness of `if (x)` over the strictness of `if (x != null)`, you can disable this rule.
 
+## Differences from upstream
+
+For a generic predicate whose constraint contains a function signature, the
+`explicitBooleanReturnType` suggestion annotates the predicate's own parameter
+list. typescript-eslint v8.67.0 instead finds the first closing parenthesis and
+can insert the annotation into the constraint, producing invalid syntax:
+
+```typescript
+// Input, with allowNumber: false
+[true].some(<T extends () => boolean>() => 1);
+
+// Rslint suggestion
+[true].some(<T extends () => boolean>(): boolean => 1);
+```
+
+The suggestion also preserves an existing parameter list with a trailing comma,
+including comments containing parentheses. For `(x, /* ) */) => 1`, Rslint
+produces `(x, /* ) */): boolean => 1`. Upstream v8.67.0 misidentifies this
+as a parameter without parentheses and produces an invalid annotation.
+
+The `noStrictNullCheck` diagnostic uses an empty range at the start of the file
+(line 1, column 1). Upstream uses line 0 for this file-level diagnostic; Rslint's
+API reports 1-based source locations.
+
 ## Original Documentation
 
 - [typescript-eslint: strict-boolean-expressions](https://typescript-eslint.io/rules/strict-boolean-expressions)

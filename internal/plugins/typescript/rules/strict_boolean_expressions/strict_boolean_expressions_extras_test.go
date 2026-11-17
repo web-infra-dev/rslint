@@ -16,6 +16,10 @@ import (
 
 func TestStrictBooleanExpressionsExtras(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, []rule_tester.ValidTestCase{
+		// A boolean condition inside an object method is valid; run this case
+		// instead of retaining the previous skipped invalid placeholder.
+		{Code: "const o = { m() { if (true) return; } };\no.m;"},
+
 		// ━━━━━━━━━━━━ Dimension 4 + general lock-ins ━━━━━━━━━━━━
 		// ==== Dimension 4: receiver / expression wrappers ====
 		// Single & multi-level parenthesized boolean stays valid.
@@ -483,12 +487,13 @@ func TestStrictBooleanExpressionsExtras(t *testing.T) {
 
 		// ==== Dimension 4: optional call producing boolean | undefined ====
 		{
+			// Upstream wraps the complete optional chain before transforming it.
 			Code: "declare const f: (() => boolean) | undefined;\nif (f?.()) {}",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "conditionErrorNullableBoolean", Line: 2, Column: 5,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "conditionFixDefaultFalse", Output: "declare const f: (() => boolean) | undefined;\nif (f?.() ?? false) {}"},
-					{MessageId: "conditionFixCompareTrue", Output: "declare const f: (() => boolean) | undefined;\nif (f?.() === true) {}"},
+					{MessageId: "conditionFixDefaultFalse", Output: "declare const f: (() => boolean) | undefined;\nif ((f?.()) ?? false) {}"},
+					{MessageId: "conditionFixCompareTrue", Output: "declare const f: (() => boolean) | undefined;\nif ((f?.()) === true) {}"},
 				},
 			}},
 		},
@@ -918,14 +923,6 @@ func TestStrictBooleanExpressionsExtras(t *testing.T) {
 		// `!!nullable` resolves to boolean. Inner `!nullable` becomes boolean → outer `!boolean` valid.
 		// We assert as valid below in valid section already.
 
-		// ==== Lock-in: Methods-as-method-shorthand in object literal ====
-		{
-			Code: "const o = { m() { if (true) return; } };\no.m;",
-			// Inner `if (true)` is always-truthy boolean — valid; no diagnostic. Wrap as a no-op invalid (skip).
-			Skip:   true,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionErrorOther"}},
-		},
-
 		// ==== Lock-in: nested logical chains check correct operand ====
 		{
 			Code: "declare const a: object;\ndeclare const b: object;\ndeclare const c: number;\nif (a && b && c) {}",
@@ -1280,12 +1277,13 @@ if ((a || b) && (c !== "")) {}`},
 		// `(value?.field)` types as `T | undefined`; if T is object, it's
 		// nullable object — should report when allowNullableObject:false.
 		{
+			// Preserve the optional-chain wrapper required by upstream suggestions.
 			Code:    "interface A { b?: { c: object } }\nfunction f(a: A) { if (a.b?.c) {} }",
 			Options: map[string]interface{}{"allowNullableObject": false},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "conditionErrorNullableObject", Line: 2, Column: 24,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "conditionFixCompareNullish", Output: "interface A { b?: { c: object } }\nfunction f(a: A) { if (a.b?.c != null) {} }"},
+					{MessageId: "conditionFixCompareNullish", Output: "interface A { b?: { c: object } }\nfunction f(a: A) { if ((a.b?.c) != null) {} }"},
 				},
 			}},
 		},
@@ -2051,5 +2049,269 @@ if (tag` + "`hi`" + ` !== "") {}`},
 				},
 			}},
 		},
+	})
+}
+
+// TestStrictBooleanExpressionsSyntaxEdges checks wrappers and token boundaries
+// against typescript-eslint v8.67.0, including the complete suggestion outputs.
+func TestStrictBooleanExpressionsSyntaxEdges(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, []rule_tester.InvalidTestCase{
+		// predicate-parens
+		{Code: "[1, null].filter((x => x));",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 19, EndLine: 1, EndColumn: 25,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareNullish", Output: "[1, null].filter((x => x != null));"},
+						{MessageId: "conditionFixDefaultZero", Output: "[1, null].filter((x => x ?? 0));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[1, null].filter((x => Boolean(x)));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[1, null].filter(((x): boolean => x));"},
+					},
+				},
+			}},
+		// predicate-async-parens
+		{Code: "[true].filter((async x => true));",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "predicateCannotBeAsync", Message: "Predicate function should not be 'async'; expected a boolean return type.",
+					Line: 1, Column: 16, EndLine: 1, EndColumn: 31,
+				},
+			}},
+		// predicate-body-parens
+		{Code: "[1, null].filter(x => (x));",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 18, EndLine: 1, EndColumn: 26,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareNullish", Output: "[1, null].filter(x => (x != null));"},
+						{MessageId: "conditionFixDefaultZero", Output: "[1, null].filter(x => (x ?? 0));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[1, null].filter(x => (Boolean(x)));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[1, null].filter((x): boolean => (x));"},
+					},
+				},
+			}},
+		// predicate-any
+		{Code: "declare const cb: any; [true].some(cb);",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorOther", Message: "Unexpected value in conditional. A boolean expression is required.",
+					Line: 1, Column: 36, EndLine: 1, EndColumn: 38,
+				},
+			}},
+		// predicate-not-callable
+		{Code: "[true].some(undefined);",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorOther", Message: "Unexpected value in conditional. A boolean expression is required.",
+					Line: 1, Column: 13, EndLine: 1, EndColumn: 22,
+				},
+			}},
+		// predicate-empty-comment
+		{Code: "[true].some(/* ) */ () => 1);",
+			Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+					Line: 1, Column: 21, EndLine: 1, EndColumn: 28,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareZero", Output: "[true].some(/* ) */ () => 1 !== 0);"},
+						{MessageId: "conditionFixCompareNaN", Output: "[true].some(/* ) */ () => !Number.isNaN(1));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[true].some(/* ) */ () => Boolean(1));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[true].some(/* ) */ (): boolean => 1);"},
+					},
+				},
+			}},
+		// predicate-param-comment
+		{Code: "[true].some((x /* ) */) => 1);",
+			Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+					Line: 1, Column: 13, EndLine: 1, EndColumn: 29,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareZero", Output: "[true].some((x /* ) */) => 1 !== 0);"},
+						{MessageId: "conditionFixCompareNaN", Output: "[true].some((x /* ) */) => !Number.isNaN(1));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[true].some((x /* ) */) => Boolean(1));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[true].some((x /* ) */): boolean => 1);"},
+					},
+				},
+			}},
+		// predicate-parenless-comment
+		{Code: "[true].some(x /* ) */ => 1);",
+			Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+					Line: 1, Column: 13, EndLine: 1, EndColumn: 27,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareZero", Output: "[true].some(x /* ) */ => 1 !== 0);"},
+						{MessageId: "conditionFixCompareNaN", Output: "[true].some(x /* ) */ => !Number.isNaN(1));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[true].some(x /* ) */ => Boolean(1));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[true].some((x): boolean /* ) */ => 1);"},
+					},
+				},
+			}},
+		// chain-string
+		{Code: "declare const x: {s: string}; if (x?.s) {}",
+			Options: map[string]any{"allowString": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorString", Message: "Unexpected string value in conditional. An explicit empty string check is required.",
+					Line: 1, Column: 35, EndLine: 1, EndColumn: 39,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: {s: string}; if ((x?.s).length > 0) {}"},
+						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: {s: string}; if ((x?.s) !== \"\") {}"},
+						{MessageId: "conditionFixCastBoolean", Output: "declare const x: {s: string}; if (Boolean((x?.s))) {}"},
+					},
+				},
+			}},
+		// chain-length
+		{Code: "declare const x: string[]; if (x?.length) {}",
+			Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNumber", Message: "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+					Line: 1, Column: 32, EndLine: 1, EndColumn: 41,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareZero", Output: "declare const x: string[]; if ((x?.length) !== 0) {}"},
+						{MessageId: "conditionFixCompareNaN", Output: "declare const x: string[]; if (!Number.isNaN((x?.length))) {}"},
+						{MessageId: "conditionFixCastBoolean", Output: "declare const x: string[]; if (Boolean((x?.length))) {}"},
+					},
+				},
+			}},
+		// chain-call
+		{Code: "declare const x: () => string; if (x?.()) {}",
+			Options: map[string]any{"allowString": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorString", Message: "Unexpected string value in conditional. An explicit empty string check is required.",
+					Line: 1, Column: 36, EndLine: 1, EndColumn: 41,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: () => string; if ((x?.()).length > 0) {}"},
+						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: () => string; if ((x?.()) !== \"\") {}"},
+						{MessageId: "conditionFixCastBoolean", Output: "declare const x: () => string; if (Boolean((x?.()))) {}"},
+					},
+				},
+			}},
+		// template
+		{Code: "if (`text`) {}",
+			Options: map[string]any{"allowString": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorString", Message: "Unexpected string value in conditional. An explicit empty string check is required.",
+					Line: 1, Column: 5, EndLine: 1, EndColumn: 11,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareStringLength", Output: "if ((`text`).length > 0) {}"},
+						{MessageId: "conditionFixCompareEmptyString", Output: "if ((`text`) !== \"\") {}"},
+						{MessageId: "conditionFixCastBoolean", Output: "if (Boolean((`text`))) {}"},
+					},
+				},
+			}},
+	})
+}
+
+// Unlike upstream v8.67.0, insert after the actual parameters, not a closing
+// parenthesis in a generic constraint. The latter produces invalid syntax.
+func TestStrictBooleanExpressionsGenericPredicate(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "[true].some(<T extends () => boolean>() => 1);", Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.", Line: 1, Column: 13, EndLine: 1, EndColumn: 45,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "conditionFixCompareZero", Output: "[true].some(<T extends () => boolean>() => 1 !== 0);"},
+					{MessageId: "conditionFixCompareNaN", Output: "[true].some(<T extends () => boolean>() => !Number.isNaN(1));"},
+					{MessageId: "conditionFixCastBoolean", Output: "[true].some(<T extends () => boolean>() => Boolean(1));"},
+					{MessageId: "explicitBooleanReturnType", Output: "[true].some(<T extends () => boolean>(): boolean => 1);"},
+				}}}},
+	})
+}
+
+// TestStrictBooleanExpressionsPredicateAccess checks wrappers and token boundaries
+// against typescript-eslint v8.67.0, including the complete suggestion outputs.
+func TestStrictBooleanExpressionsPredicateAccess(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, []rule_tester.ValidTestCase{{Code: `const key = "map"; [1, null][key](x => x);`}, {Code: `const obj = {filter: (cb: unknown) => cb}; obj.filter(x => x);`}, {Code: `let key = "filter"; key = "map"; [1, null][key](x => x);`}, {Code: `declare function getKey(): "filter"; const key = getKey(); [1, null][key](x => x);`}}, []rule_tester.InvalidTestCase{
+		// callee-parens
+		{Code: "([1, null].filter)(x => x);",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 20, EndLine: 1, EndColumn: 26,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareNullish", Output: "([1, null].filter)(x => x != null);"},
+						{MessageId: "conditionFixDefaultZero", Output: "([1, null].filter)(x => x ?? 0);"},
+						{MessageId: "conditionFixCastBoolean", Output: "([1, null].filter)(x => Boolean(x));"},
+						{MessageId: "explicitBooleanReturnType", Output: "([1, null].filter)((x): boolean => x);"},
+					},
+				},
+			}},
+		// callee-computed
+		{Code: "const name = \"filter\"; [1, null][name](x => x);",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorAny", Message: "Unexpected any value in array predicate return type. An explicit comparison or type conversion is required.",
+					Line: 1, Column: 40, EndLine: 1, EndColumn: 46,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCastBoolean", Output: "const name = \"filter\"; [1, null][name](x => Boolean(x));"},
+						{MessageId: "explicitBooleanReturnType", Output: "const name = \"filter\"; [1, null][name]((x): boolean => x);"},
+					},
+				},
+			}},
+		// callback-spread
+		{Code: "declare const p: ((x: any) => boolean)[]; [1].filter(...p);",
+			Errors: []rule_tester.InvalidTestCaseError{}},
+		// callback-cast
+		{Code: "[1, null].filter(((x: number | null) => x) as (x: number | null) => number | null);",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 18, EndLine: 1, EndColumn: 82,
+				},
+			}},
+		// callback-function-parens
+		{Code: "[1, null].filter((function (x) { return x; }));",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 19, EndLine: 1, EndColumn: 45,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "explicitBooleanReturnType", Output: "[1, null].filter((function (x): boolean { return x; }));"},
+					},
+				},
+			}},
+		// callback-default
+		{Code: "[true].some((x = (() => true)()) => 1);",
+			Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+					Line: 1, Column: 13, EndLine: 1, EndColumn: 38,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareZero", Output: "[true].some((x = (() => true)()) => 1 !== 0);"},
+						{MessageId: "conditionFixCompareNaN", Output: "[true].some((x = (() => true)()) => !Number.isNaN(1));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[true].some((x = (() => true)()) => Boolean(1));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[true].some((x = (() => true)()): boolean => 1);"},
+					},
+				},
+			}},
+		// callback-parenthesized-logical
+		{Code: "[1, null].filter(x => ((x || x)));",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 18, EndLine: 1, EndColumn: 33,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareNullish", Output: "[1, null].filter(x => (((x || x) != null)));"},
+						{MessageId: "conditionFixDefaultZero", Output: "[1, null].filter(x => (((x || x) ?? 0)));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[1, null].filter(x => ((Boolean((x || x)))));"},
+						{MessageId: "explicitBooleanReturnType", Output: "[1, null].filter((x): boolean => ((x || x)));"},
+					},
+				},
+				{MessageId: "conditionErrorNullableNumber", Message: "Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+					Line: 1, Column: 25, EndLine: 1, EndColumn: 26,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "conditionFixCompareNullish", Output: "[1, null].filter(x => (((x != null) || x)));"},
+						{MessageId: "conditionFixDefaultZero", Output: "[1, null].filter(x => (((x ?? 0) || x)));"},
+						{MessageId: "conditionFixCastBoolean", Output: "[1, null].filter(x => (((Boolean(x)) || x)));"},
+					},
+				},
+			}},
+	})
+}
+
+// The upstream parenless-arrow check mistakes a trailing comma for an absent
+// parameter list; preserve the actual list and insert a syntactically valid type.
+func TestStrictBooleanExpressionsTrailingCommaPredicate(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "[true].some((x, /* ) */) => 1);", Options: map[string]any{"allowNumber": false},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "conditionErrorNumber", Message: "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.", Line: 1, Column: 13, EndLine: 1, EndColumn: 30,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "conditionFixCompareZero", Output: "[true].some((x, /* ) */) => 1 !== 0);"},
+					{MessageId: "conditionFixCompareNaN", Output: "[true].some((x, /* ) */) => !Number.isNaN(1));"},
+					{MessageId: "conditionFixCastBoolean", Output: "[true].some((x, /* ) */) => Boolean(1));"},
+					{MessageId: "explicitBooleanReturnType", Output: "[true].some((x, /* ) */): boolean => 1);"},
+				}}}},
 	})
 }

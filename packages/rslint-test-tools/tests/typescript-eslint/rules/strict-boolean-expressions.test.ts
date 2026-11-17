@@ -1,28 +1,21 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+// Ported from typescript-eslint v8.67.0 (101 valid and 117 invalid cases).
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/tests/rules/strict-boolean-expressions.test.ts
+// The upstream noStrictNullCheck location (line 0) is mapped to the file start
+// (1:1-1:1), because Rslint exposes 1-based source locations.
+// Original source, options and suggestion outputs are preserved. Missing message
+// text and full locations were verified with that release's rule and parser.
+import { RuleTester } from '@rslint/rule-tester';
+import { config } from '../config';
 
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
-  },
-});
-
-ruleTester.run('strict-boolean-expressions', {
+new RuleTester(config).run('strict-boolean-expressions', {
   valid: [
-    // boolean in boolean context
     "true ? 'a' : 'b';",
     `
 if (false) {
 }
     `,
     'while (true) {}',
-    'for (; false; ) {}',
+    'for (; false;) {}',
     '!true;',
     'false || 123;',
     "true && 'foo';",
@@ -43,14 +36,12 @@ declare const x: never;
 if (x) {
 }
     `,
-
-    // string in boolean context
     `
 if ('') {
 }
     `,
     "while ('x') {}",
-    "for (; ''; ) {}",
+    "for (; '';) {}",
     "('' && '1') || x;",
     `
 declare const x: string;
@@ -59,14 +50,12 @@ if (x) {
     `,
     '(x: string) => !x;',
     '<T extends string>(x: T) => (x ? 1 : 0);',
-
-    // number in boolean context
     `
 if (0) {
 }
     `,
     'while (1n) {}',
-    'for (; Infinity; ) {}',
+    'for (; Infinity;) {}',
     '(0 / 0 && 1 + 2) || x;',
     `
 declare const x: number;
@@ -75,8 +64,6 @@ if (x) {
     `,
     '(x: bigint) => !x;',
     '<T extends number>(x: T) => (x ? 1 : 0);',
-
-    // nullable object in boolean context
     `
 declare const x: null | object;
 if (x) {
@@ -84,296 +71,416 @@ if (x) {
     `,
     '(x?: { a: any }) => !x;',
     '<T extends {} | null | undefined>(x: T) => (x ? 1 : 0);',
-
-    // nullable boolean in boolean context
     {
       code: `
-        declare const x: boolean | null;
-        if (x) {
-        }
+declare const x: boolean | null;
+if (x) {
+}
       `,
-      options: [{ allowNullableBoolean: true }],
+      options: [
+        {
+          allowNullableBoolean: true,
+        },
+      ],
     },
     {
       code: `
-        (x?: boolean) => !x;
+(x?: boolean) => !x;
       `,
-      options: [{ allowNullableBoolean: true }],
+      options: [
+        {
+          allowNullableBoolean: true,
+        },
+      ],
     },
     {
       code: `
-        <T extends boolean | null | undefined>(x: T) => (x ? 1 : 0);
+<T extends boolean | null | undefined>(x: T) => (x ? 1 : 0);
       `,
-      options: [{ allowNullableBoolean: true }],
+      options: [
+        {
+          allowNullableBoolean: true,
+        },
+      ],
     },
     {
       code: `
-        const a: (undefined | boolean | null)[] = [true, undefined, null];
-        a.some(x => x);
+const a: (undefined | boolean | null)[] = [true, undefined, null];
+a.some(x => x);
       `,
-      options: [{ allowNullableBoolean: true }],
-    },
-
-    // nullable string in boolean context
-    {
-      code: `
-        declare const x: string | null;
-        if (x) {
-        }
-      `,
-      options: [{ allowNullableString: true }],
+      options: [
+        {
+          allowNullableBoolean: true,
+        },
+      ],
     },
     {
       code: `
-        (x?: string) => !x;
+declare const x: string | null;
+if (x) {
+}
       `,
-      options: [{ allowNullableString: true }],
+      options: [
+        {
+          allowNullableString: true,
+        },
+      ],
     },
     {
       code: `
-        <T extends string | null | undefined>(x: T) => (x ? 1 : 0);
+(x?: string) => !x;
       `,
-      options: [{ allowNullableString: true }],
-    },
-
-    // nullable number in boolean context
-    {
-      code: `
-        declare const x: number | null;
-        if (x) {
-        }
-      `,
-      options: [{ allowNullableNumber: true }],
+      options: [
+        {
+          allowNullableString: true,
+        },
+      ],
     },
     {
       code: `
-        (x?: number) => !x;
+<T extends string | null | undefined>(x: T) => (x ? 1 : 0);
       `,
-      options: [{ allowNullableNumber: true }],
+      options: [
+        {
+          allowNullableString: true,
+        },
+      ],
     },
     {
       code: `
-        <T extends number | null | undefined>(x: T) => (x ? 1 : 0);
+declare const x: number | null;
+if (x) {
+}
       `,
-      options: [{ allowNullableNumber: true }],
+      options: [
+        {
+          allowNullableNumber: true,
+        },
+      ],
     },
     {
       code: `
-        declare const arrayOfArrays: (null | unknown[])[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array?.length);
+(x?: number) => !x;
       `,
-      options: [{ allowNullableNumber: true }],
-    },
-
-    // any in boolean context
-    {
-      code: `
-        declare const x: any;
-        if (x) {
-        }
-      `,
-      options: [{ allowAny: true }],
+      options: [
+        {
+          allowNullableNumber: true,
+        },
+      ],
     },
     {
       code: `
-        x => !x;
+<T extends number | null | undefined>(x: T) => (x ? 1 : 0);
       `,
-      options: [{ allowAny: true }],
+      options: [
+        {
+          allowNullableNumber: true,
+        },
+      ],
     },
     {
       code: `
-        <T extends any>(x: T) => (x ? 1 : 0);
+declare const arrayOfArrays: (null | unknown[])[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array?.length);
       `,
-      options: [{ allowAny: true }],
+      options: [
+        {
+          allowNullableNumber: true,
+        },
+      ],
     },
     {
       code: `
-        declare const arrayOfArrays: any[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+declare const x: any;
+if (x) {
+}
       `,
-      options: [{ allowAny: true }],
-    },
-
-    // logical operator
-    {
-      code: `
-        1 && true && 'x' && {};
-      `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
     {
       code: `
-        let x = 0 || false || '' || null;
+x => !x;
       `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
     {
       code: `
-        if (1 && true && 'x') void 0;
+<T extends any>(x: T) => (x ? 1 : 0);
       `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
     {
       code: `
-        if (0 || false || '') void 0;
+declare const arrayOfArrays: any[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
       `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowAny: true,
+        },
+      ],
     },
     {
       code: `
-        1 && true && 'x' ? {} : null;
+1 && true && 'x' && {};
       `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        0 || false || '' ? null : {};
+let x = 0 || false || '' || null;
       `,
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        declare const arrayOfArrays: string[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+if (1 && true && 'x') void 0;
       `,
-      options: [{ allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        declare const arrayOfArrays: number[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+if (0 || false || '') void 0;
       `,
-      options: [{ allowNumber: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        declare const arrayOfArrays: (null | object)[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+1 && true && 'x' ? {} : null;
       `,
-      options: [{ allowNullableObject: true }],
-    },
-
-    // nullable enum in boolean context
-    {
-      code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const rand = Math.random();
-        let theEnum: ExampleEnum | null = null;
-        if (rand < 0.3) {
-          theEnum = ExampleEnum.This;
-        }
-        if (theEnum) {
-        }
-      `,
-      options: [{ allowNullableEnum: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const rand = Math.random();
-        let theEnum: ExampleEnum | null = null;
-        if (rand < 0.3) {
-          theEnum = ExampleEnum.This;
-        }
-        if (!theEnum) {
-        }
+0 || false || '' ? null : {};
       `,
-      options: [{ allowNullableEnum: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 1,
-          That = 2,
-        }
-        const rand = Math.random();
-        let theEnum: ExampleEnum | null = null;
-        if (rand < 0.3) {
-          theEnum = ExampleEnum.This;
-        }
-        if (!theEnum) {
-        }
+declare const arrayOfArrays: string[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
       `,
-      options: [{ allowNullableEnum: true }],
+      options: [
+        {
+          allowString: true,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 'one',
-          That = 'two',
-        }
-        const rand = Math.random();
-        let theEnum: ExampleEnum | null = null;
-        if (rand < 0.3) {
-          theEnum = ExampleEnum.This;
-        }
-        if (!theEnum) {
-        }
+declare const arrayOfArrays: number[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
       `,
-      options: [{ allowNullableEnum: true }],
-    },
-
-    // nullable mixed enum in boolean context
-    {
-      // falsy number and truthy string
-      code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 'one',
-        }
-        (value?: ExampleEnum) => (value ? 1 : 0);
-      `,
-      options: [{ allowNullableEnum: true }],
-    },
-    {
-      // falsy string and truthy number
-      code: `
-        enum ExampleEnum {
-          This = '',
-          That = 1,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
-      `,
-      options: [{ allowNullableEnum: true }],
-    },
-    {
-      // truthy string and truthy number
-      code: `
-        enum ExampleEnum {
-          This = 'this',
-          That = 1,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
-      `,
-      options: [{ allowNullableEnum: true }],
-    },
-    {
-      // falsy string and falsy number
-      code: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
-      `,
-      options: [{ allowNullableEnum: true }],
+      options: [
+        {
+          allowNumber: true,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        declare const arrayOfArrays: (ExampleEnum | null)[];
-        const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+declare const arrayOfArrays: (null | object)[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
       `,
-      options: [{ allowNullableEnum: true }],
+      options: [
+        {
+          allowNullableObject: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const rand = Math.random();
+let theEnum: ExampleEnum | null = null;
+if (rand < 0.3) {
+  theEnum = ExampleEnum.This;
+}
+if (theEnum) {
+}
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const rand = Math.random();
+let theEnum: ExampleEnum | null = null;
+if (rand < 0.3) {
+  theEnum = ExampleEnum.This;
+}
+if (!theEnum) {
+}
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 1,
+  That = 2,
+}
+const rand = Math.random();
+let theEnum: ExampleEnum | null = null;
+if (rand < 0.3) {
+  theEnum = ExampleEnum.This;
+}
+if (!theEnum) {
+}
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 'one',
+  That = 'two',
+}
+const rand = Math.random();
+let theEnum: ExampleEnum | null = null;
+if (rand < 0.3) {
+  theEnum = ExampleEnum.This;
+}
+if (!theEnum) {
+}
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 0,
+  That = 'one',
+}
+(value?: ExampleEnum) => (value ? 1 : 0);
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = '',
+  That = 1,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = 'this',
+  That = 1,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
+    },
+    {
+      code: `
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+declare const arrayOfArrays: (ExampleEnum | null)[];
+const isAnyNonEmptyArray1 = arrayOfArrays.some(array => array);
+      `,
+      options: [
+        {
+          allowNullableEnum: true,
+        },
+      ],
     },
     {
       code: `
@@ -384,7 +491,7 @@ if (x) {
       `,
       languageOptions: {
         parserOptions: {
-          project: './tsconfig.unstrict.json',
+          project: ['unstrict/tsconfig.json'],
         },
       },
       options: [
@@ -392,8 +499,8 @@ if (x) {
           allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: true,
         },
       ],
+      filename: 'unstrict/file.ts',
     },
-
     `
 function f(arg: 'a' | null) {
   if (arg) console.log(arg);
@@ -552,18 +659,15 @@ declare const nullableString: string | null;
 assert(3 as any, nullableString);
       `,
     },
-    // Intentional use of `any` to test a function call with no call signatures.
     `
 declare const assert: any;
 declare const nullableString: string | null;
 assert(nullableString);
     `,
-    // Coverage for absent "test expression".
-    // Ensure that no crash or false positive occurs
     `
-      for (let x = 0; ; x++) {
-        break;
-      }
+for (let x = 0; ; x++) {
+  break;
+}
     `,
     `
 [true, false].some(function (x) {
@@ -634,9 +738,7 @@ declare function f(x: string | null): boolean;
 [35].filter(f);
     `,
   ],
-
   invalid: [
-    // non-boolean in RHS of test expression
     {
       code: `
 if (true && 1 + 1) {
@@ -645,7 +747,6 @@ if (true && 1 + 1) {
       errors: [
         {
           column: 13,
-          data: { context: 'conditional' },
           line: 2,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -655,6 +756,7 @@ if (true && 1 + 1) {
 if (true && ((1 + 1) !== 0)) {
 }
       `,
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
@@ -662,6 +764,7 @@ if (true && ((1 + 1) !== 0)) {
 if (true && (!Number.isNaN((1 + 1)))) {
 }
       `,
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -669,8 +772,13 @@ if (true && (!Number.isNaN((1 + 1)))) {
 if (true && (Boolean((1 + 1)))) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 2,
+          endColumn: 18,
         },
       ],
       options: [
@@ -692,16 +800,23 @@ if (true && (Boolean((1 + 1)))) {
             {
               messageId: 'conditionFixCompareStringLength',
               output: "while (false || (('a' + 'b').length > 0)) {}",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
-              output: `while (false || (('a' + 'b') !== "")) {}`,
+              output: "while (false || (('a' + 'b') !== \"\")) {}",
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "while (false || (Boolean(('a' + 'b')))) {}",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 26,
         },
       ],
       options: [
@@ -717,9 +832,12 @@ if (true && (Boolean((1 + 1)))) {
       errors: [
         {
           column: 34,
-          data: { context: 'conditional' },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 35,
         },
       ],
       options: [
@@ -730,10 +848,8 @@ if (true && (Boolean((1 + 1)))) {
         },
       ],
     },
-
-    // check if all and only the outermost operands are checked
     {
-      code: noFormat`if (('' && {}) || (0 && void 0)) { }`,
+      code: "if (('' && {}) || (0 && void 0)) { }",
       errors: [
         {
           column: 6,
@@ -742,111 +858,143 @@ if (true && (Boolean((1 + 1)))) {
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
-              output: `if (((''.length > 0) && {}) || (0 && void 0)) { }`,
+              output: "if (((''.length > 0) && {}) || (0 && void 0)) { }",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
-              output: `if ((('' !== "") && {}) || (0 && void 0)) { }`,
+              output: 'if (((\'\' !== "") && {}) || (0 && void 0)) { }',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
-              output: `if (((Boolean('')) && {}) || (0 && void 0)) { }`,
+              output: "if (((Boolean('')) && {}) || (0 && void 0)) { }",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 8,
         },
         {
           column: 12,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 14,
         },
         {
           column: 20,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
-              output: `if (('' && {}) || ((0 !== 0) && void 0)) { }`,
+              output: "if (('' && {}) || ((0 !== 0) && void 0)) { }",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
-              output: `if (('' && {}) || ((!Number.isNaN(0)) && void 0)) { }`,
+              output: "if (('' && {}) || ((!Number.isNaN(0)) && void 0)) { }",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
-              output: `if (('' && {}) || ((Boolean(0)) && void 0)) { }`,
+              output: "if (('' && {}) || ((Boolean(0)) && void 0)) { }",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 21,
         },
-        { column: 25, line: 1, messageId: 'conditionErrorNullish' },
+        {
+          column: 25,
+          line: 1,
+          messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
       options: [
-        { allowNullableObject: false, allowNumber: false, allowString: false },
+        {
+          allowNullableObject: false,
+          allowNumber: false,
+          allowString: false,
+        },
       ],
-      output: null,
     },
     {
       code: `
-        declare const array: string[];
-        array.some(x => x);
+declare const array: string[];
+array.some(x => x);
       `,
       errors: [
         {
-          data: {
-            context: 'array predicate return type',
-          },
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: `
-        declare const array: string[];
-        array.some(x => x.length > 0);
+declare const array: string[];
+array.some(x => x.length > 0);
       `,
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: `
-        declare const array: string[];
-        array.some(x => x !== "");
+declare const array: string[];
+array.some(x => x !== "");
       `,
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: `
-        declare const array: string[];
-        array.some(x => Boolean(x));
+declare const array: string[];
+array.some(x => Boolean(x));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
               output: `
-        declare const array: string[];
-        array.some((x): boolean => x);
+declare const array: string[];
+array.some((x): boolean => x);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected string value in array predicate return type. An explicit empty string check is required.',
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 18,
         },
       ],
-      options: [{ allowNullableBoolean: true, allowString: false }],
+      options: [
+        {
+          allowNullableBoolean: true,
+          allowString: false,
+        },
+      ],
     },
     {
-      code: noFormat`
+      code: `
 declare const foo: true & { __BRAND: 'Foo' };
 if (('' && foo) || (0 && void 0)) { }
       `,
       errors: [
         {
           column: 6,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -856,6 +1004,7 @@ if (('' && foo) || (0 && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if (((''.length > 0) && foo) || (0 && void 0)) { }
       `,
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
@@ -863,6 +1012,7 @@ if (((''.length > 0) && foo) || (0 && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if ((('' !== "") && foo) || (0 && void 0)) { }
       `,
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -870,14 +1020,16 @@ if ((('' !== "") && foo) || (0 && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if (((Boolean('')) && foo) || (0 && void 0)) { }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 3,
+          endColumn: 8,
         },
         {
           column: 21,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -887,6 +1039,7 @@ if (((Boolean('')) && foo) || (0 && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if (('' && foo) || ((0 !== 0) && void 0)) { }
       `,
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
@@ -894,6 +1047,7 @@ if (('' && foo) || ((0 !== 0) && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if (('' && foo) || ((!Number.isNaN(0)) && void 0)) { }
       `,
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -901,27 +1055,40 @@ if (('' && foo) || ((!Number.isNaN(0)) && void 0)) { }
 declare const foo: true & { __BRAND: 'Foo' };
 if (('' && foo) || ((Boolean(0)) && void 0)) { }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 3,
+          endColumn: 22,
         },
-        { column: 26, line: 3, messageId: 'conditionErrorNullish' },
+        {
+          column: 26,
+          line: 3,
+          messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 3,
+          endColumn: 32,
+        },
       ],
       options: [
-        { allowNullableObject: false, allowNumber: false, allowString: false },
+        {
+          allowNullableObject: false,
+          allowNumber: false,
+          allowString: false,
+        },
       ],
-      output: null,
     },
     {
-      code: noFormat`
+      code: `
 declare const foo: false & { __BRAND: 'Foo' };
 if (('' && {}) || (foo && void 0)) { }
       `,
       errors: [
         {
           column: 6,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -931,6 +1098,7 @@ if (('' && {}) || (foo && void 0)) { }
 declare const foo: false & { __BRAND: 'Foo' };
 if (((''.length > 0) && {}) || (foo && void 0)) { }
       `,
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
@@ -938,6 +1106,7 @@ if (((''.length > 0) && {}) || (foo && void 0)) { }
 declare const foo: false & { __BRAND: 'Foo' };
 if ((('' !== "") && {}) || (foo && void 0)) { }
       `,
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -945,182 +1114,217 @@ if ((('' !== "") && {}) || (foo && void 0)) { }
 declare const foo: false & { __BRAND: 'Foo' };
 if (((Boolean('')) && {}) || (foo && void 0)) { }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 3,
+          endColumn: 8,
         },
         {
           column: 12,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 3,
+          endColumn: 14,
         },
         {
           column: 27,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 3,
+          endColumn: 33,
         },
       ],
       options: [
-        { allowNullableObject: false, allowNumber: false, allowString: false },
+        {
+          allowNullableObject: false,
+          allowNumber: false,
+          allowString: false,
+        },
       ],
-      output: null,
     },
-
-    // shouldn't check last logical operand when used for control flow
     {
       code: "'asd' && 123 && [] && null;",
       errors: [
         {
           column: 1,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "('asd'.length > 0) && 123 && [] && null;",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: '(\'asd\' !== "") && 123 && [] && null;',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "(Boolean('asd')) && 123 && [] && null;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 6,
         },
         {
           column: 10,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "'asd' && (123 !== 0) && [] && null;",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output: "'asd' && (!Number.isNaN(123)) && [] && null;",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "'asd' && (Boolean(123)) && [] && null;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 13,
         },
         {
           column: 17,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 19,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "'asd' || 123 || [] || null;",
       errors: [
         {
           column: 1,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "('asd'.length > 0) || 123 || [] || null;",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: '(\'asd\' !== "") || 123 || [] || null;',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "(Boolean('asd')) || 123 || [] || null;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 6,
         },
         {
           column: 10,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "'asd' || (123 !== 0) || [] || null;",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output: "'asd' || (!Number.isNaN(123)) || [] || null;",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "'asd' || (Boolean(123)) || [] || null;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 13,
         },
         {
           column: 17,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 19,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "let x = (1 && 'a' && null) || 0 || '' || {};",
       errors: [
         {
           column: 10,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "let x = ((1 !== 0) && 'a' && null) || 0 || '' || {};",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "let x = ((!Number.isNaN(1)) && 'a' && null) || 0 || '' || {};",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "let x = ((Boolean(1)) && 'a' && null) || 0 || '' || {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 11,
         },
         {
           column: 15,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1128,50 +1332,62 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareStringLength',
               output:
                 "let x = (1 && ('a'.length > 0) && null) || 0 || '' || {};",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: "let x = (1 && ('a' !== \"\") && null) || 0 || '' || {};",
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "let x = (1 && (Boolean('a')) && null) || 0 || '' || {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 18,
         },
         {
           column: 22,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 26,
         },
         {
           column: 31,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "let x = (1 && 'a' && null) || (0 !== 0) || '' || {};",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "let x = (1 && 'a' && null) || (!Number.isNaN(0)) || '' || {};",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "let x = (1 && 'a' && null) || (Boolean(0)) || '' || {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 32,
         },
         {
           column: 36,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1179,52 +1395,64 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareStringLength',
               output:
                 "let x = (1 && 'a' && null) || 0 || (''.length > 0) || {};",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: "let x = (1 && 'a' && null) || 0 || ('' !== \"\") || {};",
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "let x = (1 && 'a' && null) || 0 || (Boolean('')) || {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 38,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "return (1 || 'a' || null) && 0 && '' && {};",
       errors: [
         {
           column: 9,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "return ((1 !== 0) || 'a' || null) && 0 && '' && {};",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "return ((!Number.isNaN(1)) || 'a' || null) && 0 && '' && {};",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return ((Boolean(1)) || 'a' || null) && 0 && '' && {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 10,
         },
         {
           column: 14,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1232,50 +1460,62 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareStringLength',
               output:
                 "return (1 || ('a'.length > 0) || null) && 0 && '' && {};",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: "return (1 || ('a' !== \"\") || null) && 0 && '' && {};",
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return (1 || (Boolean('a')) || null) && 0 && '' && {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 17,
         },
         {
           column: 21,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 25,
         },
         {
           column: 30,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "return (1 || 'a' || null) && (0 !== 0) && '' && {};",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "return (1 || 'a' || null) && (!Number.isNaN(0)) && '' && {};",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return (1 || 'a' || null) && (Boolean(0)) && '' && {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 31,
         },
         {
           column: 35,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1283,148 +1523,184 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareStringLength',
               output:
                 "return (1 || 'a' || null) && 0 && (''.length > 0) && {};",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: "return (1 || 'a' || null) && 0 && ('' !== \"\") && {};",
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return (1 || 'a' || null) && 0 && (Boolean('')) && {};",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 37,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "console.log((1 && []) || ('a' && {}));",
       errors: [
         {
           column: 14,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "console.log(((1 !== 0) && []) || ('a' && {}));",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output: "console.log(((!Number.isNaN(1)) && []) || ('a' && {}));",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "console.log(((Boolean(1)) && []) || ('a' && {}));",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 15,
         },
         {
           column: 19,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 21,
         },
         {
           column: 27,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "console.log((1 && []) || (('a'.length > 0) && {}));",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: 'console.log((1 && []) || ((\'a\' !== "") && {}));',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "console.log((1 && []) || ((Boolean('a')) && {}));",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 30,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
-
-    // should check all logical operands when used in a condition
     {
       code: "if ((1 && []) || ('a' && {})) void 0;",
       errors: [
         {
           column: 6,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "if (((1 !== 0) && []) || ('a' && {})) void 0;",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output: "if (((!Number.isNaN(1)) && []) || ('a' && {})) void 0;",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "if (((Boolean(1)) && []) || ('a' && {})) void 0;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 7,
         },
         {
           column: 11,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 13,
         },
         {
           column: 19,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "if ((1 && []) || (('a'.length > 0) && {})) void 0;",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: 'if ((1 && []) || ((\'a\' !== "") && {})) void 0;',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "if ((1 && []) || ((Boolean('a')) && {})) void 0;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 22,
         },
         {
           column: 26,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "let x = null || 0 || 'a' || [] ? {} : undefined;",
@@ -1433,12 +1709,13 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
           column: 9,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 13,
         },
         {
           column: 17,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -1446,24 +1723,28 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareZero',
               output:
                 "let x = null || (0 !== 0) || 'a' || [] ? {} : undefined;",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "let x = null || (!Number.isNaN(0)) || 'a' || [] ? {} : undefined;",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output:
                 "let x = null || (Boolean(0)) || 'a' || [] ? {} : undefined;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 18,
         },
         {
           column: 22,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1471,30 +1752,42 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
               messageId: 'conditionFixCompareStringLength',
               output:
                 "let x = null || 0 || ('a'.length > 0) || [] ? {} : undefined;",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output:
                 'let x = null || 0 || (\'a\' !== "") || [] ? {} : undefined;',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output:
                 "let x = null || 0 || (Boolean('a')) || [] ? {} : undefined;",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 25,
         },
         {
           column: 29,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 31,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
     {
       code: "return !(null || 0 || 'a' || []);",
@@ -1503,65 +1796,80 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
           column: 10,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 14,
         },
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: "return !(null || (0 !== 0) || 'a' || []);",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output: "return !(null || (!Number.isNaN(0)) || 'a' || []);",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return !(null || (Boolean(0)) || 'a' || []);",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 19,
         },
         {
           column: 23,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "return !(null || 0 || ('a'.length > 0) || []);",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: 'return !(null || 0 || (\'a\' !== "") || []);',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "return !(null || 0 || (Boolean('a')) || []);",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 26,
         },
         {
           column: 30,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 32,
         },
       ],
-      options: [{ allowNumber: false, allowString: false }],
-      output: null,
+      options: [
+        {
+          allowNumber: false,
+          allowString: false,
+        },
+      ],
     },
-
-    // nullish in boolean context
     {
       code: 'null || {};',
       errors: [
@@ -1569,6 +1877,10 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
           column: 1,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 5,
         },
       ],
     },
@@ -1579,6 +1891,10 @@ if (((Boolean('')) && {}) || (foo && void 0)) { }
           column: 1,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 10,
         },
       ],
     },
@@ -1593,6 +1909,10 @@ if (x) {
           column: 5,
           line: 3,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
     },
@@ -1603,6 +1923,10 @@ if (x) {
           column: 20,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 21,
         },
       ],
     },
@@ -1613,6 +1937,10 @@ if (x) {
           column: 40,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 41,
         },
       ],
     },
@@ -1623,6 +1951,10 @@ if (x) {
           column: 28,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 29,
         },
       ],
     },
@@ -1633,21 +1965,24 @@ if (x) {
           column: 33,
           line: 1,
           messageId: 'conditionErrorNullish',
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
+          endLine: 1,
+          endColumn: 34,
         },
       ],
     },
-
-    // object in boolean context
     {
       code: '[] || 1;',
       errors: [
         {
           column: 1,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 3,
         },
       ],
     },
@@ -1656,11 +1991,12 @@ if (x) {
       errors: [
         {
           column: 2,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 4,
         },
       ],
     },
@@ -1673,11 +2009,12 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
     },
@@ -1686,11 +2023,12 @@ if (x) {
       errors: [
         {
           column: 21,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 22,
         },
       ],
     },
@@ -1699,11 +2037,12 @@ if (x) {
       errors: [
         {
           column: 30,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 31,
         },
       ],
     },
@@ -1712,11 +2051,12 @@ if (x) {
       errors: [
         {
           column: 41,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 42,
         },
       ],
     },
@@ -1725,11 +2065,12 @@ if (x) {
       errors: [
         {
           column: 37,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 38,
         },
       ],
     },
@@ -1738,40 +2079,43 @@ if (x) {
       errors: [
         {
           column: 34,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 1,
+          endColumn: 35,
         },
       ],
     },
-
-    // string in boolean context
     {
       code: "while ('') {}",
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: "while (''.length > 0) {}",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
-              output: `while ('' !== "") {}`,
+              output: 'while (\'\' !== "") {}',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: "while (Boolean('')) {}",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 10,
         },
       ],
       options: [
@@ -1781,29 +2125,33 @@ if (x) {
       ],
     },
     {
-      code: "for (; 'foo'; ) {}",
+      code: "for (; 'foo';) {}",
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
-              output: "for (; 'foo'.length > 0; ) {}",
+              output: "for (; 'foo'.length > 0;) {}",
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
-              output: `for (; 'foo' !== ""; ) {}`,
+              output: 'for (; \'foo\' !== "";) {}',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
-              output: "for (; Boolean('foo'); ) {}",
+              output: "for (; Boolean('foo');) {}",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 13,
         },
       ],
       options: [
@@ -1821,9 +2169,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorString',
           suggestions: [
@@ -1834,6 +2179,7 @@ declare const x: string;
 if (x.length > 0) {
 }
       `,
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
@@ -1842,6 +2188,7 @@ declare const x: string;
 if (x !== "") {
 }
       `,
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -1850,8 +2197,13 @@ declare const x: string;
 if (Boolean(x)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
       options: [
@@ -1865,25 +2217,29 @@ if (Boolean(x)) {
       errors: [
         {
           column: 17,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: '(x: string) => x.length === 0;',
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: '(x: string) => x === "";',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '(x: string) => !Boolean(x);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 18,
         },
       ],
       options: [
@@ -1897,25 +2253,29 @@ if (Boolean(x)) {
       errors: [
         {
           column: 30,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorString',
           suggestions: [
             {
               messageId: 'conditionFixCompareStringLength',
               output: '<T extends string>(x: T) => ((x.length > 0) ? 1 : 0);',
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
               output: '<T extends string>(x: T) => ((x !== "") ? 1 : 0);',
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '<T extends string>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected string value in conditional. An explicit empty string check is required.',
+          endLine: 1,
+          endColumn: 31,
         },
       ],
       options: [
@@ -1924,34 +2284,34 @@ if (Boolean(x)) {
         },
       ],
     },
-
-    // number in boolean context
     {
       code: 'while (0n) {}',
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
-              // TODO: fix compare zero suggestion for bigint
               output: 'while (0n !== 0) {}',
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
-              // TODO: remove check NaN suggestion for bigint
               messageId: 'conditionFixCompareNaN',
               output: 'while (!Number.isNaN(0n)) {}',
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: 'while (Boolean(0n)) {}',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 10,
         },
       ],
       options: [
@@ -1961,29 +2321,33 @@ if (Boolean(x)) {
       ],
     },
     {
-      code: 'for (; 123; ) {}',
+      code: 'for (; 123;) {}',
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
-              output: 'for (; 123 !== 0; ) {}',
+              output: 'for (; 123 !== 0;) {}',
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
-              output: 'for (; !Number.isNaN(123); ) {}',
+              output: 'for (; !Number.isNaN(123);) {}',
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
-              output: 'for (; Boolean(123); ) {}',
+              output: 'for (; Boolean(123);) {}',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 11,
         },
       ],
       options: [
@@ -2001,9 +2365,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -2014,6 +2375,7 @@ declare const x: number;
 if (x !== 0) {
 }
       `,
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
@@ -2022,6 +2384,7 @@ declare const x: number;
 if (!Number.isNaN(x)) {
 }
       `,
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2030,8 +2393,13 @@ declare const x: number;
 if (Boolean(x)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
       options: [
@@ -2045,27 +2413,29 @@ if (Boolean(x)) {
       errors: [
         {
           column: 17,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
-              // TODO: fix compare zero suggestion for bigint
               messageId: 'conditionFixCompareZero',
               output: '(x: bigint) => x === 0;',
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
-              // TODO: remove check NaN suggestion for bigint
               messageId: 'conditionFixCompareNaN',
               output: '(x: bigint) => Number.isNaN(x);',
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '(x: bigint) => !Boolean(x);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 18,
         },
       ],
       options: [
@@ -2079,26 +2449,30 @@ if (Boolean(x)) {
       errors: [
         {
           column: 30,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareZero',
               output: '<T extends number>(x: T) => ((x !== 0) ? 1 : 0);',
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 '<T extends number>(x: T) => ((!Number.isNaN(x)) ? 1 : 0);',
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '<T extends number>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 31,
         },
       ],
       options: [
@@ -2112,9 +2486,6 @@ if (Boolean(x)) {
       errors: [
         {
           column: 2,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -2122,18 +2493,25 @@ if (Boolean(x)) {
               messageId: 'conditionFixCompareZero',
               output:
                 "[]['length'] === 0; // doesn't count as array.length when computed",
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
               output:
                 "Number.isNaN([]['length']); // doesn't count as array.length when computed",
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output:
                 "!Boolean([]['length']); // doesn't count as array.length when computed",
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 1,
+          endColumn: 14,
         },
       ],
       options: [
@@ -2151,7 +2529,6 @@ if (a.notLength) {
       errors: [
         {
           column: 5,
-          data: { context: 'conditional' },
           line: 3,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -2162,6 +2539,7 @@ declare const a: any[] & { notLength: number };
 if (a.notLength !== 0) {
 }
       `,
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
@@ -2170,6 +2548,7 @@ declare const a: any[] & { notLength: number };
 if (!Number.isNaN(a.notLength)) {
 }
       `,
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2178,8 +2557,13 @@ declare const a: any[] & { notLength: number };
 if (Boolean(a.notLength)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 3,
+          endColumn: 16,
         },
       ],
       options: [
@@ -2188,9 +2572,6 @@ if (Boolean(a.notLength)) {
         },
       ],
     },
-
-    // number (array.length) in boolean context
-
     {
       code: `
 if (![].length) {
@@ -2199,9 +2580,6 @@ if (![].length) {
       errors: [
         {
           column: 6,
-          data: {
-            context: 'conditional',
-          },
           line: 2,
           messageId: 'conditionErrorNumber',
           suggestions: [
@@ -2211,11 +2589,20 @@ if (![].length) {
 if ([].length === 0) {
 }
       `,
+              desc: "Change condition to check array's length (`value.length === 0`)",
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 2,
+          endColumn: 15,
         },
       ],
-      options: [{ allowNumber: false }],
+      options: [
+        {
+          allowNumber: false,
+        },
+      ],
     },
     {
       code: `
@@ -2224,23 +2611,28 @@ if ([].length === 0) {
       errors: [
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 2,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareArrayLengthNonzero',
-              // not technically the same; changes from returning (nonzero) number to returning true
               output: `
 (a: number[]) => (a.length > 0) && '...';
       `,
+              desc: "Change condition to check array's length (`value.length > 0`)",
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 2,
+          endColumn: 26,
         },
       ],
-      options: [{ allowNumber: false }],
+      options: [
+        {
+          allowNumber: false,
+        },
+      ],
     },
     {
       code: `
@@ -2249,26 +2641,29 @@ if ([].length === 0) {
       errors: [
         {
           column: 35,
-          data: {
-            context: 'conditional',
-          },
           line: 2,
           messageId: 'conditionErrorNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareArrayLengthNonzero',
-              // not technically the same; changes from returning (nonzero) number to returning true
               output: `
 <T extends unknown[]>(...a: T) => (a.length > 0) || 'empty';
       `,
+              desc: "Change condition to check array's length (`value.length > 0`)",
             },
           ],
+          message:
+            'Unexpected number value in conditional. An explicit zero/NaN check is required.',
+          endLine: 2,
+          endColumn: 43,
         },
       ],
-      options: [{ allowNumber: false }],
+      options: [
+        {
+          allowNumber: false,
+        },
+      ],
     },
-
-    // mixed `string | number` value in boolean context
     {
       code: `
 declare const x: string | number;
@@ -2280,9 +2675,18 @@ if (x) {
           column: 5,
           line: 3,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: '(x: bigint | string) => !x;',
@@ -2291,9 +2695,18 @@ if (x) {
           column: 26,
           line: 1,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
+          endLine: 1,
+          endColumn: 27,
         },
       ],
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
     {
       code: '<T extends number | bigint | string>(x: T) => (x ? 1 : 0);',
@@ -2302,12 +2715,19 @@ if (x) {
           column: 48,
           line: 1,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
+          endLine: 1,
+          endColumn: 49,
         },
       ],
-      options: [{ allowNumber: true, allowString: true }],
+      options: [
+        {
+          allowNumber: true,
+          allowString: true,
+        },
+      ],
     },
-
-    // nullable boolean in boolean context
     {
       code: `
 declare const x: boolean | null;
@@ -2317,9 +2737,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNullableBoolean',
           suggestions: [
@@ -2330,6 +2747,7 @@ declare const x: boolean | null;
 if (x ?? false) {
 }
       `,
+              desc: 'Explicitly treat nullish value the same as false (`value ?? false`)',
             },
             {
               messageId: 'conditionFixCompareTrue',
@@ -2338,44 +2756,57 @@ declare const x: boolean | null;
 if (x === true) {
 }
       `,
+              desc: 'Change condition to check if true (`value === true`)',
             },
           ],
+          message:
+            'Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
-      options: [{ allowNullableBoolean: false }],
+      options: [
+        {
+          allowNullableBoolean: false,
+        },
+      ],
     },
     {
       code: '(x?: boolean) => !x;',
       errors: [
         {
           column: 19,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNullableBoolean',
           suggestions: [
             {
               messageId: 'conditionFixDefaultFalse',
               output: '(x?: boolean) => !(x ?? false);',
+              desc: 'Explicitly treat nullish value the same as false (`value ?? false`)',
             },
             {
               messageId: 'conditionFixCompareFalse',
               output: '(x?: boolean) => x === false;',
+              desc: 'Change condition to check if false (`value === false`)',
             },
           ],
+          message:
+            'Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.',
+          endLine: 1,
+          endColumn: 20,
         },
       ],
-      options: [{ allowNullableBoolean: false }],
+      options: [
+        {
+          allowNullableBoolean: false,
+        },
+      ],
     },
     {
       code: '<T extends boolean | null | undefined>(x: T) => (x ? 1 : 0);',
       errors: [
         {
           column: 50,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNullableBoolean',
           suggestions: [
@@ -2383,19 +2814,27 @@ if (x === true) {
               messageId: 'conditionFixDefaultFalse',
               output:
                 '<T extends boolean | null | undefined>(x: T) => ((x ?? false) ? 1 : 0);',
+              desc: 'Explicitly treat nullish value the same as false (`value ?? false`)',
             },
             {
               messageId: 'conditionFixCompareTrue',
               output:
                 '<T extends boolean | null | undefined>(x: T) => ((x === true) ? 1 : 0);',
+              desc: 'Change condition to check if true (`value === true`)',
             },
           ],
+          message:
+            'Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.',
+          endLine: 1,
+          endColumn: 51,
         },
       ],
-      options: [{ allowNullableBoolean: false }],
+      options: [
+        {
+          allowNullableBoolean: false,
+        },
+      ],
     },
-
-    // nullable object in boolean context
     {
       code: `
 declare const x: object | null;
@@ -2415,11 +2854,20 @@ declare const x: object | null;
 if (x != null) {
 }
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
-      options: [{ allowNullableObject: false }],
+      options: [
+        {
+          allowNullableObject: false,
+        },
+      ],
     },
     {
       code: '(x?: { a: number }) => !x;',
@@ -2432,11 +2880,20 @@ if (x != null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: '(x?: { a: number }) => x == null;',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 1,
+          endColumn: 26,
         },
       ],
-      options: [{ allowNullableObject: false }],
+      options: [
+        {
+          allowNullableObject: false,
+        },
+      ],
     },
     {
       code: '<T extends {} | null | undefined>(x: T) => (x ? 1 : 0);',
@@ -2450,14 +2907,21 @@ if (x != null) {
               messageId: 'conditionFixCompareNullish',
               output:
                 '<T extends {} | null | undefined>(x: T) => ((x != null) ? 1 : 0);',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 1,
+          endColumn: 46,
         },
       ],
-      options: [{ allowNullableObject: false }],
+      options: [
+        {
+          allowNullableObject: false,
+        },
+      ],
     },
-
-    // nullable string in boolean context
     {
       code: `
 declare const x: string | null;
@@ -2467,9 +2931,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -2480,6 +2941,7 @@ declare const x: string | null;
 if (x != null) {
 }
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -2488,6 +2950,7 @@ declare const x: string | null;
 if (x ?? "") {
 }
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2496,8 +2959,13 @@ declare const x: string | null;
 if (Boolean(x)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
     },
@@ -2506,25 +2974,29 @@ if (Boolean(x)) {
       errors: [
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNullableString',
           suggestions: [
             {
               messageId: 'conditionFixCompareNullish',
               output: '(x?: string) => x == null;',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
               output: '(x?: string) => !(x ?? "");',
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '(x?: string) => !Boolean(x);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -2533,7 +3005,6 @@ if (Boolean(x)) {
       errors: [
         {
           column: 49,
-          data: { context: 'conditional' },
           line: 1,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -2541,18 +3012,25 @@ if (Boolean(x)) {
               messageId: 'conditionFixCompareNullish',
               output:
                 '<T extends string | null | undefined>(x: T) => ((x != null) ? 1 : 0);',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
               output:
                 '<T extends string | null | undefined>(x: T) => ((x ?? "") ? 1 : 0);',
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output:
                 '<T extends string | null | undefined>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 1,
+          endColumn: 50,
         },
       ],
     },
@@ -2566,7 +3044,6 @@ function foo(x: '' | 'bar' | null) {
       errors: [
         {
           column: 8,
-          data: { context: 'conditional' },
           line: 3,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -2578,6 +3055,7 @@ function foo(x: '' | 'bar' | null) {
   }
 }
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -2587,6 +3065,7 @@ function foo(x: '' | 'bar' | null) {
   }
 }
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2596,13 +3075,16 @@ function foo(x: '' | 'bar' | null) {
   }
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 3,
+          endColumn: 9,
         },
       ],
     },
-
-    // nullable number in boolean context
     {
       code: `
 declare const x: number | null;
@@ -2612,9 +3094,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNullableNumber',
           suggestions: [
@@ -2625,6 +3104,7 @@ declare const x: number | null;
 if (x != null) {
 }
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultZero',
@@ -2633,6 +3113,7 @@ declare const x: number | null;
 if (x ?? 0) {
 }
       `,
+              desc: 'Explicitly treat nullish value the same as 0 (`value ?? 0`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2641,8 +3122,13 @@ declare const x: number | null;
 if (Boolean(x)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
     },
@@ -2651,25 +3137,29 @@ if (Boolean(x)) {
       errors: [
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNullableNumber',
           suggestions: [
             {
               messageId: 'conditionFixCompareNullish',
               output: '(x?: number) => x == null;',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultZero',
               output: '(x?: number) => !(x ?? 0);',
+              desc: 'Explicitly treat nullish value the same as 0 (`value ?? 0`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output: '(x?: number) => !Boolean(x);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
+          endLine: 1,
+          endColumn: 19,
         },
       ],
     },
@@ -2678,9 +3168,6 @@ if (Boolean(x)) {
       errors: [
         {
           column: 49,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorNullableNumber',
           suggestions: [
@@ -2688,18 +3175,25 @@ if (Boolean(x)) {
               messageId: 'conditionFixCompareNullish',
               output:
                 '<T extends number | null | undefined>(x: T) => ((x != null) ? 1 : 0);',
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultZero',
               output:
                 '<T extends number | null | undefined>(x: T) => ((x ?? 0) ? 1 : 0);',
+              desc: 'Explicitly treat nullish value the same as 0 (`value ?? 0`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
               output:
                 '<T extends number | null | undefined>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
+          endLine: 1,
+          endColumn: 50,
         },
       ],
     },
@@ -2713,9 +3207,6 @@ function foo(x: 0 | 1 | null) {
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorNullableNumber',
           suggestions: [
@@ -2727,6 +3218,7 @@ function foo(x: 0 | 1 | null) {
   }
 }
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultZero',
@@ -2736,6 +3228,7 @@ function foo(x: 0 | 1 | null) {
   }
 }
       `,
+              desc: 'Explicitly treat nullish value the same as 0 (`value ?? 0`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -2745,30 +3238,30 @@ function foo(x: 0 | 1 | null) {
   }
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
+          endLine: 3,
+          endColumn: 9,
         },
       ],
     },
-
-    // nullable enum in boolean context
     {
       code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum) {
-        }
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum) {
+}
       `,
       errors: [
         {
-          column: 13,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 20,
+          column: 5,
+          endColumn: 12,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2776,37 +3269,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum != null) {
-        }
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum != null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2814,37 +3311,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 0,
-          That = 1,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This,
-          That,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This,
+  That,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2852,37 +3353,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This,
-          That,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This,
+  That,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = '',
-          That = 'a',
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This = '',
+  That = 'a',
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2890,37 +3395,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = '',
-          That = 'a',
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This = '',
+  That = 'a',
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2928,37 +3437,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 'one',
-          That = 'two',
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This = 'one',
+  That = 'two',
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -2966,37 +3479,41 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 'one',
-          That = 'two',
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This = 'one',
+  That = 'two',
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
       code: `
-        enum ExampleEnum {
-          This = 1,
-          That = 2,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (!theEnum) {
-        }
+enum ExampleEnum {
+  This = 1,
+  That = 2,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (!theEnum) {
+}
       `,
       errors: [
         {
-          column: 14,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 21,
+          column: 6,
+          endColumn: 13,
           endLine: 7,
           line: 7,
           messageId: 'conditionErrorNullableEnum',
@@ -3004,38 +3521,39 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 1,
-          That = 2,
-        }
-        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
-        if (theEnum == null) {
-        }
+enum ExampleEnum {
+  This = 1,
+  That = 2,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+if (theEnum == null) {
+}
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
-
-    // nullable mixed enum in boolean context
     {
-      // falsy number and truthy string
       code: `
-        enum ExampleEnum {
-          This = 0,
-          That = 'one',
-        }
-        (value?: ExampleEnum) => (value ? 1 : 0);
+enum ExampleEnum {
+  This = 0,
+  That = 'one',
+}
+(value?: ExampleEnum) => (value ? 1 : 0);
       `,
       errors: [
         {
-          column: 35,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 40,
+          column: 27,
+          endColumn: 32,
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorNullableEnum',
@@ -3043,34 +3561,37 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 0,
-          That = 'one',
-        }
-        (value?: ExampleEnum) => ((value != null) ? 1 : 0);
+enum ExampleEnum {
+  This = 0,
+  That = 'one',
+}
+(value?: ExampleEnum) => ((value != null) ? 1 : 0);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
-      // falsy string and truthy number
       code: `
-        enum ExampleEnum {
-          This = '',
-          That = 1,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
+enum ExampleEnum {
+  This = '',
+  That = 1,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
       `,
       errors: [
         {
-          column: 36,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 41,
+          column: 28,
+          endColumn: 33,
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorNullableEnum',
@@ -3078,34 +3599,37 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = '',
-          That = 1,
-        }
-        (value?: ExampleEnum) => ((value == null) ? 1 : 0);
+enum ExampleEnum {
+  This = '',
+  That = 1,
+}
+(value?: ExampleEnum) => ((value == null) ? 1 : 0);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
-      // truthy string and truthy number
       code: `
-        enum ExampleEnum {
-          This = 'this',
-          That = 1,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
+enum ExampleEnum {
+  This = 'this',
+  That = 1,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
       `,
       errors: [
         {
-          column: 36,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 41,
+          column: 28,
+          endColumn: 33,
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorNullableEnum',
@@ -3113,34 +3637,37 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = 'this',
-          That = 1,
-        }
-        (value?: ExampleEnum) => ((value == null) ? 1 : 0);
+enum ExampleEnum {
+  This = 'this',
+  That = 1,
+}
+(value?: ExampleEnum) => ((value == null) ? 1 : 0);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
     {
-      // falsy string and falsy number
       code: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        (value?: ExampleEnum) => (!value ? 1 : 0);
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+(value?: ExampleEnum) => (!value ? 1 : 0);
       `,
       errors: [
         {
-          column: 36,
-          data: {
-            context: 'conditional',
-          },
-          endColumn: 41,
+          column: 28,
+          endColumn: 33,
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorNullableEnum',
@@ -3148,20 +3675,25 @@ function foo(x: 0 | 1 | null) {
             {
               messageId: 'conditionFixCompareNullish',
               output: `
-        enum ExampleEnum {
-          This = '',
-          That = 0,
-        }
-        (value?: ExampleEnum) => ((value == null) ? 1 : 0);
+enum ExampleEnum {
+  This = '',
+  That = 0,
+}
+(value?: ExampleEnum) => ((value == null) ? 1 : 0);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
-      options: [{ allowNullableEnum: false }],
+      options: [
+        {
+          allowNullableEnum: false,
+        },
+      ],
     },
-
-    // any in boolean context
     {
       code: `
 if (x) {
@@ -3170,9 +3702,6 @@ if (x) {
       errors: [
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 2,
           messageId: 'conditionErrorAny',
           suggestions: [
@@ -3182,8 +3711,13 @@ if (x) {
 if (Boolean(x)) {
 }
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected any value in conditional. An explicit comparison or type conversion is required.',
+          endLine: 2,
+          endColumn: 6,
         },
       ],
     },
@@ -3192,17 +3726,19 @@ if (Boolean(x)) {
       errors: [
         {
           column: 7,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorAny',
           suggestions: [
             {
               messageId: 'conditionFixCastBoolean',
               output: 'x => !(Boolean(x));',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected any value in conditional. An explicit comparison or type conversion is required.',
+          endLine: 1,
+          endColumn: 8,
         },
       ],
     },
@@ -3211,17 +3747,19 @@ if (Boolean(x)) {
       errors: [
         {
           column: 27,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorAny',
           suggestions: [
             {
               messageId: 'conditionFixCastBoolean',
               output: '<T extends any>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected any value in conditional. An explicit comparison or type conversion is required.',
+          endLine: 1,
+          endColumn: 28,
         },
       ],
     },
@@ -3230,26 +3768,22 @@ if (Boolean(x)) {
       errors: [
         {
           column: 16,
-          data: {
-            context: 'conditional',
-          },
           line: 1,
           messageId: 'conditionErrorAny',
           suggestions: [
             {
               messageId: 'conditionFixCastBoolean',
               output: '<T,>(x: T) => ((Boolean(x)) ? 1 : 0);',
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected any value in conditional. An explicit comparison or type conversion is required.',
+          endLine: 1,
+          endColumn: 17,
         },
       ],
     },
-
-    // noStrictNullCheck — uses per-case `parserOptions.project` to point at
-    // tsconfig.unstrict.json (strictNullChecks off). Upstream's equivalent
-    // sets `tsconfigRootDir` to the `unstrict/` subdirectory, but rslint's
-    // backend doesn't read `tsconfigRootDir`; pointing `project` at a
-    // strict-disabled tsconfig achieves the same observable behavior.
     {
       code: `
 declare const x: string[] | null;
@@ -3259,29 +3793,32 @@ if (x) {
       errors: [
         {
           column: 1,
-          line: 0,
+          line: 1,
           messageId: 'noStrictNullCheck',
+          message:
+            'This rule requires the `strictNullChecks` compiler option to be turned on to function correctly.',
+          endLine: 1,
+          endColumn: 1,
         },
         {
           column: 5,
-          data: {
-            context: 'conditional',
-          },
           line: 3,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in conditional. The condition is always true.',
+          endLine: 3,
+          endColumn: 6,
         },
       ],
       languageOptions: {
         parserOptions: {
-          project: './tsconfig.unstrict.json',
+          project: ['unstrict/tsconfig.json'],
         },
       },
-      output: null,
+      filename: 'unstrict/file.ts',
     },
-
-    // automatic semicolon insertion test
     {
-      code: noFormat`
+      code: `
         declare const obj: { x: number } | null;
         !obj ? 1 : 0
         !obj
@@ -3303,8 +3840,13 @@ if (x) {
         obj || 0
         obj && 1 || 0
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 3,
+          endColumn: 13,
         },
         {
           column: 10,
@@ -3320,8 +3862,13 @@ if (x) {
         obj || 0
         obj && 1 || 0
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 4,
+          endColumn: 13,
         },
         {
           column: 9,
@@ -3337,8 +3884,13 @@ if (x) {
         ;(obj != null) || 0
         obj && 1 || 0
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 5,
+          endColumn: 12,
         },
         {
           column: 9,
@@ -3354,12 +3906,20 @@ if (x) {
         obj || 0
         ;(obj != null) && 1 || 0
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
           ],
+          message:
+            'Unexpected nullable object value in conditional. An explicit null check is required.',
+          endLine: 6,
+          endColumn: 12,
         },
       ],
-      options: [{ allowNullableObject: false }],
-      output: null,
+      options: [
+        {
+          allowNullableObject: false,
+        },
+      ],
     },
     {
       code: `
@@ -3370,9 +3930,6 @@ assert(nullableString);
       errors: [
         {
           column: 8,
-          data: {
-            context: 'conditional',
-          },
           line: 4,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3383,6 +3940,7 @@ declare function assert(x: unknown): asserts x;
 declare const nullableString: string | null;
 assert(nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3391,6 +3949,7 @@ declare function assert(x: unknown): asserts x;
 declare const nullableString: string | null;
 assert(nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3399,11 +3958,15 @@ declare function assert(x: unknown): asserts x;
 declare const nullableString: string | null;
 assert(Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 4,
+          endColumn: 22,
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3414,9 +3977,6 @@ assert(foo, nullableString);
       errors: [
         {
           column: 13,
-          data: {
-            context: 'conditional',
-          },
           line: 4,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3427,6 +3987,7 @@ declare function assert(a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3435,6 +3996,7 @@ declare function assert(a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3443,11 +4005,15 @@ declare function assert(a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 4,
+          endColumn: 27,
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3459,9 +4025,6 @@ assert(foo, nullableString);
       errors: [
         {
           column: 13,
-          data: {
-            context: 'conditional',
-          },
           line: 5,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3473,6 +4036,7 @@ declare function assert(one: number, two: unknown): asserts two;
 declare const nullableString: string | null;
 assert(foo, nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3482,6 +4046,7 @@ declare function assert(one: number, two: unknown): asserts two;
 declare const nullableString: string | null;
 assert(foo, nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3491,11 +4056,15 @@ declare function assert(one: number, two: unknown): asserts two;
 declare const nullableString: string | null;
 assert(foo, Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 5,
+          endColumn: 27,
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3506,9 +4075,6 @@ assert(foo, nullableString);
       errors: [
         {
           column: 13,
-          data: {
-            context: 'conditional',
-          },
           line: 4,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3519,6 +4085,7 @@ declare function assert(this: object, a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3527,6 +4094,7 @@ declare function assert(this: object, a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3535,19 +4103,18 @@ declare function assert(this: object, a: number, b: unknown): asserts b;
 declare const nullableString: string | null;
 assert(foo, Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 4,
+          endColumn: 27,
         },
       ],
-      output: null,
     },
     {
-      // This should be checkable, but the TS API doesn't currently report
-      // `someAssert(maybeString)` as a type predicate call, which appears to be
-      // a bug.
-      //
-      // See https://github.com/microsoft/TypeScript/issues/59707
-      skip: true,
+      skip: 'TypeScript does not expose the truthiness predicate of a union of assertion signatures (microsoft/TypeScript#59707); also skipped by typescript-eslint v8.67.0.',
       code: `
 function asserts1(x: string | number | undefined): asserts x {}
 function asserts2(x: string | number | undefined): asserts x {}
@@ -3561,9 +4128,6 @@ someAssert(maybeString);
       `,
       errors: [
         {
-          data: {
-            context: 'conditional',
-          },
           messageId: 'conditionErrorNullableString',
           suggestions: [
             {
@@ -3579,6 +4143,7 @@ const someAssert: typeof asserts1 | typeof asserts2 =
 
 someAssert(maybeString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3593,6 +4158,7 @@ const someAssert: typeof asserts1 | typeof asserts2 =
 
 someAssert(maybeString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3607,14 +4173,19 @@ const someAssert: typeof asserts1 | typeof asserts2 =
 
 someAssert(Boolean(maybeString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          line: 10,
+          column: 12,
+          endLine: 10,
+          endColumn: 23,
         },
       ],
-      output: null,
     },
     {
-      // The implementation signature doesn't count towards the call signatures
       code: `
 function assert(this: object, a: number, b: unknown): asserts b;
 function assert(a: bigint, b: unknown): asserts b;
@@ -3637,9 +4208,6 @@ assert(3 as any, nullableString);
       errors: [
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 18,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3664,6 +4232,7 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3686,6 +4255,7 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3708,14 +4278,17 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 18,
+          endColumn: 32,
         },
       ],
-      output: null,
     },
     {
-      // The implementation signature doesn't count towards the call signatures
       code: `
 function assert(this: object, a: number, b: unknown): asserts b;
 function assert(a: bigint, b: unknown): asserts b;
@@ -3739,9 +4312,6 @@ assert(3 as any, nullableString, 'more', 'args', 'afterwards');
       errors: [
         {
           column: 18,
-          data: {
-            context: 'conditional',
-          },
           line: 19,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3767,6 +4337,7 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, nullableString != null, 'more', 'args', 'afterwards');
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3790,6 +4361,7 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, nullableString ?? "", 'more', 'args', 'afterwards');
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3813,11 +4385,15 @@ function assert(...args: any[]) {
 declare const nullableString: string | null;
 assert(3 as any, Boolean(nullableString), 'more', 'args', 'afterwards');
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          endLine: 19,
+          endColumn: 32,
         },
       ],
-      output: null,
     },
     {
       code: `
@@ -3829,9 +4405,6 @@ assert(boo, nullableString);
       `,
       errors: [
         {
-          data: {
-            context: 'conditional',
-          },
           line: 6,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3844,6 +4417,7 @@ declare const nullableString: string | null;
 declare const boo: boolean;
 assert(boo, nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3854,8 +4428,8 @@ declare const nullableString: string | null;
 declare const boo: boolean;
 assert(boo, nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
-
             {
               messageId: 'conditionFixCastBoolean',
               output: `
@@ -3865,14 +4439,18 @@ declare const nullableString: string | null;
 declare const boo: boolean;
 assert(boo, Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          column: 13,
+          endLine: 6,
+          endColumn: 27,
         },
       ],
-      output: null,
     },
     {
-      // This report matches TS's analysis, which selects the assertion overload.
       code: `
 function assert(one: unknown): asserts one;
 function assert(one: unknown, two: unknown): asserts two;
@@ -3884,9 +4462,6 @@ assert(nullableString);
       `,
       errors: [
         {
-          data: {
-            context: 'conditional',
-          },
           line: 8,
           messageId: 'conditionErrorNullableString',
           suggestions: [
@@ -3901,6 +4476,7 @@ function assert(...args: unknown[]) {
 declare const nullableString: string | null;
 assert(nullableString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -3913,6 +4489,7 @@ function assert(...args: unknown[]) {
 declare const nullableString: string | null;
 assert(nullableString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -3925,8 +4502,14 @@ function assert(...args: unknown[]) {
 declare const nullableString: string | null;
 assert(Boolean(nullableString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
+          column: 8,
+          endLine: 8,
+          endColumn: 22,
         },
       ],
     },
@@ -3951,11 +4534,18 @@ assert(Boolean(nullableString));
   return x;
 });
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected string value in array predicate return type. An explicit empty string check is required.',
         },
       ],
-      options: [{ allowString: false }],
+      options: [
+        {
+          allowString: false,
+        },
+      ],
     },
     {
       code: `
@@ -3978,8 +4568,11 @@ assert(Boolean(nullableString));
   return;
 });
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
@@ -4004,8 +4597,11 @@ assert(Boolean(nullableString));
   return undefined;
 });
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
@@ -4034,8 +4630,11 @@ assert(Boolean(nullableString));
   }
 });
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.',
         },
       ],
     },
@@ -4056,9 +4655,15 @@ const predicate = (x: string) => {
           endLine: 8,
           line: 8,
           messageId: 'conditionErrorNullableBoolean',
+          message:
+            'Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.',
         },
       ],
-      options: [{ allowNullableBoolean: false }],
+      options: [
+        {
+          allowNullableBoolean: false,
+        },
+      ],
     },
     {
       code: `
@@ -4069,13 +4674,12 @@ const predicate = (x: string) => {
       errors: [
         {
           column: 17,
-          data: {
-            type: 'Promise<boolean>',
-          },
           endColumn: 2,
           endLine: 4,
           line: 2,
           messageId: 'predicateCannotBeAsync',
+          message:
+            "Predicate function should not be 'async'; expected a boolean return type.",
         },
       ],
     },
@@ -4094,6 +4698,8 @@ const predicate = async x => {
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorObject',
+          message:
+            'Unexpected object value in array predicate return type. The condition is always true.',
         },
       ],
     },
@@ -4110,6 +4716,8 @@ const predicate = async x => {
           endLine: 4,
           line: 2,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
         },
       ],
     },
@@ -4126,10 +4734,11 @@ const predicate = async x => {
           endLine: 4,
           line: 2,
           messageId: 'conditionErrorNullableBoolean',
+          message:
+            'Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.',
         },
       ],
     },
-    // various cases for the suggestion fix
     {
       code: `
 [1, null].every((x, i) => {});
@@ -4147,8 +4756,11 @@ const predicate = async x => {
               output: `
 [1, null].every((x, i): boolean => {});
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
@@ -4169,8 +4781,11 @@ const predicate = async x => {
               output: `
 [() => {}, null].every((x: () => void): boolean => {});
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
@@ -4191,8 +4806,11 @@ const predicate = async x => {
               output: `
 [() => {}, null].every(function (x: () => void): boolean {});
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
@@ -4213,12 +4831,14 @@ const predicate = async x => {
               output: `
 [() => {}, null].every((): boolean => {});
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullish value in conditional. The condition is always false.',
         },
       ],
     },
-    // function overloading
     {
       code: `
 declare function f(x: number): string;
@@ -4233,6 +4853,8 @@ declare function f(x: string | null): boolean;
           endLine: 5,
           line: 5,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
         },
       ],
     },
@@ -4251,10 +4873,11 @@ declare function f(x: string | null): boolean;
           endLine: 6,
           line: 6,
           messageId: 'conditionErrorOther',
+          message:
+            'Unexpected value in conditional. A boolean expression is required.',
         },
       ],
     },
-    // type constraints
     {
       code: `
 declare function foo<T>(x: number): T;
@@ -4267,6 +4890,8 @@ declare function foo<T>(x: number): T;
           endLine: 3,
           line: 3,
           messageId: 'conditionErrorAny',
+          message:
+            'Unexpected any value in array predicate return type. An explicit comparison or type conversion is required.',
         },
       ],
     },
@@ -4282,6 +4907,8 @@ function foo<T extends number>(x: number): T {}
           endLine: 3,
           line: 3,
           messageId: 'conditionErrorNumber',
+          message:
+            'Unexpected number value in array predicate return type. An explicit zero/NaN check is required.',
         },
       ],
       options: [
@@ -4298,9 +4925,6 @@ declare const nullOrString: string | null;
       errors: [
         {
           column: 22,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 39,
           endLine: 3,
           line: 3,
@@ -4312,6 +4936,7 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => nullOrString != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -4319,6 +4944,7 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => nullOrString ?? "");
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -4326,6 +4952,7 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => Boolean(nullOrString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4333,8 +4960,11 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter((x): boolean => nullOrString);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable string value in array predicate return type. Please handle the nullish/empty cases explicitly.',
         },
       ],
     },
@@ -4346,9 +4976,6 @@ declare const nullOrString: string | null;
       errors: [
         {
           column: 28,
-          data: {
-            context: 'conditional',
-          },
           endColumn: 40,
           endLine: 3,
           line: 3,
@@ -4360,6 +4987,7 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => nullOrString == null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultEmptyString',
@@ -4367,6 +4995,7 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => !(nullOrString ?? ""));
       `,
+              desc: 'Explicitly treat nullish value the same as an empty string (`value ?? ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -4374,8 +5003,11 @@ declare const nullOrString: string | null;
 declare const nullOrString: string | null;
 ['one', null].filter(x => !Boolean(nullOrString));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
           ],
+          message:
+            'Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.',
         },
       ],
     },
@@ -4387,9 +5019,6 @@ declare const anyValue: any;
       errors: [
         {
           column: 22,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 35,
           endLine: 3,
           line: 3,
@@ -4401,6 +5030,7 @@ declare const anyValue: any;
 declare const anyValue: any;
 ['one', null].filter(x => Boolean(anyValue));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4408,8 +5038,11 @@ declare const anyValue: any;
 declare const anyValue: any;
 ['one', null].filter((x): boolean => anyValue);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected any value in array predicate return type. An explicit comparison or type conversion is required.',
         },
       ],
     },
@@ -4421,9 +5054,6 @@ declare const nullOrBoolean: boolean | null;
       errors: [
         {
           column: 21,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 39,
           endLine: 3,
           line: 3,
@@ -4435,6 +5065,7 @@ declare const nullOrBoolean: boolean | null;
 declare const nullOrBoolean: boolean | null;
 [true, null].filter(x => nullOrBoolean ?? false);
       `,
+              desc: 'Explicitly treat nullish value the same as false (`value ?? false`)',
             },
             {
               messageId: 'conditionFixCompareTrue',
@@ -4442,6 +5073,7 @@ declare const nullOrBoolean: boolean | null;
 declare const nullOrBoolean: boolean | null;
 [true, null].filter(x => nullOrBoolean === true);
       `,
+              desc: 'Change condition to check if true (`value === true`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4449,8 +5081,11 @@ declare const nullOrBoolean: boolean | null;
 declare const nullOrBoolean: boolean | null;
 [true, null].filter((x): boolean => nullOrBoolean);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.',
         },
       ],
     },
@@ -4466,9 +5101,6 @@ const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
       errors: [
         {
           column: 15,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 27,
           endLine: 7,
           line: 7,
@@ -4484,6 +5116,7 @@ enum ExampleEnum {
 const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
 [0, 1].filter(x => theEnum != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4495,8 +5128,11 @@ enum ExampleEnum {
 const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
 [0, 1].filter((x): boolean => theEnum);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable enum value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
     },
@@ -4508,9 +5144,6 @@ declare const nullOrNumber: number | null;
       errors: [
         {
           column: 18,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 35,
           endLine: 3,
           line: 3,
@@ -4522,6 +5155,7 @@ declare const nullOrNumber: number | null;
 declare const nullOrNumber: number | null;
 [0, null].filter(x => nullOrNumber != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'conditionFixDefaultZero',
@@ -4529,6 +5163,7 @@ declare const nullOrNumber: number | null;
 declare const nullOrNumber: number | null;
 [0, null].filter(x => nullOrNumber ?? 0);
       `,
+              desc: 'Explicitly treat nullish value the same as 0 (`value ?? 0`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -4536,6 +5171,7 @@ declare const nullOrNumber: number | null;
 declare const nullOrNumber: number | null;
 [0, null].filter(x => Boolean(nullOrNumber));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4543,8 +5179,11 @@ declare const nullOrNumber: number | null;
 declare const nullOrNumber: number | null;
 [0, null].filter((x): boolean => nullOrNumber);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.',
         },
       ],
     },
@@ -4556,9 +5195,6 @@ const objectValue: object = {};
       errors: [
         {
           column: 23,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 39,
           endLine: 3,
           line: 3,
@@ -4570,8 +5206,11 @@ const objectValue: object = {};
 const objectValue: object = {};
 [{ a: 0 }, {}].filter((x): boolean => objectValue);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected object value in array predicate return type. The condition is always true.',
         },
       ],
     },
@@ -4585,9 +5224,6 @@ const objectValue: object = {};
       errors: [
         {
           column: 23,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 2,
           endLine: 5,
           line: 3,
@@ -4601,8 +5237,11 @@ const objectValue: object = {};
   return objectValue;
 });
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected object value in array predicate return type. The condition is always true.',
         },
       ],
     },
@@ -4614,9 +5253,6 @@ declare const nullOrObject: object | null;
       errors: [
         {
           column: 25,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 42,
           endLine: 3,
           line: 3,
@@ -4628,6 +5264,7 @@ declare const nullOrObject: object | null;
 declare const nullOrObject: object | null;
 [{ a: 0 }, null].filter(x => nullOrObject != null);
       `,
+              desc: 'Change condition to check for null/undefined (`value != null`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4635,11 +5272,18 @@ declare const nullOrObject: object | null;
 declare const nullOrObject: object | null;
 [{ a: 0 }, null].filter((x): boolean => nullOrObject);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected nullable object value in array predicate return type. An explicit null check is required.',
         },
       ],
-      options: [{ allowNullableObject: false }],
+      options: [
+        {
+          allowNullableObject: false,
+        },
+      ],
     },
     {
       code: `
@@ -4649,9 +5293,6 @@ const numbers: number[] = [1];
       errors: [
         {
           column: 15,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 34,
           endLine: 3,
           line: 3,
@@ -4663,6 +5304,7 @@ const numbers: number[] = [1];
 const numbers: number[] = [1];
 [1, 2].filter(x => numbers.length > 0);
       `,
+              desc: "Change condition to check array's length (`value.length > 0`)",
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4670,11 +5312,18 @@ const numbers: number[] = [1];
 const numbers: number[] = [1];
 [1, 2].filter((x): boolean => numbers.length);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected number value in array predicate return type. An explicit zero/NaN check is required.',
         },
       ],
-      options: [{ allowNumber: false }],
+      options: [
+        {
+          allowNumber: false,
+        },
+      ],
     },
     {
       code: `
@@ -4684,9 +5333,6 @@ const numberValue: number = 1;
       errors: [
         {
           column: 15,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 31,
           endLine: 3,
           line: 3,
@@ -4698,6 +5344,7 @@ const numberValue: number = 1;
 const numberValue: number = 1;
 [1, 2].filter(x => numberValue !== 0);
       `,
+              desc: 'Change condition to check for 0 (`value !== 0`)',
             },
             {
               messageId: 'conditionFixCompareNaN',
@@ -4705,6 +5352,7 @@ const numberValue: number = 1;
 const numberValue: number = 1;
 [1, 2].filter(x => !Number.isNaN(numberValue));
       `,
+              desc: 'Change condition to check for NaN (`!Number.isNaN(value)`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -4712,6 +5360,7 @@ const numberValue: number = 1;
 const numberValue: number = 1;
 [1, 2].filter(x => Boolean(numberValue));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4719,11 +5368,18 @@ const numberValue: number = 1;
 const numberValue: number = 1;
 [1, 2].filter((x): boolean => numberValue);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected number value in array predicate return type. An explicit zero/NaN check is required.',
         },
       ],
-      options: [{ allowNumber: false }],
+      options: [
+        {
+          allowNumber: false,
+        },
+      ],
     },
     {
       code: `
@@ -4733,9 +5389,6 @@ const stringValue: string = 'hoge';
       errors: [
         {
           column: 24,
-          data: {
-            context: 'array predicate return type',
-          },
           endColumn: 40,
           endLine: 3,
           line: 3,
@@ -4747,6 +5400,7 @@ const stringValue: string = 'hoge';
 const stringValue: string = 'hoge';
 ['hoge', 'foo'].filter(x => stringValue.length > 0);
       `,
+              desc: "Change condition to check string's length (`value.length !== 0`)",
             },
             {
               messageId: 'conditionFixCompareEmptyString',
@@ -4754,6 +5408,7 @@ const stringValue: string = 'hoge';
 const stringValue: string = 'hoge';
 ['hoge', 'foo'].filter(x => stringValue !== "");
       `,
+              desc: 'Change condition to check for empty string (`value !== ""`)',
             },
             {
               messageId: 'conditionFixCastBoolean',
@@ -4761,6 +5416,7 @@ const stringValue: string = 'hoge';
 const stringValue: string = 'hoge';
 ['hoge', 'foo'].filter(x => Boolean(stringValue));
       `,
+              desc: 'Explicitly convert value to a boolean (`Boolean(value)`)',
             },
             {
               messageId: 'explicitBooleanReturnType',
@@ -4768,11 +5424,18 @@ const stringValue: string = 'hoge';
 const stringValue: string = 'hoge';
 ['hoge', 'foo'].filter((x): boolean => stringValue);
       `,
+              desc: 'Add an explicit `boolean` return type annotation.',
             },
           ],
+          message:
+            'Unexpected string value in array predicate return type. An explicit empty string check is required.',
         },
       ],
-      options: [{ allowString: false }],
+      options: [
+        {
+          allowString: false,
+        },
+      ],
     },
   ],
 });

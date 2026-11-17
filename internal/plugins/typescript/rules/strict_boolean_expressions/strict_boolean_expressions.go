@@ -239,7 +239,7 @@ func sugCompareZero() rule.RuleMessage {
 	return rule.RuleMessage{Id: "conditionFixCompareZero", Description: "Change condition to check for 0 (`value !== 0`)"}
 }
 func sugDefaultEmptyString() rule.RuleMessage {
-	return rule.RuleMessage{Id: "conditionFixDefaultEmptyString", Description: "Explicitly treat nullish value the same as an empty string (`value ?? \"\")`"}
+	return rule.RuleMessage{Id: "conditionFixDefaultEmptyString", Description: "Explicitly treat nullish value the same as an empty string (`value ?? \"\"`)"}
 }
 func sugDefaultFalse() rule.RuleMessage {
 	return rule.RuleMessage{Id: "conditionFixDefaultFalse", Description: "Explicitly treat nullish value the same as false (`value ?? false`)"}
@@ -258,6 +258,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile
+		staticEvaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(tc, sf, ctx.Refs)
 
 		// strictNullChecks gate. Matches upstream: when strictNullChecks is
 		// off and the user has not opted in via the long-named "I know what
@@ -299,6 +300,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 			if node == nil {
 				return
 			}
+			node = ast.SkipParentheses(node)
 			if _, seen := traversed[node]; seen {
 				return
 			}
@@ -392,7 +394,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				}
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
-				if utils.IsArrayMethodCallWithPredicate(tc, callExpr) && len(callExpr.Arguments.Nodes) > 0 {
+				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
 					checkArrayMethodPredicate(ctx, sf, tc, callExpr.Arguments.Nodes[0], opts)
 				}
 			},
@@ -893,6 +895,7 @@ func checkArrayMethodPredicate(
 	predicateNode *ast.Node,
 	opts resolvedOptions,
 ) {
+	predicateNode = ast.SkipParentheses(predicateNode)
 	isFunctionExpression := ast.IsArrowFunction(predicateNode) || ast.IsFunctionExpression(predicateNode)
 
 	// Async arrow / function expression → Promise<…>, never a boolean.
@@ -903,10 +906,6 @@ func checkArrayMethodPredicate(
 
 	predicateType := utils.GetConstrainedTypeAtLocation(tc, predicateNode)
 	sigs := utils.GetCallSignatures(tc, predicateType)
-	if len(sigs) == 0 {
-		return
-	}
-
 	var collected []*checker.Type
 	for _, sig := range sigs {
 		rt := checker.Checker_getReturnTypeOfSignature(tc, sig)
@@ -959,7 +958,7 @@ func checkArrayMethodPredicate(
 		// Expression-bodied function: emit the same suggestion fixes as a
 		// conditional, anchored at the body expression.
 		if body != nil && !ast.IsBlock(body) {
-			suggestions = append(suggestions, getSuggestionsForConditionError(sf, tc, body, reportID, opts)...)
+			suggestions = append(suggestions, getSuggestionsForConditionError(sf, tc, ast.SkipParentheses(body), reportID, opts)...)
 		}
 
 		// Add explicit boolean return-type annotation suggestion when the
@@ -991,7 +990,6 @@ func hasReturnTypeAnnotation(fn *ast.Node) bool {
 // insertion point depends on whether the predicate is a parenless arrow, a
 // no-arg arrow / function expression, or a normal parameter-listed function.
 func explicitBooleanReturnTypeSuggestion(sf *ast.SourceFile, fn *ast.Node) rule.RuleSuggestion {
-	src := sf.Text()
 	var fixes []rule.RuleFix
 
 	if ast.IsArrowFunction(fn) && utils.IsParenlessArrowFunction(fn) {
@@ -1012,28 +1010,16 @@ func explicitBooleanReturnTypeSuggestion(sf *ast.SourceFile, fn *ast.Node) rule.
 		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
 	}
 
-	if len(params.Nodes) == 0 {
-		// `() => …` / `function () {}` — scan from the function start for the
-		// first `)` and insert `: boolean` after it.
-		closeParen := findFirstCharAt(src, fn.Pos(), ')')
-		if closeParen < 0 {
-			return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
-		}
-		fixes = append(fixes, rule.RuleFix{
-			Text:  ": boolean",
-			Range: core.NewTextRange(closeParen+1, closeParen+1),
-		})
-		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType(), FixesArr: fixes}
-	}
-
-	lastParam := params.Nodes[len(params.Nodes)-1]
-	closeParen := findFirstCharAt(src, lastParam.End(), ')')
-	if closeParen < 0 {
+	// The parser records the parameter-list end immediately before its closing
+	// token. Start there so comments and parentheses in generic constraints or
+	// default values cannot redirect the annotation into unrelated source.
+	closeParen, ok := utils.TokenAtOrAfter(sf, params.End())
+	if !ok || closeParen.Kind != ast.KindCloseParenToken {
 		return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType()}
 	}
 	fixes = append(fixes, rule.RuleFix{
 		Text:  ": boolean",
-		Range: core.NewTextRange(closeParen+1, closeParen+1),
+		Range: core.NewTextRange(closeParen.End, closeParen.End),
 	})
 	return rule.RuleSuggestion{Message: msgExplicitBooleanReturnType(), FixesArr: fixes}
 }
@@ -1046,20 +1032,6 @@ func getFunctionParameters(fn *ast.Node) *ast.NodeList {
 		return fn.AsFunctionExpression().Parameters
 	}
 	return nil
-}
-
-// findFirstCharAt scans `src` forward from `from`, returning the index of the
-// first occurrence of `ch`. Returns -1 when not found. Sufficient for the
-// narrow `(`/`)` scans the predicate-return-type fixer performs because
-// neither character can appear inside a parameter name or default value
-// without an enclosing paren the AST already tracks.
-func findFirstCharAt(src string, from int, ch byte) int {
-	for i := from; i < len(src); i++ {
-		if src[i] == ch {
-			return i
-		}
-	}
-	return -1
 }
 
 // ----- Wrapping fixer ---------------------------------------------------
@@ -1119,6 +1091,12 @@ func wrappingFix(
 //     extras test for `x!` operand of `!` and `if (x!)` outputs.
 func isStrongInnerNode(node *ast.Node) bool {
 	if node == nil {
+		return false
+	}
+	// ESTree exposes an optional chain as ChainExpression and even a template
+	// without substitutions as TemplateLiteral. Neither is a strong node in
+	// the upstream wrapping fixer.
+	if ast.IsOptionalChain(ast.SkipOuterExpressions(node, ast.OEKNonNullAssertions)) || node.Kind == ast.KindNoSubstitutionTemplateLiteral {
 		return false
 	}
 	if utils.IsStrongPrecedenceNode(node) {
@@ -1269,7 +1247,7 @@ func isLeftHandSide(node *ast.Node) bool {
 // non-computed `.length` access on a value whose constrained type is an array
 // or a union of arrays.
 func isArrayLengthExpression(tc *checker.Checker, node *ast.Node) bool {
-	if node == nil || !ast.IsPropertyAccessExpression(node) {
+	if node == nil || !ast.IsPropertyAccessExpression(node) || ast.IsOptionalChain(node) {
 		return false
 	}
 	access := node.AsPropertyAccessExpression()
