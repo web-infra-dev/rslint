@@ -1,4 +1,4 @@
-// cspell:ignore dgimsuy dgimsvy dgimuvy giig Cpmn Ougr Tnsa Vith
+// cspell:ignore udfff dgimsuy dgimsvy dgimuvy giig Cpmn Ougr Tnsa Vith
 package no_invalid_regexp
 
 import (
@@ -627,4 +627,45 @@ func TestNoInvalidRegexpSloppyOctal(t *testing.T) {
 	if d.FixesPtr != nil || d.Suggestions != nil {
 		t.Fatalf("unexpected edits: %#v", d)
 	}
+}
+
+// Reviewer reproductions and inverse cases checked against ESLint 10.14.0.
+func TestNoInvalidRegexpRepresentationRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInvalidRegexpRule, []rule_tester.ValidTestCase{
+		{Code: "new RegExp(\"[\\ud800-\\udfff]\", \"u\");"},
+		{Code: "new RegExp(\"[\\ud800-\\udfff]\", \"v\");"},
+		{Code: "new RegExp(\"[a-�]\", \"u\");"},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c!-a]\", \"\");"},
+		{Code: "new RegExp(\"[!-\\\\c\\u0000]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c]\", \"\");"},
+		{Code: "new RegExp(\"\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\\\\\\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\(?<\\\\1>\", \"\");"},
+		{Code: "RegExp(\"[\\\\c1-!]\", flags)"},
+		{Code: "RegExp(\"[\\\\c_-!]\", flags)"},
+		{Code: "RegExp(\"\\\\k<\\\\1>\", flags)"},
+	}, []rule_tester.InvalidTestCase{
+		{Code: "new RegExp(\"[�-a]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[�-a]/u: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}}},
+		{Code: "new RegExp(\"[!-\\\\c1]\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[!-\\c1]/: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[!-\\\\c_]\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[!-\\c_]/: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"(?<a>x)\\\\k<\\\\1>\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?<a>x)\\k<\\1>/: Invalid capture group name.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34}}},
+		{Code: "new RegExp(\"(?<a>x)\\\\k<\\\\1>)\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?<a>x)\\k<\\1>)/: Unmatched ')'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 35}}},
+		{Code: "new RegExp(\"\\\\\\\"\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\\"/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
+		{Code: "new RegExp(\"\\\\\\\"\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\\"/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
+		{Code: "new RegExp(\"[a-\\\\a]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[a-\\a]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[a-\\\\a]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[a-\\a]/v: Invalid character in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[\\\\q{\\\\a}]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\q{\\a}]/v: Unterminated class string disjunction.", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}}},
+		{Code: "new RegExp(\"[)]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[)]/v: Invalid character in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 23}}},
+		{Code: "new RegExp(\"\\\\u{1,0}\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\u{1,0}/u: Invalid unicode escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"(?=a){\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?=a){/u: Lone quantifier brackets.", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}}},
+		{Code: "new RegExp(\"a{1}{\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /a{1}{/v: Lone quantifier brackets.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}}},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c_-!]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c_-!]/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "/* 😀 */\r\n  new RegExp(\"[\\\\c1-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/u: Invalid escape.", Line: 2, Column: 3, EndLine: 2, EndColumn: 30}}},
+	})
 }

@@ -385,13 +385,17 @@ func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, err
 				return nil, errors.New("API peer does not advertise reverseConfigLoadV1 capability")
 			}
 		}
+		var response *LintResponse
+		var err error
 		if bidirectional {
-			return handler.HandleLintWithContext(ctx, req, serviceRequester{
-				Requester:        s.channel,
-				peerCapabilities: s.peerCapabilities,
-			})
+			response, err = handler.HandleLintWithContext(ctx, req, serviceRequester{Requester: s.channel, peerCapabilities: s.peerCapabilities})
+		} else {
+			response, err = s.handler.HandleLint(req)
 		}
-		return s.handler.HandleLint(req)
+		if err != nil {
+			return response, err
+		}
+		return lintResponseForWire(response), nil
 
 	case KindGetAstInfo:
 		if !s.handshakeOK {
