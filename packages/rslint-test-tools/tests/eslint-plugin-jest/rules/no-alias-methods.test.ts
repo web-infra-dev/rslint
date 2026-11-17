@@ -1,294 +1,204 @@
-import { RuleTester } from '../rule-tester';
+// Upstream reference: eslint-plugin-jest@29.16.0; includes existing Rslint regressions.
+// Additional cases from 29.16.6 retain their input and parser configuration.
+// Complete assertions record current native output; documented differences remain separate.
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('no-alias-methods', {} as never, {
+new RuleTester(fixtureConfig()).run('no-alias-methods', {
   valid: [
-    { code: 'expect(a).toHaveBeenCalled()' },
-    { code: 'expect(a).toHaveBeenCalledTimes()' },
-    { code: 'expect(a).toHaveBeenCalledWith()' },
-    { code: 'expect(a).toHaveBeenLastCalledWith()' },
-    { code: 'expect(a).toHaveBeenNthCalledWith()' },
-    { code: 'expect(a).toHaveReturned()' },
-    { code: 'expect(a).toHaveReturnedTimes()' },
-    { code: 'expect(a).toHaveReturnedWith()' },
-    { code: 'expect(a).toHaveLastReturnedWith()' },
-    { code: 'expect(a).toHaveNthReturnedWith()' },
-    { code: 'expect(a).toThrow()' },
-    { code: 'expect(a).rejects;' },
-    { code: 'expect(a);' },
-    // A computed identifier key names the matcher by the variable's value, not
-    // its name.
-    {
-      code: "const toBeCalled = 'toHaveBeenCalled';\nexpect(a)[toBeCalled]();",
-    },
+    ...(
+      [
+        'expect(a).toHaveBeenCalled()',
+        'expect(a).toHaveBeenCalledTimes()',
+        'expect(a).toHaveBeenCalledWith()',
+        'expect(a).toHaveBeenLastCalledWith()',
+        'expect(a).toHaveBeenNthCalledWith()',
+        'expect(a).toHaveReturned()',
+        'expect(a).toHaveReturnedTimes()',
+        'expect(a).toHaveReturnedWith()',
+        'expect(a).toHaveLastReturnedWith()',
+        'expect(a).toHaveNthReturnedWith()',
+        'expect(a).toThrow()',
+        'expect(a).rejects;',
+        'expect(a);',
+        `const toBeCalled = 'toHaveBeenCalled';
+expect(a)[toBeCalled]();`,
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index}`,
+      code,
+    })),
   ],
-
   invalid: [
-    {
-      code: 'expect(a).toBeCalled()',
-      output: 'expect(a).toHaveBeenCalled()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toBeCalled',
-            canonical: 'toHaveBeenCalled',
+    ...(
+      [
+        [
+          'expect(a).toBeCalled()',
+          'Replace toBeCalled() with its canonical name of toHaveBeenCalled()',
+          1,
+          11,
+          21,
+          'expect(a).toHaveBeenCalled()',
+        ],
+        [
+          'expect(a).toBeCalledTimes()',
+          'Replace toBeCalledTimes() with its canonical name of toHaveBeenCalledTimes()',
+          1,
+          11,
+          26,
+          'expect(a).toHaveBeenCalledTimes()',
+        ],
+        [
+          'expect(a).toBeCalledWith()',
+          'Replace toBeCalledWith() with its canonical name of toHaveBeenCalledWith()',
+          1,
+          11,
+          25,
+          'expect(a).toHaveBeenCalledWith()',
+        ],
+        [
+          'expect(a).lastCalledWith()',
+          'Replace lastCalledWith() with its canonical name of toHaveBeenLastCalledWith()',
+          1,
+          11,
+          25,
+          'expect(a).toHaveBeenLastCalledWith()',
+        ],
+        [
+          'expect(a).nthCalledWith()',
+          'Replace nthCalledWith() with its canonical name of toHaveBeenNthCalledWith()',
+          1,
+          11,
+          24,
+          'expect(a).toHaveBeenNthCalledWith()',
+        ],
+        [
+          'expect(a).toReturn()',
+          'Replace toReturn() with its canonical name of toHaveReturned()',
+          1,
+          11,
+          19,
+          'expect(a).toHaveReturned()',
+        ],
+        [
+          'expect(a).toReturnTimes()',
+          'Replace toReturnTimes() with its canonical name of toHaveReturnedTimes()',
+          1,
+          11,
+          24,
+          'expect(a).toHaveReturnedTimes()',
+        ],
+        [
+          'expect(a).toReturnWith()',
+          'Replace toReturnWith() with its canonical name of toHaveReturnedWith()',
+          1,
+          11,
+          23,
+          'expect(a).toHaveReturnedWith()',
+        ],
+        [
+          'expect(a).lastReturnedWith()',
+          'Replace lastReturnedWith() with its canonical name of toHaveLastReturnedWith()',
+          1,
+          11,
+          27,
+          'expect(a).toHaveLastReturnedWith()',
+        ],
+        [
+          'expect(a).nthReturnedWith()',
+          'Replace nthReturnedWith() with its canonical name of toHaveNthReturnedWith()',
+          1,
+          11,
+          26,
+          'expect(a).toHaveNthReturnedWith()',
+        ],
+        [
+          'expect(a).toThrowError()',
+          'Replace toThrowError() with its canonical name of toThrow()',
+          1,
+          11,
+          23,
+          'expect(a).toThrow()',
+        ],
+        [
+          'expect(a).resolves.toThrowError()',
+          'Replace toThrowError() with its canonical name of toThrow()',
+          1,
+          20,
+          32,
+          'expect(a).resolves.toThrow()',
+        ],
+        [
+          'expect(a).rejects.toThrowError()',
+          'Replace toThrowError() with its canonical name of toThrow()',
+          1,
+          19,
+          31,
+          'expect(a).rejects.toThrow()',
+        ],
+        [
+          'expect(a).not.toThrowError()',
+          'Replace toThrowError() with its canonical name of toThrow()',
+          1,
+          15,
+          27,
+          'expect(a).not.toThrow()',
+        ],
+        [
+          'expect(a).not["toThrowError"]()',
+          'Replace toThrowError() with its canonical name of toThrow()',
+          1,
+          15,
+          29,
+          'expect(a).not["toThrow"]()',
+        ],
+        [
+          `expect(a).
+  toBeCalled()`,
+          'Replace toBeCalled() with its canonical name of toHaveBeenCalled()',
+          2,
+          3,
+          13,
+          `expect(a).
+  toHaveBeenCalled()`,
+        ],
+        [
+          'expect(a) . /* c */ toBeCalled()',
+          'Replace toBeCalled() with its canonical name of toHaveBeenCalled()',
+          1,
+          21,
+          31,
+          'expect(a) . /* c */ toHaveBeenCalled()',
+        ],
+        [
+          "expect(a)[/* c */ 'toBeCalled']()",
+          'Replace toBeCalled() with its canonical name of toHaveBeenCalled()',
+          1,
+          19,
+          31,
+          "expect(a)[/* c */ 'toHaveBeenCalled']()",
+        ],
+      ] as const
+    ).map(
+      ([code, message, line, column, endColumn, output], index): TestCase => ({
+        name: `run 0 invalid ${index}`,
+        code,
+        errors: [
+          {
+            messageId: 'replaceAlias',
+            message,
+            line,
+            column,
+            endLine: line,
+            endColumn,
           },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toBeCalledTimes()',
-      output: 'expect(a).toHaveBeenCalledTimes()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toBeCalledTimes',
-            canonical: 'toHaveBeenCalledTimes',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toBeCalledWith()',
-      output: 'expect(a).toHaveBeenCalledWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toBeCalledWith',
-            canonical: 'toHaveBeenCalledWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).lastCalledWith()',
-      output: 'expect(a).toHaveBeenLastCalledWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'lastCalledWith',
-            canonical: 'toHaveBeenLastCalledWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).nthCalledWith()',
-      output: 'expect(a).toHaveBeenNthCalledWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'nthCalledWith',
-            canonical: 'toHaveBeenNthCalledWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toReturn()',
-      output: 'expect(a).toHaveReturned()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toReturn',
-            canonical: 'toHaveReturned',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toReturnTimes()',
-      output: 'expect(a).toHaveReturnedTimes()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toReturnTimes',
-            canonical: 'toHaveReturnedTimes',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toReturnWith()',
-      output: 'expect(a).toHaveReturnedWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toReturnWith',
-            canonical: 'toHaveReturnedWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).lastReturnedWith()',
-      output: 'expect(a).toHaveLastReturnedWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'lastReturnedWith',
-            canonical: 'toHaveLastReturnedWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).nthReturnedWith()',
-      output: 'expect(a).toHaveNthReturnedWith()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'nthReturnedWith',
-            canonical: 'toHaveNthReturnedWith',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).toThrowError()',
-      output: 'expect(a).toThrow()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toThrowError',
-            canonical: 'toThrow',
-          },
-          column: 11,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).resolves.toThrowError()',
-      output: 'expect(a).resolves.toThrow()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toThrowError',
-            canonical: 'toThrow',
-          },
-          column: 20,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).rejects.toThrowError()',
-      output: 'expect(a).rejects.toThrow()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toThrowError',
-            canonical: 'toThrow',
-          },
-          column: 19,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).not.toThrowError()',
-      output: 'expect(a).not.toThrow()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toThrowError',
-            canonical: 'toThrow',
-          },
-          column: 15,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: 'expect(a).not["toThrowError"]()',
-      output: 'expect(a).not["toThrow"]()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: {
-            alias: 'toThrowError',
-            canonical: 'toThrow',
-          },
-          column: 15,
-          line: 1,
-        },
-      ],
-    },
-    // The fix range must skip the matcher's leading trivia, otherwise the
-    // newline, comment or opening quote in front of the name is overwritten.
-    {
-      code: 'expect(a).\n  toBeCalled()',
-      output: 'expect(a).\n  toHaveBeenCalled()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
-          column: 3,
-          line: 2,
-        },
-      ],
-    },
-    {
-      code: 'expect(a) . /* c */ toBeCalled()',
-      output: 'expect(a) . /* c */ toHaveBeenCalled()',
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
-          column: 21,
-          line: 1,
-        },
-      ],
-    },
-    {
-      // Previously emitted `expect(a)[/toHaveBeenCalled']()`, which is not
-      // parseable JavaScript.
-      code: "expect(a)[/* c */ 'toBeCalled']()",
-      output: "expect(a)[/* c */ 'toHaveBeenCalled']()",
-      errors: [
-        {
-          messageId: 'replaceAlias',
-          data: { alias: 'toBeCalled', canonical: 'toHaveBeenCalled' },
-          column: 19,
-          line: 1,
-        },
-      ],
-    },
+        ],
+        output,
+      }),
+    ),
   ],
 });

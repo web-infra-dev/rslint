@@ -1,239 +1,361 @@
-import { RuleTester } from '../rule-tester';
+// Upstream reference: eslint-plugin-jest@29.16.6; includes existing Rslint regressions.
+// Additional cases from 29.16.6 retain their input and parser configuration.
+// Complete assertions record current native output; documented differences remain separate.
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('consistent-test-it', {} as never, {
+new RuleTester(fixtureConfig()).run('consistent-test-it', {
   valid: [
-    { code: 'test("foo")', options: [{ fn: 'test' }] },
-    { code: 'test.only("foo")', options: [{ fn: 'test' }] },
-    { code: 'test.skip("foo")', options: [{ fn: 'test' }] },
-    { code: 'test.concurrent("foo")', options: [{ fn: 'test' }] },
-    { code: 'xtest("foo")', options: [{ fn: 'test' }] },
-    { code: 'test.each([])("foo")', options: [{ fn: 'test' }] },
-    { code: 'test.each``("foo")', options: [{ fn: 'test' }] },
+    ...(
+      [
+        'test("foo")',
+        'test.only("foo")',
+        'test.skip("foo")',
+        'test.concurrent("foo")',
+        'xtest("foo")',
+        'test.each([])("foo")',
+        'test.each``("foo")',
+        'describe("suite", () => { test("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+    })),
+    ...(
+      [
+        'it("foo")',
+        'fit("foo")',
+        'xit("foo")',
+        'it.only("foo")',
+        'it.skip("foo")',
+        'it.concurrent("foo")',
+        'it.each([])("foo")',
+        'it.each``("foo")',
+        'describe("suite", () => { it("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index + 8}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
+    })),
+    ...(
+      [
+        'test("foo")',
+        'test.only("foo")',
+        'test.skip("foo")',
+        'test.concurrent("foo")',
+        'xtest("foo")',
+        '[1,2,3].forEach(() => { test("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index + 17}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+    })),
+    ...(
+      [
+        'it("foo")',
+        'it.only("foo")',
+        'it.skip("foo")',
+        'it.concurrent("foo")',
+        'xit("foo")',
+        '[1,2,3].forEach(() => { it("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index + 23}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'test',
+        },
+      ],
+    })),
+    ...(
+      ['describe("suite", () => { test("foo") })', 'test("foo");'] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index + 29}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
+    })),
+    ...(['describe("suite", () => { it("foo") })', 'it("foo")'] as const).map(
+      (code, index): ValidTestCase => ({
+        name: `run 0 valid ${index + 31}`,
+        code,
+        options: [
+          {
+            fn: 'it',
+            withinDescribe: 'it',
+          },
+        ],
+      }),
+    ),
     {
-      code: 'describe("suite", () => { test("foo") })',
-      options: [{ fn: 'test' }],
+      name: 'run 0 valid 33',
+      code: 'test("foo")',
     },
-    { code: 'it("foo")', options: [{ fn: 'it' }] },
-    { code: 'fit("foo")', options: [{ fn: 'it' }] },
-    { code: 'xit("foo")', options: [{ fn: 'it' }] },
-    { code: 'it.only("foo")', options: [{ fn: 'it' }] },
-    { code: 'it.skip("foo")', options: [{ fn: 'it' }] },
-    { code: 'it.concurrent("foo")', options: [{ fn: 'it' }] },
-    { code: 'it.each([])("foo")', options: [{ fn: 'it' }] },
-    { code: 'it.each``("foo")', options: [{ fn: 'it' }] },
-    { code: 'describe("suite", () => { it("foo") })', options: [{ fn: 'it' }] },
-    { code: 'test("foo")', options: [{ fn: 'test', withinDescribe: 'it' }] },
+    ...(['test("foo")', 'describe("suite", () => { it("foo") })'] as const).map(
+      (code, index): ValidTestCase => ({
+        name: `run 0 valid ${index + 34}`,
+        code,
+        options: [
+          {
+            withinDescribe: 'it',
+          },
+        ],
+      }),
+    ),
+    ...(
+      ['test("foo")', 'describe("suite", () => { test("foo") })'] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index + 36}`,
+      code,
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
+    })),
+    ...(
+      [
+        'test("foo")',
+        'test.only("foo")',
+        'test.skip("foo")',
+        'test.concurrent("foo")',
+        'xtest("foo")',
+        'test.each([])("foo")',
+        'test.each``("foo")',
+        'describe("suite", () => { test("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with fn=test / valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
+    ...(
+      [
+        'it("foo")',
+        'fit("foo")',
+        'xit("foo")',
+        'it.only("foo")',
+        'it.skip("foo")',
+        'it.concurrent("foo")',
+        'it.each([])("foo")',
+        'it.each``("foo")',
+        'describe("suite", () => { it("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with fn=it / valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
+    ...(
+      [
+        'test("foo")',
+        'test.only("foo")',
+        'test.skip("foo")',
+        'test.concurrent("foo")',
+        'xtest("foo")',
+        '[1,2,3].forEach(() => { test("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with fn=test and withinDescribe=it  / valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
+    ...(
+      [
+        'it("foo")',
+        'it.only("foo")',
+        'it.skip("foo")',
+        'it.concurrent("foo")',
+        'xit("foo")',
+        '[1,2,3].forEach(() => { it("foo") })',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with fn=it and withinDescribe=test  / valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
+    ...(
+      ['describe("suite", () => { test("foo") })', 'test("foo");'] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with fn=test and withinDescribe=test  / valid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
+    ...(['describe("suite", () => { it("foo") })', 'it("foo")'] as const).map(
+      (code, index): ValidTestCase => ({
+        name: `upstream consistent-test-it with fn=it and withinDescribe=it  / valid ${index}`,
+        code,
+        options: [
+          {
+            fn: 'it',
+            withinDescribe: 'it',
+          },
+        ],
+        languageOptions: {
+          ecmaVersion: 2015,
+        },
+      }),
+    ),
     {
-      code: 'test.only("foo")',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
+      name: 'upstream consistent-test-it defaults without config object / valid 0',
+      code: 'test("foo")',
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
     },
-    {
-      code: 'test.skip("foo")',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-    },
-    {
-      code: 'test.concurrent("foo")',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-    },
-    { code: 'xtest("foo")', options: [{ fn: 'test', withinDescribe: 'it' }] },
-    {
-      code: '[1,2,3].forEach(() => { test("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-    },
-    { code: 'it("foo")', options: [{ fn: 'it', withinDescribe: 'test' }] },
-    { code: 'it.only("foo")', options: [{ fn: 'it', withinDescribe: 'test' }] },
-    { code: 'it.skip("foo")', options: [{ fn: 'it', withinDescribe: 'test' }] },
-    {
-      code: 'it.concurrent("foo")',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-    },
-    { code: 'xit("foo")', options: [{ fn: 'it', withinDescribe: 'test' }] },
-    {
-      code: '[1,2,3].forEach(() => { it("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-    },
-    {
-      code: 'describe("suite", () => { test("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'test' }],
-    },
-    { code: 'test("foo");', options: [{ fn: 'test', withinDescribe: 'test' }] },
-    {
-      code: 'describe("suite", () => { it("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'it' }],
-    },
-    { code: 'it("foo")', options: [{ fn: 'it', withinDescribe: 'it' }] },
-    { code: 'test("foo")' },
-    { code: 'test("foo")', options: [{ withinDescribe: 'it' }] },
-    {
-      code: 'describe("suite", () => { it("foo") })',
-      options: [{ withinDescribe: 'it' }],
-    },
-    { code: 'test("foo")', options: [{ withinDescribe: 'test' }] },
-    {
-      code: 'describe("suite", () => { test("foo") })',
-      options: [{ withinDescribe: 'test' }],
-    },
+    ...(['test("foo")', 'describe("suite", () => { it("foo") })'] as const).map(
+      (code, index): ValidTestCase => ({
+        name: `upstream consistent-test-it with withinDescribe=it / valid ${index}`,
+        code,
+        options: [
+          {
+            withinDescribe: 'it',
+          },
+        ],
+        languageOptions: {
+          ecmaVersion: 2015,
+        },
+      }),
+    ),
+    ...(
+      ['test("foo")', 'describe("suite", () => { test("foo") })'] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream consistent-test-it with withinDescribe=test / valid ${index}`,
+      code,
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+    })),
   ],
   invalid: [
-    {
-      code: 'it("foo")',
-      output: 'test("foo")',
-      options: [{ fn: 'test' }],
+    ...(
+      [
+        ['it("foo")', 1, 3, 'test("foo")'],
+        [
+          `import { it } from '@jest/globals';
+
+it("foo")`,
+          3,
+          3,
+          `import { test, it } from '@jest/globals';
+
+test("foo")`,
+        ],
+        [
+          `import { it as testThisThing } from '@jest/globals';
+
+testThisThing("foo")`,
+          3,
+          14,
+          `import { test, it as testThisThing } from '@jest/globals';
+
+test("foo")`,
+        ],
+        ['xit("foo")', 1, 4, 'xtest("foo")'],
+        ['fit("foo")', 1, 4, 'test.only("foo")'],
+        ['it.skip("foo")', 1, 8, 'test.skip("foo")'],
+        ['it.concurrent("foo")', 1, 14, 'test.concurrent("foo")'],
+        ['it.only("foo")', 1, 8, 'test.only("foo")'],
+        ['it.each([])("foo")', 1, 12, 'test.each([])("foo")'],
+        ['it.each``("foo")', 1, 10, 'test.each``("foo")'],
+      ] as const
+    ).map(([code, line, endColumn, output], index): TestCase => ({
+      name: `run 0 invalid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
           message: "Prefer using 'test' instead of 'it'",
-          line: 1,
+          line,
           column: 1,
-          endLine: 1,
-          endColumn: 3,
+          endLine: line,
+          endColumn,
         },
       ],
-    },
+      output,
+    })),
     {
-      code: 'import { it } from \'@jest/globals\';\n\nit("foo")',
-      // Differs from upstream, which calls the new name without importing it.
-      output: 'import { test, it } from \'@jest/globals\';\n\ntest("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 3,
-          column: 1,
-          endLine: 3,
-          endColumn: 3,
-        },
-      ],
-    },
-    {
-      code: 'import { it as testThisThing } from \'@jest/globals\';\n\ntestThisThing("foo")',
-      // Differs from upstream, which calls the new name without importing it.
-      output:
-        'import { test, it as testThisThing } from \'@jest/globals\';\n\ntest("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 3,
-          column: 1,
-          endLine: 3,
-          endColumn: 14,
-        },
-      ],
-    },
-    {
-      code: 'xit("foo")',
-      output: 'xtest("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 4,
-        },
-      ],
-    },
-    {
-      code: 'fit("foo")',
-      output: 'test.only("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 4,
-        },
-      ],
-    },
-    {
-      code: 'it.skip("foo")',
-      output: 'test.skip("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 8,
-        },
-      ],
-    },
-    {
-      code: 'it.concurrent("foo")',
-      output: 'test.concurrent("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 14,
-        },
-      ],
-    },
-    {
-      code: 'it.only("foo")',
-      output: 'test.only("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 8,
-        },
-      ],
-    },
-    {
-      code: 'it.each([])("foo")',
-      output: 'test.each([])("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 12,
-        },
-      ],
-    },
-    {
-      code: 'it.each``("foo")',
-      output: 'test.each``("foo")',
-      options: [{ fn: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'test' instead of 'it'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 10,
-        },
-      ],
-    },
-    {
+      name: 'run 0 invalid 10',
       code: 'describe.each``("foo", () => { it.each``("bar") })',
-      output: 'describe.each``("foo", () => { test.each``("bar") })',
-      options: [{ fn: 'test' }],
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -244,11 +366,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 41,
         },
       ],
+      output: 'describe.each``("foo", () => { test.each``("bar") })',
     },
     {
+      name: 'run 0 invalid 11',
       code: 'describe.each``("foo", () => { test.each``("bar") })',
-      output: 'describe.each``("foo", () => { it.each``("bar") })',
-      options: [{ fn: 'it' }],
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -259,12 +386,44 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 43,
         },
       ],
+      output: 'describe.each``("foo", () => { it.each``("bar") })',
     },
-    {
-      code: 'describe.each()("%s", () => {\n  test("is valid, but should not be", () => {});\n\n  it("is not valid, but should be", () => {});\n});',
-      output:
-        'describe.each()("%s", () => {\n  it("is valid, but should not be", () => {});\n\n  it("is not valid, but should be", () => {});\n});',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
+    ...(
+      [
+        [
+          `describe.each()("%s", () => {
+  test("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+          `describe.each()("%s", () => {
+  it("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+        ],
+        [
+          `describe.only.each()("%s", () => {
+  test("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+          `describe.only.each()("%s", () => {
+  it("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+        ],
+      ] as const
+    ).map(([code, output], index): TestCase => ({
+      name: `run 0 invalid ${index + 12}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -275,27 +434,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 7,
         },
       ],
-    },
+      output,
+    })),
     {
-      code: 'describe.only.each()("%s", () => {\n  test("is valid, but should not be", () => {});\n\n  it("is not valid, but should be", () => {});\n});',
-      output:
-        'describe.only.each()("%s", () => {\n  it("is valid, but should not be", () => {});\n\n  it("is not valid, but should be", () => {});\n});',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 2,
-          column: 3,
-          endLine: 2,
-          endColumn: 7,
-        },
-      ],
-    },
-    {
+      name: 'run 0 invalid 14',
       code: 'describe("suite", () => { it("foo") })',
-      output: 'describe("suite", () => { test("foo") })',
-      options: [{ fn: 'test' }],
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -306,11 +454,25 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 29,
         },
       ],
+      output: 'describe("suite", () => { test("foo") })',
     },
-    {
-      code: 'test("foo")',
-      output: 'it("foo")',
-      options: [{ fn: 'it' }],
+    ...(
+      [
+        ['test("foo")', 5, 'it("foo")'],
+        ['xtest("foo")', 6, 'xit("foo")'],
+        ['test.skip("foo")', 10, 'it.skip("foo")'],
+        ['test.concurrent("foo")', 16, 'it.concurrent("foo")'],
+        ['test.only("foo")', 10, 'it.only("foo")'],
+        ['test.each([])("foo")', 14, 'it.each([])("foo")'],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `run 0 invalid ${index + 15}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -318,89 +480,19 @@ ruleTester.run('consistent-test-it', {} as never, {
           line: 1,
           column: 1,
           endLine: 1,
-          endColumn: 5,
+          endColumn,
         },
       ],
-    },
+      output,
+    })),
     {
-      code: 'xtest("foo")',
-      output: 'xit("foo")',
-      options: [{ fn: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'it' instead of 'test'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 6,
-        },
-      ],
-    },
-    {
-      code: 'test.skip("foo")',
-      output: 'it.skip("foo")',
-      options: [{ fn: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'it' instead of 'test'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 10,
-        },
-      ],
-    },
-    {
-      code: 'test.concurrent("foo")',
-      output: 'it.concurrent("foo")',
-      options: [{ fn: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'it' instead of 'test'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 16,
-        },
-      ],
-    },
-    {
-      code: 'test.only("foo")',
-      output: 'it.only("foo")',
-      options: [{ fn: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'it' instead of 'test'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 10,
-        },
-      ],
-    },
-    {
-      code: 'test.each([])("foo")',
-      output: 'it.each([])("foo")',
-      options: [{ fn: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethod',
-          message: "Prefer using 'it' instead of 'test'",
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 14,
-        },
-      ],
-    },
-    {
+      name: 'run 0 invalid 21',
       code: 'describe.each``("foo", () => { test.each``("bar") })',
-      output: 'describe.each``("foo", () => { it.each``("bar") })',
-      options: [{ fn: 'it' }],
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -411,11 +503,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 43,
         },
       ],
+      output: 'describe.each``("foo", () => { it.each``("bar") })',
     },
     {
+      name: 'run 0 invalid 22',
       code: 'test.each``("foo")',
-      output: 'it.each``("foo")',
-      options: [{ fn: 'it' }],
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -426,11 +523,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 12,
         },
       ],
+      output: 'it.each``("foo")',
     },
     {
+      name: 'run 0 invalid 23',
       code: 'describe("suite", () => { test("foo") })',
-      output: 'describe("suite", () => { it("foo") })',
-      options: [{ fn: 'it' }],
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -441,120 +543,147 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 31,
         },
       ],
-    },
-    {
-      code: 'describe("suite", () => { test("foo") })',
       output: 'describe("suite", () => { it("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
+    },
+    ...(
+      [
+        [
+          'describe("suite", () => { test("foo") })',
+          1,
+          27,
+          31,
+          'describe("suite", () => { it("foo") })',
+        ],
+        [
+          'describe("suite", () => { test.only("foo") })',
+          1,
+          27,
+          36,
+          'describe("suite", () => { it.only("foo") })',
+        ],
+        [
+          'describe("suite", () => { xtest("foo") })',
+          1,
+          27,
+          32,
+          'describe("suite", () => { xit("foo") })',
+        ],
+        [
+          `import { xtest as dontTestThis } from '@jest/globals';
+
+describe("suite", () => { dontTestThis("foo") });`,
+          3,
+          27,
+          39,
+          `import { xit, xtest as dontTestThis } from '@jest/globals';
+
+describe("suite", () => { xit("foo") });`,
+        ],
+        [
+          `import { describe as context, xtest as dontTestThis } from '@jest/globals';
+
+context("suite", () => { dontTestThis("foo") });`,
+          3,
+          26,
+          38,
+          `import { describe as context, xit, xtest as dontTestThis } from '@jest/globals';
+
+context("suite", () => { xit("foo") });`,
+        ],
+        [
+          'describe("suite", () => { test.skip("foo") })',
+          1,
+          27,
+          36,
+          'describe("suite", () => { it.skip("foo") })',
+        ],
+        [
+          'describe("suite", () => { test.concurrent("foo") })',
+          1,
+          27,
+          42,
+          'describe("suite", () => { it.concurrent("foo") })',
+        ],
+      ] as const
+    ).map(([code, line, column, endColumn, output], index): TestCase => ({
+      name: `run 0 invalid ${index + 24}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
           message: "Prefer using 'it' instead of 'test' within describe",
+          line,
+          column,
+          endLine: line,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    ...(
+      [
+        [
+          'describe("suite", () => { it("foo") })',
+          29,
+          'describe("suite", () => { test("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.only("foo") })',
+          34,
+          'describe("suite", () => { test.only("foo") })',
+        ],
+        [
+          'describe("suite", () => { xit("foo") })',
+          30,
+          'describe("suite", () => { xtest("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.skip("foo") })',
+          34,
+          'describe("suite", () => { test.skip("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.concurrent("foo") })',
+          40,
+          'describe("suite", () => { test.concurrent("foo") })',
+        ],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `run 0 invalid ${index + 31}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'test',
+        },
+      ],
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
           line: 1,
           column: 27,
           endLine: 1,
-          endColumn: 31,
+          endColumn,
         },
       ],
-    },
+      output,
+    })),
     {
-      code: 'describe("suite", () => { test.only("foo") })',
-      output: 'describe("suite", () => { it.only("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 36,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { xtest("foo") })',
-      output: 'describe("suite", () => { xit("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 32,
-        },
-      ],
-    },
-    {
-      code: 'import { xtest as dontTestThis } from \'@jest/globals\';\n\ndescribe("suite", () => { dontTestThis("foo") });',
-      // Differs from upstream, which calls the new name without importing it.
-      output:
-        'import { xit, xtest as dontTestThis } from \'@jest/globals\';\n\ndescribe("suite", () => { xit("foo") });',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 3,
-          column: 27,
-          endLine: 3,
-          endColumn: 39,
-        },
-      ],
-    },
-    {
-      code: 'import { describe as context, xtest as dontTestThis } from \'@jest/globals\';\n\ncontext("suite", () => { dontTestThis("foo") });',
-      // Differs from upstream, which calls the new name without importing it.
-      output:
-        'import { describe as context, xit, xtest as dontTestThis } from \'@jest/globals\';\n\ncontext("suite", () => { xit("foo") });',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 3,
-          column: 26,
-          endLine: 3,
-          endColumn: 38,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { test.skip("foo") })',
-      output: 'describe("suite", () => { it.skip("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 36,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { test.concurrent("foo") })',
-      output: 'describe("suite", () => { it.concurrent("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'it' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'it' instead of 'test' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 42,
-        },
-      ],
-    },
-    {
+      name: 'run 0 invalid 36',
       code: 'describe("suite", () => { it("foo") })',
-      output: 'describe("suite", () => { test("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -565,86 +694,17 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 29,
         },
       ],
-    },
-    {
-      code: 'describe("suite", () => { it.only("foo") })',
-      output: 'describe("suite", () => { test.only("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'test' instead of 'it' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 34,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { xit("foo") })',
-      output: 'describe("suite", () => { xtest("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'test' instead of 'it' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 30,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { it.skip("foo") })',
-      output: 'describe("suite", () => { test.skip("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'test' instead of 'it' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 34,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { it.concurrent("foo") })',
-      output: 'describe("suite", () => { test.concurrent("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'test' instead of 'it' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 40,
-        },
-      ],
-    },
-    {
-      code: 'describe("suite", () => { it("foo") })',
       output: 'describe("suite", () => { test("foo") })',
-      options: [{ fn: 'test', withinDescribe: 'test' }],
-      errors: [
-        {
-          messageId: 'consistentMethodWithinDescribe',
-          message: "Prefer using 'test' instead of 'it' within describe",
-          line: 1,
-          column: 27,
-          endLine: 1,
-          endColumn: 29,
-        },
-      ],
     },
     {
+      name: 'run 0 invalid 37',
       code: 'it("foo")',
-      output: 'test("foo")',
-      options: [{ fn: 'test', withinDescribe: 'test' }],
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -655,11 +715,17 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 3,
         },
       ],
+      output: 'test("foo")',
     },
     {
+      name: 'run 0 invalid 38',
       code: 'describe("suite", () => { test("foo") })',
-      output: 'describe("suite", () => { it("foo") })',
-      options: [{ fn: 'it', withinDescribe: 'it' }],
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -670,11 +736,17 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 31,
         },
       ],
+      output: 'describe("suite", () => { it("foo") })',
     },
     {
+      name: 'run 0 invalid 39',
       code: 'test("foo")',
-      output: 'it("foo")',
-      options: [{ fn: 'it', withinDescribe: 'it' }],
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -685,10 +757,11 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 5,
         },
       ],
+      output: 'it("foo")',
     },
     {
+      name: 'run 0 invalid 40',
       code: 'describe("suite", () => { test("foo") })',
-      output: 'describe("suite", () => { it("foo") })',
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -699,11 +772,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 31,
         },
       ],
+      output: 'describe("suite", () => { it("foo") })',
     },
     {
+      name: 'run 0 invalid 41',
       code: 'it("foo")',
-      output: 'test("foo")',
-      options: [{ withinDescribe: 'it' }],
+      options: [
+        {
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -714,11 +792,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 3,
         },
       ],
+      output: 'test("foo")',
     },
     {
+      name: 'run 0 invalid 42',
       code: 'describe("suite", () => { test("foo") })',
-      output: 'describe("suite", () => { it("foo") })',
-      options: [{ withinDescribe: 'it' }],
+      options: [
+        {
+          withinDescribe: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -729,11 +812,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 31,
         },
       ],
+      output: 'describe("suite", () => { it("foo") })',
     },
     {
+      name: 'run 0 invalid 43',
       code: 'it("foo")',
-      output: 'test("foo")',
-      options: [{ withinDescribe: 'test' }],
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -744,11 +832,16 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 3,
         },
       ],
+      output: 'test("foo")',
     },
     {
+      name: 'run 0 invalid 44',
       code: 'describe("suite", () => { it("foo") })',
-      output: 'describe("suite", () => { test("foo") })',
-      options: [{ withinDescribe: 'test' }],
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethodWithinDescribe',
@@ -759,12 +852,20 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 29,
         },
       ],
+      output: 'describe("suite", () => { test("foo") })',
     },
     {
-      code: "test('foo'); // valid\ntest.only('foo'); // valid\n\nit('foo'); // invalid\nit.only('foo'); // invalid",
-      output:
-        "test('foo'); // valid\ntest.only('foo'); // valid\n\ntest('foo'); // invalid\ntest.only('foo'); // invalid",
-      options: [{ fn: 'test' }],
+      name: 'run 0 invalid 45',
+      code: `test('foo'); // valid
+test.only('foo'); // valid
+
+it('foo'); // invalid
+it.only('foo'); // invalid`,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -783,12 +884,24 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 8,
         },
       ],
+      output: `test('foo'); // valid
+test.only('foo'); // valid
+
+test('foo'); // invalid
+test.only('foo'); // invalid`,
     },
     {
-      code: "it('foo'); // valid\nit.only('foo'); // valid\n\ntest('foo'); // invalid\ntest.only('foo'); // invalid",
-      output:
-        "it('foo'); // valid\nit.only('foo'); // valid\n\nit('foo'); // invalid\nit.only('foo'); // invalid",
-      options: [{ fn: 'it' }],
+      name: 'run 0 invalid 46',
+      code: `it('foo'); // valid
+it.only('foo'); // valid
+
+test('foo'); // invalid
+test.only('foo'); // invalid`,
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -807,12 +920,29 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 10,
         },
       ],
+      output: `it('foo'); // valid
+it.only('foo'); // valid
+
+it('foo'); // invalid
+it.only('foo'); // invalid`,
     },
     {
-      code: "it('foo'); // valid\ndescribe('foo', function () {\n  test('bar'); // valid\n});\n\ntest('foo'); // invalid\ndescribe('foo', function () {\n  it('bar'); // invalid\n});",
-      output:
-        "it('foo'); // valid\ndescribe('foo', function () {\n  test('bar'); // valid\n});\n\nit('foo'); // invalid\ndescribe('foo', function () {\n  test('bar'); // invalid\n});",
-      options: [{ fn: 'it', withinDescribe: 'test' }],
+      name: 'run 0 invalid 47',
+      code: `it('foo'); // valid
+describe('foo', function () {
+  test('bar'); // valid
+});
+
+test('foo'); // invalid
+describe('foo', function () {
+  it('bar'); // invalid
+});`,
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'test',
+        },
+      ],
       errors: [
         {
           messageId: 'consistentMethod',
@@ -831,11 +961,27 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 5,
         },
       ],
+      output: `it('foo'); // valid
+describe('foo', function () {
+  test('bar'); // valid
+});
+
+it('foo'); // invalid
+describe('foo', function () {
+  test('bar'); // invalid
+});`,
     },
     {
-      code: "test('foo'); // valid\ndescribe('foo', function () {\n  it('bar'); // valid\n});\n\nit('foo'); // invalid\ndescribe('foo', function () {\n  test('bar'); // invalid\n});",
-      output:
-        "test('foo'); // valid\ndescribe('foo', function () {\n  it('bar'); // valid\n});\n\ntest('foo'); // invalid\ndescribe('foo', function () {\n  it('bar'); // invalid\n});",
+      name: 'run 0 invalid 48',
+      code: `test('foo'); // valid
+describe('foo', function () {
+  it('bar'); // valid
+});
+
+it('foo'); // invalid
+describe('foo', function () {
+  test('bar'); // invalid
+});`,
       errors: [
         {
           messageId: 'consistentMethod',
@@ -854,6 +1000,710 @@ ruleTester.run('consistent-test-it', {} as never, {
           endColumn: 7,
         },
       ],
+      output: `test('foo'); // valid
+describe('foo', function () {
+  it('bar'); // valid
+});
+
+test('foo'); // invalid
+describe('foo', function () {
+  it('bar'); // invalid
+});`,
+    },
+    {
+      name: 'upstream consistent-test-it with fn=test / invalid 0',
+      code: 'it("foo")',
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+      output: 'test("foo")',
+    },
+    ...(
+      [
+        [
+          `import { it } from '@jest/globals';
+
+it("foo")`,
+          3,
+          `import { test, it } from '@jest/globals';
+
+test("foo")`,
+        ],
+        [
+          `import { it as testThisThing } from '@jest/globals';
+
+testThisThing("foo")`,
+          14,
+          `import { test, it as testThisThing } from '@jest/globals';
+
+test("foo")`,
+        ],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test / invalid ${index + 1}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 3,
+          column: 1,
+          endLine: 3,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    ...(
+      [
+        ['xit("foo")', 4, 'xtest("foo")'],
+        ['fit("foo")', 4, 'test.only("foo")'],
+        ['it.skip("foo")', 8, 'test.skip("foo")'],
+        ['it.concurrent("foo")', 14, 'test.concurrent("foo")'],
+        ['it.only("foo")', 8, 'test.only("foo")'],
+        ['it.each([])("foo")', 12, 'test.each([])("foo")'],
+        ['it.each``("foo")', 10, 'test.each``("foo")'],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test / invalid ${index + 3}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    {
+      name: 'upstream consistent-test-it with fn=test / invalid 10',
+      code: 'describe.each``("foo", () => { it.each``("bar") })',
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 41,
+        },
+      ],
+      output: 'describe.each``("foo", () => { test.each``("bar") })',
+    },
+    {
+      name: 'upstream consistent-test-it with fn=test / invalid 11',
+      code: 'describe.each``("foo", () => { test.each``("bar") })',
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 43,
+        },
+      ],
+      output: 'describe.each``("foo", () => { it.each``("bar") })',
+    },
+    ...(
+      [
+        [
+          `describe.each()("%s", () => {
+  test("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+          `describe.each()("%s", () => {
+  it("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+        ],
+        [
+          `describe.only.each()("%s", () => {
+  test("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+          `describe.only.each()("%s", () => {
+  it("is valid, but should not be", () => {});
+
+  it("is not valid, but should be", () => {});
+});`,
+        ],
+      ] as const
+    ).map(([code, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test / invalid ${index + 12}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 2,
+          column: 3,
+          endLine: 2,
+          endColumn: 7,
+        },
+      ],
+      output,
+    })),
+    {
+      name: 'upstream consistent-test-it with fn=test / invalid 14',
+      code: 'describe("suite", () => { it("foo") })',
+      options: [
+        {
+          fn: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+      output: 'describe("suite", () => { test("foo") })',
+    },
+    ...(
+      [
+        [
+          'test("foo")',
+          'upstream consistent-test-it with fn=it / invalid 0',
+          5,
+          'it("foo")',
+        ],
+        [
+          'xtest("foo")',
+          'upstream consistent-test-it with fn=it / invalid 1',
+          6,
+          'xit("foo")',
+        ],
+        [
+          'test.skip("foo")',
+          'upstream consistent-test-it with fn=it / invalid 2',
+          10,
+          'it.skip("foo")',
+        ],
+        [
+          'test.concurrent("foo")',
+          'upstream consistent-test-it with fn=it / invalid 3',
+          16,
+          'it.concurrent("foo")',
+        ],
+        [
+          'test.only("foo")',
+          'upstream consistent-test-it with fn=it / invalid 4',
+          10,
+          'it.only("foo")',
+        ],
+        [
+          'test.each([])("foo")',
+          'upstream consistent-test-it with fn=it / invalid 5',
+          14,
+          'it.each([])("foo")',
+        ],
+        [
+          'test.each``("foo")',
+          'upstream consistent-test-it with fn=it / invalid 7',
+          12,
+          'it.each``("foo")',
+        ],
+      ] as const
+    ).map(([code, name, endColumn, output]): TestCase => ({
+      name,
+      code,
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'it' instead of 'test'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    {
+      name: 'upstream consistent-test-it with fn=it / invalid 8',
+      code: 'describe("suite", () => { test("foo") })',
+      options: [
+        {
+          fn: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+      output: 'describe("suite", () => { it("foo") })',
+    },
+    ...(
+      [
+        [
+          'describe("suite", () => { test("foo") })',
+          31,
+          'describe("suite", () => { it("foo") })',
+        ],
+        [
+          'describe("suite", () => { test.only("foo") })',
+          36,
+          'describe("suite", () => { it.only("foo") })',
+        ],
+        [
+          'describe("suite", () => { xtest("foo") })',
+          32,
+          'describe("suite", () => { xit("foo") })',
+        ],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test and withinDescribe=it  / invalid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    ...(
+      [
+        [
+          `import { xtest as dontTestThis } from '@jest/globals';
+
+describe("suite", () => { dontTestThis("foo") });`,
+          27,
+          `import { xit, xtest as dontTestThis } from '@jest/globals';
+
+describe("suite", () => { xit("foo") });`,
+        ],
+        [
+          `import { describe as context, xtest as dontTestThis } from '@jest/globals';
+
+context("suite", () => { dontTestThis("foo") });`,
+          26,
+          `import { describe as context, xit, xtest as dontTestThis } from '@jest/globals';
+
+context("suite", () => { xit("foo") });`,
+        ],
+      ] as const
+    ).map(([code, column, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test and withinDescribe=it  / invalid ${index + 3}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 3,
+          column,
+          endLine: 3,
+          endColumn: column + 12,
+        },
+      ],
+      output,
+    })),
+    ...(
+      [
+        [
+          'describe("suite", () => { test.skip("foo") })',
+          36,
+          'describe("suite", () => { it.skip("foo") })',
+        ],
+        [
+          'describe("suite", () => { test.concurrent("foo") })',
+          42,
+          'describe("suite", () => { it.concurrent("foo") })',
+        ],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=test and withinDescribe=it  / invalid ${index + 5}`,
+      code,
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    ...(
+      [
+        [
+          'describe("suite", () => { it("foo") })',
+          29,
+          'describe("suite", () => { test("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.only("foo") })',
+          34,
+          'describe("suite", () => { test.only("foo") })',
+        ],
+        [
+          'describe("suite", () => { xit("foo") })',
+          30,
+          'describe("suite", () => { xtest("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.skip("foo") })',
+          34,
+          'describe("suite", () => { test.skip("foo") })',
+        ],
+        [
+          'describe("suite", () => { it.concurrent("foo") })',
+          40,
+          'describe("suite", () => { test.concurrent("foo") })',
+        ],
+      ] as const
+    ).map(([code, endColumn, output], index): TestCase => ({
+      name: `upstream consistent-test-it with fn=it and withinDescribe=test  / invalid ${index}`,
+      code,
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+      output,
+    })),
+    {
+      name: 'upstream consistent-test-it with fn=test and withinDescribe=test  / invalid 0',
+      code: 'describe("suite", () => { it("foo") })',
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+      output: 'describe("suite", () => { test("foo") })',
+    },
+    {
+      name: 'upstream consistent-test-it with fn=test and withinDescribe=test  / invalid 1',
+      code: 'it("foo")',
+      options: [
+        {
+          fn: 'test',
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+      output: 'test("foo")',
+    },
+    {
+      name: 'upstream consistent-test-it with fn=it and withinDescribe=it  / invalid 0',
+      code: 'describe("suite", () => { test("foo") })',
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+      output: 'describe("suite", () => { it("foo") })',
+    },
+    {
+      name: 'upstream consistent-test-it with fn=it and withinDescribe=it  / invalid 1',
+      code: 'test("foo")',
+      options: [
+        {
+          fn: 'it',
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'it' instead of 'test'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+      output: 'it("foo")',
+    },
+    {
+      name: 'upstream consistent-test-it defaults without config object / invalid 0',
+      code: 'describe("suite", () => { test("foo") })',
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+      output: 'describe("suite", () => { it("foo") })',
+    },
+    {
+      name: 'upstream consistent-test-it with withinDescribe=it / invalid 0',
+      code: 'it("foo")',
+      options: [
+        {
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+      output: 'test("foo")',
+    },
+    {
+      name: 'upstream consistent-test-it with withinDescribe=it / invalid 1',
+      code: 'describe("suite", () => { test("foo") })',
+      options: [
+        {
+          withinDescribe: 'it',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'it' instead of 'test' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+      output: 'describe("suite", () => { it("foo") })',
+    },
+    {
+      name: 'upstream consistent-test-it with withinDescribe=test / invalid 0',
+      code: 'it("foo")',
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethod',
+          message: "Prefer using 'test' instead of 'it'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+      output: 'test("foo")',
+    },
+    {
+      name: 'upstream consistent-test-it with withinDescribe=test / invalid 1',
+      code: 'describe("suite", () => { it("foo") })',
+      options: [
+        {
+          withinDescribe: 'test',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'consistentMethodWithinDescribe',
+          message: "Prefer using 'test' instead of 'it' within describe",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+      output: 'describe("suite", () => { test("foo") })',
     },
   ],
 });

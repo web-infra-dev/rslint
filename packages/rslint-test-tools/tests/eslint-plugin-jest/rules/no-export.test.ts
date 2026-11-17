@@ -1,119 +1,351 @@
-import { RuleTester } from '../rule-tester';
+// Upstream reference: eslint-plugin-jest@29.16.0; includes existing Rslint regressions.
+// Additional cases from 29.16.6 retain their input and parser configuration.
+// Complete assertions record current native output; documented differences remain separate.
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('no-export', {} as never, {
+new RuleTester(fixtureConfig()).run('no-export', {
   valid: [
-    { code: 'describe("a test", () => { expect(1).toBe(1); })' },
-    { code: 'window.location = "valid"' },
-    { code: 'module.somethingElse = "foo";' },
-    { code: 'export const myThing = "valid"' },
-    { code: 'export default function () {}' },
-    { code: 'module.exports = function(){}' },
-    { code: 'module.exports.myThing = "valid";' },
-    { code: 'module.export.foo = "valid"; test("a test", () => {});' },
+    ...(
+      [
+        'describe("a test", () => { expect(1).toBe(1); })',
+        'window.location = "valid"',
+        'module.somethingElse = "foo";',
+        'export const myThing = "valid"',
+        'export default function () {}',
+        'module.exports = function(){}',
+        'module.exports.myThing = "valid";',
+        'module.export.foo = "valid"; test("a test", () => {});',
+        'const exports = "exports"; module[exports] = {}; test("a test", () => {});',
+        'const module = { exports: {} }; module.exports.foo = "valid"; test("a test", () => {});',
+        'const run = (module: { exports: object }) => { module.exports.foo = "valid" }; test("a test", () => {});',
+        'const exports = { foo: "" }; exports.foo = "valid"; test("a test", () => {});',
+        'const run = (exports: { foo: string }) => { exports.foo = "valid" }; test("a test", () => {});',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index}`,
+      code,
+    })),
+    ...(
+      [
+        'describe("a test", () => { expect(1).toBe(1); })',
+        'window.location = "valid"',
+        'module.somethingElse = "foo";',
+        'my.exports.myThing = "valid";',
+        'report.myThing = "valid";',
+        'export const myThing = "valid"',
+        'export default function () {}',
+        'module.exports = function(){}',
+        'module["exports"] = function(){}',
+        'module.exports.exports.exports = function(){}',
+        '["module"].exports.exports.exports = function(){}',
+        'module["exports"].exports.exports = function(){}',
+        'module["exports"]["exports"].exports = function(){}',
+        'module["exports"]["exports"]["exports"] = function(){}',
+        '["exports"]["exports"]["exports"]["exports"] = function(){}',
+        'module[`${variable}`] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+        'module[`${"exports"}`] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+        'module.exports.myThing = "valid";',
+        `const module = {};
+module.exports = function () {};
+test('a test', () => {
+  expect(1).toBe(1);
+});`,
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream no-export / valid ${index}`,
+      code,
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
+    })),
+    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
     {
-      code: 'const exports = "exports"; module[exports] = {}; test("a test", () => {});',
+      name: 'upstream no-export / invalid 9',
+      code: 'module.export.invalid = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
     },
+    // Upstream 29.16.0 classifies this as invalid; current native behavior is valid.
     {
-      code: 'const module = { exports: {} }; module.exports.foo = "valid"; test("a test", () => {});',
+      name: 'upstream no-export / invalid 12',
+      code: 'module["export"] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
     },
+    // The same local parameter is correctly ignored with type information.
     {
-      code: 'const run = (module: { exports: object }) => { module.exports.foo = "valid" }; test("a test", () => {});',
-    },
-    {
-      code: 'const exports = { foo: "" }; exports.foo = "valid"; test("a test", () => {});',
-    },
-    {
-      code: 'const run = (exports: { foo: string }) => { exports.foo = "valid" }; test("a test", () => {});',
+      name: 'typed shadowing control',
+      code: "function f(module) { module.exports = {}; } test('t', () => {});",
     },
   ],
   invalid: [
-    {
-      code: 'export const myThing = "invalid"; test("a test", () => { expect(1).toBe(1);});',
-      errors: [{ endColumn: 34, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: `
+    ...(
+      [
+        [
+          'export const myThing = "invalid"; test("a test", () => { expect(1).toBe(1);});',
+          1,
+          1,
+          34,
+        ],
+        [
+          `
         export const myThing = 'invalid';
 
         test.each()('my code', () => {
           expect(1).toBe(1);
         });
-      `,
-      errors: [{ endColumn: 34, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: `
+     \u0020`,
+          2,
+          9,
+          42,
+        ],
+        [
+          `
         export const myThing = 'invalid';
 
         test.each\`\`('my code', () => {
           expect(1).toBe(1);
         });
-      `,
-      errors: [{ endColumn: 34, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: `
+     \u0020`,
+          2,
+          9,
+          42,
+        ],
+        [
+          `
         export const myThing = 'invalid';
 
         test.only.each\`\`('my code', () => {
           expect(1).toBe(1);
         });
-      `,
-      errors: [{ endColumn: 34, column: 1, messageId: 'unexpectedExport' }],
-    },
+     \u0020`,
+          2,
+          9,
+          42,
+        ],
+        [
+          'export default function() {};  test("a test", () => { expect(1).toBe(1);});',
+          1,
+          1,
+          29,
+        ],
+        [
+          'export = function() {}; test("a test", () => { expect(1).toBe(1);});',
+          1,
+          1,
+          24,
+        ],
+        [
+          'module.exports["invalid"] = function() {};  test("a test", () => { expect(1).toBe(1);});',
+          1,
+          1,
+          26,
+        ],
+        [
+          'module.exports = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          1,
+          1,
+          15,
+        ],
+        [
+          'module["exports"] = function() {}; test("a test", () => {});',
+          1,
+          1,
+          18,
+        ],
+        [
+          'module[`exports`].foo = function() {}; test("a test", () => {});',
+          1,
+          1,
+          22,
+        ],
+        [
+          'module.exports.foo.bar = function() {}; test("a test", () => {});',
+          1,
+          1,
+          23,
+        ],
+        ['module.exports ||= {}; test("a test", () => {});', 1, 1, 15],
+        ['value = module.exports; test("a test", () => {});', 1, 9, 23],
+        ['exports.foo = "invalid"; test("a test", () => {});', 1, 1, 12],
+        ['exports["foo"].bar = "invalid"; test("a test", () => {});', 1, 1, 19],
+        [
+          'export import foo = require("./foo"); test("a test", () => {});',
+          1,
+          1,
+          38,
+        ],
+        [
+          'export const myThing = "invalid"; describe("a suite", () => {});',
+          1,
+          1,
+          34,
+        ],
+      ] as const
+    ).map(([code, line, column, endColumn], index): TestCase => ({
+      name: `run 0 invalid ${index}`,
+      code,
+      errors: [
+        {
+          messageId: 'unexpectedExport',
+          message: 'Do not export from a test file',
+          line,
+          column,
+          endLine: line,
+          endColumn,
+        },
+      ],
+    })),
+    ...(
+      [
+        [
+          'export const myThing = "invalid"; test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 0',
+          34,
+        ],
+        [
+          `export const myThing = 'invalid';
+
+test.each()('my code', () => {
+  expect(1).toBe(1);
+});`,
+          'upstream no-export / invalid 1',
+          34,
+        ],
+        [
+          `export const myThing = 'invalid';
+
+test.each\`\`('my code', () => {
+  expect(1).toBe(1);
+});`,
+          'upstream no-export / invalid 2',
+          34,
+        ],
+        [
+          `export const myThing = 'invalid';
+
+test.only.each\`\`('my code', () => {
+  expect(1).toBe(1);
+});`,
+          'upstream no-export / invalid 3',
+          34,
+        ],
+        [
+          'export default function() {};  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 4',
+          29,
+        ],
+        [
+          'export = function() {}; test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 5',
+          24,
+        ],
+        [
+          'module.exports["invalid"] = function() {};  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 6',
+          26,
+        ],
+        [
+          'module.exports = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 7',
+          15,
+        ],
+        [
+          'module.exports.exports.exports = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 8',
+          31,
+        ],
+        [
+          'module["exports"] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 10',
+          18,
+        ],
+        [
+          'module["exports"].invalid = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 11',
+          26,
+        ],
+        [
+          'module[`exports`] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 13',
+          18,
+        ],
+        [
+          `module.exports = function () {};
+
+describe('a test', () => {
+  expect(1).toBe(1);
+});`,
+          'upstream no-export / invalid 14',
+          15,
+        ],
+        [
+          'exports["invalid"] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 15',
+          19,
+        ],
+        [
+          'exports.export["invalid"] = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
+          'upstream no-export / invalid 16',
+          26,
+        ],
+        [
+          `exports.invalid = function () {};
+
+describe('a test', () => {
+  expect(1).toBe(1);
+});`,
+          'upstream no-export / invalid 17',
+          16,
+        ],
+      ] as const
+    ).map(([code, name, endColumn]): TestCase => ({
+      name,
+      code,
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2015,
+      },
+      errors: [
+        {
+          messageId: 'unexpectedExport',
+          message: 'Do not export from a test file',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+    })),
+    // Without a checker, the rule mistakes a local module parameter for CommonJS module.
     {
-      code: 'export default function() {};  test("a test", () => { expect(1).toBe(1);});',
-      errors: [{ endColumn: 29, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'export = function() {}; test("a test", () => { expect(1).toBe(1);});',
-      errors: [{ endColumn: 24, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module.exports["invalid"] = function() {};  test("a test", () => { expect(1).toBe(1);});',
-      errors: [{ endColumn: 26, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module.exports = function() {}; ;  test("a test", () => { expect(1).toBe(1);});',
-      errors: [{ endColumn: 15, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module["exports"] = function() {}; test("a test", () => {});',
-      errors: [{ endColumn: 18, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module[`exports`].foo = function() {}; test("a test", () => {});',
-      errors: [{ endColumn: 22, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module.exports.foo.bar = function() {}; test("a test", () => {});',
-      errors: [{ endColumn: 23, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'module.exports ||= {}; test("a test", () => {});',
-      errors: [{ endColumn: 15, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'value = module.exports; test("a test", () => {});',
-      errors: [{ endColumn: 23, column: 9, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'exports.foo = "invalid"; test("a test", () => {});',
-      errors: [{ endColumn: 12, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'exports["foo"].bar = "invalid"; test("a test", () => {});',
-      errors: [{ endColumn: 19, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'export import foo = require("./foo"); test("a test", () => {});',
-      errors: [{ endColumn: 38, column: 1, messageId: 'unexpectedExport' }],
-    },
-    {
-      code: 'export const myThing = "invalid"; describe("a suite", () => {});',
-      errors: [{ endColumn: 34, column: 1, messageId: 'unexpectedExport' }],
+      name: 'known existing source-only shadowing defect',
+      code: "function f(module) { module.exports = {}; } test('t', () => {});",
+      languageOptions: {
+        parserOptions: {
+          project: false,
+        },
+      },
+      errors: [
+        {
+          messageId: 'unexpectedExport',
+          message: 'Do not export from a test file',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
   ],
 });

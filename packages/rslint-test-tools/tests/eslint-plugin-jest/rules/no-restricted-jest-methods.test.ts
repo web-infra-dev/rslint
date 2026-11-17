@@ -1,117 +1,215 @@
-import { RuleTester } from '../rule-tester';
+// Upstream reference: eslint-plugin-jest@29.16.0; includes existing Rslint regressions.
+// Additional cases from 29.16.6 retain their input and parser configuration.
+// Complete assertions record current native output; documented differences remain separate.
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('no-restricted-jest-methods', {} as never, {
+new RuleTester(fixtureConfig()).run('no-restricted-jest-methods', {
   valid: [
-    { code: 'jest' },
-    { code: 'jest()' },
-    { code: 'jest.mock()' },
-    { code: 'expect(a).rejects;' },
-    { code: 'expect(a);' },
-    {
-      code: `
+    ...(
+      [
+        'jest',
+        'jest()',
+        'jest.mock()',
+        'expect(a).rejects;',
+        'expect(a);',
+        `
         import { jest } from '@jest/globals';
 
         jest;
-      `,
+     \u0020`,
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index}`,
+      code,
+    })),
+    ...(
+      [
+        'jest',
+        'jest()',
+        'jest.mock()',
+        'expect(a).rejects;',
+        'expect(a);',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream no-restricted-jest-methods / valid ${index}`,
+      code,
+      languageOptions: {
+        ecmaVersion: 2017,
+      },
+    })),
+    {
+      name: 'upstream no-restricted-jest-methods / valid 5',
+      code: `import { jest } from '@jest/globals';
+
+jest;`,
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2017,
+      },
     },
   ],
   invalid: [
-    {
-      code: 'jest.fn()',
-      options: [{ fn: null }],
+    ...(
+      [
+        ['jest.fn()', 8],
+        ['jest["fn"]()', 10],
+      ] as const
+    ).map(([code, endColumn], index): TestCase => ({
+      name: `run 0 invalid ${index}`,
+      code,
+      options: [
+        {
+          fn: null,
+        },
+      ],
       errors: [
         {
           messageId: 'restrictedJestMethod',
-          data: {
-            message: null,
-            restriction: 'fn',
-          },
-          column: 6,
+          message: 'Use of `fn` is disallowed',
           line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn,
         },
       ],
-    },
-    {
-      code: 'jest["fn"]()',
-      options: [{ fn: null }],
-      errors: [
+    })),
+    ...(
+      [
+        ['jest.mock()', 10],
+        ['jest["mock"]()', 12],
+      ] as const
+    ).map(([code, endColumn], index): TestCase => ({
+      name: `run 0 invalid ${index + 2}`,
+      code,
+      options: [
         {
-          messageId: 'restrictedJestMethod',
-          data: {
-            message: null,
-            restriction: 'fn',
-          },
-          column: 6,
-          line: 1,
+          mock: 'Do not use mocks',
         },
       ],
-    },
-    {
-      code: 'jest.mock()',
-      options: [{ mock: 'Do not use mocks' }],
       errors: [
         {
           messageId: 'restrictedJestMethodWithMessage',
-          data: {
-            message: 'Do not use mocks',
-            restriction: 'mock',
-          },
-          column: 6,
+          message: 'Do not use mocks',
           line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn,
         },
       ],
-    },
-    {
-      code: 'jest["mock"]()',
-      options: [{ mock: 'Do not use mocks' }],
-      errors: [
-        {
-          messageId: 'restrictedJestMethodWithMessage',
-          data: {
-            message: 'Do not use mocks',
-            restriction: 'mock',
-          },
-          column: 6,
-          line: 1,
-        },
-      ],
-    },
-    {
-      code: `
+    })),
+    ...(
+      [
+        [
+          `
         import { jest } from '@jest/globals';
 
         jest.advanceTimersByTime();
-      `,
-      options: [{ advanceTimersByTime: null }],
-      errors: [
+     \u0020`,
+          4,
+          14,
+        ],
+        ['jest. /* c */ advanceTimersByTime();', 1, 15],
+      ] as const
+    ).map(([code, line, column], index): TestCase => ({
+      name: `run 0 invalid ${index + 4}`,
+      code,
+      options: [
         {
-          messageId: 'restrictedJestMethod',
-          data: {
-            message: null,
-            restriction: 'advanceTimersByTime',
-          },
-          column: 6,
-          line: 3,
+          advanceTimersByTime: null,
         },
       ],
-    },
-    {
-      // The reported range starts at the method name, whose leading trivia
-      // must not be included.
-      code: 'jest. /* c */ advanceTimersByTime();',
-      options: [{ advanceTimersByTime: null }],
       errors: [
         {
           messageId: 'restrictedJestMethod',
-          data: {
-            message: null,
-            restriction: 'advanceTimersByTime',
-          },
-          column: 15,
-          endColumn: 34,
+          message: 'Use of `advanceTimersByTime` is disallowed',
+          line,
+          column,
+          endLine: line,
+          endColumn: column + 19,
+        },
+      ],
+    })),
+    ...(
+      [
+        ['jest.fn()', 8],
+        ['jest["fn"]()', 10],
+      ] as const
+    ).map(([code, endColumn], index): TestCase => ({
+      name: `upstream no-restricted-jest-methods / invalid ${index}`,
+      code,
+      options: [
+        {
+          fn: null,
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2017,
+      },
+      errors: [
+        {
+          messageId: 'restrictedJestMethod',
+          message: 'Use of `fn` is disallowed',
           line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+    })),
+    ...(
+      [
+        ['jest.mock()', 10],
+        ['jest["mock"]()', 12],
+      ] as const
+    ).map(([code, endColumn], index): TestCase => ({
+      name: `upstream no-restricted-jest-methods / invalid ${index + 2}`,
+      code,
+      options: [
+        {
+          mock: 'Do not use mocks',
+        },
+      ],
+      languageOptions: {
+        ecmaVersion: 2017,
+      },
+      errors: [
+        {
+          messageId: 'restrictedJestMethodWithMessage',
+          message: 'Do not use mocks',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn,
+        },
+      ],
+    })),
+    {
+      name: 'upstream no-restricted-jest-methods / invalid 4',
+      code: `import { jest } from '@jest/globals';
+
+jest.advanceTimersByTime();`,
+      options: [
+        {
+          advanceTimersByTime: null,
+        },
+      ],
+      languageOptions: {
+        sourceType: 'module',
+        ecmaVersion: 2017,
+      },
+      errors: [
+        {
+          messageId: 'restrictedJestMethod',
+          message: 'Use of `advanceTimersByTime` is disallowed',
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 25,
         },
       ],
     },
