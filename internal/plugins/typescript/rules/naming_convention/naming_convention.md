@@ -186,6 +186,18 @@ When no options are provided, the rule uses the following defaults:
 ]
 ```
 
+## Differences from upstream
+
+Rslint honors `types` for `autoAccessor` and for auto-accessors matched by
+`accessor`, consistently with the documented type filters. typescript-eslint
+v8.67.0 accepts these options but omits auto-accessors from its type-checking
+branch, so it applies the convention regardless of the accessor's type.
+
+For example, with `{ "selector": "autoAccessor", "types": ["string"],
+"format": ["camelCase"] }`, Rslint accepts `class C { accessor numeric_name = 1; }`
+and reports `class C { accessor string_name = "value"; }`. Upstream v8.67.0
+reports both. As with other `types` filters, this requires type information.
+
 ## Original Documentation
 
 - [typescript-eslint: naming-convention](https://typescript-eslint.io/rules/naming-convention)

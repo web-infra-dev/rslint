@@ -116,15 +116,15 @@ const (
 	selectorVariable selectorKind = 1 << iota
 	selectorFunction
 	selectorParameter
-	selectorClassProperty
-	selectorObjectLiteralProperty
-	selectorTypeProperty
 	selectorParameterProperty
+	selectorClassicAccessor
 	selectorEnumMember
 	selectorClassMethod
 	selectorObjectLiteralMethod
 	selectorTypeMethod
-	selectorClassicAccessor
+	selectorClassProperty
+	selectorObjectLiteralProperty
+	selectorTypeProperty
 	selectorAutoAccessor
 	selectorClass
 	selectorInterface
@@ -140,12 +140,12 @@ const (
 	selectorMemberLike   = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty |
 		selectorParameterProperty | selectorEnumMember | selectorClassMethod | selectorObjectLiteralMethod |
 		selectorTypeMethod | selectorClassicAccessor | selectorAutoAccessor
-	selectorTypeLike        = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
-	selectorMethod          = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
-	selectorProperty        = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
-	selectorAccessor        = selectorClassicAccessor | selectorAutoAccessor
-	selectorDefault         = selectorVariableLike | selectorMemberLike | selectorTypeLike | selectorImport
-	selectorUnusedSupported = selectorVariableLike | selectorTypeLike
+	selectorTypeLike                     = selectorClass | selectorInterface | selectorTypeAlias | selectorEnum | selectorTypeParameter
+	selectorMethod                       = selectorClassMethod | selectorObjectLiteralMethod | selectorTypeMethod
+	selectorProperty                     = selectorClassProperty | selectorObjectLiteralProperty | selectorTypeProperty
+	selectorAccessor                     = selectorClassicAccessor | selectorAutoAccessor
+	selectorDefault         selectorKind = -1
+	selectorUnusedSupported              = selectorVariableLike | selectorTypeLike
 )
 
 func parseSelectorKind(s string) (selectorKind, bool) {
@@ -318,6 +318,7 @@ type normalizedSelector struct {
 	selector           selectorKind
 	modifiers          modifierKind
 	types              typeModifierKind
+	typesConfigured    bool
 	filter             *matchRegex
 	format             []predefinedFormat // nil means "no format check" (format: null)
 	formatNull         bool
@@ -628,8 +629,8 @@ func parseOptions(options []any) []normalizedSelector {
 			return aMethodOrProperty
 		}
 
-		// Fewer bits = a narrower/more specific group.
-		return bitCount(int(a.selector)) < bitCount(int(b.selector))
+		// Upstream orders remaining selectors by their numeric bitmask.
+		return a.selector > b.selector
 	})
 
 	return selectors
@@ -776,6 +777,7 @@ func parseOneSelector(optMap map[string]interface{}) []normalizedSelector {
 			selector:           sk,
 			modifiers:          mods,
 			types:              selectorTypes,
+			typesConfigured:    optMap["types"] != nil,
 			filter:             filter,
 			format:             formats,
 			formatNull:         formatNull,
@@ -961,8 +963,50 @@ func satisfyCustomMessage(typeName, name string, regexMatch bool, regex string) 
 	}
 	return rule.RuleMessage{
 		Id:          "satisfyCustom",
-		Description: fmt.Sprintf("%s name `%s` must %s the RegExp: /%s/u", typeName, name, matchStr, regex),
+		Description: fmt.Sprintf("%s name `%s` must %s the RegExp: /%s/u", typeName, name, matchStr, regexpSourceForMessage(regex)),
 	}
+}
+
+// RegExp.prototype.source escapes literal slashes and line terminators even
+// when the option was supplied as a string rather than a regexp literal.
+func regexpSourceForMessage(pattern string) string {
+	if pattern == "" {
+		return "(?:)"
+	}
+	var result strings.Builder
+	escaped := false
+	inClass := false
+	for _, char := range pattern {
+		switch char {
+		case '[':
+			if !escaped {
+				inClass = true
+			}
+			result.WriteRune(char)
+		case ']':
+			if !escaped {
+				inClass = false
+			}
+			result.WriteRune(char)
+		case '/':
+			if !escaped && !inClass {
+				result.WriteByte('\\')
+			}
+			result.WriteRune(char)
+		case '\n':
+			result.WriteString(`\n`)
+		case '\r':
+			result.WriteString(`\r`)
+		case '\u2028':
+			result.WriteString(`\u2028`)
+		case '\u2029':
+			result.WriteString(`\u2029`)
+		default:
+			result.WriteRune(char)
+		}
+		escaped = char == '\\' && !escaped
+	}
+	return result.String()
 }
 
 func unexpectedUnderscoreMessage(typeName, name, position string) rule.RuleMessage {
@@ -1144,14 +1188,10 @@ func validateUnderscore(position string, processedName string, typeName string, 
 		if isLeading {
 			if strings.HasPrefix(processedName, "__") {
 				processedName = processedName[2:]
-			} else if len(processedName) > 0 && processedName[0] == '_' {
-				processedName = processedName[1:]
 			}
 		} else {
 			if strings.HasSuffix(processedName, "__") {
 				processedName = processedName[:len(processedName)-2]
-			} else if len(processedName) > 0 && processedName[len(processedName)-1] == '_' {
-				processedName = processedName[:len(processedName)-1]
 			}
 		}
 	case underscoreAllowSingleOrDouble:
@@ -1177,120 +1217,50 @@ func validateUnderscore(position string, processedName string, typeName string, 
 // ---- Type checking helpers ----
 
 func isCorrectType(ch *checker.Checker, node *ast.Node, types typeModifierKind) bool {
-	if types == 0 || ch == nil {
-		return true
+	if ch == nil {
+		return false
 	}
-
-	t := ch.GetTypeAtLocation(node)
+	t := ch.GetNonNullableType(ch.GetTypeAtLocation(node))
 	if t == nil {
 		return false
 	}
-
 	return checkTypeMatch(ch, t, types)
 }
 
 func checkTypeMatch(ch *checker.Checker, t *checker.Type, types typeModifierKind) bool {
-	if types&typeModBoolean != 0 {
-		if isBooleanLikeType(t) {
-			return true
+	if types&(typeModBoolean|typeModString|typeModNumber) != 0 {
+		base := checker.Checker_getWidenedType(ch, checker.Checker_getBaseTypeOfLiteralType(ch, t))
+		switch ch.TypeToString(base) {
+		case "boolean":
+			if types&typeModBoolean != 0 {
+				return true
+			}
+		case "string":
+			if types&typeModString != 0 {
+				return true
+			}
+		case "number":
+			if types&typeModNumber != 0 {
+				return true
+			}
 		}
 	}
-	if types&typeModString != 0 {
-		if isStringLikeType(t) {
-			return true
-		}
-	}
-	if types&typeModNumber != 0 {
-		if isNumberLikeType(t) {
-			return true
-		}
-	}
-	if types&typeModFunction != 0 {
-		if isFunctionLikeType(ch, t) {
-			return true
-		}
-	}
-	if types&typeModArray != 0 {
-		if isArrayLikeType(ch, t) {
-			return true
-		}
-	}
-	return false
-}
-
-func isBooleanLikeType(t *checker.Type) bool {
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsBooleanLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return true
-	}
-	if utils.IsUnionType(t) {
+	allPartsMatch := func(matches func(*checker.Type) bool) bool {
 		for _, part := range utils.UnionTypeParts(t) {
-			if !utils.IsTypeFlagSet(part, checker.TypeFlagsBooleanLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
+			if !matches(part) {
 				return false
 			}
 		}
 		return true
 	}
-	return false
-}
-
-func isStringLikeType(t *checker.Type) bool {
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
+	if types&typeModFunction != 0 && allPartsMatch(func(part *checker.Type) bool {
+		return len(utils.GetCallSignatures(ch, part)) > 0
+	}) {
 		return true
 	}
-	if utils.IsUnionType(t) {
-		for _, part := range utils.UnionTypeParts(t) {
-			if !utils.IsTypeFlagSet(part, checker.TypeFlagsStringLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-
-func isNumberLikeType(t *checker.Type) bool {
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNumberLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return true
-	}
-	if utils.IsUnionType(t) {
-		for _, part := range utils.UnionTypeParts(t) {
-			if !utils.IsTypeFlagSet(part, checker.TypeFlagsNumberLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-
-func isFunctionLikeType(ch *checker.Checker, t *checker.Type) bool {
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return true
-	}
-	if utils.IsUnionType(t) {
-		for _, part := range utils.UnionTypeParts(t) {
-			if !isFunctionLikeType(ch, part) {
-				return false
-			}
-		}
-		return true
-	}
-	return len(utils.GetCallSignatures(ch, t)) > 0
-}
-
-func isArrayLikeType(ch *checker.Checker, t *checker.Type) bool {
-	if utils.IsTypeFlagSet(t, checker.TypeFlagsNull|checker.TypeFlagsUndefined) {
-		return true
-	}
-	if utils.IsUnionType(t) {
-		for _, part := range utils.UnionTypeParts(t) {
-			if !isArrayLikeType(ch, part) {
-				return false
-			}
-		}
-		return true
-	}
-	return checker.Checker_isArrayType(ch, t) || checker.Checker_isArrayOrTupleType(ch, t)
+	return types&typeModArray != 0 && allPartsMatch(func(part *checker.Type) bool {
+		return checker.Checker_isArrayOrTupleType(ch, part)
+	})
 }
 
 // ---- Modifier detection helpers ----
@@ -1301,11 +1271,41 @@ func getModifiers(
 	nameNode *ast.Node,
 	sel selectorKind,
 	name string,
-	reExportedNames map[string]bool,
+	reExportedNames map[*ast.Symbol]bool,
 	destructured bool,
 	refInfo *referencedInfo,
 	needed modifierKind,
 ) modifierKind {
+	// Group selectors may request modifiers absent from some member kinds.
+	// Preserve the modifiers attached by each upstream visitor, rather than
+	// deriving additional ones from unrelated TypeScript declaration flags.
+	switch sel {
+	case selectorVariable:
+		needed &= modifierConst | modifierGlobal | modifierExported | modifierUnused | modifierAsync | modifierDestructured
+	case selectorFunction:
+		needed &= modifierGlobal | modifierExported | modifierUnused | modifierAsync
+	case selectorParameter:
+		needed &= modifierUnused | modifierDestructured
+	case selectorClass:
+		needed &= modifierAbstract | modifierExported | modifierUnused
+	case selectorInterface, selectorTypeAlias, selectorEnum:
+		needed &= modifierExported | modifierUnused
+	case selectorTypeParameter:
+		needed &= modifierUnused
+	case selectorEnumMember:
+		needed &= modifierRequiresQuotes
+	case selectorTypeMethod:
+		needed &= modifierPublic | modifierRequiresQuotes
+	case selectorTypeProperty:
+		needed &= modifierPublic | modifierReadonly | modifierRequiresQuotes
+	case selectorObjectLiteralProperty:
+		needed &= modifierPublic | modifierRequiresQuotes
+	case selectorObjectLiteralMethod:
+		needed &= modifierPublic | modifierRequiresQuotes | modifierAsync
+	case selectorImport:
+		needed &= modifierDefault | modifierNamespace
+	}
+
 	var mods modifierKind
 
 	const flagModifiers = modifierPublic | modifierProtected | modifierPrivate |
@@ -1349,6 +1349,7 @@ func getModifiers(
 		switch node.Kind {
 		case ast.KindPropertyDeclaration:
 			if init := node.AsPropertyDeclaration().Initializer; init != nil {
+				init = ast.SkipParentheses(init)
 				if ast.IsArrowFunction(init) || ast.IsFunctionExpression(init) {
 					if ast.GetCombinedModifierFlags(init)&ast.ModifierFlagsAsync != 0 {
 						mods |= modifierAsync
@@ -1357,6 +1358,7 @@ func getModifiers(
 			}
 		case ast.KindPropertyAssignment:
 			if init := node.AsPropertyAssignment().Initializer; init != nil {
+				init = ast.SkipParentheses(init)
 				if ast.IsArrowFunction(init) || ast.IsFunctionExpression(init) {
 					if ast.GetCombinedModifierFlags(init)&ast.ModifierFlagsAsync != 0 {
 						mods |= modifierAsync
@@ -1365,6 +1367,7 @@ func getModifiers(
 			}
 		case ast.KindVariableDeclaration:
 			if init := node.AsVariableDeclaration().Initializer; init != nil {
+				init = ast.SkipParentheses(init)
 				if ast.IsArrowFunction(init) || ast.IsFunctionExpression(init) {
 					if ast.GetCombinedModifierFlags(init)&ast.ModifierFlagsAsync != 0 {
 						mods |= modifierAsync
@@ -1395,7 +1398,7 @@ func getModifiers(
 	}
 
 	// Export check (direct export or re-export via export { ... })
-	if needed&modifierExported != 0 && (isExported(node, flags) || reExportedNames[name]) {
+	if needed&modifierExported != 0 && (isExported(node, flags) || reExportedNames[utils.BindingNameSymbol(nameNode)]) {
 		mods |= modifierExported
 	}
 
@@ -1455,8 +1458,8 @@ func getModifiers(
 		case ast.KindImportSpecifier:
 			// `import { default as Foo } from ...` is also a default import
 			importSpec := node.AsImportSpecifier()
-			if needed&modifierDefault != 0 && importSpec.PropertyName != nil && importSpec.PropertyName.Kind == ast.KindIdentifier {
-				if importSpec.PropertyName.AsIdentifier().Text == "default" {
+			if needed&modifierDefault != 0 && importSpec.PropertyName != nil {
+				if importSpec.PropertyName.Kind == ast.KindStringLiteral || importSpec.PropertyName.Text() == "default" {
 					mods |= modifierDefault
 				}
 			}
@@ -1506,6 +1509,9 @@ func isGlobalScope(node *ast.Node) bool {
 		if declList != nil && declList.Kind == ast.KindVariableDeclarationList {
 			varStmt := declList.Parent
 			if varStmt != nil {
+				if (ast.IsForInOrOfStatement(varStmt) || varStmt.Kind == ast.KindForStatement) && declList.Flags&ast.NodeFlagsBlockScoped != 0 {
+					return false
+				}
 				return isTopLevelScope(varStmt.Parent)
 			}
 		}
@@ -1519,7 +1525,7 @@ func isTopLevelScope(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return node.Kind == ast.KindSourceFile || node.Kind == ast.KindModuleBlock
+	return node.Kind == ast.KindSourceFile
 }
 
 type referencedInfo struct {
@@ -1615,7 +1621,35 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 	}
 	if refInfo.refs != nil {
 		symbol := utils.BindingNameSymbol(nameNode)
-		return symbol != nil && len(refInfo.refs.References(symbol)) == 0
+		if symbol == nil {
+			return false
+		}
+		declaration := nameNode.Parent
+		if declaration.Kind == ast.KindVariableDeclaration && declaration.Parent != nil && declaration.Parent.Parent != nil &&
+			ast.IsForInOrOfStatement(declaration.Parent.Parent) && namingLoopReturns(declaration.Parent.Parent) {
+			return false
+		}
+		if declaration.Kind == ast.KindFunctionExpression || declaration.Kind == ast.KindClassExpression {
+			return false
+		}
+		for parent := declaration; parent != nil; parent = parent.Parent {
+			if parent.Kind == ast.KindParameter {
+				owner := parent.Parent
+				if nameNode.Text() == "this" || owner.Kind == ast.KindSetAccessor || owner.Body() == nil {
+					return false
+				}
+				break
+			}
+			if ast.IsFunctionLikeDeclaration(parent) {
+				break
+			}
+		}
+		for _, reference := range refInfo.refs.References(symbol) {
+			if isNamingRead(reference, symbol, refInfo.refs) {
+				return false
+			}
+		}
+		return true
 	}
 	if ctx.TypeChecker == nil {
 		return false
@@ -1638,6 +1672,130 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 	}
 
 	return true
+}
+
+// isNamingRead mirrors collectVariables' distinction between a reference
+// and a use: writes, discarded self-updates, type queries and recursive
+// references inside the binding's own definition do not make it used.
+func isNamingRead(reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) bool {
+	if ast.IsPartOfTypeQuery(reference) {
+		return false
+	}
+	for node := reference; node != nil && (ast.IsIdentifier(node) || node.Kind == ast.KindQualifiedName); node = node.Parent {
+		if node.Parent != nil && node.Parent.Kind == ast.KindTypePredicate {
+			return false
+		}
+	}
+	for _, declaration := range symbol.Declarations {
+		container := declaration
+		if declaration.Kind == ast.KindVariableDeclaration {
+			container = ast.SkipParentheses(declaration.Initializer())
+			if container == nil || (!ast.IsArrowFunction(container) && !ast.IsFunctionExpression(container)) {
+				continue
+			}
+		} else {
+			switch declaration.Kind {
+			case ast.KindFunctionDeclaration, ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration, ast.KindClassDeclaration:
+			default:
+				continue
+			}
+		}
+		if reference.Pos() >= container.Pos() && reference.End() <= container.End() {
+			return false
+		}
+	}
+	if utils.IsWriteReference(reference) {
+		target := ast.GetAssignmentTarget(reference)
+		if target != nil {
+			if target.Kind == ast.KindBinaryExpression {
+				op := target.AsBinaryExpression().OperatorToken.Kind
+				if op == ast.KindEqualsToken {
+					return false
+				}
+				if op == ast.KindAmpersandAmpersandEqualsToken || op == ast.KindBarBarEqualsToken || op == ast.KindQuestionQuestionEqualsToken {
+					return true
+				}
+			}
+			if ast.IsForInOrOfStatement(target) {
+				return target.Initializer() == reference && namingLoopReturns(target)
+			}
+			if unusedNamingExpression(target) {
+				return false
+			}
+		}
+	}
+	// In an ordinary discarded assignment, reading the binding only to
+	// compute its new value is a self-use. A read in another function or
+	// a loop can consume a value written by an earlier execution.
+	if len(symbol.Declarations) == 0 || namingExecutionScope(reference) != namingExecutionScope(symbol.Declarations[0]) {
+		return true
+	}
+	for parent := reference.Parent; parent != nil; parent = parent.Parent {
+		if ast.IsIterationStatement(parent, false) {
+			return true
+		}
+		if ast.IsFunctionLikeDeclaration(parent) {
+			break
+		}
+	}
+
+	for parent := reference.Parent; parent != nil; parent = parent.Parent {
+		if ast.IsFunctionLikeDeclaration(parent) || ast.IsIterationStatement(parent, false) {
+			break
+		}
+		if parent.Kind != ast.KindBinaryExpression {
+			continue
+		}
+		binary := parent.AsBinaryExpression()
+		if binary.OperatorToken.Kind != ast.KindEqualsToken || !unusedNamingExpression(parent) {
+			continue
+		}
+		left := ast.SkipParentheses(binary.Left)
+		if ast.IsIdentifier(left) && refs.ResolveInFile(left) == symbol && reference.Pos() >= binary.Right.Pos() && reference.End() <= binary.Right.End() {
+			return false
+		}
+	}
+	return true
+}
+
+func namingExecutionScope(node *ast.Node) *ast.Node {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		if ast.IsFunctionLikeDeclaration(parent) || parent.Kind == ast.KindSourceFile || parent.Kind == ast.KindClassStaticBlockDeclaration || parent.Kind == ast.KindModuleBlock {
+			return parent
+		}
+	}
+	return nil
+}
+
+func namingLoopReturns(loop *ast.Node) bool {
+	body := loop.AsForInOrOfStatement().Statement
+	if body != nil && body.Kind == ast.KindBlock {
+		statements := body.AsBlock().Statements
+		if statements == nil || len(statements.Nodes) != 1 {
+			return false
+		}
+		body = statements.Nodes[0]
+	}
+	return body != nil && body.Kind == ast.KindReturnStatement
+}
+
+func unusedNamingExpression(node *ast.Node) bool {
+	for node.Parent != nil {
+		parent := node.Parent
+		if ast.IsParenthesizedExpression(parent) {
+			node = parent
+			continue
+		}
+		if parent.Kind == ast.KindBinaryExpression && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
+			if parent.AsBinaryExpression().Left == node {
+				return true
+			}
+			node = parent
+			continue
+		}
+		return parent.Kind == ast.KindExpressionStatement
+	}
+	return false
 }
 
 func isConstVariable(node *ast.Node) bool {
@@ -1849,7 +2007,7 @@ func getIdentifiersFromBindingPattern(pattern *ast.Node, result []identifierInfo
 			// considered destructured, matching the original ESLint rule behavior.
 			// e.g., `{ foo }` → destructured, `{ bar: foo }` → NOT, `[foo]` → NOT.
 			isDestructuredBinding := pattern.Kind == ast.KindObjectBindingPattern &&
-				elem.AsBindingElement().PropertyName == nil
+				elem.AsBindingElement().PropertyName == nil && elem.AsBindingElement().DotDotDotToken == nil
 			switch nameNode.Kind {
 			case ast.KindIdentifier:
 				result = append(result, identifierInfo{
@@ -2067,7 +2225,7 @@ func getIdentifiersFromPropertyDeclaration(ctx rule.RuleContext, node *ast.Node,
 	// Check if the property has a function value (making it a method-like property)
 	propDecl := node.AsPropertyDeclaration()
 	if propDecl.Initializer != nil {
-		if ast.IsArrowFunction(propDecl.Initializer) || ast.IsFunctionExpression(propDecl.Initializer) {
+		if ast.IsArrowFunction(ast.SkipParentheses(propDecl.Initializer)) || ast.IsFunctionExpression(ast.SkipParentheses(propDecl.Initializer)) {
 			return append(result, identifierInfo{
 				name:     name,
 				node:     nameNode,
@@ -2141,7 +2299,7 @@ func getIdentifiersFromPropertySignature(ctx rule.RuleContext, node *ast.Node, r
 	// If so, classify as typeMethod instead of typeProperty
 	sel := selectorTypeProperty
 	propSig := node.AsPropertySignatureDeclaration()
-	if propSig.Type != nil && propSig.Type.Kind == ast.KindFunctionType {
+	if propSig.Type != nil && ast.SkipTypeParentheses(propSig.Type).Kind == ast.KindFunctionType {
 		sel = selectorTypeMethod
 	}
 
@@ -2183,7 +2341,7 @@ func getIdentifiersFromPropertyAssignment(ctx rule.RuleContext, node *ast.Node, 
 
 	propAssignment := node.AsPropertyAssignment()
 	if propAssignment.Initializer != nil {
-		if ast.IsArrowFunction(propAssignment.Initializer) || ast.IsFunctionExpression(propAssignment.Initializer) {
+		if ast.IsArrowFunction(ast.SkipParentheses(propAssignment.Initializer)) || ast.IsFunctionExpression(ast.SkipParentheses(propAssignment.Initializer)) {
 			return append(result, identifierInfo{
 				name:     name,
 				node:     nameNode,
@@ -2232,8 +2390,8 @@ func getIdentifiersFromImportSpecifier(node *ast.Node, result []identifierInfo) 
 	// `import { default as foo }` is a default import (propertyName is "default").
 	// `import { foo }` is a named import and should NOT be matched by the import selector.
 	isDefaultImport := importSpec.PropertyName != nil &&
-		importSpec.PropertyName.Kind == ast.KindIdentifier &&
-		importSpec.PropertyName.AsIdentifier().Text == "default"
+		(importSpec.PropertyName.Kind == ast.KindStringLiteral ||
+			(importSpec.PropertyName.Kind == ast.KindIdentifier && importSpec.PropertyName.AsIdentifier().Text == "default"))
 	if !isDefaultImport {
 		return result
 	}
@@ -2264,48 +2422,44 @@ func getIdentifiersFromNamespaceImport(node *ast.Node, result []identifierInfo) 
 
 // ---- Re-export name collection ----
 
-func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
-	reExported := make(map[string]bool)
-	if ctx.SourceFile == nil || ctx.SourceFile.Statements == nil {
-		return reExported
+func collectReExportedNames(ctx rule.RuleContext) map[*ast.Symbol]bool {
+	exported := make(map[*ast.Symbol]bool)
+	if ctx.Refs == nil {
+		return exported
 	}
-	for _, stmt := range ctx.SourceFile.Statements.Nodes {
-		if stmt.Kind != ast.KindExportDeclaration {
-			continue
-		}
-		ed := stmt.AsExportDeclaration()
-		if ed == nil || ed.ExportClause == nil {
-			continue
-		}
-		// Only handle named exports without a module specifier (re-exports of local names)
-		if ed.ModuleSpecifier != nil {
-			continue
-		}
-		if ed.ExportClause.Kind != ast.KindNamedExports {
-			continue
-		}
-		namedExports := ed.ExportClause.AsNamedExports()
-		if namedExports == nil || namedExports.Elements == nil {
-			continue
-		}
-		for _, element := range namedExports.Elements.Nodes {
-			spec := element.AsExportSpecifier()
-			if spec == nil {
-				continue
-			}
-			// The local name is PropertyName if aliased, otherwise Name
-			var localName *ast.Node
-			if spec.PropertyName != nil {
-				localName = spec.PropertyName
-			} else {
-				localName = spec.Name()
-			}
-			if localName != nil && localName.Kind == ast.KindIdentifier {
-				reExported[localName.AsIdentifier().Text] = true
+	mark := func(name *ast.Node) {
+		if name != nil && name.Kind == ast.KindIdentifier {
+			if symbol := ctx.Refs.ResolveInFile(name); symbol != nil {
+				exported[symbol] = true
 			}
 		}
 	}
-	return reExported
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		switch node.Kind {
+		case ast.KindExportAssignment:
+			assignment := node.AsExportAssignment()
+			if !assignment.IsExportEquals {
+				mark(ast.SkipParentheses(assignment.Expression))
+			}
+		case ast.KindExportDeclaration:
+			declaration := node.AsExportDeclaration()
+			if declaration.ModuleSpecifier == nil && declaration.ExportClause != nil && ast.IsNamedExports(declaration.ExportClause) {
+				for _, specifier := range declaration.ExportClause.AsNamedExports().Elements.Nodes {
+					spec := specifier.AsExportSpecifier()
+					name := spec.Name()
+					if spec.PropertyName != nil {
+						name = spec.PropertyName
+					}
+					mark(name)
+				}
+			}
+		case ast.KindSourceFile, ast.KindModuleDeclaration, ast.KindModuleBlock:
+			node.ForEachChild(func(child *ast.Node) bool { visit(child); return false })
+		}
+	}
+	visit(ctx.SourceFile.AsNode())
+	return exported
 }
 
 // ---- Main run function ----
@@ -2318,7 +2472,7 @@ func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return nil
 	}
 
-	var reExportedNames map[string]bool
+	var reExportedNames map[*ast.Symbol]bool
 	if parsed.allModifiers&modifierExported != 0 {
 		reExportedNames = collectReExportedNames(ctx)
 	}
@@ -2370,7 +2524,7 @@ func validateIdentifier(
 	id identifierInfo,
 	selectors []normalizedSelector,
 	originalNode *ast.Node,
-	reExportedNames map[string]bool,
+	reExportedNames map[*ast.Symbol]bool,
 	referencedInfo *referencedInfo,
 	neededMods modifierKind,
 ) {
@@ -2411,7 +2565,7 @@ func validateIdentifier(
 		}
 
 		// Check type match
-		if sel.types != 0 {
+		if sel.typesConfigured && selectorSupportsTypes(id.selector) {
 			if !isCorrectType(ctx.TypeChecker, id.node, sel.types) {
 				continue
 			}
@@ -2424,7 +2578,7 @@ func validateIdentifier(
 		// This selector matches - validate the name
 		result := validate(id.name, sel, idMods, id.selector)
 		if !result.valid && result.message != nil {
-			ctx.ReportNode(id.node, *result.message)
+			ctx.ReportRange(utils.GetESTreeBindingIdentifierRange(ctx.SourceFile, id.node), *result.message)
 		}
 
 		// First matching selector wins (most specific first due to sorting)
