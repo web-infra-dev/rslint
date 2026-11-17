@@ -1,6 +1,9 @@
 package no_deprecated
 
+// cspell:ignore deprecatedish
+
 import (
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -992,4 +995,340 @@ b;
 			t.Fatalf("expected only a to be reported, got %#v", diagnostics[0].Message)
 		}
 	})
+}
+
+// Independently checked against typescript-eslint v8.72.2 and TypeScript 6.0.2.
+func TestNoDeprecatedAdditionalParity(t *testing.T) {
+	type expected struct {
+		id, message string
+		start, end  int
+	}
+	for _, tc := range []struct {
+		name, code string
+		options    any
+		node16     bool
+		want       []expected
+	}{
+		{name: "nearby-reason", code: `/** @deprecated unrelated reason */ const first = 1;
+/** @deprecated */ const second = 2;
+second;`, want: []expected{{"deprecated", "`second` is deprecated.", 90, 96}}},
+		{name: "nested-reason", code: `/** @deprecated outer */ class Old {
+/** @deprecated inner */ method() {}
+}
+new Old();`, want: []expected{{"deprecatedWithReason", "`Old` is deprecated. outer", 80, 83}}},
+		{name: "tag-boundary", code: `/** @deprecatedish no */ const x=1;
+x;`, want: []expected{}},
+		{name: "tag-in-prose", code: `/** This mentions @deprecated in prose. */ const x=1;
+x;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. in prose.", 54, 55}}},
+		{name: "tag-followed-by-return", code: `/** @deprecated old
+ * @returns current
+ */ function old() {}
+old();`, want: []expected{{"deprecatedWithReason", "`old` is deprecated. old", 62, 65}}},
+		{name: "multiple-declarations", code: `/** @deprecated reason */ const first=1, second=2;
+first; second;`, want: []expected{{"deprecatedWithReason", "`first` is deprecated. reason", 51, 56}}},
+		{name: "array-binding", code: `const [/** @deprecated local */ x] = [1];
+x;`, want: []expected{}},
+		{name: "shadowing", code: `/** @deprecated old */ const x=1;
+function f(x:number){return {x};}
+x;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. old", 68, 69}}},
+		{name: "shorthand", code: `/** @deprecated reason */ const x=1;
+const o={x};`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. reason", 46, 47}}},
+		{name: "selected-overload", code: `/** @deprecated old */ function f(x:0):void;
+function f(x:1):void;
+function f(x:number){}
+f(1);f(0);`, want: []expected{{"deprecatedWithReason", "`f` is deprecated. old", 95, 96}}},
+		{name: "paren-callee", code: `/** @deprecated old */ function f(x:0):void;
+function f(x:1):void;
+function f(x:number){}
+(f)(1);(f)(0);`, want: []expected{{"deprecatedWithReason", "`f` is deprecated. old", 98, 99}}},
+		{name: "empty-reason-overload", code: `/** @deprecated unrelated */ function f(x:0):void;
+/** @deprecated */ function f(x:1):void;
+function f(x:number){}
+f(1);`, want: []expected{{"deprecated", "`f` is deprecated.", 115, 116}}},
+		{name: "computed-overload", code: `interface A {
+/** @deprecated old */ m(x:0):void;
+m(x:1):void;
+}
+declare const a:A; a['m'](1);`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. old", 86, 89}}},
+		{name: "computed-key-reference", code: `/** @deprecated key */ const k='x';
+const a={x:1};a[k];`, want: []expected{}},
+		{name: "computed-empty-key", code: `const a={
+/** @deprecated empty */ '':1
+};a[''];`, want: []expected{{"deprecatedWithReason", "`` is deprecated. empty", 44, 46}}},
+		{name: "private-field", code: `class C {
+/** @deprecated secret */ #x=1;
+f(){return this.#x;}
+}`, want: []expected{{"deprecatedWithReason", "`#x` is deprecated. secret", 58, 60}}},
+		{name: "inheritance", code: `class A {
+/** @deprecated parent */ m(){}
+}
+class B extends A {m(){}}
+new B().m();`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. parent", 78, 79}}},
+		{name: "contextual-method", code: `interface A {
+/** @deprecated old */ m():void;
+}
+const a:A={m(){}};`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. old", 60, 61}}},
+		{name: "contextual-getter", code: `interface A {
+/** @deprecated old */ x:number;
+}
+const a:A={get x(){return 1;}};`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. old", 64, 65}}},
+		{name: "contextual-shorthand-double", code: `interface A {
+/** @deprecated property */ x:number;
+}
+/** @deprecated variable */ const x=1;
+const a:A={x};`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. property", 104, 105}, {"deprecatedWithReason", "`x` is deprecated. variable", 104, 105}}},
+		{name: "contextual-computed-expression", code: `interface A {
+/** @deprecated property */ x:number;
+}
+const key='x';const a:A={[key]:1};`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. property", 80, 83}}},
+		{name: "binding-rename-same", code: `const a={
+/** @deprecated property */ x:1
+};const {x:x}=a;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. property", 51, 52}}},
+		{name: "binding-rest", code: `const a={
+/** @deprecated property */ x:1
+};const {...x}=a;`, want: []expected{}},
+		{name: "binding-default", code: `const a={
+/** @deprecated property */ x:1
+};const {x=1}=a;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. property", 51, 52}}},
+		{name: "qualified-type", code: `namespace N {
+/** @deprecated old */ export type T=string;
+}
+type X=N.T;`, want: []expected{{"deprecatedWithReason", "`T` is deprecated. old", 70, 71}}},
+		{name: "jsx-closing-member", code: `namespace N {
+/** @deprecated old */ export function C(){return null;}
+}
+const x=<N.C></N.C>;`, want: []expected{{"deprecatedWithReason", "`C` is deprecated. old", 84, 85}, {"deprecatedWithReason", "`C` is deprecated. old", 90, 91}}},
+		{name: "jsdoc-multiple", code: `/** @deprecated first */
+/** @deprecated second */
+const x=1;x;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. second", 61, 62}}},
+		{name: "long-reason", code: `/** @deprecated First line
+ *
+ * Last line
+ */const x=1;x;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. First line\n\nLast line", 56, 57}}},
+		{name: "inheritance-local-tag-blocks", code: `class A {
+/** @deprecated parent */ m(){}
+}
+class B extends A {
+/** @returns nothing */ m(){}
+}
+new B().m();`, want: []expected{}},
+		{name: "inheritance-local-reason", code: `class A {
+/** @deprecated parent */ m(){}
+}
+class B extends A {
+/** @deprecated child */ m(){}
+}
+new B().m();`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. child", 105, 106}}},
+		{name: "inheritance-explicit-tag", code: `class A {
+/** @deprecated parent */ m(){}
+}
+class B extends A {
+/** @inheritDoc
+ * @deprecated child */ m(){}
+}
+new B().m();`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. parent", 120, 121}}},
+		{name: "inheritance-interface", code: `interface A {
+/** @deprecated interface */ m():void;
+}
+class B implements A {m(){}}
+new B().m();`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. interface", 92, 93}}},
+		{name: "inheritance-static", code: `class A {
+/** @deprecated static */ static m(){}
+}
+class B extends A {static m(){}}
+B.m();`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. static", 86, 87}}},
+		{name: "inheritance-getter", code: `class A {
+/** @deprecated getter */ get x(){return 1;}
+set x(v:number){}
+}
+class B extends A {get x(){return 1;}}
+new B().x;`, want: []expected{{"deprecatedWithReason", "`x` is deprecated. getter", 122, 123}}},
+		{name: "inheritance-overloaded-base", code: `class A {
+/** @deprecated overload */ m(x:0):void;
+m(x:1):void;
+m(x:number){}
+}
+class B extends A {m(x:number){}}
+new B().m(0);`, want: []expected{}},
+		{name: "inheritance-recursive", code: `class A implements A {m(){}}
+new A().m();`, want: []expected{}},
+		{name: "paren-property-call", code: `class A {
+/** @deprecated zero */ m(x:0):void;
+m(x:1):void;
+m(x:number){}
+}
+const a=new A();((a.m))(1);((a.m))(0);`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. zero", 107, 108}}},
+		{name: "initializer-jsdoc", code: `const old = /** @deprecated initializer */ ()=>{};
+old();`, want: []expected{{"deprecatedWithReason", "`old` is deprecated. initializer", 51, 54}}},
+		{name: "unicode-range", code: `const text="😀"; /** @deprecated */ const 旧=1;
+旧;`, want: []expected{}},
+		{name: "unicode-reference-range", code: `/** @deprecated use new */ const 旧=1;
+const text="😀"; 旧;`, want: []expected{{"deprecatedWithReason", "`旧` is deprecated. use new", 59, 62}}},
+		{name: "previous-valid-44", code: `
+        async function fn() {
+          const d = await import('./deprecated.js');
+          d.default['foo'];
+        }
+      `, node16: true, want: []expected{}},
+		{name: "previous-valid-62", code: `
+        interface AllowedType {
+          /** @deprecated */
+          prop: string;
+        }
+
+        const obj: AllowedType = {
+          prop: 'test',
+        };
+
+        const value = obj['prop'];
+      `, options: []any{map[string]any{"allow": []any{map[string]any{"from": "file", "name": "AllowedType"}}}}, want: []expected{}},
+		{name: "previous-valid-72", code: `
+      const a = { /** @deprecated */ b: 'string' };
+      const a2 = { b: 'string' };
+
+      a2['b'];
+    `, want: []expected{}},
+		{name: "previous-valid-73", code: `
+      interface U1 {
+        /** @deprecated */
+        shared: number;
+      }
+
+      const obj: any = {};
+      obj['shared'];
+    `, want: []expected{}},
+		{name: "previous-valid-74", code: `
+        interface U2 {
+          /** @deprecated */
+          foo: number;
+        }
+
+        declare function Comp(p: any): any;
+
+        const x = <Comp foo={1} />;
+      `, want: []expected{}},
+		{name: "previous-valid-75", code: `
+declare function log(x: unknown): void;
+try {
+  log(1);
+} catch (error) {
+  log(error);
+}
+    `, want: []expected{}},
+		{name: "previous-invalid-10", code: `
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a);
+      `, want: []expected{{"deprecated", "`a` is deprecated.", 68, 69}}},
+		{name: "previous-invalid-13", code: `
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a.b);
+      `, want: []expected{{"deprecated", "`a` is deprecated.", 68, 69}}},
+		{name: "previous-invalid-14", code: `
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a?.b);
+      `, want: []expected{{"deprecated", "`a` is deprecated.", 68, 69}}},
+		{name: "previous-invalid-22", code: `
+        /** @deprecated */
+        declare const test: string;
+        const myObj = {
+          prop: test,
+          deep: {
+            prop: test,
+          },
+        };
+      `, want: []expected{{"deprecated", "`test` is deprecated.", 104, 108}, {"deprecated", "`test` is deprecated.", 146, 150}}},
+		{name: "previous-invalid-79", code: `
+        import {
+          deprecatedVariable,
+        } from './deprecated';
+
+        const foo = deprecatedVariable;
+      `, want: []expected{{"deprecated", "`deprecatedVariable` is deprecated.", 100, 118}}},
+		{name: "previous-invalid-139", code: `
+        /** @deprecated */
+        const a = 1, b = 2;
+
+        a;
+        b;
+      `, want: []expected{{"deprecated", "`a` is deprecated.", 65, 66}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			files := map[string]string{"main.tsx": tc.code,
+				"deprecated.ts": `/** @deprecated */
+export const deprecatedVariable = 1;
+/** @deprecated */
+export default {foo: 1};`,
+			}
+			if tc.node16 {
+				files["tsconfig.json"] = `{"compilerOptions":{"jsx":"preserve","module":"node16","moduleResolution":"node16","strict":true,"esModuleInterop":true,"types":[]}}`
+			}
+			got := runNoDeprecatedDiagnosticsForFiles(t, files, "main.tsx", tc.options)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %d diagnostics, want %d: %#v", len(got), len(tc.want), got)
+			}
+			for i, w := range tc.want {
+				d := got[i]
+				if d.Message.Id != w.id || d.Message.Description != w.message || d.Range.Pos() != w.start || d.Range.End() != w.end {
+					t.Errorf("diagnostic %d = %s %q [%d,%d), want %s %q [%d,%d)", i, d.Message.Id, d.Message.Description, d.Range.Pos(), d.Range.End(), w.id, w.message, w.start, w.end)
+				}
+				if d.FixesPtr != nil || d.Suggestions != nil {
+					t.Error("no-deprecated must not provide fixes or suggestions")
+				}
+			}
+		})
+	}
+}
+
+func TestNoDeprecatedLongAliasChain(t *testing.T) {
+	const code = "import { value } from './alias0';\nvalue;"
+	files := map[string]string{"main.ts": code}
+	for i := range 72 {
+		name := "alias" + strconv.Itoa(i) + ".ts"
+		if i == 71 {
+			files[name] = "export const value=1;"
+			continue
+		}
+		tag := ""
+		if i == 70 {
+			tag = "/** @deprecated deep alias */ "
+		}
+		files[name] = "export { " + tag + "value } from './alias" + strconv.Itoa(i+1) + "';"
+	}
+	got := runNoDeprecatedDiagnosticsForFiles(t, files, "main.ts", nil)
+	if len(got) != 1 {
+		t.Fatalf("got %d diagnostics, want 1", len(got))
+	}
+	d := got[0]
+	if d.Message.Id != "deprecatedWithReason" || d.Message.Description != "`value` is deprecated. deep alias" || d.Range.Pos() != len(code)-6 || d.Range.End() != len(code)-1 {
+		t.Fatalf("unexpected diagnostic: %#v", d)
+	}
+}
+
+func TestNoDeprecatedClassExpressionInheritance(t *testing.T) {
+	for _, tc := range []struct{ code, message string }{
+		{`const C=class { method(){} }; new C().method();`, ""},
+		{`class Base {
+/** @deprecated inherited */ method(){}
+}
+const C=class extends Base {method(){}};
+new C().method();`, "`method` is deprecated. inherited"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			got := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": tc.code}, "main.ts", nil)
+			if tc.message == "" {
+				if len(got) != 0 {
+					t.Fatalf("unexpected diagnostics: %#v", got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("got %d diagnostics, want 1", len(got))
+			}
+			d := got[0]
+			start := strings.LastIndex(tc.code, "method")
+			if d.Message.Id != "deprecatedWithReason" || d.Message.Description != tc.message || d.Range.Pos() != start || d.Range.End() != start+len("method") {
+				t.Fatalf("unexpected diagnostic: %#v", d)
+			}
+		})
+	}
 }
