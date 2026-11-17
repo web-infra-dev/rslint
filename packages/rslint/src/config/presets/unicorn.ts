@@ -21,7 +21,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/class-reference-in-static-methods': 'error', // not implemented
     // 'unicorn/comment-content': 'off', // not implemented
     // 'unicorn/consistent-arrow-return-style': 'off', // not implemented
-    // 'unicorn/consistent-assert': 'error', // not implemented
+    'unicorn/consistent-assert': 'error',
     // 'unicorn/consistent-boolean-name': 'error', // not implemented
     // 'unicorn/consistent-class-member-order': 'error', // not implemented
     // 'unicorn/consistent-compound-words': 'error', // not implemented
@@ -91,7 +91,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/no-document-cookie': 'error',
     // 'unicorn/no-double-comparison': 'error', // not implemented
     // 'unicorn/no-duplicate-if-branches': 'error', // not implemented
-    // 'unicorn/no-duplicate-logical-operands': 'error', // not implemented
+    'unicorn/no-duplicate-logical-operands': 'error',
     // 'unicorn/no-duplicate-loops': 'error', // not implemented
     'unicorn/no-duplicate-set-values': 'error',
     'unicorn/no-empty-file': 'error',

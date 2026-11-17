@@ -224,6 +224,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-node/rules/prefer-promises/fs.test.ts',
 
     // eslint-plugin-import
+    './tests/eslint-plugin-import/config.test.ts',
     './tests/eslint-plugin-import/rules/consistent-type-specifier-style.test.ts',
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/dynamic-import-chunkname.test.ts',
@@ -851,6 +852,7 @@ const ecosystemTests = {
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/better-dom-traversing.test.ts',
     './tests/eslint-plugin-unicorn/rules/catch-error-name.test.ts',
+    './tests/eslint-plugin-unicorn/rules/consistent-assert.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-date-clone.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-json-file-read.test.ts',
     './tests/eslint-plugin-unicorn/rules/consistent-template-literal-escape.test.ts',
@@ -884,6 +886,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-console-spaces.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-constant-zero-expression.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-duplicate-logical-operands.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-duplicate-loops.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-duplicate-set-values.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-empty-file.test.ts',
