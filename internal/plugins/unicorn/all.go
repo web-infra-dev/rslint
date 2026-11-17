@@ -3,6 +3,7 @@ package unicorn_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/better_dom_traversing"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/catch_error_name"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_assert"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_date_clone"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_json_file_read"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/consistent_template_literal_escape"
@@ -36,6 +37,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_constant_zero_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_document_cookie"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_double_comparison"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_logical_operands"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_loops"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_empty_file"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
@@ -151,6 +153,7 @@ func GetAllRules() []rule.Rule {
 		prefer_optional_catch_binding.PreferOptionalCatchBindingRule,
 		better_dom_traversing.BetterDomTraversingRule,
 		catch_error_name.CatchErrorNameRule,
+		consistent_assert.ConsistentAssertRule,
 		consistent_date_clone.ConsistentDateCloneRule,
 		consistent_json_file_read.ConsistentJSONFileReadRule,
 		consistent_template_literal_escape.ConsistentTemplateLiteralEscapeRule,
@@ -184,6 +187,7 @@ func GetAllRules() []rule.Rule {
 		no_constant_zero_expression.NoConstantZeroExpressionRule,
 		no_document_cookie.NoDocumentCookieRule,
 		no_double_comparison.NoDoubleComparisonRule,
+		no_duplicate_logical_operands.NoDuplicateLogicalOperandsRule,
 		no_duplicate_loops.NoDuplicateLoopsRule,
 		no_empty_file.NoEmptyFileRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
