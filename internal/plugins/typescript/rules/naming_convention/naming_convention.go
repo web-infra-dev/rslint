@@ -1186,13 +1186,9 @@ func validateUnderscore(position string, processedName string, typeName string, 
 	case underscoreAllowDouble:
 		// Strip double underscore if present
 		if isLeading {
-			if strings.HasPrefix(processedName, "__") {
-				processedName = processedName[2:]
-			}
+			processedName = strings.TrimPrefix(processedName, "__")
 		} else {
-			if strings.HasSuffix(processedName, "__") {
-				processedName = processedName[:len(processedName)-2]
-			}
+			processedName = strings.TrimSuffix(processedName, "__")
 		}
 	case underscoreAllowSingleOrDouble:
 		// Strip up to two underscores if present
