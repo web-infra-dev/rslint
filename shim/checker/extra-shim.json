@@ -39,7 +39,8 @@
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
-      "getTemplateTypeFromMappedType"
+      "getTemplateTypeFromMappedType",
+      "getNodeBuilder"
     ]
   },
   "ExtraFields": {

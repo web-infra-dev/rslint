@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/microsoft/TypeScript/tsc/shim/api/encoder"
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
@@ -160,7 +161,9 @@ func TestProjectionExpressionChains(t *testing.T) {
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			var builder Builder
-			data, err := builder.Build(context.Background(), source("/chain.js", fixture.text), Options{SourceType: "module"})
+			file := source("/chain.js", fixture.text)
+			options := Options{SourceType: "module"}
+			data, err := builder.Build(t.Context(), file, options)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -184,6 +187,27 @@ func TestProjectionExpressionChains(t *testing.T) {
 					t.Fatalf("typed projection lost linear storage: equal=%t aliases=%d listWords=%d", bytes.Equal(data, typed), aliases, len(builder.p.lists))
 				}
 				t.Logf("typed frame=%d bytes (identical), aliases=%d, list words=%d", len(typed), aliases, len(builder.p.lists))
+			}
+			if fixture.name == "optional" {
+				wantOrigins := len(builder.p.nodes) + 1
+				origins, err := builder.ProjectOrigins(t.Context(), file, options, encoder.GetNodeIndexTable(file))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(origins.Origins) != wantOrigins {
+					t.Fatalf("on-demand origins = %d, want %d to match the ordinary frame", len(origins.Origins), wantOrigins)
+				}
+				if len(origins.ChainAliases) != count-1 {
+					t.Fatalf("chain aliases = %d, want %d", len(origins.ChainAliases), count-1)
+				}
+				for _, alias := range origins.ChainAliases {
+					if alias.Index != alias.Origin || origins.Origins[alias.Expression] != alias.Origin {
+						t.Fatalf("chain alias lost its original compiler identity: %+v", alias)
+					}
+					if _, ok := origins.Reverse[alias.Index]; ok {
+						t.Fatalf("reverse map retained a reclaimed frame ID for %+v", alias)
+					}
+				}
 			}
 
 		})

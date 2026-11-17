@@ -38,6 +38,11 @@ type NodeRequest struct {
 	Op   Operation `json:"-"`
 	Node NodeRef   `json:"node"`
 }
+type ResolvedSignatureRequest struct {
+	Node           NodeRef `json:"node"`
+	WithCandidates bool    `json:"withCandidates"`
+	ArgumentCount  *int    `json:"argumentCount"`
+}
 type TypeRequest struct {
 	Op Operation `json:"-"`
 	ID uint32    `json:"id"`
@@ -45,6 +50,11 @@ type TypeRequest struct {
 type SymbolRequest struct {
 	Op Operation `json:"-"`
 	ID uint32    `json:"id"`
+}
+type SymbolDocsRequest struct {
+	Op          Operation `json:"-"`
+	ID          uint32    `json:"id"`
+	WithChecker bool      `json:"withChecker"`
 }
 type SignatureRequest struct {
 	Op Operation `json:"-"`
@@ -94,9 +104,13 @@ type ResolveNameRequest struct {
 	ExcludeGlobals bool     `json:"excludeGlobals"`
 }
 
-func (r *NodeRequest) operation() Operation       { return r.Op }
+func (r *NodeRequest) operation() Operation { return r.Op }
+func (*ResolvedSignatureRequest) operation() Operation {
+	return "resolvedSignatureWithOptions"
+}
 func (r *TypeRequest) operation() Operation       { return r.Op }
 func (r *SymbolRequest) operation() Operation     { return r.Op }
+func (r *SymbolDocsRequest) operation() Operation { return r.Op }
 func (r *SignatureRequest) operation() Operation  { return r.Op }
 func (*VoidRequest) operation() Operation         { return "void" }
 func (r *PropertyRequest) operation() Operation   { return r.Op }
@@ -129,12 +143,16 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	switch wire.Op {
 	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol":
 		request = &NodeRequest{Op: wire.Op}
+	case "resolvedSignatureWithOptions":
+		request = &ResolvedSignatureRequest{}
 	case "constraint", "apparent", "baseLiteral", "nonNullable", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "stringIndexType", "typeRecord",
-		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos":
+		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos", "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
 		request = &TypeRequest{Op: wire.Op}
 	case "aliasedSymbol", "declaredType", "symbolRecord", "typeOfSymbol", "exportsOfModule", "exportSymbol", "immediateAliasedSymbol", "isUnknownSymbol":
 		request = &SymbolRequest{Op: wire.Op}
-	case "returnType", "signatureRecord", "typePredicate":
+	case "symbolDocumentation", "symbolJSDocTags":
+		request = &SymbolDocsRequest{Op: wire.Op}
+	case "returnType", "signatureRecord", "typePredicate", "signatureDocumentation", "signatureJSDocTags":
 		request = &SignatureRequest{Op: wire.Op}
 	case "void":
 		request = &VoidRequest{}
@@ -169,6 +187,8 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 func requestNode(request Request) *NodeRef {
 	switch r := request.(type) {
 	case *NodeRequest:
+		return &r.Node
+	case *ResolvedSignatureRequest:
 		return &r.Node
 	case *SymbolTypeRequest:
 		return &r.Node
@@ -268,6 +288,21 @@ type TypePredicateFact struct {
 	Type           uint32
 }
 
+type DisplayParts []DisplayPart
+type DisplayPart struct {
+	Text, Kind string
+	Target     *DisplayPartTarget
+}
+type DisplayPartTarget struct {
+	File          string
+	Start, Length uint32
+}
+type JSDocTags []JSDocTag
+type JSDocTag struct {
+	Name string
+	Text DisplayParts
+}
+
 func (NodeFacts) result()          {}
 func (Handle) result()             {}
 func (Handles) result()            {}
@@ -279,3 +314,5 @@ func (*SignatureFact) result()     {}
 func (NamedSymbols) result()       {}
 func (IndexInfos) result()         {}
 func (*TypePredicateFact) result() {}
+func (DisplayParts) result()       {}
+func (JSDocTags) result()          {}

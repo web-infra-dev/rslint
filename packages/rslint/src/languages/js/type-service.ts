@@ -10,6 +10,7 @@ import {
 } from './type-service-syntax.js';
 import {
   typeQueryKey,
+  isCacheableTypeQuery,
   nameToUnits,
   type FileBinding,
   type TypeServiceDescriptor,
@@ -53,6 +54,9 @@ export interface TypeView {
   readonly typeArguments: readonly TypeView[] | undefined;
   readonly aliasTypeArguments: readonly TypeView[] | undefined;
   readonly typeParameters: readonly TypeView[] | undefined;
+  readonly typeParameter: TypeView | undefined;
+  readonly constraintType: TypeView | undefined;
+  readonly templateType: TypeView | undefined;
   readonly combinedFlags: number | undefined;
   readonly readonly: boolean | undefined;
   getFlags(): number;
@@ -90,6 +94,8 @@ export interface SymbolView {
   getEscapedName(): string;
   getFlags(): number;
   getDeclarations(): readonly object[] | undefined;
+  getDocumentationComment(checker?: CheckerView): ts.SymbolDisplayPart[];
+  getJsDocTags(checker?: CheckerView): ts.JSDocTagInfo[];
 }
 export interface SignatureView {
   readonly id: number;
@@ -103,6 +109,8 @@ export interface SignatureView {
   getTypeParameterAtPosition(position: number): TypeView | undefined;
   getDeclaration(): object | undefined;
   getReturnType(): TypeView | undefined;
+  getDocumentationComment(checker?: CheckerView): ts.SymbolDisplayPart[];
+  getJsDocTags(): ts.JSDocTagInfo[];
 }
 export interface IndexInfoView {
   readonly keyType: TypeView;
@@ -169,8 +177,8 @@ export interface CheckerView {
   getSignatureFromDeclaration(n: object): SignatureView | undefined;
   getResolvedSignature(
     n: object,
-    candidates?: unknown,
-    argumentCount?: unknown,
+    candidates?: SignatureView[],
+    argumentCount?: number,
   ): SignatureView | undefined;
   getReturnTypeOfSignature(s: object): TypeView | undefined;
   getTypePredicateOfSignature(s: object): TypePredicateView | undefined;
@@ -189,10 +197,11 @@ export interface ProgramView {
 function unsupported(surface: string): never {
   throw new Error(`unsupported TypeScript operation: ${surface}`);
 }
-function guarded<T extends object>(
+export function guarded<T extends object>(
   object: T,
   ensure: () => void,
   surface: string,
+  has?: (target: T, key: string | symbol) => boolean,
 ): T {
   return new Proxy(object, {
     get(target, key, receiver) {
@@ -212,6 +221,12 @@ function guarded<T extends object>(
           }
         : value;
     },
+    has: has
+      ? (target, key) => {
+          ensure();
+          return has(target, key);
+        }
+      : undefined,
   });
 }
 // The wrapper caches decoded values only. This closure never captures a packet
@@ -222,27 +237,6 @@ function memo<T>(ensure: () => void, read: () => T): () => T {
     ensure();
     return (cached ??= { value: read() }).value;
   };
-}
-type NodeOperation =
-  | 'type'
-  | 'fromTypeNode'
-  | 'context'
-  | 'symbol'
-  | 'signature'
-  | 'resolvedSignature';
-function isNodeOperation(operation: string): operation is NodeOperation {
-  return (
-    operation === 'type' ||
-    operation === 'fromTypeNode' ||
-    operation === 'context' ||
-    operation === 'symbol' ||
-    operation === 'signature' ||
-    operation === 'resolvedSignature'
-  );
-}
-interface QueryProfile {
-  shapes: Map<string, Set<NodeOperation>>;
-  maxQueries: number;
 }
 type ObjectKind = 'type' | 'symbol' | 'signature';
 interface ObjectBrand {
@@ -282,15 +276,7 @@ export class TypeServiceClient {
   private readonly fileOrdinals = new Map<string, number>();
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
-  private readonly profiles = new Map<string, QueryProfile>();
-  private activeFile:
-    | {
-        file: TypeServiceFile;
-        name: string;
-        profile: QueryProfile;
-        queries: number;
-      }
-    | undefined;
+  private signatureOptionsUsed = false;
   readonly stats = { queries: 0, localHits: 0, sharedHits: 0, factBytes: 0 };
   readonly program: ProgramView;
   readonly checker: CheckerView;
@@ -544,13 +530,26 @@ export class TypeServiceClient {
             }),
           ),
         getResolvedSignature: (n, candidates, argumentCount) => {
-          if (candidates !== undefined || argumentCount !== undefined)
-            unsupported('checker.getResolvedSignature optional arguments');
+          const node = this.syntax.location(n);
+          if (candidates !== undefined || argumentCount !== undefined) {
+            if (candidates?.length)
+              throw new Error('signature candidate output array must be empty');
+            this.signatureOptionsUsed = true;
+            this.shared?.markSignatureOptionsUsed();
+            const [resolved, ...ids] = this.query({
+              op: 'resolvedSignatureWithOptions',
+              args: {
+                node,
+                withCandidates: candidates !== undefined,
+                argumentCount,
+              },
+            });
+            if (candidates && ids.length)
+              candidates.push(...this.signaturesFor(ids));
+            return this.signature(resolved);
+          }
           return this.signature(
-            this.query({
-              op: 'resolvedSignature',
-              args: { node: this.syntax.location(n) },
-            }),
+            this.query({ op: 'resolvedSignature', args: { node } }),
           );
         },
         getReturnTypeOfSignature: (s) =>
@@ -644,8 +643,6 @@ export class TypeServiceClient {
     this.shared = undefined;
     this.transport = undefined;
     this.batchTransport = undefined;
-    this.profiles.clear();
-    this.activeFile = undefined;
   }
   private read<K>(
     request: ServiceRequest,
@@ -658,6 +655,19 @@ export class TypeServiceClient {
       ...request,
     };
     const key = this.key(query);
+    if (!this.cacheable(query)) {
+      this.stats.queries++;
+      const reader = this.ingest(
+        query,
+        this.transport!(query, key, false),
+        false,
+      );
+      try {
+        return read(reader);
+      } finally {
+        reader.close();
+      }
+    }
     let reader = this.facts.get(key);
     if (reader) {
       this.stats.localHits++;
@@ -667,7 +677,7 @@ export class TypeServiceClient {
       const shared = this.shared?.get(key);
       if (shared) this.stats.sharedHits++;
       else this.stats.queries++;
-      reader = this.ingest(query, shared ?? this.transport!(query, key));
+      reader = this.ingest(query, shared ?? this.transport!(query, key, true));
     }
     try {
       return read(reader);
@@ -695,7 +705,17 @@ export class TypeServiceClient {
     }
     return reader;
   }
-  private ingest(query: TypeServiceQuery, bytes: Uint8Array): TypePacketReader {
+  private cacheable(query: TypeServiceQuery): boolean {
+    return isCacheableTypeQuery(
+      query.op,
+      this.signatureOptionsUsed || this.shared?.hasSignatureOptions === true,
+    );
+  }
+  private ingest(
+    query: TypeServiceQuery,
+    bytes: Uint8Array,
+    retain = true,
+  ): TypePacketReader {
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
       const key = this.key({
@@ -706,17 +726,13 @@ export class TypeServiceClient {
       const reader = this.store(key, record.packet);
       if (this.facts.get(key) !== reader) reader.close();
     }
-    return this.store(this.key(query), reply.packet);
+    return retain
+      ? this.store(this.key(query), reply.packet)
+      : new TypePacketReader(reply.packet);
   }
   /** Merge known misses only. Cache hits, including negative answers, never
    * cross the bridge. The scalar API remains the authoritative fallback. */
   prefetch(requests: readonly ServiceRequest[]): void {
-    this.prepare(requests, false);
-  }
-  private prepare(
-    requests: readonly ServiceRequest[],
-    optional: boolean,
-  ): void {
     this.ensure();
     if (!this.batchTransport) return;
     const missing = new Map<string, TypeServiceQuery>();
@@ -726,6 +742,7 @@ export class TypeServiceClient {
         checker: this.descriptor.checker,
         ...request,
       };
+      if (!this.cacheable(query)) continue;
       const key = this.key(query);
       if (this.facts.has(key) || missing.has(key)) continue;
       const shared = this.shared?.get(key);
@@ -740,18 +757,7 @@ export class TypeServiceClient {
       const batch = all.slice(offset, offset + 256),
         queries = batch.map(([, query]) => query),
         keys = batch.map(([key]) => key);
-      let packets: readonly Uint8Array[];
-      try {
-        packets = this.batchTransport(queries, keys);
-      } catch (error) {
-        this.ensure();
-        if (
-          !optional ||
-          (error instanceof Error && error.name === 'AbortError')
-        )
-          throw error;
-        return;
-      }
+      const packets = this.batchTransport(queries, keys);
       if (packets.length !== batch.length)
         throw new Error('incomplete type service batch');
       this.stats.queries += batch.length;
@@ -762,22 +768,6 @@ export class TypeServiceClient {
     }
   }
   private query<Q extends ScalarRequest>(request: Q): QueryResults[Q['op']] {
-    const active = this.activeFile;
-    if (
-      active &&
-      'node' in request.args &&
-      request.args.node?.file === active.name &&
-      isNodeOperation(request.op)
-    ) {
-      active.queries++;
-      const shape = this.syntax.shape(request.args.node);
-      if (shape) {
-        let operations = active.profile.shapes.get(shape);
-        if (!operations && active.profile.shapes.size < 128)
-          active.profile.shapes.set(shape, (operations = new Set()));
-        operations?.add(request.op);
-      }
-    }
     return this.read(request, (packet) => packet.scalar<Q['op']>(request.op));
   }
   private typeField<K extends keyof TypeFact>(
@@ -827,6 +817,21 @@ export class TypeServiceClient {
         this.ensure();
       },
       kind,
+      kind === 'type'
+        ? (view, key) => {
+            if (
+              key !== 'typeParameter' &&
+              key !== 'constraintType' &&
+              key !== 'templateType'
+            )
+              return Reflect.has(view, key);
+            const flags: unknown = Reflect.get(view, 'objectFlags');
+            return (
+              typeof flags === 'number' &&
+              Boolean(flags & this.typescript.ObjectFlags.Mapped)
+            );
+          }
+        : undefined,
     );
     this.brands.set(object, brand);
     map.set(id, object);
@@ -905,6 +910,18 @@ export class TypeServiceClient {
           ? this.typesFor(this.query({ op: 'typeArguments', args: { id } }))
           : undefined,
       );
+      const mapped = (
+        op:
+          'mappedTypeParameter' | 'mappedConstraintType' | 'mappedTemplateType',
+      ) =>
+        memo(ensure, () =>
+          objectFlag(of.Mapped)
+            ? this.type(this.query({ op, args: { id } }))
+            : undefined,
+        );
+      const typeParameter = mapped('mappedTypeParameter'),
+        constraintType = mapped('mappedConstraintType'),
+        templateType = mapped('mappedTemplateType');
       const isClassOrInterface = () => objectFlag(of.ClassOrInterface);
       const calls = memo(ensure, () =>
           this.signaturesFor(
@@ -1003,6 +1020,15 @@ export class TypeServiceClient {
         get typeParameters() {
           return typeParameters();
         },
+        get typeParameter() {
+          return typeParameter();
+        },
+        get constraintType() {
+          return constraintType();
+        },
+        get templateType() {
+          return templateType();
+        },
         get combinedFlags() {
           return tuple()?.combinedFlags;
         },
@@ -1061,6 +1087,13 @@ export class TypeServiceClient {
       const value = memo(ensure, () =>
         this.syntax.nodeRef(this.symbolField(id, 'valueDeclaration')),
       );
+      const withChecker = (checker: CheckerView | undefined): boolean => {
+        if (checker !== undefined && checker !== this.checker)
+          throw new Error('foreign type service checker');
+        return checker !== undefined;
+      };
+      let documentation: ts.SymbolDisplayPart[] | undefined;
+      let tags: ts.JSDocTagInfo[] | undefined;
       return {
         id,
         get name() {
@@ -1082,6 +1115,20 @@ export class TypeServiceClient {
         getEscapedName: escaped,
         getFlags: flags,
         getDeclarations: declarations,
+        getDocumentationComment: (checker) => {
+          const useChecker = withChecker(checker);
+          return (documentation ??= this.query({
+            op: 'symbolDocumentation',
+            args: { id, withChecker: useChecker },
+          }));
+        },
+        getJsDocTags: (checker) => {
+          const useChecker = withChecker(checker);
+          return (tags ??= this.query({
+            op: 'symbolJSDocTags',
+            args: { id, withChecker: useChecker },
+          }));
+        },
       };
     });
     if (view && knownName !== undefined)
@@ -1137,10 +1184,16 @@ export class TypeServiceClient {
           ),
         getDeclaration: declaration,
         getReturnType: returned,
+        getDocumentationComment: memo(ensure, () =>
+          this.query({ op: 'signatureDocumentation', args: { id } }),
+        ),
+        getJsDocTags: memo(ensure, () =>
+          this.query({ op: 'signatureJSDocTags', args: { id } }),
+        ),
       };
     });
   }
-  file(binding: FileBinding, profileKey?: string): TypeServiceFile {
+  file(binding: FileBinding): TypeServiceFile {
     this.ensure();
     if (
       binding.generation !== this.descriptor.generation ||
@@ -1153,48 +1206,12 @@ export class TypeServiceClient {
       new FileSyntaxViews(this.syntax, binding, () => {
         this.ensure();
       }),
-      profileKey,
     );
     this.files.add(file);
     return file;
   }
-  prepareFile(
-    file: TypeServiceFile,
-    name: string,
-    profileKey: string | undefined,
-  ): void {
-    if (!profileKey || !this.batchTransport) return;
-    let profile = this.profiles.get(profileKey);
-    if (!profile) {
-      if (this.profiles.size >= 64)
-        this.profiles.delete(this.profiles.keys().next().value!);
-      this.profiles.set(
-        profileKey,
-        (profile = { shapes: new Map(), maxQueries: 0 }),
-      );
-    }
-    this.activeFile = { file, name, profile, queries: 0 };
-    if (profile.maxQueries < 16) return;
-    const cap = Math.max(256, Math.min(4096, profile.maxQueries * 4));
-    const requests = this.syntax.matching(name, profile.shapes, cap);
-    if (requests.length > cap) return;
-    this.prepare(
-      requests.map(({ op, node }) => ({
-        op,
-        args: { node },
-      })),
-      true,
-    );
-  }
   releaseFile(file: TypeServiceFile): void {
     this.files.delete(file);
-    if (this.activeFile?.file === file) {
-      this.activeFile.profile.maxQueries = Math.max(
-        this.activeFile.profile.maxQueries,
-        this.activeFile.queries,
-      );
-      this.activeFile = undefined;
-    }
   }
 }
 
@@ -1204,7 +1221,6 @@ export class TypeServiceFile {
     private readonly owner: TypeServiceClient,
     readonly binding: FileBinding,
     private readonly syntax: FileSyntaxViews,
-    private readonly profileKey?: string,
   ) {}
   close(): void {
     if (this.closed) return;
@@ -1219,7 +1235,6 @@ export class TypeServiceFile {
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
-    this.owner.prepareFile(this, sourceFileName, this.profileKey);
     const toTS = (node: ESTreeNode): object => {
       const native = this.syntax.esTreeNodeToTSNodeMap.get(node);
       if (!native)

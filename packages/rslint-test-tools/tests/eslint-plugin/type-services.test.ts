@@ -18,6 +18,7 @@ import {
   type TypeServiceDescriptor,
 } from '../../../rslint/src/languages/js/type-service.js';
 import {
+  MIN_SHARED_TYPE_CACHE_BYTES,
   SharedTypeCacheOwner,
   MAX_SHARED_TYPE_PROBES,
   SharedTypeCacheReader,
@@ -131,6 +132,7 @@ interface Case {
   reports: number;
   dependencies?: Record<string, string>;
   requiredOps?: string[];
+  js?: boolean;
 }
 // Focused valid/invalid examples follow the original rule fixtures and exercise
 // their actual npm implementations, including real type-utils dependencies.
@@ -314,6 +316,45 @@ const cases: Case[] = [
     requiredOps: ['stringIndexType', 'typeOfSymbol', 'typePredicate'],
   },
   {
+    name: 'type parameters in empty and materialized mapped types',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-parameters',
+    code: `
+      declare function keys<T>(): { [K in keyof T]: T[K] };
+      declare function record<T>(): { [K in 'key']: T };
+      declare function empty<T>(): { [K in never]: T };
+      declare function single<T>(value: T): void;
+    `,
+    reports: 3,
+    requiredOps: ['mappedTypeParameter', 'mappedTemplateType'],
+  },
+  {
+    name: 'deprecated overloads and properties reached through inheritance',
+    plugin: typedPlugin,
+    rule: 'no-deprecated',
+    code: `
+      import { pick, Contract } from './dependency';
+      class Implementation implements Contract { value = 1; }
+      pick('retired');
+      pick(42);
+      new Implementation().value;
+    `,
+    dependencies: {
+      'dependency.ts': `
+        export declare function replacement(): void;
+        /** @deprecated Use {@link replacement}. */
+        export declare function pick(input: string): void;
+        export declare function pick(input: number): void;
+        export interface Contract {
+          /** @deprecated */
+          value: number;
+        }
+      `,
+    },
+    reports: 2,
+    requiredOps: ['signatureJSDocTags', 'symbolJSDocTags'],
+  },
+  {
     name: 'default type arguments of a constructor-valued base class',
     plugin: typedPlugin,
     rule: 'no-unnecessary-type-arguments',
@@ -432,6 +473,22 @@ const cases: Case[] = [
     rule: 'no-collection-size-mischeck',
     code: 'declare const list: number[]; declare const set: Set<number>; declare const other: { length: number }; if (list.length < 0) {} if (set.size < 0) {} if (other.length < 0) {}',
     reports: 2,
+  },
+  {
+    name: 'SonarJS recognizes JSDoc-annotated JavaScript constructors',
+    plugin: sonarPlugin,
+    rule: 'new-operator-misuse',
+    options: [{ considerJSDoc: true }],
+    js: true,
+    code: `
+      /** @constructor Creates a box. */
+      function Box() { this.value = 1; }
+      function compute() { return 1; }
+      new Box();
+      new compute();
+    `,
+    reports: 1,
+    requiredOps: ['signatureJSDocTags'],
   },
   {
     // SonarJS S3403 uses assignability in both directions for strict equality.
@@ -558,7 +615,8 @@ describe('original npm typed rules over Go type services', () => {
       const directory = mkdtempSync(
         resolve(root, 'packages/rslint-test-tools/.type-services-'),
       );
-      const file = resolve(directory, 'input.ts'),
+      const extension = c.js ? 'js' : 'ts';
+      const file = resolve(directory, `input.${extension}`),
         config = resolve(directory, 'tsconfig.json');
       writeFileSync(file, c.code);
       for (const [name, text] of Object.entries(c.dependencies ?? {}))
@@ -567,13 +625,15 @@ describe('original npm typed rules over Go type services', () => {
         config,
         JSON.stringify({
           compilerOptions: {
+            allowJs: c.js,
+            checkJs: c.js,
             strict: true,
             target: 'ES2022',
             module: 'ESNext',
             moduleResolution: 'Bundler',
             skipLibCheck: true,
           },
-          include: ['*.ts'],
+          include: [`*.${extension}`],
         }),
       );
       const host = new Host();
@@ -603,7 +663,7 @@ describe('original npm typed rules over Go type services', () => {
           c.code,
           [
             {
-              files: ['**/*.ts'],
+              files: [`**/*.${extension}`],
               languageOptions: {
                 parser: tsParser,
                 parserOptions: { project: config, tsconfigRootDir: directory },
@@ -742,8 +802,7 @@ test('generation clients reuse facts and lazy dependency identities across files
     let scalar = 0,
       batches = 0,
       sources = 0,
-      metadataRequests = 0,
-      failPrefetch = false;
+      metadataRequests = 0;
     const owner = new TypeServiceClient(
       enums,
       descriptor,
@@ -762,7 +821,6 @@ test('generation clients reuse facts and lazy dependency identities across files
         maxSyntaxFactsBytes: 1024,
         batchTransport: (queries) => {
           batches++;
-          if (failPrefetch) throw new Error('speculative checker query failed');
           return host
             .request({ method: 'batch', queries })
             .map((packet: string) => Buffer.from(packet, 'base64'));
@@ -777,13 +835,13 @@ test('generation clients reuse facts and lazy dependency identities across files
         tree: Buffer.from(encoded.tree, 'base64'),
       };
       const frame = decodeFrame(Buffer.from(encoded.frame, 'base64'));
-      const handle = owner.file(projection.binding, 'same rules and options');
+      const handle = owner.file(projection.binding);
       const services = handle.parserServices(
         frame,
         projection,
         file.replaceAll('\\', '/'),
       );
-      return { file, frame, handle, services };
+      return { file, frame, projection, handle, services };
     };
     try {
       const first = open('first.ts');
@@ -830,10 +888,26 @@ test('generation clients reuse facts and lazy dependency identities across files
       expect(firstType.flags & ts.TypeFlags.NumberLiteral).toBeTruthy();
       const before = scalar,
         second = open('second.ts');
-      expect(batches).toBeGreaterThan(0);
-      for (const node of (second.frame.ast.body as any[]).flatMap(
+      const secondDeclarations = (second.frame.ast.body as any[]).flatMap(
         (node) => node.declarations ?? [],
-      ))
+      );
+      expect(batches).toBe(0);
+      owner.prefetch(
+        secondDeclarations.map((declaration) => ({
+          op: 'type',
+          args: {
+            node: {
+              file: second.projection.sourceFileName,
+              index:
+                second.projection.origins[
+                  second.frame.nodes.indexOf(declaration.id)
+                ],
+            },
+          },
+        })),
+      );
+      expect(batches).toBe(1);
+      for (const node of secondDeclarations)
         expect(second.services.getTypeAtLocation(node.id)).toBe(firstType);
       expect(scalar - before).toBe(0);
       expect(
@@ -851,19 +925,13 @@ test('generation clients reuse facts and lazy dependency identities across files
       expect('initializer' in declaration).toBe(true);
       expect(sources).toBe(1);
       second.handle.close();
-      // The learned batch includes unconsumed nodes; a speculative failure must
-      // not alter the demanded scalar result or diagnostics of this rule.
-      failPrefetch = true;
       const thirdFile = resolve(directory, 'third.ts'),
         encoded = host.request({ method: 'project', file: thirdFile });
       const thirdProjection = {
         ...encoded,
         tree: Buffer.from(encoded.tree, 'base64'),
       };
-      const thirdHandle = owner.file(
-        thirdProjection.binding,
-        'same rules and options',
-      );
+      const thirdHandle = owner.file(thirdProjection.binding);
       const beforeDemand = scalar;
       const actual = lintFile(
         {
@@ -907,6 +975,7 @@ test('generation clients reuse facts and lazy dependency identities across files
         normMessages(expected),
       );
       expect(scalar).toBeGreaterThan(beforeDemand);
+      expect(batches).toBe(1);
       thirdHandle.close();
       expect(owner.syntaxStats.summaryBytes).toBeLessThanOrEqual(1024);
       expect(owner.stats.factBytes).toBeLessThanOrEqual(1 << 20);
@@ -948,6 +1017,25 @@ const uniqueKeys = {[unique]: true};
 const truth = true as const;
 const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
 const spreadKeys = {...surrogateKeys};
+const multiline = { nested: { label: "中文" as const }, count: 1 };
+declare function multilineCall(
+  { '\\é': escaped }: { '\\é': string },
+  value: { label: "中文"; escaped: "\\é"; slash: "\\\\é" },
+): { nested: { label: "中文" }; count: number };
+function docsTarget() {}
+async function tokenContext() { await Promise.resolve(1); }
+interface DocsBase {
+  /** Base documentation linking to {@linkcode docsTarget | example}.
+   * @param value Value to use.
+   * @deprecated Replace this with {@link docsTarget}.
+   */
+  method(value: string): void;
+}
+class DocsChild implements DocsBase {
+  /** @inheritDoc Additional detail. */
+  method(value: string) {}
+}
+const docAssertion = /** @type {{ label: string }} */ ({ label: "temporary" });
 const view = <Box />;
 declare const Box: () => null;
 declare namespace N { const value: number; interface Item<T> {} }
@@ -1002,7 +1090,7 @@ await Promise.resolve(1);
       1024,
     );
     const published = new Map<string, Uint8Array>();
-    const makeClient = (maxFactsBytes = 1 << 16) =>
+    const makeClient = (maxFactsBytes = 1 << 16, maxSyntaxBytes?: number) =>
       new FileTypeServiceClient(
         enums,
         descriptor,
@@ -1030,6 +1118,7 @@ await Promise.resolve(1);
         host.source,
         {
           maxFactsBytes,
+          maxSyntaxBytes,
           shared: maxFactsBytes
             ? new SharedTypeCacheReader(cache.descriptor)
             : undefined,
@@ -1141,7 +1230,44 @@ await Promise.resolve(1);
     );
     expect(nativeAwait.getChildAt(1)).toBe(nativeAwait.expression);
     expect(nativeAwait.getChildAt(1).kind).toBe(ts.SyntaxKind.CallExpression);
-    expect(() => nativeAwait.getChildAt(0)).toThrow('synthetic token');
+    const awaitToken = nativeAwait.getChildAt(0);
+    expect(awaitToken.kind).toBe(ts.SyntaxKind.AwaitKeyword);
+    expect(awaitToken.parent).toBe(nativeAwait);
+    expect(awaitToken.getText()).toBe('await');
+    expect(nativeAwait.getFirstToken()).toBe(awaitToken);
+    const call = nativeAwait.expression;
+    const argumentsList = call.getChildAt(2);
+    expect(argumentsList.kind).toBe(ts.SyntaxKind.SyntaxList);
+    expect(argumentsList.parent).toBe(call);
+    expect(argumentsList.getChildAt(0)).toBe(call.arguments[0]);
+    expect(call.getChildCount()).toBe(4);
+    expect(call.getChildren()).toBe(call.getChildren());
+    expect(call.getLastToken()).toBe(call.getChildAt(3));
+    expect(call.getLastToken().getSourceFile()).toBe(beforeSource);
+    expect(services.tsNodeToESTreeNodeMap.has(argumentsList)).toBe(false);
+    expect(() =>
+      services.program.getTypeChecker().getTypeAtLocation(awaitToken),
+    ).toThrow('foreign compiler node handle');
+    const syntaxOnly = makeClient(0, 0);
+    try {
+      const uncached = syntaxOnly.parserServices(
+        frame,
+        projection,
+        file,
+      ) as any;
+      const awaitView = uncached.esTreeNodeToTSNodeMap.get(
+        expression('AwaitExpression'),
+      );
+      const before = syntaxOnly.syntaxStats.sourceRequests;
+      const first = awaitView.getFirstToken();
+      expect(first).toBe(awaitView.getChildAt(0));
+      expect(first).toBe(awaitView.getChildren()[0]);
+      expect(first.parent).toBe(awaitView);
+      expect(syntaxOnly.syntaxStats.sourceRequests - before).toBeGreaterThan(1);
+      expect(syntaxOnly.syntaxStats.sourceBytes).toBe(0);
+    } finally {
+      syntaxOnly.close();
+    }
     const fn = body.find(
       (node) => node.type === 'ExportNamedDeclaration',
     ).declaration;
@@ -1280,6 +1406,18 @@ await Promise.resolve(1);
       referenceBody.find((node) => node.type === 'ExportNamedDeclaration')
         .declaration,
     ) as ts.FunctionDeclaration;
+    const contextualToken = (source: ts.SourceFile) => {
+      const fn = source.statements.find(
+        (node): node is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(node) && node.name?.text === 'tokenContext',
+      )!;
+      return (
+        fn.body!.statements[0] as ts.ExpressionStatement
+      ).expression.getFirstToken()!;
+    };
+    const contextFlags = contextualToken(referenceFn.getSourceFile()).flags;
+    expect(contextFlags & ts.NodeFlags.ContextFlags).toBeTruthy();
+    expect(contextualToken(beforeSource).flags).toBe(contextFlags);
     const formatted = (
       typeChecker: ts.TypeChecker,
       declaration: ts.FunctionDeclaration,
@@ -1324,13 +1462,89 @@ await Promise.resolve(1);
     );
     expect(new Set(expectedFormats).size).toBe(expectedFormats.length);
     expect(formatted(checker, nativeFn, uniqueType)).toEqual(expectedFormats);
-    expect(() =>
-      checker.typeToString(
-        keyType,
-        nativeFn,
-        ts.TypeFormatFlags.MultilineObjectLiterals,
+    const multilineFormats = (
+      typeChecker: ts.TypeChecker,
+      sourceFile: ts.SourceFile,
+      object: ts.Node,
+    ) => {
+      const declaration = sourceFile.statements.find(
+        (node): node is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(node) && node.name?.text === 'multilineCall',
+      )!;
+      const type = typeChecker.getTypeAtLocation(object);
+      const signature = typeChecker.getSignatureFromDeclaration(declaration)!;
+      const multiline = ts.TypeFormatFlags.MultilineObjectLiterals;
+      const flags = multiline | ts.TypeFormatFlags.NoTruncation;
+      return [
+        typeChecker.typeToString(type, declaration, flags),
+        ...[ts.SignatureKind.Call, ts.SignatureKind.Construct].map((kind) =>
+          typeChecker.signatureToString(
+            signature,
+            declaration,
+            flags | ts.TypeFormatFlags.WriteArrowStyleSignature,
+            kind,
+          ),
+        ),
+        typeChecker.signatureToString(
+          signature,
+          declaration,
+          flags | ts.TypeFormatFlags.UseSingleQuotesForStringLiteralType,
+          ts.SignatureKind.Call,
+        ),
+      ];
+    };
+    expect(
+      multilineFormats(
+        checker,
+        beforeSource,
+        services.esTreeNodeToTSNodeMap.get(variable('multiline').id),
       ),
-    ).toThrow('MultilineObjectLiterals');
+    ).toEqual(
+      multilineFormats(
+        referenceChecker,
+        referenceFn.getSourceFile(),
+        referenceNodes.get(referenceVariable('multiline').id),
+      ),
+    );
+    const readDocumentation = (
+      typeChecker: ts.TypeChecker,
+      source: ts.SourceFile,
+    ) => {
+      const owner = source.statements.find(
+        (node): node is ts.ClassDeclaration =>
+          ts.isClassDeclaration(node) && node.name?.text === 'DocsChild',
+      )!;
+      const method = owner.members[0] as ts.MethodDeclaration;
+      const symbol = typeChecker.getSymbolAtLocation(method.name)!;
+      const signature = typeChecker.getSignatureFromDeclaration(method)!;
+      const documentation = symbol.getDocumentationComment(typeChecker);
+      const tags = symbol.getJsDocTags(typeChecker);
+      expect(symbol.getDocumentationComment(typeChecker)).toBe(documentation);
+      expect(symbol.getJsDocTags(typeChecker)).toBe(tags);
+      expect(documentation.map((part) => part.kind)).toContain('linkName');
+      return [
+        documentation,
+        tags,
+        signature.getDocumentationComment(typeChecker),
+        signature.getJsDocTags(),
+      ];
+    };
+    expect(readDocumentation(checker, beforeSource)).toEqual(
+      readDocumentation(referenceChecker, referenceFn.getSourceFile()),
+    );
+    const symbolTags = (typeChecker: ts.TypeChecker, node: ts.Node) =>
+      typeChecker.getSymbolAtLocation(node)!.getJsDocTags(typeChecker);
+    expect(
+      symbolTags(
+        checker,
+        services.esTreeNodeToTSNodeMap.get(variable('docAssertion').id),
+      ),
+    ).toEqual(
+      symbolTags(
+        referenceChecker,
+        referenceNodes.get(referenceVariable('docAssertion').id),
+      ),
+    );
 
     const referenceSpreadType = referenceChecker.getTypeAtLocation(
       referenceNodes.get(referenceVariable('spreadKeys').init),
@@ -1446,11 +1660,14 @@ await Promise.resolve(1);
     await reader.terminate();
     const saved = services.program.getCompilerOptions;
     const savedFlags = voidType.isUnion;
+    const savedChildren = argumentsList.getChildren;
     expect(client.stats.factBytes).toBeLessThanOrEqual(1 << 16);
     client.close();
     expect(client.stats.factBytes).toBe(0);
     expect(client.syntaxStats.sourceBytes).toBe(0);
     expect(() => savedFlags()).toThrow('closed');
+    expect(() => awaitToken.kind).toThrow('closed');
+    expect(() => savedChildren()).toThrow('closed');
     expect(cache.readers).toBe(0);
     expect(() => voidType.flags).toThrow('closed');
     expect(() => saved()).toThrow('closed');
@@ -1471,6 +1688,142 @@ await Promise.resolve(1);
   } finally {
     await host.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('signature options preserve TypeScript query order across clients', async () => {
+  const directory = mkdtempSync(resolve(temp, 'signature-options-'));
+  const file = resolve(directory, 'input.ts');
+  const config = resolve(directory, 'tsconfig.json');
+  writeFileSync(
+    file,
+    `
+    type Picked<T> = { [K in keyof T]: T[K] };
+    declare function choose<T extends string>(value: T): 1;
+    declare function choose<T extends string>(value: T, extra: T): 2;
+    const warmed = choose(false,);
+    const fresh = choose(false,);
+  `,
+  );
+  const compilerOptions = { strict: true, noLib: true };
+  writeFileSync(
+    config,
+    JSON.stringify({ compilerOptions, files: ['input.ts'] }),
+  );
+  const host = new Host();
+  const nativeCall = (source: ts.SourceFile, index: number) =>
+    (source.statements[index] as ts.VariableStatement).declarationList
+      .declarations[0].initializer as ts.CallExpression;
+  const exercise = (program: ts.Program, peer = program) => {
+    const checker = program.getTypeChecker(),
+      peerChecker = peer.getTypeChecker();
+    const source = program.getSourceFile(file)!,
+      peerSource = peer.getSourceFile(file)!;
+    const call = nativeCall(source, 3),
+      peerCall = nativeCall(peerSource, 3);
+    const firstCall = nativeCall(source, 4);
+    const returned = (signature: ts.Signature | undefined, owner = checker) =>
+      owner.typeToString(signature!.getReturnType());
+    const read = () => [
+      returned(peerChecker.getResolvedSignature(peerCall), peerChecker),
+      peerChecker.typeToString(peerChecker.getTypeAtLocation(peerCall)),
+    ];
+    const withCandidates = (count: number) => {
+      const candidates: ts.Signature[] = [];
+      const chosen = checker.getResolvedSignature(call, candidates, count);
+      return [
+        returned(chosen),
+        candidates.map((signature) => returned(signature)),
+        candidates.indexOf(chosen!),
+      ];
+    };
+    return [
+      read(),
+      returned(checker.getResolvedSignature(firstCall, undefined, 2)),
+      returned(checker.getResolvedSignature(call, undefined, 2)),
+      withCandidates(2),
+      read(),
+      returned(checker.getResolvedSignature(call, undefined, 2)),
+      withCandidates(1),
+      read(),
+      withCandidates(2),
+      read(),
+    ];
+  };
+  const expected = exercise(ts.createProgram([file], compilerOptions));
+  expect(expected).toEqual([
+    ['1', '1'],
+    '2',
+    '1',
+    ['2', ['1', '2'], 1],
+    ['2', '2'],
+    '2',
+    ['1', ['1', '2'], 0],
+    ['1', '1'],
+    ['2', ['1', '2'], 1],
+    ['2', '2'],
+  ]);
+  try {
+    for (const budget of [MIN_SHARED_TYPE_CACHE_BYTES, 1 << 16]) {
+      const descriptor: TypeServiceDescriptor = host.request({
+        method: 'init',
+        config,
+      });
+      const cache = new SharedTypeCacheOwner(descriptor.generation, budget, 1);
+      const open = () =>
+        new TypeServiceClient(
+          enums,
+          descriptor,
+          (query, key, cacheable) => {
+            const packet = Buffer.from(
+              host.request({ method: 'query', query }),
+              'base64',
+            );
+            if (cacheable) cache.publish(key, typeReplyPackets(packet).packet);
+            return packet;
+          },
+          host.source,
+          {
+            maxFactsBytes: 1 << 16,
+            shared: new SharedTypeCacheReader(cache.descriptor),
+          },
+        );
+      const owner = open(),
+        peer = open();
+      try {
+        expect(
+          exercise(
+            owner.program as unknown as ts.Program,
+            peer.program as unknown as ts.Program,
+          ),
+        ).toEqual(expected);
+        expect(cache.hasSignatureOptions).toBe(true);
+        const source = owner.program.getSourceFile(file) as ts.SourceFile;
+        const checker = owner.checker;
+        const call = nativeCall(source, 3),
+          signature = checker.getResolvedSignature(call)!;
+        expect(() => checker.getResolvedSignature(call, [signature])).toThrow(
+          'must be empty',
+        );
+
+        const mapped = checker.getTypeFromTypeNode(
+          (source.statements[0] as ts.TypeAliasDeclaration).type,
+        )!;
+        expect('typeParameter' in mapped).toBe(true);
+        expect('typeParameter' in checker.getTypeAtLocation(call)!).toBe(false);
+        expect(mapped.typeParameter?.symbol?.name).toBe('K');
+        expect(checker.typeToString(mapped.constraintType!)).toBe('keyof T');
+        expect(checker.typeToString(mapped.templateType!)).toBe('T[K]');
+        expect(mapped.templateType?.indexType).toBe(mapped.typeParameter);
+      } finally {
+        owner.close();
+        peer.close();
+        cache.close();
+        host.request({ method: 'close' });
+      }
+    }
+  } finally {
+    await host.close();
   }
 });
 

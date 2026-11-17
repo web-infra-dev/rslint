@@ -1,3 +1,5 @@
+import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
+
 /** Finite semantic protocol shared by the checker client and injected host. */
 export interface Scope {
   generation: number;
@@ -35,6 +37,16 @@ export interface TypeServiceProjection {
     start: number;
     end: number;
   }> | null;
+  /** Original frame IDs shared by all aliases of a flattened sequence. */
+  sequenceMembers?: Record<number, number[]>;
+  /** Optional chain prefixes removed from the ordinary frame. */
+  chainAliases?: Array<{
+    index: number;
+    origin: number;
+    expression: number;
+    start: number;
+    end: number;
+  }>;
 }
 export type SyntaxSource = (
   scope: Scope,
@@ -108,6 +120,10 @@ export interface QueryArguments {
   symbol: NodeArgs;
   signature: NodeArgs;
   resolvedSignature: NodeArgs;
+  resolvedSignatureWithOptions: NodeArgs & {
+    withCandidates: boolean;
+    argumentCount: number | undefined;
+  };
   shorthandValueSymbol: NodeArgs;
   constraint: IDArgs;
   apparent: IDArgs;
@@ -131,6 +147,9 @@ export interface QueryArguments {
   indexInfo: IDArgs & { kind: number };
   indexInfos: IDArgs;
   typeRecord: IDArgs;
+  mappedTypeParameter: IDArgs;
+  mappedConstraintType: IDArgs;
+  mappedTemplateType: IDArgs;
   aliasedSymbol: IDArgs;
   immediateAliasedSymbol: IDArgs;
   isUnknownSymbol: IDArgs;
@@ -140,10 +159,14 @@ export interface QueryArguments {
   declaredType: IDArgs;
   typeOfSymbol: IDArgs;
   symbolRecord: IDArgs;
+  symbolDocumentation: IDArgs & { withChecker: boolean };
+  symbolJSDocTags: IDArgs & { withChecker: boolean };
   returnType: IDArgs;
   typePredicate: IDArgs;
   parameterType: IDArgs & { position: number };
   signatureRecord: IDArgs;
+  signatureDocumentation: IDArgs;
+  signatureJSDocTags: IDArgs;
   void: Record<string, never>;
   property: IDArgs & { name: readonly number[] };
   propertyType: IDArgs & { name: readonly number[] };
@@ -164,6 +187,7 @@ export interface QueryResults {
   symbol: number;
   signature: number;
   resolvedSignature: number;
+  resolvedSignatureWithOptions: readonly [number, ...number[]];
   shorthandValueSymbol: number;
   constraint: number;
   apparent: number;
@@ -187,6 +211,9 @@ export interface QueryResults {
   indexInfo: readonly IndexInfoFact[];
   indexInfos: readonly IndexInfoFact[];
   typeRecord: TypeFact;
+  mappedTypeParameter: number;
+  mappedConstraintType: number;
+  mappedTemplateType: number;
   aliasedSymbol: number;
   immediateAliasedSymbol: number;
   isUnknownSymbol: boolean;
@@ -196,10 +223,14 @@ export interface QueryResults {
   declaredType: number;
   typeOfSymbol: number;
   symbolRecord: SymbolFact;
+  symbolDocumentation: SymbolDisplayPart[];
+  symbolJSDocTags: JSDocTagInfo[];
   returnType: number;
   typePredicate: TypePredicateFact | undefined;
   parameterType: number;
   signatureRecord: SignatureFact;
+  signatureDocumentation: SymbolDisplayPart[];
+  signatureJSDocTags: JSDocTagInfo[];
   void: number;
   property: number;
   propertyType: number;
@@ -214,7 +245,29 @@ export type TypeServiceQuery<K extends Operation = Operation> = {
 export type QueryTransport = (
   query: TypeServiceQuery,
   key: string,
+  cacheable: boolean,
 ) => Uint8Array;
+
+/** Normal overload resolution can replace semantic results for syntax nodes. */
+export function isCacheableTypeQuery(
+  operation: Operation,
+  signatureOptionsUsed: boolean,
+): boolean {
+  if (operation === 'resolvedSignatureWithOptions') return false;
+  if (!signatureOptionsUsed) return true;
+  switch (operation) {
+    case 'type':
+    case 'fromTypeNode':
+    case 'context':
+    case 'symbol':
+    case 'signature':
+    case 'resolvedSignature':
+    case 'symbolType':
+      return false;
+    default:
+      return true;
+  }
+}
 const operations = [
   'type',
   'fromTypeNode',
@@ -265,6 +318,14 @@ const operations = [
   'typePredicate',
   'parameterType',
   'propertyType',
+  'resolvedSignatureWithOptions',
+  'mappedTypeParameter',
+  'mappedConstraintType',
+  'mappedTemplateType',
+  'symbolDocumentation',
+  'symbolJSDocTags',
+  'signatureDocumentation',
+  'signatureJSDocTags',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -288,6 +349,8 @@ export function typeQueryKey(
     case 'resolvedSignature':
     case 'shorthandValueSymbol':
       return prefix + nodeKey(q.args.node);
+    case 'resolvedSignatureWithOptions':
+      return `${prefix}${nodeKey(q.args.node)}:${q.args.withCandidates}:${q.args.argumentCount ?? '-'}`;
     case 'void':
       return prefix;
     case 'property':
@@ -304,6 +367,9 @@ export function typeQueryKey(
       return `${prefix}${nodeKey(q.args.node)}:${q.args.meaning}`;
     case 'parameterType':
       return `${prefix}${q.args.id}:${q.args.position}`;
+    case 'symbolDocumentation':
+    case 'symbolJSDocTags':
+      return `${prefix}${q.args.id}:${q.args.withChecker}`;
     case 'typeString':
       return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
     case 'signatureString':
@@ -326,6 +392,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   symbol: 1,
   signature: 1,
   resolvedSignature: 1,
+  resolvedSignatureWithOptions: 4,
   shorthandValueSymbol: 1,
   constraint: 1,
   apparent: 1,
@@ -341,6 +408,9 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   properties: 4,
   apparentProperties: 4,
   typeArguments: 4,
+  mappedTypeParameter: 1,
+  mappedConstraintType: 1,
+  mappedTemplateType: 1,
   isArray: 2,
   isArrayLike: 2,
   isTuple: 2,
@@ -356,9 +426,13 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   symbolsInScope: 11,
   declaredType: 1,
   typeOfSymbol: 1,
+  symbolDocumentation: 12,
+  symbolJSDocTags: 13,
   returnType: 1,
   typePredicate: 10,
   parameterType: 1,
+  signatureDocumentation: 12,
+  signatureJSDocTags: 13,
   void: 1,
   property: 1,
   propertyType: 1,

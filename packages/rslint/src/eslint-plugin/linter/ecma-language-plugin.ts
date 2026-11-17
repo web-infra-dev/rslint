@@ -231,7 +231,10 @@ export function lintFile(
   // of `languageOptions`. No legacy positions are accepted.
   // Lazy SourceCode resources may outlive lintFile. Keep their language
   // metadata, rather than capturing the request and its transport frame.
-  const languageOptions = req.languageOptions;
+  const languageOptions =
+    services && !req.languageOptions?.parserOptions
+      ? { ...req.languageOptions, parserOptions: {} }
+      : req.languageOptions;
   const globals = languageOptions?.globals;
   const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
   const createScopeManager = makeScopeManagerFactory(ast, {
