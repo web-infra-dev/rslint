@@ -1,135 +1,430 @@
-// Upstream: eslint-plugin-import v2.32.0 tests/src/rules/no-relative-parent-imports.js
-// and docs/rules/no-relative-parent-imports.md. Babel's standard syntax uses
-// the native parser; all upstream cases run without skips.
-import fs from 'node:fs';
-import path from 'node:path';
-
-import { RuleTester } from '../rule-tester.js';
-
-const root = fs.mkdtempSync(
-  path.join(process.cwd(), '.no-relative-parent-imports-'),
-);
-const archive = fs.readFileSync(
-  path.resolve(
-    import.meta.dirname,
-    '../../../../../internal/plugins/import/rules/no_relative_parent_imports/testdata/modules.txtar',
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+new RuleTester(
+  fixtureConfig(
+    'internal/plugins/import/rules/no_relative_parent_imports/testdata/modules.txtar',
   ),
-  'utf8',
-);
-const chunks = archive.split(/^-- (.+) --\r?$/m);
-if (chunks.length < 3) throw new Error('Missing upstream fixtures');
-for (let i = 1; i < chunks.length; i += 2) {
-  const file = path.join(root, chunks[i]);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, chunks[i + 1].replace(/^\r?\n/, ''));
-}
-afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
-
-const filename = path.join(root, 'internal-modules/plugins/plugin2/index.js');
-const message = (dependency: string, file = 'index.js') =>
-  `Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move \`${file}\` to same directory as \`${dependency}\` or consider making \`${dependency}\` a package.`;
-
-new RuleTester().run('no-relative-parent-imports', null as never, {
+).run('no-relative-parent-imports', {
   valid: [
-    { code: 'import foo from "./internal.js"', filename },
-    { code: 'import foo from "./app/index.js"', filename },
-    { code: 'import foo from "package"', filename },
     {
+      name: 'run 0 valid 0',
+      code: 'import foo from "./internal.js"',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 1',
+      code: 'import foo from "./app/index.js"',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 2',
+      code: 'import foo from "package"',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 3',
       code: 'require("./internal.js")',
-      filename,
-      options: [{ commonjs: true }],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      options: [
+        {
+          commonjs: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 4',
       code: 'require("./app/index.js")',
-      filename,
-      options: [{ commonjs: true }],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      options: [
+        {
+          commonjs: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 5',
       code: 'require("package")',
-      filename,
-      options: [{ commonjs: true }],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      options: [
+        {
+          commonjs: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
-    { code: 'import("./internal.js")', filename },
-    { code: 'import("./app/index.js")', filename },
-    { code: 'import(".")', filename },
-    { code: 'import("path")', filename },
-    { code: 'import("package")', filename },
-    { code: 'import("@scope/package")', filename },
-    // Documentation examples and both relocation strategies.
     {
+      name: 'run 0 valid 6',
+      code: 'import("./internal.js")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 7',
+      code: 'import("./app/index.js")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 8',
+      code: 'import(".")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 9',
+      code: 'import("path")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 10',
+      code: 'import("package")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 11',
+      code: 'import("@scope/package")',
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+    },
+    {
+      name: 'run 0 valid 12',
       code: 'export default function (numbers) { return numbers.reduce((sum, n) => sum + n, 0); }',
-      filename: path.join(root, 'add.js'),
+      filename: 'add.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 13',
       code: 'export default function three(add) { return add([1, 2]); }',
-      filename: path.join(root, 'numbers/three.js'),
+      filename: 'numbers/three.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 14',
       code: "import add from './add';\nimport three from './numbers/three';\nconsole.log(three(add));",
-      filename: path.join(root, 'use.js'),
+      filename: 'use.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 15',
       code: "import add from 'add';\nexport default function three() { return add([1,2]); }",
-      filename: path.join(root, 'numbers/three.js'),
+      filename: 'numbers/three.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 16',
       code: "import foo from 'foo';\nimport a from './lib/a';",
-      filename: path.join(root, 'main.js'),
+      filename: 'main.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 17',
       code: "import b from './b';",
-      filename: path.join(root, 'lib/a.js'),
+      filename: 'lib/a.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 18',
       code: "import add from './add';",
-      filename: path.join(root, 'three.js'),
+      filename: 'three.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
     {
+      name: 'run 0 valid 19',
       code: "import add from './math/add';",
-      filename: path.join(root, 'three.js'),
+      filename: 'three.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
     },
   ],
   invalid: [
     {
+      name: 'run 0 invalid 0',
       code: 'import foo from "../plugin.js"',
-      filename,
-      errors: [message('../plugin.js')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `../plugin.js` or consider making `../plugin.js` a package.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 1',
       code: 'require("../plugin.js")',
-      filename,
-      options: [{ commonjs: true }],
-      errors: [message('../plugin.js')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      options: [
+        {
+          commonjs: true,
+        },
+      ],
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `../plugin.js` or consider making `../plugin.js` a package.",
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 23,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 2',
       code: 'import("../plugin.js")',
-      filename,
-      errors: [message('../plugin.js')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `../plugin.js` or consider making `../plugin.js` a package.",
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 3',
       code: 'import foo from "./../plugin.js"',
-      filename,
-      errors: [message('./../plugin.js')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `./../plugin.js` or consider making `./../plugin.js` a package.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 4',
       code: 'import foo from "../../api/service"',
-      filename,
-      errors: [message('../../api/service')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `../../api/service` or consider making `../../api/service` a package.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 5',
       code: 'import("../../api/service")',
-      filename,
-      errors: [message('../../api/service')],
+      filename: 'internal-modules/plugins/plugin2/index.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `index.js` to same directory as `../../api/service` or consider making `../../api/service` a package.",
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 6',
       code: "import add from '../add';\nexport default function three() { return add([1, 2]); }",
-      filename: path.join(root, 'numbers/three.js'),
-      errors: [message('../add', 'three.js')],
+      filename: 'numbers/three.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `three.js` to same directory as `../add` or consider making `../add` a package.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
     },
     {
+      name: 'run 0 invalid 7',
       code: "import bar from '../main';",
-      filename: path.join(root, 'lib/a.js'),
-      errors: [message('../main', 'a.js')],
+      filename: 'lib/a.js',
+      languageOptions: {
+        parserOptions: {
+          project: false,
+          projectService: false,
+        },
+      },
+      errors: [
+        {
+          messageId: '',
+          message:
+            "Relative imports from parent directories are not allowed. Please either pass what you're importing through at runtime (dependency injection), move `a.js` to same directory as `../main` or consider making `../main` a package.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 26,
+        },
+      ],
     },
   ],
 });

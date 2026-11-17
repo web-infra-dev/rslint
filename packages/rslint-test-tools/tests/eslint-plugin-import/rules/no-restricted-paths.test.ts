@@ -1,618 +1,1081 @@
-import { test, testFixturePath } from '../utils.js';
-
-import { RuleTester } from '../rule-tester.js';
-
-const ruleTester = new RuleTester();
-// Rslint-Modified: we don't require rules
-// const rule = require('rules/no-restricted-paths')
-const rule = null as never;
-// Rslint-Modified end
-
-// Rslint-Modified: upstream resolves the zone paths against `process.cwd()`.
-// The harness runs from an unrelated working directory, so every case pins
-// `basePath` to the fixture root and uses zone paths relative to it.
-const basePath = testFixturePath('./no-restricted-paths-rule');
-
-function filePath(relativePath: string): string {
-  return testFixturePath(`./no-restricted-paths-rule/${relativePath}`);
-}
-// Rslint-Modified end
-
-ruleTester.run('no-restricted-paths', rule, {
+// Migrated from eslint-plugin-import@2.32.0 and the existing Rslint regressions.
+// Assertions record current native output; skipped inputs retain their upstream assertions.
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, resolveFixturePaths } from '../config';
+new RuleTester(fixtureConfig()).run('no-restricted-paths', {
   valid: [
-    test({
+    {
+      name: 'run 0 valid 0',
       code: 'import a from "../client/a"',
-      filename: filePath('server/b.ts'),
-      options: [{ basePath, zones: [{ target: './server', from: './other' }] }],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 1',
       code: 'import a from "../client/a"',
-      filename: filePath('server/b.ts'),
-      options: [{ basePath, zones: [{ target: '**/*', from: './other' }] }],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: '**/*',
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 2',
       code: 'import a from "../client/a"',
-      filename: filePath('client/b.ts'),
-      options: [
-        {
-          basePath,
-          zones: [{ target: './!(client)/**/*', from: './client/**/*' }],
-        },
-      ],
-    }),
-    test({
-      // Rslint-Modified: CommonJS specifiers only take part in module
-      // resolution inside JavaScript files, so the require cases run on a
-      // `.js` fixture.
+      filename: 'fixtures/no-restricted-paths-rule/client/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './!(client)/**/*',
+                  from: './client/**/*',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 3',
       code: 'const a = require("../client/a")',
-      filename: filePath('server/consumer.js'),
-      options: [{ basePath, zones: [{ target: './server', from: './other' }] }],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/consumer.js',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 4',
       code: 'import b from "../server/b"',
-      filename: filePath('client/a.ts'),
-      options: [{ basePath, zones: [{ target: './client', from: './other' }] }],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 5',
       code: 'import a from "./a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './server/one', from: './server', except: ['./one'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['./one'],
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 6',
       code: 'import a from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './server/one', from: './server', except: ['./two'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['./two'],
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 7',
       code: 'import a from "../one/a"',
-      filename: filePath('server/two-new/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [{ target: './server/two', from: './server', except: [] }],
-        },
-      ],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/two-new/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/two',
+                  from: './server',
+                  except: [],
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 8',
       code: 'import A from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: '**/*', from: './server/**/*', except: ['**/a.ts'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: '**/*',
+                  from: './server/**/*',
+                  except: ['**/a.ts'],
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-
-    // support of arrays for from and target
-    // array with single element
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 9',
       code: 'import a from "../client/a"',
-      filename: filePath('server/b.ts'),
-      options: [
-        { basePath, zones: [{ target: ['./server'], from: './other' }] },
-      ],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./server'],
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 10',
       code: 'import a from "../client/a"',
-      filename: filePath('server/b.ts'),
-      options: [
-        { basePath, zones: [{ target: './server', from: ['./other'] }] },
-      ],
-    }),
-    // array with multiple elements
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: ['./other'],
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 11',
       code: 'import a from "../one/a"',
-      filename: filePath('server/two-new/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: ['./server/two', './server/three'], from: './server' },
+      filename: 'fixtures/no-restricted-paths-rule/server/two-new/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./server/two', './server/three'],
+                  from: './server',
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 12',
       code: 'import a from "../one/a"',
-      filename: filePath('server/two-new/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
+      filename: 'fixtures/no-restricted-paths-rule/server/two-new/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
             {
-              target: './server',
-              from: ['./server/two', './server/three'],
-              except: [],
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: ['./server/two', './server/three'],
+                  except: [],
+                },
+              ],
             },
           ],
-        },
-      ],
-    }),
-    // array with multiple glob patterns in from
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 13',
       code: 'import a from "../client/a"',
-      filename: filePath('client/b.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
+      filename: 'fixtures/no-restricted-paths-rule/client/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
             {
-              target: './!(client)/**/*',
-              from: ['./client/*', './client/one/*'],
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './!(client)/**/*',
+                  from: ['./client/*', './client/one/*'],
+                },
+              ],
             },
           ],
-        },
-      ],
-    }),
-    // array with mix of glob and non glob patterns in target
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 14',
       code: 'import a from "../client/a"',
-      filename: filePath('client/b.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
+      filename: 'fixtures/no-restricted-paths-rule/client/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
             {
-              target: ['./!(client)/**/*', './client/a/'],
-              from: './client/**/*',
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./!(client)/**/*', './client/a/'],
+                  from: './client/**/*',
+                },
+              ],
             },
           ],
-        },
-      ],
-    }),
-
-    // irrelevant function calls
-    test({ code: 'notRequire("../server/b")' }),
-    test({
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 15',
       code: 'notRequire("../server/b")',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client', from: './server' }] },
-      ],
-    }),
-
-    // no config
-    test({ code: 'require("../server/b")' }),
-    test({ code: 'import b from "../server/b"' }),
-
-    // builtin (ignore)
-    test({ code: 'require("os")' }),
-
-    // typescript: type-only imports
-    test({
+    },
+    {
+      name: 'run 0 valid 16',
+      code: 'notRequire("../server/b")',
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 17',
+      code: 'require("../server/b")',
+    },
+    {
+      name: 'run 0 valid 18',
+      code: 'import b from "../server/b"',
+    },
+    {
+      name: 'run 0 valid 19',
+      code: 'require("os")',
+    },
+    {
+      name: 'run 0 valid 20',
       code: 'import type a from "../client/a"',
-      filename: filePath('server/b.ts'),
-      options: [{ basePath, zones: [{ target: './server', from: './other' }] }],
-    }),
-    test({
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: './other',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 21',
       code: 'import type a from "./a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './server/one', from: './server', except: ['./one'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['./one'],
+                },
+              ],
+            },
           ],
-        },
-      ],
-    }),
-    test({ code: 'import type b from "../server/b"' }),
-    test({ code: 'import type * as b from "../server/b"' }),
+          root,
+        ),
+    },
+    {
+      name: 'run 0 valid 22',
+      code: 'import type b from "../server/b"',
+    },
+    {
+      name: 'run 0 valid 23',
+      code: 'import type * as b from "../server/b"',
+    },
   ],
-
   invalid: [
-    test({
+    {
+      name: 'run 0 invalid 0',
       code: 'import b from "../server/b"; // 1',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client', from: './server' }] },
-      ],
-      errors: [
-        {
-          message: 'Unexpected path "../server/b" imported in restricted zone.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "../server/b"; // 2',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client/**/*', from: './server' }] },
-      ],
-      errors: [
-        {
-          message: 'Unexpected path "../server/b" imported in restricted zone.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "../server/b";',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client/*.ts', from: './server' }] },
-      ],
-      errors: [
-        {
-          message: 'Unexpected path "../server/b" imported in restricted zone.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import b from "../server/b"; // 2 ter',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client/**', from: './server' }] },
-      ],
-      errors: [
-        {
-          message: 'Unexpected path "../server/b" imported in restricted zone.',
-          line: 1,
-          column: 15,
-        },
-      ],
-    }),
-    test({
-      code: 'import a from "../client/a"\nimport c from "./c"',
-      filename: filePath('server/b.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './server', from: './client' },
-            { target: './server', from: './server/c.ts' },
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: './server',
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
+          message: 'Unexpected path "../server/b" imported in restricted zone.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 1',
+      code: 'import b from "../server/b"; // 2',
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client/**/*',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+      errors: [
+        {
+          messageId: 'unexpectedPath',
+          message: 'Unexpected path "../server/b" imported in restricted zone.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 2',
+      code: 'import b from "../server/b";',
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client/*.ts',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+      errors: [
+        {
+          messageId: 'unexpectedPath',
+          message: 'Unexpected path "../server/b" imported in restricted zone.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 3',
+      code: 'import b from "../server/b"; // 2 ter',
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client/**',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+      errors: [
+        {
+          messageId: 'unexpectedPath',
+          message: 'Unexpected path "../server/b" imported in restricted zone.',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      name: 'run 0 invalid 4',
+      code: 'import a from "../client/a"\nimport c from "./c"',
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: './client',
+                },
+                {
+                  target: './server',
+                  from: './server/c.ts',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
+      errors: [
+        {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../client/a" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 28,
         },
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "./c" imported in restricted zone.',
           line: 2,
           column: 15,
+          endLine: 2,
+          endColumn: 20,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 5',
       code: 'const b = require("../server/b")',
-      filename: filePath('client/consumer.js'),
-      options: [
-        { basePath, zones: [{ target: './client', from: './server' }] },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/client/consumer.js',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 19,
+          endLine: 1,
+          endColumn: 32,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 6',
       code: 'import b from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './server/one', from: './server', except: ['./one'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['./one'],
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../two/a" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 7',
       code: 'import b from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
             {
-              target: './server/one',
-              from: './server',
-              except: ['./one'],
-              message: 'Custom message',
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['./one'],
+                  message: 'Custom message',
+                },
+              ],
             },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message:
             'Unexpected path "../two/a" imported in restricted zone. Custom message',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 8',
       code: 'import b from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
             {
-              target: './server/one',
-              from: './server',
-              except: ['../client/a'],
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server/one',
+                  from: './server',
+                  except: ['../client/a'],
+                },
+              ],
             },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'invalidExceptionPath',
           message:
             'Restricted path exceptions must be descendants of the configured `from` path for that zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 9',
       code: 'import A from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        { basePath, zones: [{ target: '**/*', from: './server/**/*' }] },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: '**/*',
+                  from: './server/**/*',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../two/a" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 10',
       code: 'import A from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [{ target: '**/*', from: './server/**/*', except: ['a.ts'] }],
-        },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: '**/*',
+                  from: './server/**/*',
+                  except: ['a.ts'],
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'invalidExceptionGlob',
           message:
             'Restricted path exceptions must be glob patterns when `from` contains glob patterns',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-
-    // support of arrays for from and target
-    // array with single element
-    test({
+    },
+    {
+      name: 'run 0 invalid 11',
       code: 'import b from "../server/b"; // 4',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: ['./client'], from: './server' }] },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./client'],
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 12',
       code: 'import b from "../server/b"; // 5',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client', from: ['./server'] }] },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: ['./server'],
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-    }),
-    // array with multiple elements
-    test({
+    },
+    {
+      name: 'run 0 invalid 13',
       code: 'import b from "../server/b"; // 6',
-      filename: filePath('client/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [{ target: ['./client/one', './client'], from: './server' }],
-        },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./client/one', './client'],
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 14',
       code: 'import b from "../server/one/b"\nimport a from "../server/two/a"',
-      filename: filePath('client/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './client', from: ['./server/one', './server/two'] },
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: ['./server/one', './server/two'],
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message:
             'Unexpected path "../server/one/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 32,
         },
         {
+          messageId: 'unexpectedPath',
           message:
             'Unexpected path "../server/two/a" imported in restricted zone.',
           line: 2,
           column: 15,
+          endLine: 2,
+          endColumn: 32,
         },
       ],
-    }),
-    // array with multiple glob patterns in from
-    test({
+    },
+    {
+      name: 'run 0 invalid 15',
       code: 'import b from "../server/one/b"\nimport a from "../server/two/a"',
-      filename: filePath('client/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './client', from: ['./server/one/*', './server/two/*'] },
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: ['./server/one/*', './server/two/*'],
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message:
             'Unexpected path "../server/one/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 32,
         },
         {
+          messageId: 'unexpectedPath',
           message:
             'Unexpected path "../server/two/a" imported in restricted zone.',
           line: 2,
           column: 15,
+          endLine: 2,
+          endColumn: 32,
         },
       ],
-    }),
-    // array with mix of glob and non glob patterns in target
-    test({
+    },
+    {
+      name: 'run 0 invalid 16',
       code: 'import b from "../server/b"; // 7',
-      filename: filePath('client/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: ['./client/one', './client/**/*'], from: './server' },
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: ['./client/one', './client/**/*'],
+                  from: './server',
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 28,
         },
       ],
-    }),
-    // configuration format
-    test({
+    },
+    {
+      name: 'run 0 invalid 17',
       code: 'import A from "../two/a"',
-      filename: filePath('server/one/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: '**/*', from: ['./server/**/*'], except: ['a.ts'] },
+      filename: 'fixtures/no-restricted-paths-rule/server/one/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: '**/*',
+                  from: ['./server/**/*'],
+                  except: ['a.ts'],
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'invalidExceptionGlob',
           message:
             'Restricted path exceptions must be glob patterns when `from` contains glob patterns',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 25,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 18',
       code: 'import b from "../server/one/b"',
-      filename: filePath('client/a.ts'),
-      options: [
-        {
-          basePath,
-          zones: [
-            { target: './client', from: ['./server/one', './server/two/*'] },
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: ['./server/one', './server/two/*'],
+                },
+              ],
+            },
           ],
-        },
-      ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'mixedGlobAndNonGlob',
           message:
             'Restricted path `from` must contain either only glob patterns or none',
           line: 1,
           column: 15,
+          endLine: 1,
+          endColumn: 32,
         },
       ],
-    }),
-
-    // typescript: type-only imports
-    test({
+    },
+    {
+      name: 'run 0 invalid 19',
       code: 'import type b from "../server/b"',
-      filename: filePath('client/a.ts'),
-      options: [
-        { basePath, zones: [{ target: './client', from: './server' }] },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/client/a.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './client',
+                  from: './server',
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../server/b" imported in restricted zone.',
           line: 1,
           column: 20,
+          endLine: 1,
+          endColumn: 33,
         },
       ],
-    }),
-    test({
+    },
+    {
+      name: 'run 0 invalid 20',
       code: 'import type a from "../client/a"\nimport type c from "./c"',
-      filename: filePath('server/b.ts'),
-      options: [
-        {
-          basePath,
-          zones: [{ target: './server', from: ['./client', './server/c.ts'] }],
-        },
-      ],
+      filename: 'fixtures/no-restricted-paths-rule/server/b.ts',
+      options: (root: string) =>
+        resolveFixturePaths(
+          [
+            {
+              basePath: '<fixture>/fixtures/no-restricted-paths-rule',
+              zones: [
+                {
+                  target: './server',
+                  from: ['./client', './server/c.ts'],
+                },
+              ],
+            },
+          ],
+          root,
+        ),
       errors: [
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "../client/a" imported in restricted zone.',
           line: 1,
           column: 20,
+          endLine: 1,
+          endColumn: 33,
         },
         {
+          messageId: 'unexpectedPath',
           message: 'Unexpected path "./c" imported in restricted zone.',
           line: 2,
           column: 20,
+          endLine: 2,
+          endColumn: 25,
         },
       ],
-    }),
+    },
   ],
 });

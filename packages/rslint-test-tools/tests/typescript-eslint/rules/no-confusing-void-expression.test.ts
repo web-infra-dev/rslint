@@ -1,15 +1,16 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+// Upstream: typescript-eslint v8.67.0, no-confusing-void-expression.test.ts.
+// All upstream cases and outputs are preserved; full ranges come from the upstream parser.
+import { RuleTester } from '@rslint/rule-tester';
 
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
 const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
+  plugin: '@typescript-eslint',
+  filename: 'input.ts',
+  languageOptions: { parserOptions: { project: './tsconfig.json' } },
+  fixtureFiles: {
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: { strict: true, target: 'esnext', jsx: 'preserve', types: [] },
+    }),
+    'globals.d.ts': 'declare namespace JSX { interface IntrinsicElements { button: { onClick?: () => void } } }',
   },
 });
 
@@ -24,101 +25,99 @@ ruleTester.run('no-confusing-void-expression', {
 
     {
       code: `
-        () => console.log('foo');
+() => console.log('foo');
       `,
       options: [{ ignoreArrowShorthand: true }],
     },
     {
       code: `
-        foo => foo && console.log(foo);
+foo => foo && console.log(foo);
       `,
       options: [{ ignoreArrowShorthand: true }],
     },
     {
       code: `
-        foo => foo || console.log(foo);
+foo => foo || console.log(foo);
       `,
       options: [{ ignoreArrowShorthand: true }],
     },
     {
       code: `
-        foo => (foo ? console.log(true) : console.log(false));
+foo => (foo ? console.log(true) : console.log(false));
       `,
       options: [{ ignoreArrowShorthand: true }],
     },
 
     {
       code: `
-        !void console.log('foo');
+!void console.log('foo');
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        +void (foo && console.log(foo));
++void (foo && console.log(foo));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        -void (foo || console.log(foo));
+-void (foo || console.log(foo));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        () => void ((foo && void console.log(true)) || console.log(false));
+() => void ((foo && void console.log(true)) || console.log(false));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        const x = void (foo ? console.log(true) : console.log(false));
+const x = void (foo ? console.log(true) : console.log(false));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        !(foo && void console.log(foo));
+!(foo && void console.log(foo));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        !!(foo || void console.log(foo));
+!!(foo || void console.log(foo));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        const x = (foo && void console.log(true)) || void console.log(false);
+const x = (foo && void console.log(true)) || void console.log(false);
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        () => (foo ? void console.log(true) : void console.log(false));
+() => (foo ? void console.log(true) : void console.log(false));
       `,
       options: [{ ignoreVoidOperator: true }],
     },
     {
       code: `
-        return void console.log('foo');
+return void console.log('foo');
       `,
       options: [{ ignoreVoidOperator: true }],
     },
 
     `
 function cool(input: string) {
-  return console.log(input), input;
+  return (console.log(input), input);
 }
     `,
     {
-      // FIXME: same as go port, ts-eslint handles (input, console.log(input)), input differently, so this is a bug
-			skip: true,
       code: `
 function cool(input: string) {
-  return input, console.log(input), input;
+  return (input, console.log(input), input);
 }
       `,
     },
@@ -297,6 +296,7 @@ const test: Foo = () => console.log('foo');
       options: [{ ignoreVoidReturningFunctions: true }],
     },
     {
+      filename: 'jsx.tsx',
       code: 'const foo = <button onClick={() => console.log()} />;',
       languageOptions: {
         parserOptions: {
@@ -417,146 +417,318 @@ test((() => {
   invalid: [
     {
       code: `
-        const x = console.log('foo');
+const x = console.log('foo');
       `,
-      errors: [{ column: 19, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 11,
+          endLine: 2,
+          endColumn: 29,
+        },
+      ],
     },
     {
       code: `
-        const x = console?.log('foo');
+const x = console?.log('foo');
       `,
-      errors: [{ column: 19, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 11,
+          endLine: 2,
+          endColumn: 30,
+        },
+      ],
     },
     {
       code: `
-        console.error(console.log('foo'));
+console.error(console.log('foo'));
       `,
-      errors: [{ column: 23, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 33,
+        },
+      ],
     },
     {
       code: `
-        [console.log('foo')];
+[console.log('foo')];
       `,
-      errors: [{ column: 10, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `
-        ({ x: console.log('foo') });
+({ x: console.log('foo') });
       `,
-      errors: [{ column: 15, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 25,
+        },
+      ],
     },
     {
       code: `
-        void console.log('foo');
+void console.log('foo');
       `,
-      errors: [{ column: 14, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 6,
+          endLine: 2,
+          endColumn: 24,
+        },
+      ],
     },
     {
       code: `
-        console.log('foo') ? true : false;
+console.log('foo') ? true : false;
       `,
-      errors: [{ column: 9, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 1,
+          endLine: 2,
+          endColumn: 19,
+        },
+      ],
     },
     {
       code: `
-        (console.log('foo') && true) || false;
+(console.log('foo') && true) || false;
       `,
-      errors: [{ column: 10, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `
-        (cond && console.log('ok')) || console.log('error');
+(cond && console.log('ok')) || console.log('error');
       `,
-      errors: [{ column: 18, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 10,
+          endLine: 2,
+          endColumn: 27,
+        },
+      ],
     },
     {
       code: `
-        !console.log('foo');
+!console.log('foo');
       `,
-      errors: [{ column: 10, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 20,
+        },
+      ],
     },
 
     {
       code: `
 function notcool(input: string) {
-  return input, console.log(input);
+  return (input, console.log(input));
 }
       `,
-      errors: [{ column: 17, line: 3, messageId: 'invalidVoidExpr' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExpr",
+          message: "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: "() => console.log('foo');",
-      errors: [{ column: 7, line: 1, messageId: 'invalidVoidExprArrow' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
       output: `() => { console.log('foo'); };`,
     },
     {
       code: 'foo => foo && console.log(foo);',
-      errors: [{ column: 15, line: 1, messageId: 'invalidVoidExprArrow' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '(foo: undefined) => foo && console.log(foo);',
-      errors: [{ column: 28, line: 1, messageId: 'invalidVoidExprArrow' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
       output: `(foo: undefined) => { foo && console.log(foo); };`,
     },
     {
       code: 'foo => foo || console.log(foo);',
-      errors: [{ column: 15, line: 1, messageId: 'invalidVoidExprArrow' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
     },
     {
       code: '(foo: undefined) => foo || console.log(foo);',
-      errors: [{ column: 28, line: 1, messageId: 'invalidVoidExprArrow' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 44,
+        },
+      ],
       output: `(foo: undefined) => { foo || console.log(foo); };`,
     },
     {
       code: '(foo: void) => foo || console.log(foo);',
-      errors: [{ column: 23, line: 1, messageId: 'invalidVoidExprArrow' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 39,
+        },
+      ],
       output: `(foo: void) => { foo || console.log(foo); };`,
     },
     {
       code: 'foo => (foo ? console.log(true) : console.log(false));',
       errors: [
-        { column: 15, line: 1, messageId: 'invalidVoidExprArrow' },
-        { column: 35, line: 1, messageId: 'invalidVoidExprArrow' },
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 32,
+        },
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 53,
+        },
       ],
       output: `foo => { foo ? console.log(true) : console.log(false); };`,
     },
     {
       code: `
-        function f() {
-          return console.log('foo');
-          console.log('bar');
-        }
+function f() {
+  return console.log('foo');
+  console.log('bar');
+}
       `,
-      errors: [{ column: 18, line: 3, messageId: 'invalidVoidExprReturn' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturn",
+          message: "Returning a void expression from a function is forbidden. Please move it before the `return` statement.",
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 28,
+        },
+      ],
       output: `
-        function f() {
-          console.log('foo'); return;
-          console.log('bar');
-        }
+function f() {
+  console.log('foo'); return;
+  console.log('bar');
+}
       `,
     },
     {
-      code: noFormat`
+      code: `
         function f() {
           console.log('foo')
           return ['bar', 'baz'].forEach(console.log)
           console.log('quux')
         }
       `,
-      errors: [{ column: 18, line: 4, messageId: 'invalidVoidExprReturn' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturn",
+          message: "Returning a void expression from a function is forbidden. Please move it before the `return` statement.",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 53,
+        },
+      ],
       output: `
         function f() {
           console.log('foo')
@@ -567,27 +739,45 @@ function notcool(input: string) {
     },
     {
       code: `
-        function f() {
-          console.log('foo');
-          return console.log('bar');
-        }
+function f() {
+  console.log('foo');
+  return console.log('bar');
+}
       `,
-      errors: [{ column: 18, line: 4, messageId: 'invalidVoidExprReturnLast' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 28,
+        },
+      ],
       output: `
-        function f() {
-          console.log('foo');
-          console.log('bar');
-        }
+function f() {
+  console.log('foo');
+  console.log('bar');
+}
       `,
     },
     {
-      code: noFormat`
+      code: `
         function f() {
           console.log('foo')
           return ['bar', 'baz'].forEach(console.log)
         }
       `,
-      errors: [{ column: 18, line: 4, messageId: 'invalidVoidExprReturnLast' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 53,
+        },
+      ],
       output: `
         function f() {
           console.log('foo')
@@ -597,111 +787,187 @@ function notcool(input: string) {
     },
     {
       code: `
-        const f = () => {
-          if (cond) {
-            return console.error('foo');
-          }
-          console.log('bar');
-        };
+const f = () => {
+  if (cond) {
+    return console.error('foo');
+  }
+  console.log('bar');
+};
       `,
-      errors: [{ column: 20, line: 4, messageId: 'invalidVoidExprReturn' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturn",
+          message: "Returning a void expression from a function is forbidden. Please move it before the `return` statement.",
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 32,
+        },
+      ],
       output: `
-        const f = () => {
-          if (cond) {
-            console.error('foo'); return;
-          }
-          console.log('bar');
-        };
+const f = () => {
+  if (cond) {
+    console.error('foo'); return;
+  }
+  console.log('bar');
+};
       `,
     },
     {
       code: `
-        const f = function () {
-          if (cond) return console.error('foo');
-          console.log('bar');
-        };
+const f = function () {
+  if (cond) return console.error('foo');
+  console.log('bar');
+};
       `,
-      errors: [{ column: 28, line: 3, messageId: 'invalidVoidExprReturn' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturn",
+          message: "Returning a void expression from a function is forbidden. Please move it before the `return` statement.",
+          line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 40,
+        },
+      ],
       output: `
-        const f = function () {
-          if (cond) { console.error('foo'); return; }
-          console.log('bar');
-        };
+const f = function () {
+  if (cond) { console.error('foo'); return; }
+  console.log('bar');
+};
       `,
     },
     {
       code: `
-        const f = function () {
-          let num = 1;
-          return num ? console.log('foo') : num;
-        };
+const f = function () {
+  let num = 1;
+  return num ? console.log('foo') : num;
+};
       `,
-      errors: [{ column: 24, line: 4, messageId: 'invalidVoidExprReturnLast' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 16,
+          endLine: 4,
+          endColumn: 34,
+        },
+      ],
     },
     {
       code: `
-        const f = function () {
-          let undef = undefined;
-          return undef ? console.log('foo') : undef;
-        };
+const f = function () {
+  let undef = undefined;
+  return undef ? console.log('foo') : undef;
+};
       `,
-      errors: [{ column: 26, line: 4, messageId: 'invalidVoidExprReturnLast' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 36,
+        },
+      ],
       output: `
-        const f = function () {
-          let undef = undefined;
-          undef ? console.log('foo') : undef;
-        };
+const f = function () {
+  let undef = undefined;
+  undef ? console.log('foo') : undef;
+};
       `,
     },
     {
       code: `
-        const f = function () {
-          let num = 1;
-          return num || console.log('foo');
-        };
+const f = function () {
+  let num = 1;
+  return num || console.log('foo');
+};
       `,
-      errors: [{ column: 25, line: 4, messageId: 'invalidVoidExprReturnLast' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: `
-        const f = function () {
-          let bar = void 0;
-          return bar || console.log('foo');
-        };
+const f = function () {
+  let bar = void 0;
+  return bar || console.log('foo');
+};
       `,
-      errors: [{ column: 25, line: 4, messageId: 'invalidVoidExprReturnLast' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
+          line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 35,
+        },
+      ],
       output: `
-        const f = function () {
-          let bar = void 0;
-          bar || console.log('foo');
-        };
+const f = function () {
+  let bar = void 0;
+  bar || console.log('foo');
+};
       `,
     },
     {
       code: `
-        let num = 1;
-        const foo = () => (num ? console.log('foo') : num);
+let num = 1;
+const foo = () => (num ? console.log('foo') : num);
       `,
-      errors: [{ column: 34, line: 3, messageId: 'invalidVoidExprArrow' }],
-      output: null,
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 3,
+          column: 26,
+          endLine: 3,
+          endColumn: 44,
+        },
+      ],
     },
     {
       code: `
-        let bar = void 0;
-        const foo = () => (bar ? console.log('foo') : bar);
+let bar = void 0;
+const foo = () => (bar ? console.log('foo') : bar);
       `,
-      errors: [{ column: 34, line: 3, messageId: 'invalidVoidExprArrow' }],
+      errors: [
+        {
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+          line: 3,
+          column: 26,
+          endLine: 3,
+          endColumn: 44,
+        },
+      ],
       output: `
-        let bar = void 0;
-        const foo = () => { bar ? console.log('foo') : bar; };
+let bar = void 0;
+const foo = () => { bar ? console.log('foo') : bar; };
       `,
     },
     {
       code: "return console.log('foo');",
       errors: [
-        { column: 8, line: 1, messageId: 'invalidVoidExprReturnWrapVoid' },
+        {
+          messageId: "invalidVoidExprReturnWrapVoid",
+          message: "Void expressions returned from a function must be marked explicitly with the `void` operator.",
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
       options: [{ ignoreVoidOperator: true }],
       output: "return void console.log('foo');",
@@ -710,60 +976,76 @@ function notcool(input: string) {
       code: "console.error(console.log('foo'));",
       errors: [
         {
-          column: 15,
+          messageId: "invalidVoidExprWrapVoid",
+          message: "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the `void` operator.",
           line: 1,
-          messageId: 'invalidVoidExprWrapVoid',
+          column: 15,
+          endLine: 1,
+          endColumn: 33,
           suggestions: [
             {
-              messageId: 'voidExprWrapVoid',
+              messageId: "voidExprWrapVoid",
+              desc: "Mark with an explicit `void` operator.",
               output: "console.error(void console.log('foo'));",
             },
           ],
         },
       ],
       options: [{ ignoreVoidOperator: true }],
-      output: null,
     },
     {
       code: "console.log('foo') ? true : false;",
       errors: [
         {
-          column: 1,
+          messageId: "invalidVoidExprWrapVoid",
+          message: "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the `void` operator.",
           line: 1,
-          messageId: 'invalidVoidExprWrapVoid',
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
           suggestions: [
             {
-              messageId: 'voidExprWrapVoid',
+              messageId: "voidExprWrapVoid",
+              desc: "Mark with an explicit `void` operator.",
               output: "void console.log('foo') ? true : false;",
             },
           ],
         },
       ],
       options: [{ ignoreVoidOperator: true }],
-      output: null,
     },
     {
       code: "const x = foo ?? console.log('foo');",
       errors: [
         {
-          column: 18,
+          messageId: "invalidVoidExprWrapVoid",
+          message: "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the `void` operator.",
           line: 1,
-          messageId: 'invalidVoidExprWrapVoid',
+          column: 18,
+          endLine: 1,
+          endColumn: 36,
           suggestions: [
             {
-              messageId: 'voidExprWrapVoid',
+              messageId: "voidExprWrapVoid",
+              desc: "Mark with an explicit `void` operator.",
               output: "const x = foo ?? void console.log('foo');",
             },
           ],
         },
       ],
       options: [{ ignoreVoidOperator: true }],
-      output: null,
     },
     {
       code: 'foo => foo || console.log(foo);',
       errors: [
-        { column: 15, line: 1, messageId: 'invalidVoidExprArrowWrapVoid' },
+        {
+          messageId: "invalidVoidExprArrowWrapVoid",
+          message: "Void expressions returned from an arrow function shorthand must be marked explicitly with the `void` operator.",
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
       options: [{ ignoreVoidOperator: true }],
       output: 'foo => foo || void console.log(foo);',
@@ -772,19 +1054,22 @@ function notcool(input: string) {
       code: "!!console.log('foo');",
       errors: [
         {
-          column: 3,
+          messageId: "invalidVoidExprWrapVoid",
+          message: "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the `void` operator.",
           line: 1,
-          messageId: 'invalidVoidExprWrapVoid',
+          column: 3,
+          endLine: 1,
+          endColumn: 21,
           suggestions: [
             {
-              messageId: 'voidExprWrapVoid',
+              messageId: "voidExprWrapVoid",
+              desc: "Mark with an explicit `void` operator.",
               output: "!!void console.log('foo');",
             },
           ],
         },
       ],
       options: [{ ignoreVoidOperator: true }],
-      output: null,
     },
     {
       code: `
@@ -794,9 +1079,12 @@ function test() {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 3,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -810,9 +1098,12 @@ function test() {
       code: "const test = () => console.log('foo');",
       errors: [
         {
-          column: 20,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 1,
-          messageId: 'invalidVoidExprArrow',
+          column: 20,
+          endLine: 1,
+          endColumn: 38,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -826,9 +1117,12 @@ const test = () => {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 3,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -848,9 +1142,12 @@ function foo(): void {
       `,
       errors: [
         {
-          column: 12,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 4,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 12,
+          endLine: 4,
+          endColumn: 25,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -864,34 +1161,40 @@ function foo(): void {
     },
     {
       code: `
-        (): any => console.log('foo');
+(): any => console.log('foo');
       `,
       errors: [
         {
-          column: 20,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 2,
-          messageId: 'invalidVoidExprArrow',
+          column: 12,
+          endLine: 2,
+          endColumn: 30,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
       output: `
-        (): any => { console.log('foo'); };
+(): any => { console.log('foo'); };
       `,
     },
     {
       code: `
-        (): unknown => console.log('foo');
+(): unknown => console.log('foo');
       `,
       errors: [
         {
-          column: 24,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 2,
-          messageId: 'invalidVoidExprArrow',
+          column: 16,
+          endLine: 2,
+          endColumn: 34,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
       output: `
-        (): unknown => { console.log('foo'); };
+(): unknown => { console.log('foo'); };
       `,
     },
     {
@@ -902,9 +1205,12 @@ function test(): void {
       `,
       errors: [
         {
-          column: 15,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 15,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -921,9 +1227,12 @@ type Foo = any;
       `,
       errors: [
         {
-          column: 12,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 12,
+          endLine: 3,
+          endColumn: 25,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -939,9 +1248,12 @@ type Foo = unknown;
       `,
       errors: [
         {
-          column: 12,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 12,
+          endLine: 3,
+          endColumn: 25,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -958,9 +1270,12 @@ function test(): any {
       `,
       errors: [
         {
-          column: 15,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 15,
+          endLine: 3,
+          endColumn: 28,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -978,9 +1293,12 @@ function test(): unknown {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 3,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -998,9 +1316,12 @@ function test(): any {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 3,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 3,
+          endColumn: 23,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1017,9 +1338,12 @@ type Foo = () => any;
       `,
       errors: [
         {
-          column: 18,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 18,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1035,9 +1359,12 @@ type Foo = () => unknown;
       `,
       errors: [
         {
-          column: 18,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 18,
+          endLine: 3,
+          endColumn: 31,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1053,9 +1380,12 @@ const test: Foo = () => console.log();
       `,
       errors: [
         {
-          column: 25,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 25,
+          endLine: 3,
+          endColumn: 38,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1071,9 +1401,12 @@ const test: Foo = () => console.log();
       `,
       errors: [
         {
-          column: 25,
+          messageId: "invalidVoidExprArrow",
+          message: "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
           line: 3,
-          messageId: 'invalidVoidExprArrow',
+          column: 25,
+          endLine: 3,
+          endColumn: 38,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1094,9 +1427,12 @@ const foo: Foo = function () {
       `,
       errors: [
         {
-          column: 12,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 6,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 12,
+          endLine: 6,
+          endColumn: 25,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1120,9 +1456,12 @@ const foo = function () {
       `,
       errors: [
         {
-          column: 12,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 4,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 12,
+          endLine: 4,
+          endColumn: 25,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1140,9 +1479,12 @@ return console.log('foo');
       `,
       errors: [
         {
-          column: 8,
+          messageId: "invalidVoidExprReturn",
+          message: "Returning a void expression from a function is forbidden. Please move it before the `return` statement.",
           line: 2,
-          messageId: 'invalidVoidExprReturn',
+          column: 8,
+          endLine: 2,
+          endColumn: 26,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1163,9 +1505,12 @@ function test(arg?: string): any | void {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 8,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
@@ -1193,9 +1538,12 @@ function test(arg?: string): any | void {
       `,
       errors: [
         {
-          column: 10,
+          messageId: "invalidVoidExprReturnLast",
+          message: "Returning a void expression from a function is forbidden. Please remove the `return` statement.",
           line: 8,
-          messageId: 'invalidVoidExprReturnLast',
+          column: 10,
+          endLine: 8,
+          endColumn: 23,
         },
       ],
       options: [{ ignoreVoidReturningFunctions: true }],
