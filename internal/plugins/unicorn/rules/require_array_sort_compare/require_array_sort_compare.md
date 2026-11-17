@@ -24,6 +24,18 @@ The rule provides two editor suggestions: a numeric comparator and a string `loc
 
 Typed arrays are intentionally not reported because `TypedArray#sort()` already sorts numerically.
 
+## Differences from upstream
+
+Upstream skips every instance of a custom class. Rslint still reports an instance of a class that extends `Array`, because its `sort()` and `toSorted()` compare elements as strings too:
+
+```javascript
+class Numbers extends Array {}
+
+new Numbers(10, 2, 1).sort(); // reported by rslint, not by upstream
+```
+
+The class chain must reach `Array` through classes declared in the same file. TypeScript files with type information also follow the checker's base types.
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: require-array-sort-compare](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/docs/rules/require-array-sort-compare.md)

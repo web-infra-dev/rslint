@@ -19,13 +19,17 @@ import (
 // assignment and logical operands, and array producers are read, and a call
 // has a static value only through Object.freeze/preventExtensions/seal.
 func IsKnownNonArray(ctx rule.RuleContext, node *ast.Node) bool {
-	return classifyArrayReceiverWithOptions(ctx, node, arrayTargets, knownNonArrayNames, knownNonArrayOptions) == arrayClassNonTarget
+	return IsKnownNonArrayWithOptions(ctx, node, ArrayReceiverOptions{})
 }
 
-var knownNonArrayOptions = ArrayReceiverOptions{
-	CheckArrayProducers:      true,
-	ReadJSDoc:                true,
-	sideEffectFreeStaticCall: true,
+// IsKnownNonArrayWithOptions adds rule-specific receiver policies to the
+// Unicorn defaults that IsKnownNonArray applies. For example,
+// CheckClassHeritage and CheckClassSyntax make an Array subclass an array.
+func IsKnownNonArrayWithOptions(ctx rule.RuleContext, node *ast.Node, options ArrayReceiverOptions) bool {
+	options.CheckArrayProducers = true
+	options.ReadJSDoc = true
+	options.sideEffectFreeStaticCall = true
+	return classifyArrayReceiverWithOptions(ctx, node, arrayTargets, knownNonArrayNames, options) == arrayClassNonTarget
 }
 
 // IsKnownNonIndexedCollection reports whether node is definitely outside the
@@ -639,9 +643,6 @@ func classifyArrayIdentifier(
 		var optional bool
 		if state.options.ReadJSDoc && (declaration.Kind == ast.KindVariableDeclaration || declaration.Kind == ast.KindParameter) {
 			annotation, optional = valueTypeAnnotation(ctx, declaration, true)
-			if isSharedStatementJSDoc(declaration, annotation) {
-				annotation, optional = nil, false
-			}
 		}
 		options := arrayTypeOptions(targetNames, nonTargetNames, state.options)
 		class := ClassifyTypeAnnotation(ctx, annotation, options)
@@ -674,16 +675,6 @@ func classifyArrayIdentifier(
 		state.memo[symbol] = class
 	}
 	return class
-}
-
-// isSharedStatementJSDoc reports a JSDoc annotation written before a variable
-// statement that declares several bindings. tsgo attaches it to the first
-// declarator, while Unicorn reads statement JSDoc only for a single binding.
-func isSharedStatementJSDoc(declaration, annotation *ast.Node) bool {
-	list := declaration.Parent
-	return annotation != nil && ast.IsVariableDeclaration(declaration) && utils.IsJSDocSyntaxNode(annotation) &&
-		list != nil && ast.IsVariableDeclarationList(list) && len(list.AsVariableDeclarationList().Declarations.Nodes) > 1 &&
-		annotation.Pos() < declaration.Pos()
 }
 
 // arrayBindingTypeAnnotation mirrors definition.name?.typeAnnotation in
@@ -728,7 +719,7 @@ func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNa
 			if !ok || state.options.ReadJSDoc && hasContextDependentFactoryReturn(utils.SkipAssertionsAndParens(initializer)) {
 				return arrayClassUnknown
 			}
-			if class := ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, declaration), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
+			if class := ClassifyTypeAnnotation(ctx, callableReturnTypeAnnotation(ctx, declaration, state.options.ReadJSDoc), arrayTypeOptions(targetNames, nonTargetNames, state.options)); class != arrayClassUnknown {
 				return class
 			}
 			return classifyArrayFactoryReturn(ctx, initializer, targetNames, nonTargetNames, state)
@@ -742,7 +733,7 @@ func classifyArrayFactoryReturn(ctx rule.RuleContext, callee *ast.Node, targetNa
 		if state.options.ReadJSDoc && hasContextDependentFactoryReturn(callee) {
 			return arrayClassUnknown
 		}
-		return ClassifyTypeAnnotation(ctx, CallableReturnTypeAnnotation(ctx, callee), arrayTypeOptions(targetNames, nonTargetNames, state.options))
+		return ClassifyTypeAnnotation(ctx, callableReturnTypeAnnotation(ctx, callee, state.options.ReadJSDoc), arrayTypeOptions(targetNames, nonTargetNames, state.options))
 	}
 	return arrayClassUnknown
 }

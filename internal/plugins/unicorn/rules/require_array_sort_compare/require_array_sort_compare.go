@@ -16,6 +16,11 @@ const (
 	stringCompare       = "(a, b) => a.localeCompare(b)"
 )
 
+var arraySubclassReceivers = unicornutil.ArrayReceiverOptions{
+	CheckClassHeritage: true,
+	CheckClassSyntax:   true,
+}
+
 var missingCompareMessage = rule.RuleMessage{
 	Id:          messageID,
 	Description: "Pass a compare function to avoid sorting elements as strings.",
@@ -82,7 +87,9 @@ var RequireArraySortCompareRule = rule.Rule{
 					}
 				}
 
-				if unicornutil.IsKnownNonArray(ctx, call.Object) {
+				// Upstream treats every custom constructor as a non-array. An instance
+				// of a class that extends Array still sorts its elements as strings.
+				if unicornutil.IsKnownNonArrayWithOptions(ctx, call.Object, arraySubclassReceivers) {
 					return
 				}
 

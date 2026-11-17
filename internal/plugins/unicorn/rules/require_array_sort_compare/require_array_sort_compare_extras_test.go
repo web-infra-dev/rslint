@@ -33,6 +33,16 @@ func TestRequireArraySortCompareExtras(t *testing.T) {
 			valid(`declare const x: typeof Array; x.sort()`, "file.ts"),
 			valid(`enum E { A } E.sort()`, "file.ts"),
 			valid(`class A { s: Set<number>; f() { this.s.sort() } }`, "file.ts"),
+			// Unicorn ignores an ambiguous JSDoc annotation and reads only the
+			// closest attached comment.
+			valid("/** @type {number[]}\n * @type {Set<number>} */\nconst values = { sort() {} };\nvalues.sort()", "file.js"),
+			valid("/** @type {number[]} */\n// no longer an array\nconst values = { sort() {} };\nvalues.sort()", "file.js"),
+			valid("/** @type {number[]} */\n// no longer an array\nconst values = { sort() {} };\nvalues.sort()", "file.ts"),
+			valid("/** @type {number[]} */\n/** @type {Set<number>} */\nconst values = x;\nvalues.sort()", "file.js"),
+			valid("/** @type {Set<number>} */\n// eslint-disable-next-line no-undef\nconst values = x;\nvalues.sort()", "file.js"),
+			valid("class Numbers {}\nnew Numbers().sort()", "file.js"),
+			valid("class Numbers extends Set {}\nconst values = new Numbers();\nvalues.sort()", "file.js"),
+			valid("class Numbers extends Uint8Array {}\nnew Numbers().sort()", "file.ts"),
 		},
 		[]rule_tester.InvalidTestCase{
 			invalid(`((array)).sort()`, "sort", "file.js", true),
@@ -47,6 +57,21 @@ func TestRequireArraySortCompareExtras(t *testing.T) {
 			invalid(`const s = /** @type {Set<number>} */ (x); s.sort()`, "sort", "file.js", true),
 			invalid(`/** @type {Set<number>} */ var s, t; s.sort()`, "sort", "file.js", true),
 			invalid(`/** @type {*} */ const s = new Set(); s.sort()`, "sort", "file.js", true),
+			// Unicorn treats every custom constructor as a non-array. Rslint keeps
+			// reporting a class whose heritage reaches Array.
+			invalid("class Numbers extends Array {}\nnew Numbers(10, 2, 1).sort()", "sort", "file.js", true),
+			invalid("class Numbers extends Array {}\nnew Numbers(10, 2, 1).toSorted()", "toSorted", "file.js", true),
+			invalid("class Numbers extends Array {}\nconst values = new Numbers(10, 2, 1);\nvalues.sort()", "sort", "file.js", true),
+			invalid("class Base extends Array {}\nconst Derived = class extends Base {};\nnew Derived().sort()", "sort", "file.js", true),
+			invalid("class Numbers extends Array {}\nnew Numbers(10, 2, 1).sort()", "sort", "file.ts", true),
+			invalid("class Numbers extends Array<number> {}\nconst values = new Numbers(10, 2, 1);\nvalues.toSorted()", "toSorted", "file.ts", true),
+			invalid("class Numbers extends Array<number> {}\nlet values = new Numbers(10, 2, 1);\nvalues.sort()", "sort", "file.ts", true),
+			invalid("class Numbers extends Array<number> {}\ndeclare const values: Numbers;\nvalues.sort()", "sort", "file.ts", true),
+			invalid("/** @type {Set<number>}\n * @type {number[]} */\nconst values = [10, 2, 1];\nvalues.sort()", "sort", "file.js", true),
+			invalid("/** @type {Set<number>}\n * @type {number[]} */\nconst values = [10, 2, 1];\nvalues.sort()", "sort", "file.ts", true),
+			invalid("/** @type {Set<number>} */\n// now an array\nconst values = [10, 2, 1];\nvalues.sort()", "sort", "file.js", true),
+			invalid("/** @returns {Set<number>}\n * @returns {number[]} */\nfunction make() {}\nmake().sort()", "sort", "file.js", true),
+			invalid("/** @returns {Set<number>} */\n// changed\nfunction make() {}\nmake().sort()", "sort", "file.js", true),
 			// Comments outside the replaced argument range are preserved.
 			commentCase(`array.sort(/* before */ undefined /* after */)`, "sort", "file.js", 1, 7, `array.sort(/* before */ COMPARATOR /* after */)`),
 			commentCase("array.sort(\n\t// keep\n)", "sort", "file.js", 1, 7, "array.sort(\n\t// keep\nCOMPARATOR)"),
