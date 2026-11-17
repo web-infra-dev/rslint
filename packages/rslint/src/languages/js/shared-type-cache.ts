@@ -6,6 +6,8 @@ export interface SharedTypeCacheDescriptor {
 }
 const HEADER = 8,
   SLOT = 4;
+const SIGNATURE_OPTIONS_USED = 5;
+export const MIN_SHARED_TYPE_CACHE_BYTES = (HEADER + SLOT) * 4;
 export const MAX_SHARED_TYPE_PROBES = 64;
 function keyBytes(key: string): Uint8Array {
   const bytes = new Uint8Array(key.length * 2);
@@ -61,6 +63,12 @@ export class SharedTypeCacheReader {
   }
   assertOpen(): void {
     this.open();
+  }
+  get hasSignatureOptions(): boolean {
+    return Atomics.load(this.open().control, SIGNATURE_OPTIONS_USED) !== 0;
+  }
+  markSignatureOptionsUsed(): void {
+    Atomics.store(this.open().control, SIGNATURE_OPTIONS_USED, 1);
   }
   get(key: string): Uint8Array | undefined {
     const { descriptor, control, bytes } = this.open();
@@ -138,6 +146,9 @@ export class SharedTypeCacheOwner {
   }
   get descriptor(): SharedTypeCacheDescriptor {
     return this.open().descriptor;
+  }
+  get hasSignatureOptions(): boolean {
+    return Atomics.load(this.open().control, SIGNATURE_OPTIONS_USED) !== 0;
   }
   publish(key: string, packet: Uint8Array): boolean {
     const { descriptor, control, bytes } = this.open();

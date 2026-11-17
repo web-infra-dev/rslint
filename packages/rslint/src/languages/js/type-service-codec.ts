@@ -1,5 +1,6 @@
 /* rslint-disable @typescript-eslint/no-unsafe-type-assertion -- Indexed generic return types follow the finite field switch and checked packet kind. */
 import { SCALAR_KINDS } from './type-service-protocol.js';
+import type { JSDocTagInfo, SymbolDisplayPart } from 'typescript';
 import type {
   NodeRef,
   NodeFact,
@@ -29,7 +30,7 @@ export class TypePacketReader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 13, 5, 5, 1, 1, 4, 1][this.kind];
+    const words = [0, 1, 1, 1, 1, 13, 5, 5, 1, 1, 4, 1, 1, 1][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -263,6 +264,44 @@ export class TypePacketReader {
       return { id: this.word(pos), name: this.text(this.word(pos + 4)) };
     });
   }
+  private displayParts(at: number): SymbolDisplayPart[] {
+    if (!at) return [];
+    const count = this.word(at);
+    if (at + 4 + count * 12 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 12,
+        part = {
+          text: this.text(this.word(pos)),
+          kind: this.text(this.word(pos + 4)),
+        },
+        target = this.word(pos + 8);
+      return target
+        ? {
+            ...part,
+            target: {
+              fileName: this.text(this.word(target)),
+              textSpan: {
+                start: this.word(target + 4),
+                length: this.word(target + 8),
+              },
+            },
+          }
+        : part;
+    });
+  }
+  private jsDocTags(): JSDocTagInfo[] {
+    const at = this.word(8),
+      count = this.word(at);
+    if (at + 4 + count * 8 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 8,
+        text = this.word(pos + 4);
+      return {
+        name: this.text(this.word(pos)),
+        text: text ? this.displayParts(text) : undefined,
+      };
+    });
+  }
   scalar<K extends ScalarOperation>(operation: K): QueryResults[K] {
     if (this.kind !== SCALAR_KINDS[operation]) return invalid();
     let value: QueryResults[ScalarOperation];
@@ -287,6 +326,12 @@ export class TypePacketReader {
         break;
       case 11:
         value = this.namedSymbols();
+        break;
+      case 12:
+        value = this.displayParts(this.word(8));
+        break;
+      case 13:
+        value = this.jsDocTags();
         break;
       default:
         return invalid();

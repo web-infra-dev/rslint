@@ -68,7 +68,12 @@ type estreeProjector struct {
 	origins          []*ast.Node
 	reverse          map[*ast.Node]uint32
 	sequenceAliases  []sequenceAlias
+	chainRecord      uint32
+	chainReverse     []*ast.Node
 	recordOrigins    bool
+	originsOnly      bool
+	sequenceMembers  func(sequenceID uint32, members []uint32)
+	recordChainAlias func(node, origin *ast.Node, expression, start, end uint32)
 }
 
 // Options are syntax metadata already resolved by the linter.
@@ -85,12 +90,17 @@ type Options struct {
 	// RecordSequenceAlias describes a flattened comma prefix without encoding
 	// another growing expression list. It is materialized only on reverse lookup.
 	RecordSequenceAlias func(node *ast.Node, sequenceID, count, start, end uint32)
+	sequenceMembers     func(sequenceID uint32, members []uint32)
+	recordChainAlias    func(node, origin *ast.Node, expression, start, end uint32)
 }
 
 type sequenceAlias struct {
 	node              *ast.Node
 	sequenceID, count uint32
 }
+
+// Keep the first reverse mapping reserved after its frame ID is reclaimed.
+const detachedChainReverse = ^uint32(0)
 
 // Builder reuses scratch for sequential projections. Build returns
 // independently owned bytes and clears every source-backed reference on return.
@@ -157,6 +167,10 @@ func (b *Builder) Build(ctx context.Context, file *ast.SourceFile, options Optio
 // storage must remain immutable until every consumer has finished; it never
 // aliases the Builder's scratch. allocate is called synchronously at most once.
 func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte) (data []byte, err error) {
+	return b.build(ctx, file, options, allocate, false)
+}
+
+func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, originsOnly bool) (data []byte, err error) {
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
 	}
@@ -178,6 +192,9 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.text = file.Text()
 	p.sourceType = options.SourceType
 	p.recordOrigins = options.RecordOrigin != nil || options.RecordReverse != nil || options.RecordSequenceAlias != nil
+	p.originsOnly = originsOnly
+	p.sequenceMembers = options.sequenceMembers
+	p.recordChainAlias = options.recordChainAlias
 	p.origins = p.origins[:0]
 	if p.recordOrigins {
 		p.reverse = make(map[*ast.Node]uint32)
@@ -205,9 +222,11 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
-	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
-	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
-	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
+	if !originsOnly {
+		initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
+		b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
+		b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
+	}
 	if options.RecordOrigin != nil {
 		for index, node := range p.origins {
 			options.RecordOrigin(uint32(index+1), node)
@@ -215,7 +234,9 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	if options.RecordReverse != nil {
 		for node, id := range p.reverse {
-			options.RecordReverse(node, id)
+			if id != detachedChainReverse {
+				options.RecordReverse(node, id)
+			}
 		}
 	}
 	if options.RecordSequenceAlias != nil {
@@ -223,6 +244,10 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 			start, end := p.rangeOf(alias.node)
 			options.RecordSequenceAlias(alias.node, alias.sequenceID, alias.count, start, end)
 		}
+	}
+	if originsOnly {
+		p.check()
+		return nil, nil
 	}
 	return b.encode(root, options.HasBOM, allocate)
 }
@@ -240,7 +265,13 @@ func (p *estreeProjector) clearSource() {
 	p.reverse = nil
 	clear(p.sequenceAliases)
 	p.sequenceAliases = nil
+	p.chainRecord = 0
+	clear(p.chainReverse)
+	p.chainReverse = nil
 	p.recordOrigins = false
+	p.originsOnly = false
+	p.sequenceMembers = nil
+	p.recordChainAlias = nil
 	p.file = nil
 	p.text = ""
 	p.sourceType = ""

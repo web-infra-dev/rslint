@@ -54,6 +54,9 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 	if _, err := session.BindTarget(file); err != nil {
 		t.Fatal(err)
 	}
+	if session.checker != nil {
+		t.Fatal("binding and reading Program metadata created a checker")
+	}
 	table := encoder.GetNodeIndexTable(file)
 	missing := uint32(0)
 	for index, node := range table.Nodes {

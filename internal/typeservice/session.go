@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/web-infra-dev/rslint/internal/program"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var nextGeneration atomic.Uint32
@@ -119,7 +120,7 @@ func New(ctx context.Context, p *program.Program, eligible []*ast.SourceFile) (*
 	if !p.IsValid() || len(eligible) == 0 {
 		return nil, errors.New("type services require a bound Program and explicitly eligible sources")
 	}
-	s := &Session{program: p, anchor: eligible[0], eligible: make(map[*ast.SourceFile]bool), generation: nextGeneration.Add(1), types: make(map[uint32]*checker.Type), symbols: make(map[uint32]*ast.Symbol), signatures: make(map[uint32]*checker.Signature)}
+	s := &Session{program: p, anchor: eligible[0], eligible: make(map[*ast.SourceFile]bool, len(eligible)), generation: nextGeneration.Add(1)}
 	for _, f := range eligible {
 		if !p.CanProvideTypeChecker(f) {
 			return nil, errors.New("ineligible or foreign type service source")
@@ -129,15 +130,6 @@ func New(ctx context.Context, p *program.Program, eligible []*ast.SourceFile) (*
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	c, done := p.TypeCheckerForFileExclusive(core.WithCheckerLifetime(ctx, core.CheckerLifetimeAPI), s.anchor)
-	defer done()
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if c == nil {
-		return nil, errors.New("program cannot provide type services")
-	}
-	s.checker = c
 	return s, nil
 }
 
@@ -311,7 +303,18 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 	}
 	c, done := s.program.TypeCheckerForFileExclusive(core.WithCheckerLifetime(ctx, core.CheckerLifetimeAPI), s.anchor)
 	defer done()
-	if c != s.checker {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c == nil {
+		return errors.New("program cannot provide type services")
+	}
+	if s.checker == nil {
+		s.checker = c
+		s.types = make(map[uint32]*checker.Type)
+		s.symbols = make(map[uint32]*ast.Symbol)
+		s.signatures = make(map[uint32]*checker.Signature)
+	} else if c != s.checker {
 		return errors.New("type service checker identity changed")
 	}
 	for i, q := range queries {
@@ -337,12 +340,13 @@ func (s *Session) directRecords(c *checker.Checker, op Operation, result Result)
 	var kind Operation
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable", "void", "declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments",
-		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType":
+		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType",
+		"mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
 		kind = "typeRecord"
 	case "symbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"apparentProperties", "exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol":
 		kind = "symbolRecord"
-	case "signature", "resolvedSignature", "signatures":
+	case "signature", "resolvedSignature", "resolvedSignatureWithOptions", "signatures":
 		kind = "signatureRecord"
 	default:
 		return nil, nil
@@ -558,10 +562,29 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 		case "signature":
 			return Handle(s.signatureID(c.GetSignatureFromDeclaration(native))), nil
 		case "resolvedSignature":
+			if !ast.IsCallLikeExpression(native) {
+				return Handle(0), nil
+			}
 			return Handle(s.signatureID(c.GetResolvedSignature(native))), nil
 		case "shorthandValueSymbol":
 			return Handle(s.symbolID(c.GetShorthandAssignmentValueSymbol(native))), nil
 		}
+	case *ResolvedSignatureRequest:
+		ids := Handles{0}
+		if !ast.IsCallLikeExpression(native) {
+			return ids, nil
+		}
+		var candidates []*checker.Signature
+		var output *[]*checker.Signature
+		if r.WithCandidates {
+			output = &candidates
+		}
+		sig := checker.ResolveSignatureWithOptions(c, native, output, r.ArgumentCount)
+		ids[0] = s.signatureID(sig)
+		for _, candidate := range candidates {
+			ids = append(ids, s.signatureID(candidate))
+		}
+		return ids, nil
 	case *TypeRequest:
 		switch r.Op {
 		case "constraint":
@@ -584,6 +607,21 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return s.typeIDs(c.GetBaseTypes(t)), nil
 		case "defaultType":
 			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
+		case "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
+			t := s.typeByID(r.ID)
+			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
+				return Handle(0), nil
+			}
+			var operand *checker.Type
+			switch r.Op {
+			case "mappedTypeParameter":
+				operand = checker.Checker_getTypeParameterFromMappedType(c, t)
+			case "mappedConstraintType":
+				operand = checker.Checker_getConstraintTypeFromMappedType(c, t)
+			case "mappedTemplateType":
+				operand = checker.Checker_getTemplateTypeFromMappedType(c, t)
+			}
+			return Handle(s.typeID(operand)), nil
 		case "properties":
 			return s.symbolIDs(c.GetPropertiesOfType(s.typeByID(r.ID))), nil
 		case "apparentProperties":
@@ -701,10 +739,24 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			sym := s.symbolByID(r.ID)
 			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
 		}
+	case *SymbolDocsRequest:
+		if !r.WithChecker {
+			c = nil
+		}
+		symbol := s.symbolByID(r.ID)
+		active := map[*ast.Symbol]bool{symbol: true}
+		if r.Op == "symbolDocumentation" {
+			return documentation(c, symbol.Declarations, active), nil
+		}
+		return jsDocTags(c, symbol.Declarations, active), nil
 	case *SignatureRequest:
 		switch r.Op {
 		case "returnType":
 			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
+		case "signatureDocumentation":
+			return documentation(c, []*ast.Node{s.signatureByID(r.ID).Declaration()}, make(map[*ast.Symbol]bool)), nil
+		case "signatureJSDocTags":
+			return jsDocTags(c, []*ast.Node{s.signatureByID(r.ID).Declaration()}, make(map[*ast.Symbol]bool)), nil
 		case "typePredicate":
 			predicate := c.GetTypePredicateOfSignature(s.signatureByID(r.ID))
 			if predicate == nil {
@@ -763,14 +815,28 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 		} else if r.Op == "typeString" {
 			flags = checker.TypeFormatFlagsAllowUniqueESSymbolType | checker.TypeFormatFlagsUseAliasDefinedOutsideCurrentScope
 		}
-		if flags&checker.TypeFormatFlagsMultilineObjectLiterals != 0 {
-			return nil, errors.New("unsupported TypeScript operation: TypeFormatFlags.MultilineObjectLiterals")
-		}
 		switch r.Op {
 		case "typeString":
+			if flags&checker.TypeFormatFlagsMultilineObjectLiterals != 0 {
+				text := checker.TypeToStringWithJavaScriptLayout(c, s.typeByID(r.ID), native, flags)
+				// TypeScript applies a second, hard limit after printing.
+				limit := 320
+				if s.program.Options().NoErrorTruncation == core.TSTrue || flags&checker.TypeFormatFlagsNoTruncation != 0 {
+					limit = 2_000_000
+				}
+				if len(text) >= limit {
+					if units := ecmascript.StringCodeUnits(text); len(units) >= limit {
+						text = ecmascript.StringFromCodeUnits(units[:limit-3]) + "..."
+					}
+				}
+				return Text(text), nil
+			}
 			return Text(c.TypeToStringEx(s.typeByID(r.ID), native, flags, nil)), nil
 		case "signatureString":
 			sig := s.signatureByID(r.ID)
+			if flags&checker.TypeFormatFlagsMultilineObjectLiterals != 0 {
+				return Text(checker.SignatureToStringWithJavaScriptLayout(c, sig, native, flags, checker.SignatureKind(r.Kind))), nil
+			}
 			if r.Kind != uint32(checker.SignatureKindConstruct) {
 				flags |= checker.TypeFormatFlagsWriteCallStyleSignature
 			}

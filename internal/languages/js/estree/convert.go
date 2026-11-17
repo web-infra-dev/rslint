@@ -30,6 +30,9 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 func (p *estreeProjector) registerReverse(node *ast.Node, id uint32) {
 	if p.recordOrigins && node != nil && id != 0 && p.reverse[node] == 0 {
 		p.reverse[node] = id
+		if id == p.chainRecord {
+			p.chainReverse = append(p.chainReverse, node)
+		}
 	}
 }
 
@@ -794,7 +797,15 @@ func (p *estreeProjector) wrapOptionalChain(node *ast.Node, id uint32, chain boo
 	if !chain && node.Flags&ast.NodeFlagsOptionalChain == 0 {
 		return id
 	}
-	return p.addNode("ChainExpression", node, nodeValue(id))
+	wrapper := p.addNode("ChainExpression", node, nodeValue(id))
+	if p.originsOnly {
+		// A chain operand can reclaim only the last record it emitted.
+		// Track every reverse key for that wrapper, including transparent nodes.
+		p.chainRecord = wrapper
+		clear(p.chainReverse)
+		p.chainReverse = p.chainReverse[:0]
+	}
+	return wrapper
 }
 
 func (p *estreeProjector) convertFunction(node *ast.Node, requestedType string) uint32 {
@@ -987,6 +998,9 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 			items[count] = p.convert(rights[index], false)
 		}
 		id := p.addNode("SequenceExpression", node, p.listValue(items))
+		if len(prefixes) > 1 && p.sequenceMembers != nil {
+			p.sequenceMembers(id, items)
+		}
 		for index := 1; index < len(prefixes); index++ {
 			p.sequenceAliases = append(p.sequenceAliases, sequenceAlias{prefixes[index], id, uint32(len(items) - index)})
 		}
@@ -1678,10 +1692,22 @@ func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 		return id, false
 	}
 	expression := p.values[record.valueStart] & payloadMask
-	// TypeScript's reverse map retains this detached wrapper. Keep its record
-	// when semantic identity is requested, even though traversal unwraps it.
-	if p.recordOrigins {
+	// Standalone typed projection owns its own frame and can keep the
+	// detached wrapper. On-demand origins must reproduce the smaller frame.
+	if p.recordOrigins && !p.originsOnly {
 		return expression, true
+	}
+	if p.originsOnly {
+		origin := p.origins[id-1]
+		for _, node := range p.chainReverse {
+			p.reverse[node] = detachedChainReverse
+			p.recordChainAlias(node, origin, expression, record.start, record.end)
+		}
+		p.chainRecord = 0
+		clear(p.chainReverse)
+		p.chainReverse = p.chainReverse[:0]
+		p.origins[id-1] = nil
+		p.origins = p.origins[:id-1]
 	}
 	// The wrapper is the last record emitted by convert and has no users yet.
 	// Its parent consumes the inner expression, so reclaim it before proceeding.

@@ -5,6 +5,7 @@ import {
   SyntaxKind,
   NodeFlags,
   Wtf8Decoder,
+  type Node,
 } from '@rslint/api';
 import type ts from 'typescript';
 import { WeakObjectCache } from './type-service-cache.js';
@@ -20,6 +21,12 @@ import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import { offsetToLineColumn } from './positions.js';
 type Bag = Record<string, unknown>;
+interface SyntheticRef {
+  readonly owner: NodeRef;
+  readonly child: number;
+  readonly listChild?: number;
+}
+type SyntaxRef = NodeRef | SyntheticRef;
 function unsupported(name: string): never {
   throw new Error(`unsupported TypeScript operation: ${name}`);
 }
@@ -45,6 +52,8 @@ function translateFlags(flags: number, from: object, to: object): number {
 export class GenerationSyntaxViews {
   private readonly identities = new WeakMap<object, NodeRef>();
   private readonly wrapped = new WeakObjectCache<string, object>();
+  private readonly syntheticRefs = new WeakMap<Node, SyntheticRef>();
+  private children = new WeakMap<object, object[]>();
   private readonly sources = new Map<string, RemoteSourceFile>();
   private readonly summaries = new Map<
     string,
@@ -166,45 +175,23 @@ export class GenerationSyntaxViews {
     if (!reply.tree) throw new Error('missing source syntax packet');
     return this.attach(reply.tree);
   }
-  shape(ref: NodeRef): string {
-    const source = this.sources.get(ref.file);
-    if (!source) return '';
-    const raw = source.getOrCreateNodeAtIndex(ref.index),
-      parent = raw.parent;
-    const role =
-      ['expression', 'name', 'type', 'initializer'].find(
-        (key) => parent && Reflect.get(parent, key, parent) === raw,
-      ) ?? 'other';
-    return `${raw.kind}:${parent?.kind}:${role}`;
-  }
-  matching<Operation extends string>(
-    file: string,
-    shapes: ReadonlyMap<string, ReadonlySet<Operation>>,
-    limit: number,
-  ): Array<{ op: Operation; node: NodeRef }> {
-    const source = this.sources.get(file),
-      requests: Array<{ op: Operation; node: NodeRef }> = [];
-    if (!source) return requests;
-    const visit = (node: RemoteNode): void => {
-      if (requests.length > limit) return;
-      const ref = { file, index: (node as unknown as { index: number }).index };
-      for (const op of shapes.get(this.shape(ref)) ?? [])
-        requests.push({ op, node: ref });
-      node.forEachChild((child) => {
-        if (child instanceof RemoteNode) visit(child);
-      });
-    };
-    visit(source);
-    return requests;
-  }
   raw(node: object): RemoteNode {
-    const ref = this.location(node),
-      source = this.source(ref.file);
+    return this.rawNode(this.location(node));
+  }
+  private rawNode(ref: NodeRef): RemoteNode {
+    const source = this.source(ref.file);
     if (!source) throw new Error('foreign source');
     const raw = source.getOrCreateNodeAtIndex(ref.index);
     if (!(raw instanceof RemoteNode))
       throw new Error('invalid compiler node handle');
     return raw;
+  }
+  private rawSyntax(ref: SyntaxRef): Node {
+    if (!('owner' in ref)) return this.rawNode(ref);
+    const child = this.rawNode(ref.owner).getChildAt(ref.child);
+    return ref.listChild === undefined
+      ? child
+      : child.getChildAt(ref.listChild);
   }
   private summary(ref: NodeRef): NodeFact {
     const key = this.key(ref),
@@ -260,11 +247,20 @@ export class GenerationSyntaxViews {
       this.nativeKind(this.summary(current).parent!) === 'HeritageClause',
     );
   }
-  private kind(ref: NodeRef, name: string): number {
-    if (name === 'TypeReference' && this.isHeritage(ref))
+  private kind(ref: SyntaxRef, name: string): number {
+    if (!('owner' in ref) && name === 'TypeReference' && this.isHeritage(ref))
       name = 'ExpressionWithTypeArguments';
-    else if (name === 'QualifiedName' && this.isHeritage(ref))
+    else if (
+      !('owner' in ref) &&
+      name === 'QualifiedName' &&
+      this.isHeritage(ref)
+    )
       name = 'PropertyAccessExpression';
+    return this.translateKind(name);
+  }
+  private translateKind(name: string): number {
+    if (name === 'EndOfFile') name = 'EndOfFileToken';
+    if (name === 'JSDocUnknownTag') name = 'JSDocTag';
     const result =
       this.typescript.SyntaxKind[name as keyof typeof ts.SyntaxKind];
     if (typeof result !== 'number') unsupported(`SyntaxKind.${name}`);
@@ -275,29 +271,31 @@ export class GenerationSyntaxViews {
     if (!ref) return undefined;
     const metadata = this.metadataByName.get(ref.file);
     if (!metadata) throw new Error('foreign source');
-    ref = { file: metadata.fileName, index: ref.index };
-    const key = this.key(ref),
-      old = this.wrapped.get(key);
+    const identity = { file: metadata.fileName, index: ref.index };
+    return this.wrapRef(identity, this.key(identity));
+  }
+  private wrapRef(identity: SyntaxRef, cacheKey: string): object {
+    const old = this.wrapped.get(cacheKey);
     if (old) return old;
-    const identity = ref;
     const proxy: object = new Proxy(
       {},
       {
         get: (target, key, receiver) => {
-          if (!Object.hasOwn(target, key)) return this.get(identity, key);
+          if (!Object.hasOwn(target, key))
+            return this.get(identity, key, proxy);
           this.ensure();
           // TypeScript helpers write node-local caches, such as modifier flags.
           return Reflect.get(target, key, receiver);
         },
         has: (target, key) => {
           this.ensure();
-          return Object.hasOwn(target, key) || key in this.raw(proxy);
+          return Object.hasOwn(target, key) || key in this.rawSyntax(identity);
         },
         ownKeys: (target) => {
           this.ensure();
           return [
             ...new Set([
-              ...Reflect.ownKeys(this.raw(proxy)),
+              ...Reflect.ownKeys(this.rawSyntax(identity)),
               ...Reflect.ownKeys(target),
             ]),
           ];
@@ -306,21 +304,54 @@ export class GenerationSyntaxViews {
           this.ensure();
           const own = Reflect.getOwnPropertyDescriptor(target, key);
           if (own) return own;
-          const raw = this.raw(proxy);
+          const raw = this.rawSyntax(identity);
           return Object.hasOwn(raw, key)
             ? {
                 configurable: true,
                 enumerable: true,
-                get: () => this.get(identity, key),
+                get: () => this.get(identity, key, proxy),
               }
             : undefined;
         },
       },
     );
-    this.identities.set(proxy, identity);
-    this.wrapped.set(key, proxy);
+    if (!('owner' in identity)) this.identities.set(proxy, identity);
+    this.wrapped.set(cacheKey, proxy);
     this.stats.nodes++;
     return proxy;
+  }
+  private ref(value: RemoteNode): NodeRef {
+    return {
+      file: value.getSourceFile().fileName,
+      index: (value as unknown as { index: number }).index,
+    };
+  }
+  private wrapNode(value: Node): object {
+    if (value instanceof RemoteNode) return this.nodeRef(this.ref(value))!;
+    const parent = value.parent;
+    if (!(parent instanceof RemoteNode))
+      throw new Error('missing syntax owner');
+    let ref = this.syntheticRefs.get(value);
+    if (!ref) {
+      const owner = this.ref(parent);
+      // Index the reader's cached child objects once per decoded parent.
+      for (const [child, item] of parent.getChildren().entries()) {
+        if (item instanceof RemoteNode) continue;
+        this.syntheticRefs.set(item, { owner, child });
+        if (item.kind !== SyntaxKind.SyntaxList) continue;
+        for (const [listChild, token] of item.getChildren().entries()) {
+          if (!(token instanceof RemoteNode))
+            this.syntheticRefs.set(token, { owner, child, listChild });
+        }
+      }
+      ref = this.syntheticRefs.get(value);
+      if (!ref) throw new Error('missing synthetic syntax node');
+    }
+    const key =
+      value.kind === SyntaxKind.SyntaxList
+        ? `list:${this.key(ref.owner)}:${ref.child}`
+        : `token:${this.sourceOrdinals.get(ref.owner.file)}:${value.pos}:${value.end}`;
+    return this.wrapRef(ref, key);
   }
   wrap(value: unknown): unknown {
     if (Array.isArray(value)) {
@@ -333,40 +364,47 @@ export class GenerationSyntaxViews {
           });
       return list;
     }
-    if (!(value instanceof RemoteNode)) return value;
-    return this.nodeRef({
-      file: value.getSourceFile().fileName,
-      index: (value as unknown as { index: number }).index,
-    });
+    if (
+      value instanceof RemoteNode ||
+      (typeof value === 'object' &&
+        value !== null &&
+        'kind' in value &&
+        'getSourceFile' in value)
+    )
+      return this.wrapNode(value as Node);
+    return value;
   }
-  private get(ref: NodeRef, key: string | symbol): unknown {
+  private get(ref: SyntaxRef, key: string | symbol, proxy: object): unknown {
     this.ensure();
+    const real = 'owner' in ref ? undefined : ref,
+      file = 'owner' in ref ? ref.owner.file : ref.file;
     if (key === 'getSourceFile')
       return () => {
         this.ensure();
-        return this.sourceView(ref.file);
+        return this.sourceView(file);
       };
-    if (ref.index === 1) {
-      const source = this.metadataByName.get(ref.file)!;
+    if (real?.index === 1) {
+      const source = this.metadataByName.get(file)!;
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];
       if (key === 'kind') return this.typescript.SyntaxKind.SourceFile;
       if (key === 'parent') return undefined;
     }
     if (
-      !this.sources.has(ref.file) &&
+      real &&
+      !this.sources.has(file) &&
       ['kind', 'flags', 'parent', 'name', 'text', 'escapedText'].includes(
         String(key),
       )
     ) {
-      const fact = this.summary(ref);
-      if (key === 'kind') return this.kind(ref, fact.kind);
+      const fact = this.summary(real);
+      if (key === 'kind') return this.kind(real, fact.kind);
       if (key === 'flags')
         return translateFlags(fact.flags, NodeFlags, this.typescript.NodeFlags);
       if (key === 'parent') return this.nodeRef(fact.parent);
       if (
         key === 'name' &&
-        !(fact.kind === 'QualifiedName' && this.isHeritage(ref))
+        !(fact.kind === 'QualifiedName' && this.isHeritage(real))
       )
         return this.nodeRef(fact.name);
       if (key === 'text' && fact.text !== undefined) return fact.text;
@@ -376,16 +414,61 @@ export class GenerationSyntaxViews {
       )
         return fact.text?.startsWith('__') ? `_${fact.text}` : fact.text;
     }
-    const source = this.source(ref.file);
-    if (!source) throw new Error('foreign source');
-    const raw = source.getOrCreateNodeAtIndex(ref.index);
+    if (key === 'forEachChild')
+      return (
+        cb: (node: unknown) => unknown,
+        cbNodes?: (nodes: unknown) => unknown,
+      ) => {
+        this.ensure();
+        return this.rawSyntax(ref).forEachChild(
+          (n) => cb(this.wrapNode(n)),
+          cbNodes ? (nodes) => cbNodes(this.wrap(nodes)) : undefined,
+        );
+      };
+    if (key === 'getChildren')
+      return (sourceFile?: object) => {
+        this.checkSource(file, sourceFile);
+        return this.childNodes(ref, proxy);
+      };
+    if (key === 'getChildAt')
+      return (index: number, sourceFile?: object) => {
+        this.checkSource(file, sourceFile);
+        const children = this.children.get(proxy);
+        if (children) return children[index];
+        const child = this.rawSyntax(ref).getChildAt(index);
+        return child && this.wrapNode(child);
+      };
+    if (key === 'getChildCount')
+      return (sourceFile?: object) => {
+        this.checkSource(file, sourceFile);
+        return (
+          this.children.get(proxy)?.length ??
+          this.rawSyntax(ref).getChildCount()
+        );
+      };
+    if (key === 'getFirstToken' || key === 'getLastToken')
+      return (sourceFile?: object) => {
+        this.checkSource(file, sourceFile);
+        const token = this.rawSyntax(ref)[key]();
+        return token && this.wrapNode(token);
+      };
+    if ('owner' in ref) {
+      if (key === 'parent') return this.nodeRef(ref.owner);
+      if (key === 'flags') {
+        const flags = Reflect.get(this.nodeRef(ref.owner)!, 'flags') as number;
+        return flags & this.typescript.NodeFlags.ContextFlags;
+      }
+    }
+    const raw = this.rawSyntax(ref);
+    if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
+      return this.childNodes(ref, proxy);
     if (key === 'default' && raw.kind === SyntaxKind.TypeParameter)
       return this.wrap(Reflect.get(raw, 'defaultType', raw));
     const heritageReference =
       raw.kind === SyntaxKind.TypeReference &&
       raw.parent?.kind === SyntaxKind.HeritageClause;
     const heritageName =
-      raw.kind === SyntaxKind.QualifiedName && this.isHeritage(ref);
+      real && raw.kind === SyntaxKind.QualifiedName && this.isHeritage(real);
     if (key === 'kind' && heritageReference)
       return this.typescript.SyntaxKind.ExpressionWithTypeArguments;
     if (key === 'kind' && heritageName)
@@ -406,11 +489,7 @@ export class GenerationSyntaxViews {
     ) {
       const native = Reflect.get(raw, key, raw) as number;
       if (native === undefined) return undefined;
-      const name = SyntaxKind[native];
-      const kind =
-        this.typescript.SyntaxKind[name as keyof typeof ts.SyntaxKind];
-      if (typeof kind !== 'number') unsupported(`SyntaxKind.${name}`);
-      return kind;
+      return this.translateKind(SyntaxKind[native]);
     }
     if (key === 'flags')
       return translateFlags(raw.flags, NodeFlags, this.typescript.NodeFlags);
@@ -422,51 +501,15 @@ export class GenerationSyntaxViews {
       const text = (raw as unknown as { text: string }).text;
       return text.startsWith('__') ? `_${text}` : text;
     }
-    if (key === 'forEachChild')
-      return (
-        cb: (node: unknown) => unknown,
-        cbNodes?: (nodes: unknown) => unknown,
-      ) => {
-        this.ensure();
-        return raw.forEachChild(
-          (n) => cb(this.wrap(n)),
-          cbNodes ? (nodes) => cbNodes(this.wrap(nodes)) : undefined,
-        );
-      };
-    if (key === 'getChildAt')
-      return (index: number, sourceFile?: object) => {
-        this.ensure();
-        if (
-          sourceFile !== undefined &&
-          this.location(sourceFile).file !== raw.getSourceFile().fileName
-        )
-          unsupported('node.getChildAt with a foreign source');
-        const child = raw.getChildAt(index);
-        // The decoder also creates token/SyntaxList objects with no Go
-        // compiler handle. Keep those explicit until their syntax views
-        // can translate kinds and preserve identity without inventing one.
-        if (child !== undefined && !(child instanceof RemoteNode))
-          unsupported('node.getChildAt synthetic token or SyntaxList');
-        return this.wrap(child);
-      };
-    if (
-      typeof key === 'string' &&
-      [
-        'getChildren',
-        'getFirstToken',
-        'getLastToken',
-        'getChildCount',
-      ].includes(key)
-    )
-      unsupported(`node.${key}`);
     const member: unknown = Reflect.get(raw, key, raw);
     if (typeof member === 'function')
       return (...args: unknown[]) => {
         this.ensure();
+        const current = this.rawSyntax(ref);
         return this.wrap(
           Reflect.apply(
             member,
-            raw,
+            current,
             args.map((a) =>
               typeof a === 'object' && a !== null
                 ? this.locationOrUndefined(a)
@@ -485,8 +528,27 @@ export class GenerationSyntaxViews {
       unsupported(`node.${key}`);
     return this.wrap(member);
   }
+  private childNodes(ref: SyntaxRef, proxy: object): object[] {
+    let children = this.children.get(proxy);
+    if (!children) {
+      children = this.rawSyntax(ref)
+        .getChildren()
+        .map((child) => this.wrapNode(child));
+      this.children.set(proxy, children);
+    }
+    return children;
+  }
+  private checkSource(file: string, sourceFile: object | undefined): void {
+    this.ensure();
+    if (sourceFile !== undefined) {
+      const ref = this.location(sourceFile);
+      if (ref.file !== file || ref.index !== 1)
+        throw new Error('foreign syntax source');
+    }
+  }
   close(): void {
     this.lookup = undefined;
+    this.children = new WeakMap();
     this.sources.clear();
     this.sourceSizes.clear();
     this.summaries.clear();
@@ -501,9 +563,10 @@ export class FileSyntaxViews {
   private closed = false;
   private forward = new WeakMap<ESTreeNode, number>();
   private reverse = new Map<number, number>();
-  private aliases = new Map<
+  private readonly aliases = new Map<
     number,
-    NonNullable<TypeServiceProjection['aliases']>[number]
+    | NonNullable<TypeServiceProjection['aliases']>[number]
+    | NonNullable<TypeServiceProjection['chainAliases']>[number]
   >();
   private readonly materializedAliases = new Map<number, ESTreeNode>();
   private nodes: DecodedFrame['nodes'] | undefined;
@@ -565,15 +628,19 @@ export class FileSyntaxViews {
         id,
       ]),
     );
-    this.aliases = new Map(
-      (projection.aliases ?? []).map((alias) => [alias.index, alias]),
-    );
-    for (const alias of this.aliases.values())
-      if (!this.sequenceMembers.has(alias.sequence))
-        this.sequenceMembers.set(
-          alias.sequence,
-          (frame.nodes[alias.sequence]!.expressions as ESTreeNode[]).slice(),
-        );
+    for (const alias of projection.aliases ?? []) {
+      this.aliases.set(alias.index, alias);
+      if (this.sequenceMembers.has(alias.sequence)) continue;
+      const members = projection.sequenceMembers?.[alias.sequence];
+      this.sequenceMembers.set(
+        alias.sequence,
+        members
+          ? members.map((id) => frame.nodes[id]!)
+          : (frame.nodes[alias.sequence]!.expressions as ESTreeNode[]).slice(),
+      );
+    }
+    for (const alias of projection.chainAliases ?? [])
+      this.aliases.set(alias.index, alias);
   }
   readonly esTreeNodeToTSNodeMap = {
     get: (node: ESTreeNode): object | undefined => {
@@ -596,23 +663,39 @@ export class FileSyntaxViews {
       const index = ref.index;
       const id = this.reverse.get(index);
       if (id) return this.nodes![id];
-      const old = this.materializedAliases.get(index);
-      if (old) return old;
       const info = this.aliases.get(index);
       if (!info) return undefined;
-      const alias: ESTreeNode = {
-        type: 'SequenceExpression',
+      const chain = 'expression' in info;
+      // Reverse aliases for the same chain wrapper share its expression's
+      // frame ID. Negative keys keep those IDs distinct from native indices.
+      const key = chain ? -info.expression : index;
+      const old = this.materializedAliases.get(key);
+      if (old) return old;
+      const position: Pick<ESTreeNode, 'range' | 'loc'> = {
         range: [info.start, info.end],
         loc: {
           start: offsetToLineColumn(info.start, this.lineStarts),
           end: offsetToLineColumn(info.end, this.lineStarts),
         },
-        expressions: this.sequenceMembers
-          .get(info.sequence)!
-          .slice(0, info.count),
       };
-      this.materializedAliases.set(index, alias);
-      this.forward.set(alias, index);
+      const alias: ESTreeNode = chain
+        ? {
+            type: 'ChainExpression',
+            start: info.start,
+            end: info.end,
+            ...position,
+            expression: this.nodes![info.expression],
+          }
+        : {
+            type: 'SequenceExpression',
+            ...position,
+            expressions: this.sequenceMembers
+              .get(info.sequence)!
+              .slice(0, info.count),
+          };
+      const origin = chain ? info.origin : index;
+      this.materializedAliases.set(key, alias);
+      if (origin) this.forward.set(alias, origin);
       this.registry.stats.aliases++;
       return alias;
     },

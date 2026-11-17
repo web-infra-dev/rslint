@@ -22,6 +22,8 @@ const (
 	packetIndexInfos
 	packetTypePredicate
 	packetNamedSymbols
+	packetDisplayParts
+	packetJSDocTags
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -54,6 +56,10 @@ func EncodePacket(result Result) ([]byte, error) {
 		kind, words = packetTypePredicate, 4
 	case NamedSymbols:
 		kind, words = packetNamedSymbols, 1
+	case DisplayParts:
+		kind, words = packetDisplayParts, 1
+	case JSDocTags:
+		kind, words = packetJSDocTags, 1
 	default:
 		return nil, errors.New("unsupported semantic fact")
 	}
@@ -196,6 +202,18 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(at+4, w.text(symbol.Name))
 		}
 		w.put(8, offset)
+	case DisplayParts:
+		w.put(8, w.displayParts(fact))
+	case JSDocTags:
+		offset := uint32(len(w.data))
+		w.data = append(w.data, make([]byte, 4+len(fact)*8)...)
+		w.put(offset, uint32(len(fact)))
+		for i, tag := range fact {
+			at := offset + 4 + uint32(i)*8
+			w.put(at, w.text(tag.Name))
+			w.put(at+4, w.displayParts(tag.Text))
+		}
+		w.put(8, offset)
 	}
 	if uint64(len(w.data)) > math.MaxUint32 {
 		return nil, errors.New("semantic fact exceeds packet limit")
@@ -230,6 +248,28 @@ func (w *packetWriter) ids(ids []uint32) uint32 {
 	w.data = binary.LittleEndian.AppendUint32(w.data, uint32(len(ids)))
 	for _, id := range ids {
 		w.data = binary.LittleEndian.AppendUint32(w.data, id)
+	}
+	return offset
+}
+func (w *packetWriter) displayParts(parts DisplayParts) uint32 {
+	if parts == nil {
+		return 0
+	}
+	offset := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 4+len(parts)*12)...)
+	w.put(offset, uint32(len(parts)))
+	for i, part := range parts {
+		at := offset + 4 + uint32(i)*12
+		w.put(at, w.text(part.Text))
+		w.put(at+4, w.text(part.Kind))
+		if target := part.Target; target != nil {
+			span := uint32(len(w.data))
+			w.data = append(w.data, make([]byte, 12)...)
+			w.put(span, w.text(target.File))
+			w.put(span+4, target.Start)
+			w.put(span+8, target.Length)
+			w.put(at+8, span)
+		}
 	}
 	return offset
 }
