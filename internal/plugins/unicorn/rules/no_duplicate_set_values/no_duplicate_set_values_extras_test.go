@@ -7,6 +7,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/fixtures"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_set_values"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
@@ -34,6 +35,10 @@ func TestNoDuplicateSetValuesExtras(t *testing.T) {
 			valid(`new Set([new Set([1]), new Set([1])])`),
 			valid(`new Set([() => 1, () => 1])`),
 			valid("class A { #a; #b; m() { return new Set([this.#a, this.#b]); } }"),
+			// Wrapped regular-expression literals are still distinct objects
+			// (upstream reports them).
+			validTS(`new Set([/a/ as RegExp, /a/ as RegExp])`),
+			validTS(`new Set([/a/!, (/a/)])`),
 
 			// Reassigned bindings have no static value.
 			valid("let foo = 1;\nfoo = 2;\nnew Set([foo, 1]);"),
@@ -58,9 +63,8 @@ func TestNoDuplicateSetValuesExtras(t *testing.T) {
 			invalidTS(`new Set([1 as number, 1])`, duplicate(1, 23, 24, "1")),
 			invalidTS(`new Set([foo!, foo])`, duplicate(1, 16, 19, "foo")),
 			invalidTS(`new Set([foo satisfies number, <number>foo])`, duplicate(1, 32, 43, "<number>foo")),
-			// Upstream's reference comparison unwraps the assertions and then
-			// compares regular-expression literals by pattern and flags.
-			invalidTS(`new Set([/a/ as RegExp, /a/ as RegExp])`, duplicate(1, 25, 38, "/a/ as RegExp")),
+			// A repeated binding to one regular expression is the same object.
+			invalid(`const r = /a/; new Set([r, r])`, duplicate(1, 28, 29, "r")),
 
 			// References: optional chains and computed keys.
 			invalid(`new Set([foo?.bar, foo.bar])`, duplicate(1, 20, 27, "foo.bar")),
@@ -110,6 +114,48 @@ func TestNoDuplicateSetValuesInstantiationExpressions(t *testing.T) {
 			invalidTS(`new Set([,,]<x>);`, duplicate(1, 9, 16, "undefined")),
 		},
 	)
+}
+
+// TestNoDuplicateSetValuesWrappedReferences covers TypeScript wrappers on a
+// reference's receiver or computed key, which upstream's comparison removes at
+// every level, in both operand orders and with or without type information.
+func TestNoDuplicateSetValuesWrappedReferences(t *testing.T) {
+	pairs := [][2]string{
+		{`foo["a" as string]`, `foo.a`},
+		{`(foo<T>).bar`, `foo.bar`},
+		{`foo[bar<T>]`, `foo[bar]`},
+		{"foo[`a` as string]", `foo["a"]`},
+		{`foo[bar as string].baz`, `foo[bar].baz`},
+		{`foo![bar!]`, `foo[bar]`},
+	}
+	var invalidCases []rule_tester.InvalidTestCase
+	for _, pair := range pairs {
+		for _, order := range [][2]string{{pair[0], pair[1]}, {pair[1], pair[0]}} {
+			code := "new Set([" + order[0] + ", " + order[1] + "]);"
+			column := len("new Set([") + len(order[0]) + len(", ") + 1
+			invalidCases = append(invalidCases, invalidTS(code, duplicate(1, column, column+len(order[1]), order[1])))
+		}
+	}
+	validCases := []rule_tester.ValidTestCase{
+		validTS(`new Set([foo["a" as string], foo.b]);`),
+		validTS(`new Set([(foo<T>).bar, baz.bar]);`),
+		validTS(`new Set([foo[bar<T>], foo[baz]]);`),
+		validTS("new Set([foo[`a` as string], foo[\"b\"]]);"),
+		validTS(`new Set([foo[bar as string].baz, foo[bar].qux]);`),
+	}
+
+	for _, mode := range []string{"with type information", "without type information"} {
+		t.Run(mode, func(t *testing.T) {
+			testedRule := no_duplicate_set_values.NoDuplicateSetValuesRule
+			if mode == "without type information" {
+				testedRule.Run = func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+					ctx.TypeChecker = nil
+					return no_duplicate_set_values.NoDuplicateSetValuesRule.Run(ctx, options)
+				}
+			}
+			rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &testedRule, validCases, invalidCases)
+		})
+	}
 }
 
 // TestNoDuplicateSetValuesLargeLiteral covers the indexed comparison path: a

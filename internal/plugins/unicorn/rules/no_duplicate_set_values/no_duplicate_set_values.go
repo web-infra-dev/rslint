@@ -86,8 +86,9 @@ var NoDuplicateSetValuesRule = rule.Rule{
 // comparisons holds the earlier elements of one array literal.
 type comparisons struct {
 	keys map[any]struct{}
-	// references are the earlier non-Literal expressions; unresolved is the
-	// subset without a static value.
+	// references are the earlier expressions that are not Literals once
+	// TypeScript wrappers are removed, so `/a/ as RegExp` stays a distinct
+	// object; unresolved is the subset without a static value.
 	references, unresolved []*ast.Node
 }
 
@@ -98,7 +99,7 @@ func (c *comparisons) add(current element) {
 		}
 		c.keys[current.key] = struct{}{}
 	}
-	if current.node == nil || isLiteral(current.node) {
+	if current.node == nil || isLiteral(current.value) {
 		return
 	}
 	c.references = append(c.references, current.value)
@@ -109,7 +110,8 @@ func (c *comparisons) add(current element) {
 
 // isDuplicate mirrors upstream isDuplicateValue against every earlier element:
 // two static values compare with SameValueZero, otherwise two non-Literal
-// expressions compare by reference.
+// expressions compare by reference, ignoring TypeScript wrappers on the
+// receiver and computed keys as well as on the element itself.
 func (c *comparisons) isDuplicate(current element) bool {
 	candidates := c.references
 	if current.known {
@@ -118,11 +120,11 @@ func (c *comparisons) isDuplicate(current element) bool {
 		}
 		candidates = c.unresolved
 	}
-	if current.node == nil || isLiteral(current.node) {
+	if current.node == nil || isLiteral(current.value) {
 		return false
 	}
 	for _, previous := range candidates {
-		if unicornutil.IsSameReference(previous, current.value) {
+		if unicornutil.IsSameComparisonOperand(previous, current.value) {
 			return true
 		}
 	}

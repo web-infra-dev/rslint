@@ -32,6 +32,22 @@ const references = new Set([foo.bar, foo.baz]);
 
 This rule only checks `new Set([...])` with a single array literal argument, including one wrapped in TypeScript `as`, `satisfies`, `!` or `<Type>` assertions. It does not check arrays, maps, non-array iterables, or chained `Set#add()` calls.
 
+## Differences from upstream
+
+Regular expression literals wrapped in TypeScript assertions are not reported. Each literal evaluates to a new object, so the `Set` keeps both values. Upstream reports the second one:
+
+```typescript
+// Not reported by rslint; reported by upstream.
+const patterns = new Set([/a/ as RegExp, /a/ as RegExp]);
+```
+
+A repeated reference to the same regular expression is still reported:
+
+```javascript
+const pattern = /a/;
+const patterns = new Set([pattern, pattern]);
+```
+
 ## Original Documentation
 
 - [eslint-plugin-unicorn: no-duplicate-set-values](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v80.0.0/docs/rules/no-duplicate-set-values.md)
