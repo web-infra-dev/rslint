@@ -1858,8 +1858,13 @@ types are handles on those facts. Index signatures and type predicates come from
 the checker on demand.
 Scope and export lists carry symbol names and handles so name searches can
 defer declaration facts. JSDoc queries return display parts with link targets
-and UTF-16 text spans. Mapped-type operands resolve on demand through the
-checker's existing caches. Explicit signature queries pass the apparent
+and UTF-16 text spans. Suggestion diagnostics preserve the source file, UTF-16
+ranges, message chains and related locations. The worker reads generated type
+nodes from the compiler's detached binary syntax tree and translates their
+kinds for JS rules. Generated nodes have no source-node handle.
+Symbol member tables materialize on demand. Reads of transient symbol links
+and mapped modifiers observe the checker's current cached type, including
+values populated by intervening queries. Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
 can change the checker's cached answers. After the first explicit query,
 node-dependent semantic reads go directly to the checker. Type and signature

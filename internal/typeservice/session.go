@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,6 +16,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
+	"github.com/microsoft/TypeScript/tsc/shim/locale"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -325,23 +328,23 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 			continue
 		}
 		var err error
-		results[i], err = s.execute(c, q.Request, natives[i])
+		results[i], err = s.execute(ctx, c, q.Request, natives[i])
 		if err != nil {
 			return err
 		}
-		records[i], err = s.directRecords(c, q.Request.operation(), results[i])
+		records[i], err = s.directRecords(ctx, c, q.Request.operation(), results[i])
 		if err != nil {
 			return err
 		}
 	}
 	return nil
 }
-func (s *Session) directRecords(c *checker.Checker, op Operation, result Result) ([]Record, error) {
+func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Operation, result Result) ([]Record, error) {
 	var kind Operation
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable", "void", "declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments",
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType",
-		"mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
+		"mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType", "classThisType", "contextualArgument", "symbolLinkType":
 		kind = "typeRecord"
 	case "symbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"apparentProperties", "exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol":
@@ -395,7 +398,7 @@ func (s *Session) directRecords(c *checker.Checker, op Operation, result Result)
 		case "signatureRecord":
 			request = &SignatureRequest{Op: kind, ID: id}
 		}
-		fact, err := s.execute(c, request, nil)
+		fact, err := s.execute(ctx, c, request, nil)
 		if err != nil {
 			return err
 		}
@@ -547,7 +550,7 @@ func (s *Session) indexInfo(info *checker.IndexInfo) IndexInfo {
 		node:       info.Declaration(),
 	}
 }
-func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node) (Result, error) {
+func (s *Session) execute(ctx context.Context, c *checker.Checker, request Request, native *ast.Node) (Result, error) {
 	switch r := request.(type) {
 	case *NodeRequest:
 		switch r.Op {
@@ -568,7 +571,14 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return Handle(s.signatureID(c.GetResolvedSignature(native))), nil
 		case "shorthandValueSymbol":
 			return Handle(s.symbolID(c.GetShorthandAssignmentValueSymbol(native))), nil
+		case "suggestionDiagnostics":
+			if native.Kind != ast.KindSourceFile {
+				return nil, errors.New("expected a source file for suggestion diagnostics")
+			}
+			return diagnosticFacts(c.GetSuggestionDiagnostics(ctx, native.AsSourceFile())), ctx.Err()
 		}
+	case *ContextualArgumentRequest:
+		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *ResolvedSignatureRequest:
 		ids := Handles{0}
 		if !ast.IsCallLikeExpression(native) {
@@ -607,7 +617,13 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return s.typeIDs(c.GetBaseTypes(t)), nil
 		case "defaultType":
 			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
-		case "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
+		case "classThisType":
+			t := s.typeByID(r.ID)
+			if t.ObjectFlags()&checker.ObjectFlagsClassOrInterface == 0 {
+				return Handle(0), nil
+			}
+			return Handle(s.typeID(checker.InterfaceType_thisType(t.AsInterfaceType()))), nil
+		case "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType":
 			t := s.typeByID(r.ID)
 			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
 				return Handle(0), nil
@@ -620,6 +636,8 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 				operand = checker.Checker_getConstraintTypeFromMappedType(c, t)
 			case "mappedTemplateType":
 				operand = checker.Checker_getTemplateTypeFromMappedType(c, t)
+			case "mappedModifiersType":
+				operand = checker.MappedType_modifiersType(t.AsMappedType())
 			}
 			return Handle(s.typeID(operand)), nil
 		case "properties":
@@ -729,6 +747,18 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return Boolean(c.IsUnknownSymbol(s.symbolByID(r.ID))), nil
 		case "exportsOfModule":
 			return s.namedSymbols(c.GetExportsOfModule(s.symbolByID(r.ID))), nil
+		case "fullyQualifiedName":
+			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
+		case "symbolLinkType":
+			return Handle(s.typeID(checker.CachedSymbolType(c, s.symbolByID(r.ID)))), nil
+		case "symbolMembers":
+			members := slices.Collect(maps.Values(s.symbolByID(r.ID).Members))
+			checker.Checker_sortSymbols(c, members)
+			result := make(NamedSymbols, len(members))
+			for i, member := range members {
+				result[i] = NamedSymbol{ID: s.symbolID(member), Name: ast.EscapeSymbolName(member.Name)}
+			}
+			return result, nil
 		case "exportSymbol":
 			return Handle(s.symbolID(c.GetExportSymbolOfSymbol(s.symbolByID(r.ID)))), nil
 		case "declaredType":
@@ -737,7 +767,7 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
+			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {
@@ -809,6 +839,18 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 	case *ParameterTypeRequest:
 		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
 	case *PrintRequest:
+		if r.Op == "typeNode" {
+			var flags uint32
+			if r.Flags != nil {
+				flags = *r.Flags
+			}
+			node := checker.TypeNodeForPlugin(c, s.typeByID(r.ID), native, flags)
+			if node == nil {
+				return EncodedTypeNode(nil), nil
+			}
+			data, _, err := encoder.EncodeNode(node, nil)
+			return EncodedTypeNode(data), err
+		}
 		flags := checker.TypeFormatFlagsNone
 		if r.Flags != nil {
 			flags = checker.TypeFormatFlags(*r.Flags)
@@ -858,6 +900,35 @@ func (s *Session) execute(c *checker.Checker, request Request, native *ast.Node)
 		return ids, nil
 	}
 	return nil, fmt.Errorf("unsupported type service operation %q", request.operation())
+}
+
+// Go inserts three write-access bits before ContainsStatic and has private
+// cache flags above Unresolved. Neither group exists in JS CheckFlags.
+func jsCheckFlags(flags ast.CheckFlags) uint32 {
+	const low = ast.CheckFlagsContainsWritePublic - 1
+	const high = (ast.CheckFlagsUnresolved*2 - 1) &^ (ast.CheckFlagsContainsStatic - 1)
+	return uint32(flags&low | (flags&high)>>3)
+}
+
+func diagnosticFacts(diagnostics []*ast.Diagnostic) SuggestionDiagnostics {
+	var result SuggestionDiagnostics
+	for _, diagnostic := range diagnostics {
+		d := DiagnosticFact{
+			Code: uint32(diagnostic.Code()), Category: uint32(diagnostic.Category()),
+			Message: diagnostic.Localize(locale.Default), Source: diagnostic.Source(),
+			Deprecated: diagnostic.ReportsDeprecated(), Unnecessary: diagnostic.ReportsUnnecessary(),
+			Chain: diagnosticFacts(diagnostic.MessageChain()), Related: diagnosticFacts(diagnostic.RelatedInformation()),
+		}
+		if f := diagnostic.File(); f != nil {
+			d.File = f.FileName()
+			positions := f.GetPositionMap()
+			start := positions.UTF8ToUTF16(diagnostic.Pos())
+			d.Start = uint32(start)
+			d.Length = uint32(positions.UTF8ToUTF16(diagnostic.End()) - start)
+		}
+		result = append(result, d)
+	}
+	return result
 }
 
 func appendNodes(nodes []*ast.Node) []*ast.Node {

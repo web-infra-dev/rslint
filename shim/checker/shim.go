@@ -153,6 +153,8 @@ func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, tar
 func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_getMinArgumentCount github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getMinArgumentCount
 func Checker_getMinArgumentCount(recv *checker.Checker, signature *checker.Signature) int
+//go:linkname Checker_sortSymbols github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).sortSymbols
+func Checker_sortSymbols(recv *checker.Checker, symbols []*ast.Symbol)
 type extra_Checker struct {
   id uint32
   program checker.Program
@@ -786,6 +788,20 @@ func LiteralType_regularType(v *checker.LiteralType) *checker.Type {
 const MAX_REVERSE_MAPPED_NESTING_INSPECTION_DEPTH = checker.MAX_REVERSE_MAPPED_NESTING_INSPECTION_DEPTH
 type MappedSymbolLinks = checker.MappedSymbolLinks
 type MappedType = checker.MappedType
+type extra_MappedType struct {
+  checker.ObjectType
+  declaration *ast.MappedTypeNode
+  typeParameter *checker.Type
+  constraintType *checker.Type
+  nameType *checker.Type
+  templateType *checker.Type
+  modifiersType *checker.Type
+  resolvedApparentType *checker.Type
+  containsError bool
+}
+func MappedType_modifiersType(v *checker.MappedType) *checker.Type {
+  return ((*extra_MappedType)(unsafe.Pointer(v))).modifiersType
+}
 type MappedTypeModifiers = checker.MappedTypeModifiers
 const MappedTypeModifiersExcludeOptional = checker.MappedTypeModifiersExcludeOptional
 const MappedTypeModifiersExcludeReadonly = checker.MappedTypeModifiersExcludeReadonly
@@ -1292,6 +1308,18 @@ type UnusedKind = checker.UnusedKind
 const UnusedKindLocal = checker.UnusedKindLocal
 const UnusedKindParameter = checker.UnusedKindParameter
 type ValueSymbolLinks = checker.ValueSymbolLinks
+type extra_ValueSymbolLinks struct {
+  resolvedType *checker.Type
+  writeType *checker.Type
+  target *ast.Symbol
+  mapper *checker.TypeMapper
+  nameType *checker.Type
+  containingType *checker.Type
+  functionOrConstructorChecked bool
+}
+func ValueSymbolLinks_resolvedType(v *checker.ValueSymbolLinks) *checker.Type {
+  return ((*extra_ValueSymbolLinks)(unsafe.Pointer(v))).resolvedType
+}
 //go:linkname ValueToString github.com/microsoft/TypeScript/tsc/internal/checker.ValueToString
 func ValueToString(value any) string
 type VarianceFlags = checker.VarianceFlags

@@ -23,6 +23,7 @@ import {
   type SymbolFact,
   type SignatureFact,
   type IndexInfoFact,
+  type DiagnosticFact,
   type NamedSymbolFact,
   type ServiceRequest,
   type ScalarRequest,
@@ -57,6 +58,8 @@ export interface TypeView {
   readonly typeParameter: TypeView | undefined;
   readonly constraintType: TypeView | undefined;
   readonly templateType: TypeView | undefined;
+  readonly modifiersType: TypeView | undefined;
+  readonly thisType: TypeView | undefined;
   readonly combinedFlags: number | undefined;
   readonly readonly: boolean | undefined;
   getFlags(): number;
@@ -90,6 +93,10 @@ export interface SymbolView {
   readonly flags: number;
   readonly declarations: readonly object[] | undefined;
   readonly valueDeclaration: object | undefined;
+  readonly members: ReadonlyMap<string, SymbolView> | undefined;
+  readonly links:
+    | { readonly checkFlags: number; readonly type: TypeView | undefined }
+    | undefined;
   getName(): string;
   getEscapedName(): string;
   getFlags(): number;
@@ -128,6 +135,20 @@ export interface CheckerView {
   getTypeAtLocation(n: object): TypeView | undefined;
   getTypeFromTypeNode(n: object): TypeView | undefined;
   getContextualType(n: object): TypeView | undefined;
+  getContextualTypeForArgumentAtIndex(
+    n: object,
+    index: number,
+  ): TypeView | undefined;
+  getFullyQualifiedName(symbol: object): string;
+  typeToTypeNode(
+    type: object,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  getSuggestionDiagnostics(
+    source: object,
+    cancellation?: ts.CancellationToken,
+  ): DiagnosticView[];
   getVoidType(): TypeView | undefined;
   getBaseConstraintOfType(t: object): TypeView | undefined;
   getApparentType(t: object): TypeView | undefined;
@@ -193,6 +214,19 @@ export interface ProgramView {
   sourceFileToPackageName: { get(path: string): string | undefined };
   isSourceFileFromExternalLibrary(source: object): boolean;
   isSourceFileDefaultLibrary(source: object): boolean;
+}
+type DiagnosticView = Omit<ts.Diagnostic, 'file' | 'relatedInformation'> & {
+  file: object | undefined;
+  relatedInformation?: DiagnosticView[];
+};
+
+function diagnosticMessage(fact: DiagnosticFact): ts.DiagnosticMessageChain {
+  return {
+    code: fact.code,
+    category: fact.category,
+    messageText: fact.text,
+    next: fact.chain.length ? fact.chain.map(diagnosticMessage) : undefined,
+  };
 }
 function unsupported(surface: string): never {
   throw new Error(`unsupported TypeScript operation: ${surface}`);
@@ -347,6 +381,38 @@ export class TypeServiceClient {
         getTypeAtLocation: (n) => nodeType('type', n),
         getTypeFromTypeNode: (n) => nodeType('fromTypeNode', n),
         getContextualType: (n) => nodeType('context', n),
+        getContextualTypeForArgumentAtIndex: (n, index) =>
+          this.type(
+            this.query({
+              op: 'contextualArgument',
+              args: { node: this.syntax.location(n), index },
+            }),
+          ),
+        getFullyQualifiedName: (symbol) =>
+          this.query({
+            op: 'fullyQualifiedName',
+            args: { id: this.id(symbol, 'symbol') },
+          }),
+        typeToTypeNode: (t, enclosing, flags) => {
+          const data = this.query({
+            op: 'typeNode',
+            args: {
+              id: this.id(t, 'type'),
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        getSuggestionDiagnostics: (source, cancellation) => {
+          cancellation?.throwIfCancellationRequested();
+          const diagnostics = this.query({
+            op: 'suggestionDiagnostics',
+            args: { node: this.syntax.location(source) },
+          });
+          cancellation?.throwIfCancellationRequested();
+          return diagnostics.map((d) => this.diagnostic(d));
+        },
         getVoidType: () => this.type(this.query({ op: 'void', args: {} })),
         getBaseConstraintOfType: (t) => typeType('constraint', t),
         getApparentType: (t) => typeType('apparent', t),
@@ -624,6 +690,22 @@ export class TypeServiceClient {
   get syntaxStats() {
     return this.syntax.stats;
   }
+  private diagnostic(d: DiagnosticFact): DiagnosticView {
+    return {
+      file: d.fileName ? this.syntax.sourceView(d.fileName) : undefined,
+      start: d.fileName ? d.start : undefined,
+      length: d.fileName ? d.length : undefined,
+      code: d.code,
+      category: d.category,
+      source: d.source,
+      messageText: d.chain.length ? diagnosticMessage(d) : d.text,
+      reportsDeprecated: d.reportsDeprecated,
+      reportsUnnecessary: d.reportsUnnecessary,
+      relatedInformation: d.related.length
+        ? d.related.map((item) => this.diagnostic(item))
+        : undefined,
+    };
+  }
   private ensure(): void {
     if (this.closed) throw new Error('type service client is closed');
     this.shared?.assertOpen();
@@ -822,13 +904,20 @@ export class TypeServiceClient {
             if (
               key !== 'typeParameter' &&
               key !== 'constraintType' &&
-              key !== 'templateType'
+              key !== 'templateType' &&
+              key !== 'modifiersType' &&
+              key !== 'thisType'
             )
               return Reflect.has(view, key);
             const flags: unknown = Reflect.get(view, 'objectFlags');
             return (
               typeof flags === 'number' &&
-              Boolean(flags & this.typescript.ObjectFlags.Mapped)
+              Boolean(
+                flags &
+                (key === 'thisType'
+                  ? this.typescript.ObjectFlags.ClassOrInterface
+                  : this.typescript.ObjectFlags.Mapped),
+              )
             );
           }
         : undefined,
@@ -923,6 +1012,7 @@ export class TypeServiceClient {
         constraintType = mapped('mappedConstraintType'),
         templateType = mapped('mappedTemplateType');
       const isClassOrInterface = () => objectFlag(of.ClassOrInterface);
+      const client = this;
       const calls = memo(ensure, () =>
           this.signaturesFor(
             this.query({ op: 'signatures', args: { id, kind: 0 } }),
@@ -1029,6 +1119,18 @@ export class TypeServiceClient {
         get templateType() {
           return templateType();
         },
+        get modifiersType() {
+          return objectFlag(of.Mapped)
+            ? client.type(
+                client.query({ op: 'mappedModifiersType', args: { id } }),
+              )
+            : undefined;
+        },
+        get thisType() {
+          return isClassOrInterface()
+            ? client.type(client.query({ op: 'classThisType', args: { id } }))
+            : undefined;
+        },
         get combinedFlags() {
           return tuple()?.combinedFlags;
         },
@@ -1094,6 +1196,9 @@ export class TypeServiceClient {
       };
       let documentation: ts.SymbolDisplayPart[] | undefined;
       let tags: ts.JSDocTagInfo[] | undefined;
+      let links: SymbolView['links'];
+      let members: Map<string, SymbolView> | undefined;
+      const client = this;
       return {
         id,
         get name() {
@@ -1110,6 +1215,30 @@ export class TypeServiceClient {
         },
         get valueDeclaration() {
           return value();
+        },
+        get members() {
+          if (members || !client.symbolField(id, 'hasMembers')) return members;
+          return (members = new Map(
+            client
+              .query({ op: 'symbolMembers', args: { id } })
+              .map((member) => [member.name, client.symbol(member.id)!]),
+          ));
+        },
+        get links() {
+          if (links) return links;
+          const flags = client.symbolField(id, 'checkFlags');
+          if (flags === undefined) return undefined;
+          return (links = {
+            get checkFlags() {
+              ensure();
+              return flags;
+            },
+            get type() {
+              return client.type(
+                client.query({ op: 'symbolLinkType', args: { id } }),
+              );
+            },
+          });
         },
         getName: name,
         getEscapedName: escaped,

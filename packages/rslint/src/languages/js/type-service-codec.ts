@@ -10,6 +10,7 @@ import type {
   IndexInfoFact,
   TypePredicateFact,
   NamedSymbolFact,
+  DiagnosticFact,
   ScalarOperation,
   QueryResults,
 } from './type-service-protocol.js';
@@ -30,7 +31,7 @@ export class TypePacketReader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 13, 5, 5, 1, 1, 4, 1, 1, 1][this.kind];
+    const words = [0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -189,6 +190,14 @@ export class TypePacketReader {
       case 'valueDeclaration':
         value = this.node(this.word(24));
         break;
+      case 'checkFlags': {
+        const flags = this.word(28);
+        value = flags ? flags - 1 : undefined;
+        break;
+      }
+      case 'hasMembers':
+        value = this.word(32) !== 0;
+        break;
       case 'declarations': {
         const at = this.word(20);
         if (!at) value = undefined;
@@ -302,6 +311,30 @@ export class TypePacketReader {
       };
     });
   }
+  private diagnostics(at: number): DiagnosticFact[] {
+    if (!at) return [];
+    const count = this.word(at);
+    if (at + 4 + count * 40 > this.view!.byteLength) return invalid();
+    return Array.from({ length: count }, (_, i) => {
+      const pos = at + 4 + i * 40;
+      const file = this.word(pos),
+        source = this.word(pos + 24),
+        flags = this.word(pos + 28);
+      return {
+        fileName: file ? this.text(file) : undefined,
+        start: this.word(pos + 4),
+        length: this.word(pos + 8),
+        category: this.word(pos + 12),
+        code: this.word(pos + 16),
+        text: this.text(this.word(pos + 20)),
+        source: source ? this.text(source) : undefined,
+        reportsDeprecated: flags & 1 ? true : undefined,
+        reportsUnnecessary: flags & 2 ? true : undefined,
+        chain: this.diagnostics(this.word(pos + 32)),
+        related: this.diagnostics(this.word(pos + 36)),
+      };
+    });
+  }
   scalar<K extends ScalarOperation>(operation: K): QueryResults[K] {
     if (this.kind !== SCALAR_KINDS[operation]) return invalid();
     let value: QueryResults[ScalarOperation];
@@ -332,6 +365,15 @@ export class TypePacketReader {
         break;
       case 13:
         value = this.jsDocTags();
+        break;
+      case 14: {
+        const len = this.word(8);
+        if (len !== this.bytes!.length - 12) return invalid();
+        value = len ? Uint8Array.from(this.bytes!.subarray(12)) : undefined;
+        break;
+      }
+      case 15:
+        value = this.diagnostics(this.word(8));
         break;
       default:
         return invalid();

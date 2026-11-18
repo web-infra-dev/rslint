@@ -202,6 +202,84 @@ const cases: Case[] = [
   },
   // See packages/eslint-plugin/tests/rules in typescript-eslint v8.65.0.
   {
+    name: 'promise-returning callbacks and inherited void methods',
+    plugin: typedPlugin,
+    rule: 'no-misused-promises',
+    code: `
+      declare function run(callback: () => void): void;
+      run(async () => {}); run(() => {});
+      interface Base { __run(): void }
+      class Derived implements Base { async __run() {} }
+    `,
+    reports: 2,
+    requiredOps: ['contextualArgument', 'symbolMembers'],
+  },
+  {
+    name: 'returning an alias of polymorphic this',
+    plugin: typedPlugin,
+    rule: 'prefer-return-this-type',
+    code: 'class Box { self(): Box { const self = this; return self; } fresh(): Box { return new Box(); } }',
+    reports: 1,
+    requiredOps: ['classThisType'],
+  },
+  {
+    name: 'readonly properties inherited through mapped and const generic types',
+    plugin: typedPlugin,
+    rule: 'prefer-readonly-parameter-types',
+    code: `
+      type Copy<T> = { [K in keyof T]: T[K] };
+      declare function capture<const T>(value: T): T;
+      const inferred = capture({ x: 1 });
+      function read(a: typeof inferred, b: Copy<{ readonly x: number }>, c: Copy<{ x: number }>) {}
+    `,
+    reports: 1,
+    requiredOps: ['mappedModifiersType'],
+  },
+  {
+    name: 'assertions that preserve or remove const generic readonlyness',
+    plugin: typedPlugin,
+    rule: 'no-unnecessary-type-assertion',
+    code: `
+      declare function capture<const T>(value: T): T;
+      const inferred = capture({ x: 1 });
+      const writable = inferred as { x: 1 }; writable.x = 1;
+      const same = inferred as { readonly x: 1 };
+    `,
+    reports: 1,
+  },
+  {
+    name: 'built-in argument types use fully qualified symbols',
+    plugin: sonarPlugin,
+    rule: 'argument-type',
+    code: '"text".includes(123); "text".includes("t");',
+    reports: 1,
+    requiredOps: ['fullyQualifiedName'],
+  },
+  {
+    name: 'deprecated call suggestion uses UTF-16 spans',
+    plugin: sonarPlugin,
+    rule: 'deprecation',
+    code: '/** @deprecated Use fresh instead. */\nfunction oldFn() {}\nconst emoji = "😀"; oldFn();',
+    reports: 1,
+    requiredOps: ['suggestionDiagnostics'],
+  },
+  {
+    name: 'generated nodes distinguish function and array returns',
+    plugin: sonarPlugin,
+    rule: 'function-return-type',
+    code: 'function value(b: boolean) { if (b) return [1]; return () => 1; }',
+    reports: 1,
+    requiredOps: ['typeNode'],
+  },
+  {
+    name: 'ignored replace result distinguishes a callback from replacement text',
+    plugin: sonarPlugin,
+    rule: 'no-ignored-return',
+    code: '"abc".replace("a", "d"); let n=0; "abc".replace("a", () => String(++n));',
+    reports: 1,
+    requiredOps: ['typeNode'],
+  },
+  {
     name: 'unsafe assignment through matching generic targets',
     plugin: typedPlugin,
     rule: 'no-unsafe-assignment',
@@ -695,11 +773,12 @@ describe('original npm typed rules over Go type services', () => {
               budget.entries,
             );
           for (let pass = 0; pass < 2; pass++) {
+            let uncached = 0;
             const client = new FileTypeServiceClient(
               enums,
               descriptor,
               projection.binding,
-              (query, key) => {
+              (query, key, cacheable) => {
                 operations.add(query.op);
                 host.requests++;
                 const packet = Buffer.from(
@@ -707,7 +786,8 @@ describe('original npm typed rules over Go type services', () => {
                   'base64',
                 );
                 const reply = typeReplyPackets(packet);
-                cache?.publish(key, reply.packet);
+                if (cacheable) cache?.publish(key, reply.packet);
+                else uncached++;
                 for (const record of reply.records)
                   cache?.publish(
                     typeQueryKey({
@@ -740,7 +820,7 @@ describe('original npm typed rules over Go type services', () => {
             expect(normResult(result, c.code)).toEqual(normMessages(expected));
             if (pass === 1 && budget?.entries === 8192) {
               expect(client.stats.sharedHits).toBeGreaterThan(0);
-              expect(host.requests - before).toBe(0);
+              expect(host.requests - before).toBe(uncached);
             }
             expect(
               client.stats.queries + client.stats.sharedHits,
@@ -1406,6 +1486,42 @@ await Promise.resolve(1);
       referenceBody.find((node) => node.type === 'ExportNamedDeclaration')
         .declaration,
     ) as ts.FunctionDeclaration;
+    // The node builder returns detached syntax. Its public kinds, child fields
+    // and visitation must agree even when the compiler enums differ.
+    const generatedShape = (n: ts.Node): unknown => {
+      const children: unknown[] = [];
+      n.forEachChild((child) => {
+        children.push(generatedShape(child));
+      });
+      return [
+        n.kind,
+        // tsgo's node builder can reuse a source literal and its range.
+        // For these leaves compare the literal's value as consumed by rules.
+        ts.isStringLiteral(n) || ts.isNumericLiteral(n)
+          ? n.text
+          : [n.pos, n.end],
+        ts.isIdentifier(n) ? n.escapedText : undefined,
+        children,
+      ];
+    };
+    const generated = checker.typeToTypeNode(
+      keyType,
+      keyLocation,
+      ts.NodeBuilderFlags.InTypeAlias,
+    )!;
+    const referenceLocation = referenceNodes.get(
+      referenceVariable('surrogateKeys').id,
+    )!;
+    expect(generatedShape(generated)).toEqual(
+      generatedShape(
+        referenceChecker.typeToTypeNode(
+          referenceChecker.getTypeAtLocation(referenceLocation),
+          referenceLocation,
+          ts.NodeBuilderFlags.InTypeAlias,
+        )!,
+      ),
+    );
+    expect(generated.getSourceFile()).toBeUndefined();
     const contextualToken = (source: ts.SourceFile) => {
       const fn = source.statements.find(
         (node): node is ts.FunctionDeclaration =>

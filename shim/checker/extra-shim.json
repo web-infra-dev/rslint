@@ -40,6 +40,7 @@
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
+      "sortSymbols",
       "getNodeBuilder"
     ]
   },
@@ -56,6 +57,8 @@
       "globalRegExpType",
       "couldContainTypeVariables"
     ],
-    "InterfaceType": ["thisType"]
+    "InterfaceType": ["thisType"],
+    "MappedType": ["modifiersType"],
+    "ValueSymbolLinks": ["resolvedType"]
   }
 }
