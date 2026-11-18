@@ -1,7 +1,9 @@
 package no_unused_vars
 
 import (
+	"cmp"
 	_ "embed"
+	"slices"
 	"strings"
 	"sync"
 
@@ -56,22 +58,23 @@ type Config struct {
 }
 
 type analysisContext struct {
-	localExportTargets map[*ast.Symbol]bool
-	seenMergedSymbols  map[*ast.Symbol]bool
-	reportedUnused     map[*ast.Node]bool
-	explicitExports    map[*ast.Node]explicitExportResult
-	parameterOwner     *ast.Node
-	parameterBoundary  parameterBoundary
-	fallbackInfos      map[*ast.Symbol]referenceInfo
-	fallbackCandidates map[string][]*ast.Node
-	heritageReferences map[*ast.Symbol][]*ast.Node
-	signatureUsage     *signatureTypeUsage
-	jsxScanned         bool
-	globalSourceFile   bool
-	declarationFile    bool
-	sourceFile         *ast.SourceFile
-	firstJsx           *ast.Node
-	firstFragment      *ast.Node
+	localExportTargets     map[*ast.Symbol]bool
+	seenMergedSymbols      map[*ast.Symbol]bool
+	reportedUnused         map[*ast.Node]bool
+	explicitExports        map[*ast.Node]explicitExportResult
+	parameterOwner         *ast.Node
+	parameterBoundary      parameterBoundary
+	fallbackInfos          map[*ast.Symbol]referenceInfo
+	fallbackCandidates     map[string][]*ast.Node
+	heritageReferences     map[*ast.Symbol][]*ast.Node
+	signatureUsage         *signatureTypeUsage
+	jsxScanned             bool
+	globalSourceFile       bool
+	declarationFile        bool
+	implicitLibraryGlobals map[string]bool
+	sourceFile             *ast.SourceFile
+	firstJsx               *ast.Node
+	firstFragment          *ast.Node
 }
 
 type VariableInfo struct {
@@ -245,13 +248,13 @@ func isMergedTypeDeclaration(sym *ast.Symbol, declaration *ast.Node) bool {
 }
 
 // mergedVariableDeclaration returns the first `var`/`let`/`const` declarator
-// that shares sym, or nil.
-func mergedVariableDeclaration(sym *ast.Symbol) *ast.Node {
+// in file that shares sym, or nil.
+func mergedVariableDeclaration(sym *ast.Symbol, file *ast.SourceFile) *ast.Node {
 	if sym == nil {
 		return nil
 	}
 	for _, declaration := range sym.Declarations {
-		if declaration.Kind == ast.KindVariableDeclaration {
+		if declaration.Kind == ast.KindVariableDeclaration && ast.GetSourceFileOfNode(declaration) == file {
 			return declaration
 		}
 	}
@@ -259,9 +262,9 @@ func mergedVariableDeclaration(sym *ast.Symbol) *ast.Node {
 }
 
 // hasTypeDeclaration reports whether sym has an interface or type alias.
-func hasTypeDeclaration(sym *ast.Symbol) bool {
+func hasTypeDeclaration(sym *ast.Symbol, file *ast.SourceFile) bool {
 	for _, declaration := range sym.Declarations {
-		if declaration.Kind == ast.KindInterfaceDeclaration || declaration.Kind == ast.KindTypeAliasDeclaration {
+		if ast.GetSourceFileOfNode(declaration) == file && (declaration.Kind == ast.KindInterfaceDeclaration || declaration.Kind == ast.KindTypeAliasDeclaration) {
 			return true
 		}
 	}
@@ -275,7 +278,7 @@ func isTypeOnlyUsage(usage *ast.Node, sym *ast.Symbol) bool {
 	if isTypeOnlyReference(usage) {
 		return true
 	}
-	return mergedVariableDeclaration(sym) != nil && ast.IsPartOfTypeNode(usage)
+	return mergedVariableDeclaration(sym, ast.GetSourceFileOfNode(usage)) != nil && ast.IsPartOfTypeNode(usage)
 }
 
 // hasRestSiblingReference mirrors upstream's reference half of
@@ -797,8 +800,12 @@ func isParamUsed(ctx rule.RuleContext, nameNode *ast.Node, ac *analysisContext) 
 		rawSym := binderSymbolForDefinition(nameNode, definition)
 		sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
 		info := getReferenceInfo(ctx, nameNode, nameNode.AsIdentifier().Text, definition, rawSym, sym, ac)
-		// Upstream counts a later parameter as used only through a reference
-		// that is not type-only (typescript-eslint#12977).
+		// after-used considers writes when locating the parameter boundary,
+		// even though those writes do not make the parameter value used.
+		if len(info.writeRefs) != 0 {
+			return true
+		}
+		// Type-only references alone do not establish that boundary.
 		for _, usage := range info.usages {
 			if usage.Pos() != nameNode.Pos() && !isTypeOnlyUsage(usage, sym) {
 				return true
@@ -2112,7 +2119,17 @@ func getReferenceInfo(
 	}
 
 	if rawSym != nil && ctx.Refs != nil {
-		info := classifyReferenceNodes(ctx.Refs.References(rawSym))
+		references := ctx.Refs.References(rawSym)
+		// A local binding and its exported facet can resolve independently,
+		// e.g. a function beside an exported type alias of the same name.
+		if exported := rawSym.ExportSymbol; exported != nil && exported != rawSym {
+			if extra := ctx.Refs.References(exported); len(extra) != 0 {
+				references = append(slices.Clone(references), extra...)
+				slices.SortStableFunc(references, func(a, b *ast.Node) int { return cmp.Compare(a.Pos(), b.Pos()) })
+				references = slices.Compact(references)
+			}
+		}
+		info := classifyReferenceNodes(references)
 		if definition != nil && definition.Kind == ast.KindModuleDeclaration &&
 			len(info.usages) == 0 && len(info.writeRefs) == 0 && checkerSym != nil {
 			// The binder resolver can miss value references to empty
@@ -2224,7 +2241,7 @@ func lastWriteInDeclarationScope(definition *ast.Node, refs []*ast.Node) *ast.No
 	}
 	declarationScope := utils.FindEnclosingScope(definition)
 	for index := len(refs) - 1; index >= 0; index-- {
-		if utils.FindEnclosingScope(refs[index]) == declarationScope {
+		if ast.GetSourceFileOfNode(refs[index]) == ast.GetSourceFileOfNode(definition) && utils.FindEnclosingScope(refs[index]) == declarationScope {
 			return refs[index]
 		}
 	}
@@ -2265,6 +2282,9 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	}
 
 	rawSym := binderSymbolForDefinition(nameNode, definition)
+	if ctx.IsGlobalScopeBinding(rawSym, name) && isImplicitLibraryGlobal(ctx, name, ac) {
+		return
+	}
 	sym := symbolForVariable(ctx, nameNode, definition, rawSym, ac.globalSourceFile)
 	// For declaration merging (interface + const, etc.), only process once.
 	if sym != nil && len(sym.Declarations) > 1 {
@@ -2278,14 +2298,22 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		// A merged type and variable is analyzed as the variable: upstream
 		// reports its value declaration, and a type reference no longer marks
 		// it used (typescript-eslint#12892).
-		if variable := mergedVariableDeclaration(sym); variable != nil && hasTypeDeclaration(sym) {
+		if variable := mergedVariableDeclaration(sym, ctx.SourceFile); variable != nil && hasTypeDeclaration(sym, ctx.SourceFile) {
 			definition = variable
 			// Upstream reports at the last write, here the initializer, or
 			// otherwise at the first declaration in source order.
 			if variable.Initializer() != nil && ast.IsIdentifier(variable.Name()) {
 				nameNode = variable.Name()
-			} else if first := sym.Declarations[0].Name(); first != nil && ast.IsIdentifier(first) {
-				nameNode = first
+			} else {
+				for _, declaration := range sym.Declarations {
+					if ast.GetSourceFileOfNode(declaration) != ctx.SourceFile {
+						continue
+					}
+					if first := declaration.Name(); first != nil && ast.IsIdentifier(first) {
+						nameNode = first
+						break
+					}
+				}
 			}
 			varInfo.Variable = nameNode
 			varInfo.Definition = definition
@@ -2300,7 +2328,12 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	// references inside any declaration body are self-references.
 	allDecls := []*ast.Node{definition}
 	if sym != nil && len(sym.Declarations) > 1 {
-		allDecls = sym.Declarations
+		allDecls = nil
+		for _, declaration := range sym.Declarations {
+			if ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
+				allDecls = append(allDecls, declaration)
+			}
+		}
 	}
 
 	// Upstream picks usedOnlyAsType when any reference is type-only, including
@@ -2553,6 +2586,9 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				// this path. Upstream reports an unread one at its first name,
 				// regardless of `vars`.
 				for _, inlineGlobal := range coreNoUnusedVars.UnusedInlineGlobals(ctx) {
+					if isImplicitLibraryGlobal(ctx, inlineGlobal.Name, ac) {
+						continue
+					}
 					ctx.ReportRange(inlineGlobal.NameRanges[0], buildUnusedVarMessage(inlineGlobal.Name, false, ""))
 				}
 			},
@@ -2886,3 +2922,28 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 		}
 	},
 })
+
+// TypeScript's implicit library variables are type-capable bindings, not
+// value-only globals such as NaN or host declarations from user .d.ts files.
+// Resolve in the compiler global scope so module locals do not hide them.
+func isImplicitLibraryGlobal(ctx rule.RuleContext, name string, ac *analysisContext) bool {
+	if used, ok := ac.implicitLibraryGlobals[name]; ok {
+		return used
+	}
+	implicit := false
+	if ctx.TypeChecker != nil && ctx.Program() != nil {
+		if symbol := ctx.TypeChecker.ResolveName(name, nil, ast.SymbolFlagsType|ast.SymbolFlagsNamespace, false); symbol != nil {
+			for _, declaration := range symbol.Declarations {
+				if file := ast.GetSourceFileOfNode(declaration); file != nil && ctx.Program().IsSourceFileDefaultLibrary(file) {
+					implicit = true
+					break
+				}
+			}
+		}
+	}
+	if ac.implicitLibraryGlobals == nil {
+		ac.implicitLibraryGlobals = make(map[string]bool)
+	}
+	ac.implicitLibraryGlobals[name] = implicit
+	return implicit
+}

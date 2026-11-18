@@ -1,6 +1,8 @@
 package no_unused_vars
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"reflect"
 	"testing"
 
@@ -1152,4 +1154,224 @@ console.log(callbacks[0]());
 		})
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}
+
+// TestNoUnusedVarsReviewBoundaries covers cross-file declarations, reference
+// namespaces, parameter writes, implicit libraries, and function value consumers.
+// Expected diagnostics follow v8.72.1 except the documented callback fixes.
+func TestNoUnusedVarsReviewBoundaries(t *testing.T) {
+	root := fixtures.GetRootDir()
+	root.FS = utils.NewOverlayVFS(root.FS, map[string]string{
+		tspath.ResolvePath(root.Dir, "round3-legacy.json"):    `{"extends":"./tsconfig.json","compilerOptions":{"moduleDetection":"legacy"}}`,
+		tspath.ResolvePath(root.Dir, "round3-no-lib.json"):    `{"compilerOptions":{"target":"esnext","strict":true,"noLib":true,"moduleDetection":"legacy","types":[]}}`,
+		tspath.ResolvePath(root.Dir, "round3-initialized.ts"): `var RoundThreeInitialized = class { value = 1; };`,
+		tspath.ResolvePath(root.Dir, "round3-no-dom.json"):    `{"extends":"./round3-legacy.json","compilerOptions":{"lib":["esnext"]}}`,
+		tspath.ResolvePath(root.Dir, "round3-host.d.ts"):      `declare var RoundThreeExternal: { new(): any }; declare function roundThreeHost(): void; interface RoundThreeHostType {}`,
+	})
+	rule_tester.RunRuleTester(root, "round3-legacy.json", t, &NoUnusedVarsRule,
+		[]rule_tester.ValidTestCase{
+			// window
+			{Code: "interface Window { customSize: number }\n", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// document
+			{Code: "interface Document { customSize: number }\n", LanguageOptions: rule.LanguageOptions{SourceType: "script"}},
+			// value-global
+			{Code: "/* global launch */\nexport function run() { type launch = number; const code: launch = 1; launch(code); }", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// type-global
+			{Code: "/* global Shape */\nexport function run() { const Shape = 1; let x: Shape; consume(x, Shape); }", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// parameter-value-read
+			{Code: "export function g(a: string, b: number): typeof b { return b; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// library
+			{Code: "/* global Promise, Array */", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// factory
+			{Code: "function Factory() {}\nexport type Factory = number;\nexport const n: Factory = 1;", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// factory-reverse
+			{Code: "export type Factory = number;\nfunction Factory() {}\nexport const n: Factory = 1;", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// v8.72.1 mistakes bind for executing the callback. The bound
+			// function can be retained by subscribe, so its read is a use.
+			{Code: "declare function subscribe(callback: () => void): () => void;\nlet off = () => {};\noff = subscribe(function () { off(); }.bind(null));", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// returned-bind
+			{Code: "let off = () => {};\noff = subscribe((() => () => off())().bind(null));", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// bound-returned-escape
+			{Code: "let off = () => {};\noff = subscribe((() => () => off()).bind(null)());", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// bind-chain
+			{Code: "let off = () => {};\noff = subscribe((() => () => off())().bind(null).bind(null));", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// bind-computed
+			{Code: "let off = () => {};\noff = subscribe((function () { off(); })[\"bind\"](null));", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// returned-wrapper-call
+			{Code: "let off = () => {};\noff = subscribe((() => () => off()).call(null));", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+			// unknown-method
+			{Code: "let off = () => {};\noff = subscribe((() => off()).custom());", LanguageOptions: rule.LanguageOptions{SourceType: "module"}},
+		},
+		[]rule_tester.InvalidTestCase{
+			// window-module
+			{Code: "interface Window { customSize: number }\n", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'Window' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// external-merge
+			{Code: "interface RoundThreeExternal { value: number }\n", LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'RoundThreeExternal' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 29},
+				},
+			},
+			// local-type-only
+			{Code: "/* global launch */\nexport function run() { type launch = number; const code: launch = 1; consume(code); }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'launch' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// local-value-only
+			{Code: "/* global launch */\nexport function run() { const launch = () => 1; launch(); }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'launch' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// parameter-write
+			{Code: "export function g(a: string, b: number): typeof b { b = 3; return 1; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedOnlyAsType", Message: "'b' is assigned a value but only used as a type.", Line: 1, Column: 53, EndLine: 1, EndColumn: 54},
+				},
+			},
+			// parameter-only-type
+			{Code: "export function g(a: string, b: number): typeof b { return 1; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'a' is defined but never used.", Line: 1, Column: 19, EndLine: 1, EndColumn: 20},
+					{MessageId: "usedOnlyAsType", Message: "'b' is defined but only used as a type.", Line: 1, Column: 30, EndLine: 1, EndColumn: 31},
+				},
+			},
+			// parameter-destructure
+			{Code: "export function g(a: string, b: number): typeof b { [b] = [3]; return 1; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedOnlyAsType", Message: "'b' is assigned a value but only used as a type.", Line: 1, Column: 54, EndLine: 1, EndColumn: 55},
+				},
+			},
+			// parameter-compound
+			{Code: "export function g(a: string, b: number): typeof b { b += 3; return 1; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedOnlyAsType", Message: "'b' is assigned a value but only used as a type.", Line: 1, Column: 53, EndLine: 1, EndColumn: 54},
+				},
+			},
+			// library-off
+			{Code: "/* global Promise, Array */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				TSConfig: "round3-no-lib.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'Promise' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 18},
+					{MessageId: "unusedVar", Message: "'Array' is defined but never used.", Line: 1, Column: 20, EndLine: 1, EndColumn: 25},
+				},
+			},
+			// mixed-library-host
+			{Code: "/* global Promise, roundThreeHost */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'roundThreeHost' is defined but never used.", Line: 1, Column: 20, EndLine: 1, EndColumn: 34},
+				},
+			},
+			// library-local
+			{Code: "/* global Promise */\nconst Promise = 1;", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'Promise' is assigned a value but never used.", Line: 2, Column: 7, EndLine: 2, EndColumn: 14},
+				},
+			},
+			// host-dts
+			{Code: "/* global roundThreeHost */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'roundThreeHost' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 25},
+				},
+			},
+			// library-intrinsics
+			{Code: "/* global undefined, NaN, Infinity */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'undefined' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 20},
+					{MessageId: "unusedVar", Message: "'NaN' is defined but never used.", Line: 1, Column: 22, EndLine: 1, EndColumn: 25},
+					{MessageId: "unusedVar", Message: "'Infinity' is defined but never used.", Line: 1, Column: 27, EndLine: 1, EndColumn: 35},
+				},
+			},
+			// factory-unused
+			{Code: "function Factory() {}\nexport type Factory = number;", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'Factory' is defined but never used.", Line: 1, Column: 10, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// const-factory
+			{Code: "const Factory = () => {};\nexport type Factory = number;\nexport const n: Factory = 1;", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "usedOnlyAsType", Message: "'Factory' is assigned a value but only used as a type.", Line: 1, Column: 7, EndLine: 1, EndColumn: 14},
+				},
+			},
+			// bound-immediate
+			{Code: "let x = 0;\nx = (() => x + 1).bind(null)();", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// returned-immediate
+			{Code: "let x = 0;\nx = (() => () => x + 1)()();", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// v8.72.1 mistakes explicit return for storage. This returned
+			// function is immediately called and only updates x.
+			{Code: "let x = 0;\nx = (() => { return () => x + 1; })()();", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// bound-returned-immediate
+			{Code: "let x = 0;\nx = (() => () => x + 1).bind(null)()();", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// three-returned-immediate
+			{Code: "let x = 0;\nx = (() => () => () => x + 1)()()();", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// returned-call
+			{Code: "let x = 0;\nx = (() => () => x + 1)().call(null);", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// returned-apply
+			{Code: "let x = 0;\nx = (() => () => x + 1)().apply(null, []);", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// parameter-write-only
+			{Code: "export function g(a: string, b: number) { b = 3; }", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'b' is assigned a value but never used.", Line: 1, Column: 43, EndLine: 1, EndColumn: 44},
+				},
+			},
+			// external-initializer
+			{Code: "interface RoundThreeInitialized { value: number }\n", LanguageOptions: rule.LanguageOptions{SourceType: "script"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'RoundThreeInitialized' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 32},
+				},
+			},
+			// returned-discarded
+			{Code: "let x = 0;\nx = ((() => () => x + 1)(), 1);", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2},
+				},
+			},
+			// library-no-dom
+			{Code: "/* global Window, Promise */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				TSConfig: "round3-no-dom.json",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'Window' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 17},
+				},
+			},
+			// host-type-dts
+			{Code: "/* global RoundThreeHostType */", LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unusedVar", Message: "'RoundThreeHostType' is defined but never used.", Line: 1, Column: 11, EndLine: 1, EndColumn: 29},
+				},
+			},
+		},
+	)
 }

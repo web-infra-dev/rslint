@@ -1492,3 +1492,40 @@ assigned = 2;
 		t.Fatalf("write-only diagnostic unexpectedly has remove suggestions")
 	}
 }
+
+// TestNoUnusedVarsFunctionValueConsumers distinguishes storing a callback from
+// immediately invoking a returned or bound function. Block and concise returns
+// follow the same consumer; unknown storage remains a real use.
+// ESLint 10.14.0 misses the explicit-return/immediate-call case below: the
+// callback runs immediately and only updates x, just like the concise form.
+func TestNoUnusedVarsFunctionValueConsumers(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `/* global launch */ export function run() { type launch = number; const code: launch = 1; launch(code); }`},
+		{Code: `/* global Shape */ export function run() { const Shape = 1; let x: Shape; consume(x, Shape); }`},
+		{Code: `let off = () => {}; off = subscribe(function () { off(); }.bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off())().bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => { return () => off(); })());`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off()).bind(null)());`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off())().bind(null).bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => ({ handler: () => off() }))());`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		`(() => () => x + 1)()()`,
+		`(() => { return () => x + 1; })()()`,
+		`(() => () => () => x + 1)()()()`,
+		`(() => x + 1).bind(null)()`,
+		`(() => x + 1)["bind"](null)()`,
+		`(() => () => x + 1).bind(null)()()`,
+		`(() => () => x + 1)().call(null)`,
+		`(() => { return () => x + 1; })().apply(null, [])`,
+		`(() => x + 1).bind(null).bind(null)()`,
+		`(() => (() => x, 0))()`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "let x = 0;\nx = " + expression + ";",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}

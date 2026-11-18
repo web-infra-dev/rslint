@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 	esregexp "github.com/web-infra-dev/rslint/internal/utils/ecmascript/regexp"
+	"github.com/web-infra-dev/rslint/internal/utils/scope"
 )
 
 //go:embed no_unused_vars.schema.json
@@ -690,49 +691,128 @@ func isInsideOfStorableFunction(node *ast.Node, rhs *ast.Node) bool {
 	return function != nil && ast.IsNodeDescendantOf(function, rhs) && IsStorableFunction(function, rhs)
 }
 
-// IsStorableFunction reports whether a function inside rhs can be stored or
-// passed elsewhere. Both no-unused-vars rules share this value-path analysis.
+// IsStorableFunction follows the function value through returns and binding.
+// Calling a wrapper executes the wrapper, not the function it returns; the
+// returned value's next consumer determines whether that function can escape.
 func IsStorableFunction(function *ast.Node, rhs *ast.Node) bool {
+	flow := functionValueFlow{rhs: rhs}
+	return flow.use(function).stored
+}
+
+type functionValueUse struct {
+	invocation *ast.Node
+	stored     bool
+}
+
+type functionValueFlow struct {
+	rhs *ast.Node
+	// Return chains only move to ancestors. Memoize wrapper uses so nested
+	// returns share their call-site lookup, without allocating on ordinary calls.
+	wrappers map[*ast.Node]functionValueUse
+}
+
+func (flow *functionValueFlow) wrapperUse(function *ast.Node) functionValueUse {
+	if function == nil || !ast.IsNodeDescendantOf(function, flow.rhs) {
+		return functionValueUse{stored: true}
+	}
+	if use, ok := flow.wrappers[function]; ok {
+		return use
+	}
+	use := flow.use(function)
+	if flow.wrappers == nil {
+		flow.wrappers = make(map[*ast.Node]functionValueUse)
+	}
+	flow.wrappers[function] = use
+	return use
+}
+
+func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 	node := function
-	for parent := function.Parent; parent != nil && ast.IsNodeDescendantOf(parent, rhs); parent = parent.Parent {
+	returned := false
+	direct := true
+	method := ""
+	for node.Parent != nil && ast.IsNodeDescendantOf(node.Parent, flow.rhs) {
+		parent := node.Parent
 		switch parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression,
+			ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+			// These wrappers preserve runtime value identity.
 		case ast.KindBinaryExpression:
-			binary := parent.AsBinaryExpression()
-			if binary != nil && binary.OperatorToken != nil {
-				operator := binary.OperatorToken.Kind
-				if operator == ast.KindCommaToken {
-					if binary.Right != node {
-						return false
-					}
-				} else if ast.IsAssignmentOperator(operator) {
-					return true
+			bin := parent.AsBinaryExpression()
+			if bin.OperatorToken.Kind == ast.KindCommaToken {
+				if bin.Right != node {
+					return functionValueUse{}
 				}
+			} else if ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
+				return functionValueUse{stored: true}
 			}
-		case ast.KindArrowFunction:
-			// A concise body is an implicit return. Be as conservative as an
-			// explicit ReturnStatement: the returned callback may escape. A
-			// call of this enclosing arrow does not invoke that callback.
-			if parent.Body() == node {
-				return true
+		case ast.KindConditionalExpression:
+			if parent.AsConditionalExpression().Condition == node {
+				return functionValueUse{}
 			}
+		case ast.KindArrowFunction, ast.KindReturnStatement:
+			var wrapper *ast.Node
+			if parent.Kind == ast.KindArrowFunction {
+				if parent.Body() != node {
+					return functionValueUse{stored: true}
+				}
+				wrapper = parent
+			} else {
+				wrapper = ast.GetContainingFunction(parent)
+			}
+			use := flow.wrapperUse(wrapper)
+			if use.invocation == nil {
+				return functionValueUse{stored: true}
+			}
+			// Continue from the wrapper's result, preserving whether it is the
+			// function itself or a container holding that function.
+			node = use.invocation
+			returned = true
+			method = ""
+			continue
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			if !direct || utils.AccessExpressionObject(parent) != node {
+				return functionValueUse{stored: true}
+			}
+			name, ok := utils.AccessExpressionStaticName(parent)
+			if !ok || (name != "bind" && name != "call" && name != "apply") {
+				return functionValueUse{stored: true}
+			}
+			method = name
 		case ast.KindCallExpression:
-			return parent.AsCallExpression().Expression != node
+			if !direct || parent.AsCallExpression().Expression != node {
+				return functionValueUse{stored: true}
+			}
+			if method == "bind" {
+				// Binding creates another callable carrying the same captured
+				// reads. It does not execute the callback body.
+				method = ""
+				node = parent
+				continue
+			}
+			return functionValueUse{invocation: parent}
 		case ast.KindNewExpression:
-			return parent.AsNewExpression().Expression != node
+			if direct && parent.AsNewExpression().Expression == node {
+				return functionValueUse{invocation: parent}
+			}
+			return functionValueUse{stored: true}
+		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
+			ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression, ast.KindSpreadAssignment,
+			ast.KindSpreadElement:
+			direct = false
 		case ast.KindTaggedTemplateExpression, ast.KindYieldExpression:
-			return true
+			return functionValueUse{stored: true}
 		default:
-			// IsStatement includes declaration statements. Include every Block
-			// as ESTree's BlockStatement too; tsgo intentionally excludes function,
-			// try, and catch bodies from IsStatement. Do not use ast.IsDeclaration,
-			// which would also classify property assignments as declarations.
 			if parent.Kind == ast.KindBlock || ast.IsStatement(parent) {
-				return true
+				return functionValueUse{stored: true}
 			}
 		}
 		node = parent
 	}
-	return false
+	// Preserve the existing conservative treatment of returned function values
+	// stored as the assignment's result. A further call or discard above has
+	// already been distinguished from storing that value.
+	return functionValueUse{stored: returned}
 }
 
 // isParamUsed checks if a parameter name (Identifier or binding pattern) has any usage.
@@ -2054,14 +2134,9 @@ func collectSymbolUsages(refs *rule.RefStore, sourceFile *ast.Node, usages map[*
 			if globalRefsByName != nil {
 				name := node.Text()
 				if _, tracked := globalRefsByName[name]; tracked {
-					// For `module.exports = value`, tsgo synthesizes a file-local
-					// ModuleExports symbol whose only declaration is the SourceFile. ESLint's
-					// scope manager still resolves `module` to an authored global, so this
-					// synthetic symbol must not make an inline `/* global module */` look
-					// shadowed.
-					if sym == nil ||
-						sym.Flags&ast.SymbolFlagsModuleExports != 0 ||
-						!utils.IsSymbolDeclaredInFile(sym, sf) {
+					// Respect both the reference's declaration space and the file's
+					// effective scope, including CommonJS wrapper bindings.
+					if isInlineGlobalReference(refs, node, sf) {
 						globalRefsByName[name] = append(globalRefsByName[name], node)
 					}
 				}
@@ -2774,8 +2849,7 @@ func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
 	walk = func(node *ast.Node) bool {
 		if ast.IsIdentifier(node) && !isNonReferenceIdentifier(node) {
 			if _, tracked := refsByName[node.Text()]; tracked {
-				sym := binderReferenceSymbol(node)
-				if sym == nil || sym.Flags&ast.SymbolFlagsModuleExports != 0 || !utils.IsSymbolDeclaredInFile(sym, sourceFile) {
+				if isInlineGlobalReference(ctx.Refs, node, sourceFile) {
 					refsByName[node.Text()] = append(refsByName[node.Text()], node)
 				}
 			}
@@ -2804,4 +2878,15 @@ func UnusedInlineGlobals(ctx rule.RuleContext) []rule.InlineGlobal {
 func shouldCheckInlineGlobal(ctx rule.RuleContext, global rule.InlineGlobal) bool {
 	return global.Access.IsDeclared() && len(global.NameRanges) != 0 &&
 		!ctx.Exported.Has(global.Name) && !ctx.Refs.HasGlobalDeclaration(global.Name)
+}
+
+// Reference meaning matters: a local type does not shadow a host value, and
+// a local value does not shadow a type-only global reference.
+func isInlineGlobalReference(refs *rule.RefStore, node *ast.Node, file *ast.SourceFile) bool {
+	if refs != nil {
+		return refs.IsGlobalReference(node)
+	}
+	meaning := scope.ESLintReferenceSpace(node).DeclarationMeaning()
+	sym := binderReferenceSymbolWithMeaning(node, meaning)
+	return sym == nil || sym.Flags&ast.SymbolFlagsModuleExports != 0 || !utils.IsSymbolDeclaredInFile(sym, file)
 }
