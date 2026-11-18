@@ -166,10 +166,12 @@ Upstream v8.67.0 can suggest `(user?.name!).length > 0`, which throws when
 consistent for all authored optional chains, including receivers whose static
 types are non-nullish. For `value: string | undefined`, the suggestion for
 `value!` is `(value! ?? "").length > 0`. The same protection applies when an
-assertion wraps a conditional expression.
+assertion wraps a conditional expression, or occurs inside `await`. For an
+optional `Promise<string>`, the suggestion for `await value!` handles the awaited
+nullish result before reading its length.
 
 Suggestions that begin with a parenthesis insert a leading semicolon when needed
-inside `case` and `default` clauses as well as ordinary blocks. This prevents a
+inside `case` and `default` clauses, namespace bodies and ordinary blocks. This prevents a
 suggestion from joining a preceding expression statement through automatic
 semicolon insertion, including when `as` or `satisfies` wraps the expression.
 Upstream v8.67.0 misses these boundaries.
@@ -180,14 +182,19 @@ empty spread admits both its element type and the following argument as possible
 callbacks. No inline callback edits are offered for a spread argument.
 Upstream v8.67.0 can report `conditionErrorOther` on a valid tuple containing a
 boolean callback and its `thisArg`. For array-like intersection types, an
-explicit required `0` property retains the first callback and nonempty status.
-`Set` and `Iterable` spreads use the compiler's iterated element type. Opaque
+explicit required `0` property retains the first callback and nonempty status
+when the type uses the standard iterator. User-declared iterators use the
+compiler's yield type independently of numeric metadata and do not imply a
+nonempty argument list. `Set` and `Iterable` spreads also use the yield type. Opaque
 collections and unresolved mixed collection unions remain conservative.
 
 Computed array-method names are treated as unknown when their backing objects
 may have been modified by a function call. Primitive strings copied from those objects
 before a later-created callback remain stable; defining that callback does not
-execute its body. Calls before the copy still invalidate the backing object. This avoids classifying a runtime `forEach` call
+execute its body. Function-local captures of outer mutable objects remain
+unknown when repeated calls could observe earlier mutations. Fresh local objects
+and primitive literals retain the single-invocation ordering. Calls before the
+copy still invalidate the backing object. This avoids classifying a runtime `forEach` call
 as a predicate method based on an object's initial property value.
 
 The `noStrictNullCheck` diagnostic uses an empty range at the start of the file

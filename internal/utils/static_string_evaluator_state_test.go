@@ -137,3 +137,39 @@ func TestStaticMethodObservationScanCost(t *testing.T) {
 		})
 	}
 }
+
+func TestStaticPrimitiveCaptureScope(t *testing.T) {
+	for _, test := range []struct {
+		name, code string
+		known      bool
+	}{
+		{"outer mutable object", `const opts={current:"some"}; function visit(){const key=opts.current; array[key](()=>unknown(opts));}`, false},
+		{"local fresh object", `function visit(){const opts={current:"some"}; const key=opts.current; array[key](()=>unknown(opts));}`, true},
+		{"alias of outer object", `const shared={current:"some"}; function visit(){const alias=shared; const key=alias.current; array[key](()=>unknown(alias));}`, false},
+		{"literal primitive", `const opts={current:"some"}; function visit(){const key="some"; array[key](()=>unknown(opts));}`, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/captures.ts", Path: "/captures.ts"}, test.code, core.ScriptKindTS)
+			binder.BindSourceFile(source)
+			var access *ast.Node
+			var visit func(*ast.Node) bool
+			visit = func(node *ast.Node) bool {
+				if ast.IsElementAccessExpression(node) && node.Expression().Text() == "array" {
+					access = node
+					return true
+				}
+				return node.ForEachChild(visit)
+			}
+			visit(source.AsNode())
+			if access == nil {
+				t.Fatal("missing method access")
+			}
+			resolver := &staticEvaluatorTestResolver{resolver: binder.NameResolver{Globals: source.Locals}}
+			evaluator := NewStaticStringEvaluatorWithCallEscapes(nil, source, resolver)
+			method, known := evaluator.EvalAccessExpressionNameAtLocation(access)
+			if known != test.known || known && method != "some" {
+				t.Fatalf("method=(%q,%v), want known=%v", method, known, test.known)
+			}
+		})
+	}
+}

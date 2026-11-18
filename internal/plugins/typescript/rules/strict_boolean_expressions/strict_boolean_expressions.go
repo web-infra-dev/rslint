@@ -395,7 +395,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
 				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
-					predicate, predicateType := firstArrayPredicateArgument(tc, callExpr.Arguments.Nodes)
+					predicate, predicateType := firstArrayPredicateArgument(ctx, callExpr.Arguments.Nodes)
 					if predicate != nil {
 						checkArrayMethodPredicate(ctx, sf, tc, predicate, predicateType, opts)
 					}
@@ -905,13 +905,23 @@ func getSuggestionsForConditionError(
 // no expression evaluator or whole-tree scan is needed.
 func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
 	for node = ast.SkipParentheses(node); node != nil; node = ast.SkipParentheses(node.Expression()) {
+		awaited := false
 		switch node.Kind {
 		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		case ast.KindAwaitExpression:
+			awaited = true
 		default:
 			return false
 		}
 		operand := ast.SkipOuterExpressions(node.Expression(), ast.OEKParentheses|ast.OEKAssertions|ast.OEKNonNullAssertions)
-		for _, part := range utils.UnionTypeParts(utils.GetConstrainedTypeAtLocation(tc, operand)) {
+		operandType := utils.GetConstrainedTypeAtLocation(tc, operand)
+		if awaited {
+			operandType = checker.Checker_getAwaitedType(tc, operandType)
+			if operandType == nil {
+				return true
+			}
+		}
+		for _, part := range utils.UnionTypeParts(operandType) {
 			if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoidLike|checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter) {
 				return true
 			}
@@ -950,7 +960,8 @@ func hasOptionalChain(node *ast.Node) bool {
 // A possibly empty spread also admits the next argument. Keep the authored
 // spread as the diagnostic node: its element types do not identify a safe
 // inline function to edit.
-func firstArrayPredicateArgument(tc *checker.Checker, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+	tc := ctx.TypeChecker
 	var firstTypes []*checker.Type
 	var reportNode *ast.Node
 	for _, argument := range arguments {
@@ -962,7 +973,7 @@ func firstArrayPredicateArgument(tc *checker.Checker, arguments []*ast.Node) (*a
 			break
 		}
 		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
-		types, mayBeEmpty, known := firstSpreadElementTypes(tc, spreadType, map[*checker.Type]bool{})
+		types, mayBeEmpty, known := firstSpreadElementTypes(ctx, spreadType, map[*checker.Type]bool{})
 		if !known {
 			// Keep unresolved mixed collection unions conservative instead of
 			// losing tuple argument positions in an iterated-type union.
@@ -996,20 +1007,21 @@ func firstArrayPredicateArgument(tc *checker.Checker, arguments []*ast.Node) (*a
 // [...Callback[], Callback, object], the object can never be the callback, even
 // though it appears in the tuple's numeric index type. Variadic elements recurse
 // through their constraints, with a cycle guard for recursive generic types.
-func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[*checker.Type]bool) ([]*checker.Type, bool, bool) {
+func firstSpreadElementTypes(ctx rule.RuleContext, t *checker.Type, visiting map[*checker.Type]bool) ([]*checker.Type, bool, bool) {
+	tc := ctx.TypeChecker
 	if t == nil || visiting[t] {
 		return nil, false, false
 	}
 	visiting[t] = true
 	defer delete(visiting, t)
 	if utils.IsTypeParameter(t) {
-		return firstSpreadElementTypes(tc, checker.Checker_getBaseConstraintOfType(tc, t), visiting)
+		return firstSpreadElementTypes(ctx, checker.Checker_getBaseConstraintOfType(tc, t), visiting)
 	}
 	if t.IsUnion() {
 		var types []*checker.Type
 		mayBeEmpty := false
 		for _, part := range t.Types() {
-			first, empty, known := firstSpreadElementTypes(tc, part, visiting)
+			first, empty, known := firstSpreadElementTypes(ctx, part, visiting)
 			if !known {
 				return nil, false, false
 			}
@@ -1017,6 +1029,22 @@ func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[
 			mayBeEmpty = mayBeEmpty || empty
 		}
 		return types, mayBeEmpty, true
+	}
+	iterator := utils.GetWellKnownSymbolPropertyOfType(t, "iterator", tc)
+	standardIterator := true
+	if iterator != nil {
+		standardIterator = len(iterator.Declarations) != 0
+		for _, declaration := range iterator.Declarations {
+			if !ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+				standardIterator = false
+				break
+			}
+		}
+	}
+	// User iterator declarations define the spread values independently of
+	// numeric properties or tuple-like metadata. Their length is not inferred.
+	if !standardIterator {
+		return iterableElementTypes(tc, t)
 	}
 	if !checker.IsTupleType(t) {
 		// A required zero property on an array-like type preserves its
@@ -1028,11 +1056,16 @@ func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[
 				return []*checker.Type{first}, false, true
 			}
 		}
-		first := tc.GetNumberIndexType(t)
-		if first == nil {
-			return nil, false, false
+		if first, empty, known := iterableElementTypes(tc, t); known {
+			return first, empty, true
 		}
-		return []*checker.Type{first}, true, true
+		// Downlevel arrays can lack the iterator library declaration.
+		if iterator == nil && arrayLike {
+			if first := tc.GetNumberIndexType(t); first != nil {
+				return []*checker.Type{first}, true, true
+			}
+		}
+		return nil, false, false
 	}
 	infos := t.TargetTupleType().ElementInfos()
 	elements := tc.GetTypeArguments(t)
@@ -1044,7 +1077,7 @@ func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[
 		flags := info.TupleElementFlags()
 		element := elements[i]
 		if flags&checker.ElementFlagsVariadic != 0 {
-			first, empty, known := firstSpreadElementTypes(tc, element, visiting)
+			first, empty, known := firstSpreadElementTypes(ctx, element, visiting)
 			if !known {
 				return nil, false, false
 			}
@@ -1063,6 +1096,14 @@ func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[
 		}
 	}
 	return types, true, true
+}
+
+func iterableElementTypes(tc *checker.Checker, t *checker.Type) ([]*checker.Type, bool, bool) {
+	first := checker.Checker_getIterationTypeOfIterable(tc, checker.IterationUseSpread, checker.IterationTypeKindYield, t, nil)
+	if first == nil || utils.IsTypeFlagSet(first, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
+		return nil, false, false
+	}
+	return []*checker.Type{first}, true, true
 }
 
 func checkArrayMethodPredicate(
@@ -1352,6 +1393,8 @@ func getBlockStatements(block *ast.Node) []*ast.Node {
 		return block.AsSourceFile().Statements.Nodes
 	case ast.KindBlock:
 		return block.AsBlock().Statements.Nodes
+	case ast.KindModuleBlock:
+		return block.AsModuleBlock().Statements.Nodes
 	case ast.KindCaseClause, ast.KindDefaultClause:
 		return block.AsCaseOrDefaultClause().Statements.Nodes
 	}

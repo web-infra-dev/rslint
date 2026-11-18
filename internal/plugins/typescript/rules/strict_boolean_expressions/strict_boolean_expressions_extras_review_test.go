@@ -309,3 +309,120 @@ func TestStrictBooleanExpressionsReviewIterableAndIndexedSpreads(t *testing.T) {
 	invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "...args", "conditionErrorOther", "Unexpected value in conditional. A boolean expression is required.", nil)}})
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
 }
+
+func TestStrictBooleanExpressionsReviewRepeatedCaptures(t *testing.T) {
+	const shared = `type Options = {method: 'some' | 'forEach'};
+const opts: Options = {method: 'some'};
+function configure(o: Options) { o.method = 'forEach'; }
+let change = () => {};
+function visit(setup: boolean) {
+  const method = opts.method;
+  if (setup) { change = () => configure(opts); return; }
+  [1][method](n => console.log(n));
+}
+visit(true); change(); visit(false);`
+	const local = `type Options = {method: 'some' | 'forEach'};
+function configure(o: Options) { o.method = 'forEach'; }
+let change = () => {};
+function visit(setup: boolean) {
+  const opts: Options = {method: 'some'};
+  const method = opts.method;
+  if (setup) { change = () => configure(opts); return; }
+  [1][method](n => console.log(n));
+}
+visit(true); change(); visit(false);`
+	const literal = `type Options = {method: 'some' | 'forEach'};
+const opts: Options = {method: 'some'};
+function configure(o: Options) { o.method = 'forEach'; }
+function visit() {
+  const method = 'some';
+  [1][method](n => configure(opts));
+}`
+	valid := []rule_tester.ValidTestCase{
+		{Code: shared},
+		{Code: strings.Replace(shared, "const method = opts.method;", "const alias = opts; const method = alias.method;", 1)},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct{ code, callback, output string }{
+		{local, "n => console.log(n)", strings.Replace(local, "n => console.log(n)", "(n): boolean => console.log(n)", 1)},
+		{literal, "n => configure(opts)", strings.Replace(literal, "n => configure(opts)", "(n): boolean => configure(opts)", 1)},
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: test.code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, test.code, test.callback, "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", []rule_tester.InvalidTestCaseSuggestion{{MessageId: "explicitBooleanReturnType", Output: test.output}})}})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
+}
+
+func TestStrictBooleanExpressionsReviewIteratorValues(t *testing.T) {
+	const valid = `type Predicate = (n: number) => boolean;
+interface Args extends Iterable<Predicate> { [i: number]: string }
+const args: Args = {0: 'metadata', *[Symbol.iterator]() { yield (n: number) => n > 0; }};
+const xs: number[] & {filter(...fns: Predicate[]): number[]} = [-1, 1];
+xs.filter(...args);`
+	const invalid = `type Predicate = (n: number) => void;
+interface Args extends Iterable<Predicate> { [i: number]: (n: number) => boolean }
+const args: Args = {0: n => n > 0, *[Symbol.iterator]() { yield (n: number) => console.log(n); }};
+const xs: number[] & {filter(...fns: Predicate[]): number[]} = [-1, 1];
+xs.filter(...args);`
+	const direct = `const args = {0: 'metadata', *[Symbol.iterator]() { yield (n: number) => n > 0; return 'done'; }};
+const xs: number[] & {filter(...fns: ((n: number) => boolean)[]): number[]} = [-1, 1];
+xs.filter(...args);`
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, []rule_tester.ValidTestCase{{Code: valid}, {Code: direct}}, []rule_tester.InvalidTestCase{{Code: invalid, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, invalid, "...args", "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", nil)}}})
+}
+
+func TestStrictBooleanExpressionsReviewAwaitAssertions(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct{ parameter, expression string }{
+		{"value?: Promise<string>", "await value!"},
+		{"value?: Promise<string>", "await (value as Promise<string>)"},
+		{"value: Promise<string | undefined>", "await (value as Promise<string>)"},
+	} {
+		for _, negated := range []bool{false, true} {
+			target := test.expression
+			if negated {
+				target = "!(" + target + ")"
+			}
+			code := "async function check(" + test.parameter + ") { if (" + target + ") return true; return false; }"
+			inner := "(" + test.expression + ")"
+			length := "(" + inner + ` ?? "").length > 0`
+			compare := inner + ` !== ""`
+			cast := "Boolean(" + inner + ")"
+			if negated {
+				length = "(" + inner + ` ?? "").length === 0`
+				compare = inner + ` === ""`
+				cast = "!Boolean(" + inner + ")"
+			}
+			suggestions := []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, target, length, 1)},
+				{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, target, compare, 1)},
+				{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, target, cast, 1)},
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
+}
+
+func TestStrictBooleanExpressionsReviewNamespaceASI(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct {
+		before, after string
+		semi          bool
+	}{
+		{"namespace Demo { function record() {} const state: {active?: boolean} = {}; record()\n", "\n}", true},
+		{"namespace Outer.Inner { function record() {} const state: {active?: boolean} = {}; record()\n", "\n}", true},
+		{"namespace Demo { function record() {} const state: {active?: boolean} = {}; record();\n", "\n}", false},
+		{"namespace Demo { const state: {active?: boolean} = {}; ", "\n}", false},
+	} {
+		code := test.before + "!state?.active" + test.after
+		compare := "(state?.active) === false"
+		if test.semi {
+			compare = ";" + compare
+		}
+		suggestions := []rule_tester.InvalidTestCaseSuggestion{
+			{MessageId: "conditionFixDefaultFalse", Output: strings.Replace(code, "!state?.active", "!((state?.active) ?? false)", 1)},
+			{MessageId: "conditionFixCompareFalse", Output: strings.Replace(code, "!state?.active", compare, 1)},
+		}
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "state?.active", "conditionErrorNullableBoolean", "Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.", suggestions)}})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
+}

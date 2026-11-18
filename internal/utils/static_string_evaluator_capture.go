@@ -38,9 +38,16 @@ func executionRoot(node *ast.Node) *ast.Node {
 // root cannot have run before that capture. Keep declarations (which hoist),
 // earlier functions and other execution roots conservative. Enclosing calls
 // still contribute their own escape sites, including calls before the capture.
-func (e *StaticStringEvaluator) callMayPrecedeCapture(site *ast.Node) bool {
+func (e *StaticStringEvaluator) callMayPrecedeCapture(site *ast.Node, symbol *ast.Symbol) bool {
 	root := executionRoot(site)
 	captureRoot := executionRoot(e.capturePoint)
+	// Captures of an outer mutable object may be repeated on later calls.
+	// Lexical ordering in the capturing function does not bound that object's
+	// lifetime. Alias evaluation also checks its outer backing symbol.
+	if captureRoot != nil && captureRoot.Kind != ast.KindSourceFile &&
+		(len(symbol.Declarations) != 1 || executionRoot(symbol.Declarations[0]) != captureRoot) {
+		return true
+	}
 	if root == captureRoot {
 		return site.End() <= e.capturePoint.Pos()
 	}
