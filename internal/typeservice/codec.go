@@ -179,6 +179,7 @@ func EncodePacket(result Result) ([]byte, error) {
 			if node.Text != nil {
 				w.put(at+20, w.text(*node.Text))
 			}
+			w.put(at+24, node.ModuleKeyword)
 		}
 		w.put(8, offset)
 	case *SignatureFact:

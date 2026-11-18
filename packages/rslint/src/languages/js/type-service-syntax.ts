@@ -30,17 +30,40 @@ type SyntaxRef = NodeRef | SyntheticRef;
 function unsupported(name: string): never {
   throw new Error(`unsupported TypeScript operation: ${name}`);
 }
-function translateFlags(flags: number, from: object, to: object): number {
+// These native bits either have no JS equivalent or depend on the node kind.
+const specialNodeFlags =
+  NodeFlags.Reparsed |
+  NodeFlags.ReparserTransformedLiteral |
+  NodeFlags.HasJSDoc |
+  NodeFlags.OptionalChain |
+  NodeFlags.PossiblyContainsDeprecatedTag;
+const commonNodeFlags = Object.entries(NodeFlags).filter(
+  (entry): entry is [string, number] => {
+    const value = entry[1];
+    return (
+      typeof value === 'number' &&
+      value > 0 &&
+      (value & (value - 1)) === 0 &&
+      !(value & specialNodeFlags)
+    );
+  },
+);
+function translateNodeFlags(
+  flags: number,
+  table: object,
+  moduleKeyword = 0,
+): number {
+  const to = table as Record<string, number>;
   let result = 0;
-  for (const [name, value] of Object.entries(from)) {
-    if (
-      typeof value !== 'number' ||
-      value <= 0 ||
-      (value & (value - 1)) !== 0 ||
-      !(flags & value)
-    )
-      continue;
-    const translated = (to as Record<string, unknown>)[name];
+  if (flags & NodeFlags.OptionalChain)
+    result |= moduleKeyword ? to.NestedNamespace : to.OptionalChain;
+  if (moduleKeyword === SyntaxKind.NamespaceKeyword) result |= to.Namespace;
+  if (moduleKeyword === SyntaxKind.GlobalKeyword)
+    result |= to.GlobalAugmentation;
+  if (flags & NodeFlags.PossiblyContainsDeprecatedTag) result |= to.Deprecated;
+  for (const [name, value] of commonNodeFlags) {
+    if (!(flags & value)) continue;
+    const translated = to[name];
     if (typeof translated !== 'number') unsupported(`enum.${name}`);
     result |= translated;
   }
@@ -405,7 +428,11 @@ export class GenerationSyntaxViews {
       const fact = this.summary(real);
       if (key === 'kind') return this.kind(real, fact.kind);
       if (key === 'flags')
-        return translateFlags(fact.flags, NodeFlags, this.typescript.NodeFlags);
+        return translateNodeFlags(
+          fact.flags,
+          this.typescript.NodeFlags,
+          fact.moduleKeyword,
+        );
       if (key === 'parent') return this.nodeRef(fact.parent);
       if (
         key === 'name' &&
@@ -465,6 +492,19 @@ export class GenerationSyntaxViews {
       }
     }
     const raw = this.rawSyntax(ref);
+    if (
+      key === 'flags' &&
+      real &&
+      (raw.kind === SyntaxKind.ModuleDeclaration ||
+        raw.flags & NodeFlags.PossiblyContainsDeprecatedTag)
+    ) {
+      const fact = this.summary(real);
+      return translateNodeFlags(
+        fact.flags,
+        this.typescript.NodeFlags,
+        fact.moduleKeyword,
+      );
+    }
     if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
       return this.childNodes(ref, proxy);
     const heritageReference =
@@ -524,7 +564,13 @@ export class GenerationSyntaxViews {
         : this.translateKind(SyntaxKind[kind]);
     }
     if (key === 'flags')
-      return translateFlags(raw.flags, NodeFlags, this.typescript.NodeFlags);
+      return translateNodeFlags(
+        raw.flags,
+        this.typescript.NodeFlags,
+        raw.kind === SyntaxKind.ModuleDeclaration
+          ? (Reflect.get(raw, 'keyword') as number)
+          : 0,
+      );
     if (
       key === 'escapedText' &&
       (raw.kind === SyntaxKind.Identifier ||

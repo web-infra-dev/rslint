@@ -57,6 +57,7 @@ export interface NodeFact {
   readonly node: NodeRef;
   readonly kind: string;
   readonly flags: number;
+  readonly moduleKeyword: number;
   readonly parent: NodeRef | undefined;
   readonly name: NodeRef | undefined;
   readonly text: string | undefined;

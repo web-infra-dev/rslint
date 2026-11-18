@@ -95,6 +95,7 @@ export class TypePacketReader {
         node: this.node(this.word(pos))!,
         kind: this.text(this.word(pos + 4)),
         flags: this.word(pos + 8),
+        moduleKeyword: this.word(pos + 24),
         parent: this.node(this.word(pos + 12)),
         name: this.node(this.word(pos + 16)),
         text: text ? this.text(text) : undefined,

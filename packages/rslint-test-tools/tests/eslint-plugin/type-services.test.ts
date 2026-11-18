@@ -244,6 +244,8 @@ const cases: Case[] = [
       const inferred = capture({ x: 1 });
       const writable = inferred as { x: 1 }; writable.x = 1;
       const same = inferred as { readonly x: 1 };
+      type Values<T extends unknown[]> = { [K in keyof T]: T[K] };
+      function build<T extends unknown[]>() { return [] as Values<T>; }
     `,
     reports: 1,
   },
@@ -1102,6 +1104,7 @@ declare function multilineCall(
   { '\\é': escaped }: { '\\é': string },
   value: { label: "中文"; escaped: "\\é"; slash: "\\\\é" },
 ): { nested: { label: "中文" }; count: number };
+/** Ordinary documentation. */
 function docsTarget() {}
 async function tokenContext() { await Promise.resolve(1); }
 interface DocsBase {
@@ -1534,6 +1537,24 @@ await Promise.resolve(1);
     const contextFlags = contextualToken(referenceFn.getSourceFile()).flags;
     expect(contextFlags & ts.NodeFlags.ContextFlags).toBeTruthy();
     expect(contextualToken(beforeSource).flags).toBe(contextFlags);
+    const nodeFlagSamples = (source: ts.SourceFile) => {
+      const samples: number[] = [];
+      const visit = (n: ts.Node) => {
+        if (
+          ts.isModuleDeclaration(n) ||
+          ts.isMethodSignature(n) ||
+          (ts.isPropertyAccessExpression(n) && n.questionDotToken) ||
+          (ts.isFunctionDeclaration(n) && n.name?.text === 'docsTarget')
+        )
+          samples.push(n.flags);
+        n.forEachChild(visit);
+      };
+      visit(source);
+      return samples;
+    };
+    expect(nodeFlagSamples(beforeSource)).toEqual(
+      nodeFlagSamples(referenceFn.getSourceFile()),
+    );
     const formatted = (
       typeChecker: ts.TypeChecker,
       declaration: ts.FunctionDeclaration,

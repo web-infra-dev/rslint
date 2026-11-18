@@ -268,11 +268,12 @@ type SymbolFact struct {
 // NodeFact is a finite syntax summary. Structural traversal still uses exact
 // source syntax; declaration ancestry never requires serializing that source.
 type NodeFact struct {
-	Node         NodeRef
-	Kind         string
-	Flags        uint32
-	Parent, Name *NodeRef
-	Text         *string
+	Node          NodeRef
+	Kind          string
+	Flags         uint32
+	ModuleKeyword uint32
+	Parent, Name  *NodeRef
+	Text          *string
 }
 type NodeFacts []NodeFact
 
