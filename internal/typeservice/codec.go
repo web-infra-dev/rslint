@@ -27,6 +27,10 @@ const (
 	packetJSDocTags
 	packetTypeNode
 	packetDiagnostics
+	packetLiteral
+	packetOptionalHandles
+	packetStrings
+	packetTypeDetails
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -37,6 +41,14 @@ const (
 func EncodePacket(result Result) ([]byte, error) {
 	var kind, words uint32
 	switch result.(type) {
+	case Literal:
+		kind, words = packetLiteral, 3
+	case *TypeDetails:
+		kind, words = packetTypeDetails, 21
+	case Strings:
+		kind, words = packetStrings, 1
+	case OptionalHandles:
+		kind, words = packetOptionalHandles, 1
 	case Handle:
 		kind, words = packetHandle, 1
 	case Boolean:
@@ -74,6 +86,52 @@ func EncodePacket(result Result) ([]byte, error) {
 	copy(w.data, "RTS5")
 	w.put(4, kind)
 	switch fact := result.(type) {
+	case Literal:
+		w.put(8, fact.Kind)
+		switch fact.Kind {
+		case 1:
+			w.put(12, w.text(fact.Text))
+		case 2:
+			binary.LittleEndian.PutUint64(w.data[12:], math.Float64bits(fact.Number))
+		}
+	case *TypeDetails:
+		w.put(8, w.node(fact.patternRef))
+		w.put(12, w.node(fact.nodeRef))
+		w.put(16, fact.fresh)
+		w.put(20, fact.regular)
+		w.put(24, fact.base)
+		w.put(28, fact.constraint)
+		w.put(32, w.ids(fact.outer))
+		w.put(36, w.ids(fact.local))
+		w.put(40, w.ids(fact.elements))
+		w.put(44, fact.minPlusOne)
+		w.put(48, fact.fixedPlusOne)
+		w.put(52, w.nodeList(fact.labelRefs))
+		if fact.texts != nil {
+			ids := make([]uint32, len(fact.texts))
+			for i, v := range fact.texts {
+				ids[i] = w.text(v)
+			}
+			w.put(56, w.ids(ids))
+		}
+		w.put(60, w.node(fact.rootRef))
+		w.put(64, fact.rootCheck)
+		w.put(68, fact.rootExtends)
+		w.put(72, fact.rootAlias)
+		if fact.distributive {
+			w.put(76, 1)
+		}
+		w.put(80, w.ids(fact.infer))
+		w.put(84, w.ids(fact.rootOuter))
+		w.put(88, w.ids(fact.rootArguments))
+	case Strings:
+		ids := make([]uint32, len(fact))
+		for i, value := range fact {
+			ids[i] = w.text(value)
+		}
+		w.put(8, w.ids(ids))
+	case OptionalHandles:
+		w.put(8, w.ids(fact))
 	case Handle:
 		w.put(8, uint32(fact))
 	case Boolean:
@@ -157,9 +215,17 @@ func EncodePacket(result Result) ([]byte, error) {
 		if fact.Flags&uint32(ast.SymbolFlagsTransient) != 0 {
 			w.put(28, fact.CheckFlags+1)
 		}
+		var tables uint32
 		if fact.HasMembers {
-			w.put(32, 1)
+			tables |= 1
 		}
+		if fact.HasExports {
+			tables |= 2
+		}
+		if fact.HasGlobalExports {
+			tables |= 4
+		}
+		w.put(32, tables)
 	case EncodedTypeNode:
 		w.put(8, uint32(len(fact)))
 		w.data = append(w.data, fact...)
@@ -190,16 +256,17 @@ func EncodePacket(result Result) ([]byte, error) {
 		w.put(24, uint32(fact.MinArgumentCount))
 	case IndexInfos:
 		offset := uint32(len(w.data))
-		w.data = append(w.data, make([]byte, 4+len(fact)*16)...)
+		w.data = append(w.data, make([]byte, 4+len(fact)*20)...)
 		w.put(offset, uint32(len(fact)))
 		for i, info := range fact {
-			at := offset + 4 + uint32(i)*16
+			at := offset + 4 + uint32(i)*20
 			w.put(at, info.KeyType)
 			w.put(at+4, info.Type)
 			if info.IsReadonly {
 				w.put(at+8, 1)
 			}
 			w.put(at+12, w.node(info.Declaration))
+			w.put(at+16, w.nodeList(info.Components))
 		}
 		w.put(8, offset)
 	case *TypePredicateFact:
@@ -325,6 +392,16 @@ func (w *packetWriter) displayParts(parts DisplayParts) uint32 {
 		}
 	}
 	return offset
+}
+func (w *packetWriter) nodeList(nodes []*NodeRef) uint32 {
+	if nodes == nil {
+		return 0
+	}
+	ids := make([]uint32, len(nodes))
+	for i, n := range nodes {
+		ids[i] = w.node(n)
+	}
+	return w.ids(ids)
 }
 func (w *packetWriter) node(node *NodeRef) uint32 {
 	if node == nil {

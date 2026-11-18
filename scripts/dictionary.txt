@@ -182,6 +182,7 @@ eszett
 Ethi
 exclam
 execdir
+expando
 extensionless
 extglob
 extname

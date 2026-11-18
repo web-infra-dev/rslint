@@ -144,6 +144,37 @@ export class GenerationSyntaxViews {
     this.ensure();
     return this.metadataByName.get(path)?.packages?.[0];
   }
+  sourceByPath(path: string): object | undefined {
+    this.ensure();
+    const source = this.metadataByName.get(path);
+    return source?.path === path && !this.configs.has(source.fileName)
+      ? this.nodeRef({ file: source.fileName, index: 1 })
+      : undefined;
+  }
+  private readonly configs = new Set<string>();
+  diagnosticSource(file: string): object | undefined {
+    const known = this.sourceView(file);
+    if (known) return known;
+    const found = this.lookup!(this.descriptor, file, true);
+    return found && this.configSource(found.fileName);
+  }
+  configSource(file: string, path = file): object {
+    if (!this.metadataByName.has(file)) {
+      this.configs.add(file);
+      const source = {
+        fileName: file,
+        path,
+        external: false,
+        defaultLibrary: false,
+        isDeclarationFile: false,
+      };
+      this.sourceOrdinals.set(file, this.sourceOrdinals.size + 1);
+      this.metadataByName.set(file, source);
+      this.metadataByName.set(path, source);
+    }
+    this.source(file);
+    return this.nodeRef({ file, index: 1 })!;
+  }
   sourceView(file: string): object | undefined {
     this.ensure();
     let metadata = this.metadataByName.get(file);
@@ -152,7 +183,7 @@ export class GenerationSyntaxViews {
       metadata = reply && this.metadataByName.get(reply.fileName);
       if (metadata) this.metadataByName.set(file, metadata);
     }
-    return metadata
+    return metadata && !this.configs.has(metadata.fileName)
       ? this.nodeRef({ file: metadata.fileName, index: 1 })
       : undefined;
   }
@@ -409,12 +440,29 @@ export class GenerationSyntaxViews {
     if (key === 'getSourceFile')
       return () => {
         this.ensure();
-        return this.sourceView(file);
+        return this.configs.has(file)
+          ? this.configSource(file)
+          : this.sourceView(file);
       };
     if (real?.index === 1) {
       const source = this.metadataByName.get(file)!;
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];
+      if (key === 'update') return () => unsupported('SourceFile.update');
+      if (key === 'getLineEndOfPosition')
+        return (position: number) => {
+          this.ensure();
+          const sourceFile = this.source(file)!;
+          const { line } = sourceFile.getLineAndCharacterOfPosition(position);
+          const starts = sourceFile.getLineStarts();
+          const end =
+            (line + 1 >= starts.length && sourceFile.getEnd()) ||
+            starts[line + 1] - 1;
+          return sourceFile.text[end] === '\n' &&
+            sourceFile.text[end - 1] === '\r'
+            ? end - 1
+            : end;
+        };
       if (key === 'kind') return this.typescript.SyntaxKind.SourceFile;
       if (key === 'parent') return undefined;
     }

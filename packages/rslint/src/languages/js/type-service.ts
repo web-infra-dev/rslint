@@ -1,4 +1,5 @@
 import type ts from 'typescript';
+import { SyntaxKind as nativeSyntaxKind } from '@rslint/api';
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import type { SharedTypeCacheReader } from './shared-type-cache.js';
@@ -36,7 +37,40 @@ export type {
   TypeServiceQuery,
 } from './type-service-protocol.js';
 
+export interface ConditionalRootView {
+  readonly instantiations?: ReadonlyMap<string, TypeView>;
+  node: object;
+  checkType: TypeView;
+  extendsType: TypeView;
+  isDistributive: boolean;
+  inferTypeParameters?: readonly TypeView[];
+  outerTypeParameters?: readonly TypeView[];
+  aliasSymbol?: SymbolView;
+  aliasTypeArguments?: readonly TypeView[];
+}
 export interface TypeView {
+  readonly simplifiedForReading: TypeView | undefined;
+  readonly simplifiedForWriting: TypeView | undefined;
+  readonly elementType: TypeView | undefined;
+  readonly finalArrayType: TypeView | undefined;
+  readonly root: ConditionalRootView | undefined;
+  readonly resolvedTrueType: TypeView | undefined;
+  readonly resolvedFalseType: TypeView | undefined;
+  readonly pattern: object | undefined;
+  readonly node: object | undefined;
+  readonly freshType: TypeView | undefined;
+  readonly regularType: TypeView | undefined;
+  readonly baseType: TypeView | undefined;
+  readonly constraint: TypeView | undefined;
+  readonly outerTypeParameters: readonly TypeView[] | undefined;
+  readonly localTypeParameters: readonly TypeView[] | undefined;
+  readonly elementFlags: readonly number[] | undefined;
+  readonly minLength: number | undefined;
+  readonly fixedLength: number | undefined;
+  readonly hasRestElement: boolean | undefined;
+  readonly labeledElementDeclarations:
+    readonly (object | undefined)[] | undefined;
+  readonly texts: readonly string[] | undefined;
   readonly id: number;
   readonly flags: number;
   readonly symbol: SymbolView | undefined;
@@ -93,6 +127,8 @@ export interface SymbolView {
   readonly flags: number;
   readonly declarations: readonly object[] | undefined;
   readonly valueDeclaration: object | undefined;
+  readonly exports: ReadonlyMap<string, SymbolView> | undefined;
+  readonly globalExports: ReadonlyMap<string, SymbolView> | undefined;
   readonly members: ReadonlyMap<string, SymbolView> | undefined;
   readonly links:
     | { readonly checkFlags: number; readonly type: TypeView | undefined }
@@ -120,6 +156,7 @@ export interface SignatureView {
   getJsDocTags(): ts.JSDocTagInfo[];
 }
 export interface IndexInfoView {
+  readonly components?: readonly object[];
   readonly keyType: TypeView;
   readonly type: TypeView;
   readonly isReadonly: boolean;
@@ -132,6 +169,110 @@ export interface TypePredicateView {
   readonly type: TypeView | undefined;
 }
 export interface CheckerView {
+  getStringLiteralType(value: string): TypeView;
+  getNumberLiteralType(value: number): TypeView;
+  getBigIntLiteralType(value: ts.PseudoBigInt): TypeView;
+  getNullableType(t: object, flags: number): TypeView;
+  getPrivateIdentifierPropertyOfType(
+    t: object,
+    name: string,
+    location: object,
+  ): SymbolView | undefined;
+  tryGetMemberInModuleExports(
+    name: string,
+    moduleSymbol: object,
+  ): SymbolView | undefined;
+  isValidPropertyAccess(n: object, name: string): boolean;
+  getSymbolsOfParameterPropertyDeclaration(
+    n: object,
+    name: string,
+  ): readonly SymbolView[];
+  getSymbolOfExpando(
+    n: object,
+    allowDeclaration: boolean,
+  ): SymbolView | undefined;
+  getIndexInfosOfIndexSymbol(
+    s: object,
+    siblings?: readonly object[],
+  ): readonly IndexInfoView[];
+  signatureToSignatureDeclaration(
+    s: object,
+    kind: number,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  symbolToParameterDeclaration(
+    s: object,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  symbolToTypeParameterDeclarations(
+    s: object,
+    enclosing?: object,
+    flags?: number,
+  ): readonly object[] | undefined;
+  typeParameterToDeclaration(
+    t: object,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  symbolToEntityName(
+    s: object,
+    meaning: number,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  symbolToExpression(
+    s: object,
+    meaning: number,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  symbolToString(
+    s: object,
+    enclosing?: object,
+    meaning?: number,
+    flags?: number,
+  ): string;
+  typePredicateToString(
+    predicate: TypePredicateView,
+    enclosing?: object,
+    flags?: number,
+  ): string;
+  indexInfoToIndexSignatureDeclaration(
+    info: IndexInfoView,
+    enclosing?: object,
+    flags?: number,
+  ): object | undefined;
+  getAnyType(): TypeView;
+  getUnknownType(): TypeView;
+  getStringType(): TypeView;
+  getNumberType(): TypeView;
+  getBooleanType(): TypeView;
+  getBigIntType(): TypeView;
+  getESSymbolType(): TypeView;
+  getNonPrimitiveType(): TypeView;
+  getNeverType(): TypeView;
+  getNullType(): TypeView;
+  getUndefinedType(): TypeView;
+  getTrueType(): TypeView;
+  getFalseType(): TypeView;
+  getAmbientModules(): readonly SymbolView[];
+  getAugmentedPropertiesOfType(t: object): readonly SymbolView[];
+  getRootSymbols(s: object): readonly SymbolView[];
+  getMergedSymbol(s: object): SymbolView | undefined;
+  isArgumentsSymbol(s: object): boolean;
+  isUndefinedSymbol(s: object): boolean;
+  getExportSpecifierLocalTargetSymbol(n: object): SymbolView | undefined;
+  getPropertySymbolOfDestructuringAssignment(n: object): SymbolView | undefined;
+  getJsxIntrinsicTagNamesAt(n: object): readonly SymbolView[];
+  getTypeOfAssignmentPattern(n: object): TypeView | undefined;
+  isOptionalParameter(n: object): boolean;
+  getConstantValue(n: object): string | number | undefined;
+  isImplementationOfOverload(n: object): boolean | undefined;
+  getTypeArgumentsForResolvedSignature(
+    s: object,
+  ): readonly TypeView[] | undefined;
   getTypeAtLocation(n: object): TypeView | undefined;
   getTypeFromTypeNode(n: object): TypeView | undefined;
   getContextualType(n: object): TypeView | undefined;
@@ -149,6 +290,10 @@ export interface CheckerView {
     source: object,
     cancellation?: ts.CancellationToken,
   ): DiagnosticView[];
+  runWithCancellationToken<T>(
+    token: ts.CancellationToken,
+    cb: (checker: CheckerView) => T,
+  ): T;
   getVoidType(): TypeView | undefined;
   getBaseConstraintOfType(t: object): TypeView | undefined;
   getApparentType(t: object): TypeView | undefined;
@@ -206,15 +351,77 @@ export interface CheckerView {
   getSignaturesOfType(t: object, kind: number): readonly SignatureView[];
 }
 export interface ProgramView {
+  getConfigFileParsingDiagnostics(): readonly DiagnosticView[];
+  getOptionsDiagnostics(
+    cancellation?: ts.CancellationToken,
+  ): readonly DiagnosticView[];
+  getGlobalDiagnostics(
+    cancellation?: ts.CancellationToken,
+  ): readonly DiagnosticView[];
+  getSyntacticDiagnostics(
+    source?: object,
+    cancellation?: ts.CancellationToken,
+  ): readonly DiagnosticView[];
+  getSemanticDiagnostics(
+    source?: object,
+    cancellation?: ts.CancellationToken,
+  ): readonly DiagnosticView[];
+  getDeclarationDiagnostics(
+    source?: object,
+    cancellation?: ts.CancellationToken,
+  ): readonly DiagnosticView[];
+  getNodeCount(): number;
+  getIdentifierCount(): number;
+  getSymbolCount(): number;
+  getTypeCount(): number;
+  getInstantiationCount(): number;
+  getRelationCacheSizes(): {
+    assignable: number;
+    identity: number;
+    subtype: number;
+    strictSubtype: number;
+  };
+  getRootFileNames(): readonly string[];
+  getModeForUsageLocation(source: object, usage: object): number | undefined;
+  getModeForResolutionAtIndex(
+    source: object,
+    index: number,
+  ): number | undefined;
+  getProjectReferences(): readonly ts.ProjectReference[] | undefined;
+  getResolvedProjectReferences():
+    readonly (ResolvedReferenceView | undefined)[] | undefined;
+  emit(): never;
   getTypeChecker(): CheckerView;
   getCompilerOptions(): Readonly<Record<string, unknown>>;
   getCurrentDirectory(): string;
+  getSourceFileByPath(path: string): object | undefined;
   getSourceFile(name: string): object | undefined;
   getSourceFiles(): readonly object[];
   sourceFileToPackageName: { get(path: string): string | undefined };
   isSourceFileFromExternalLibrary(source: object): boolean;
   isSourceFileDefaultLibrary(source: object): boolean;
 }
+interface ResolvedReferenceView {
+  commandLine: Omit<ts.ParsedCommandLine, 'errors' | 'options'> & {
+    options: Readonly<Record<string, unknown>>;
+    errors: DiagnosticView[];
+  };
+  sourceFile: object;
+  references?: readonly (ResolvedReferenceView | undefined)[];
+}
+type ReferenceConfig = {
+  name: string;
+  path: string;
+  options: Record<string, unknown>;
+  fileNames: string[];
+  projectReferences?: ts.ProjectReference[];
+  references?: number[];
+  raw?: unknown;
+  compileOnSave?: boolean;
+  typeAcquisition?: ts.TypeAcquisition;
+  watchOptions?: ts.WatchOptions;
+  diagnostics?: string;
+};
 type DiagnosticView = Omit<ts.Diagnostic, 'file' | 'relatedInformation'> & {
   file: object | undefined;
   relatedInformation?: DiagnosticView[];
@@ -288,6 +495,61 @@ type TypeScriptEnums = Pick<
   | 'ModuleDetectionKind'
 >;
 
+function readCompilerOptions(
+  typescript: TypeScriptEnums,
+  input: Record<string, unknown>,
+) {
+  const compilerOptions = { ...input };
+  for (const [key, group] of [
+    ['jsx', typescript.JsxEmit],
+    ['moduleDetection', typescript.ModuleDetectionKind],
+  ] as const) {
+    const value = compilerOptions[key];
+    if (typeof value === 'string') {
+      const translated: unknown = Reflect.get(group, value);
+      if (typeof translated !== 'number')
+        unsupported(`compilerOptions.${key}.${value}`);
+      compilerOptions[key] = translated;
+    }
+  }
+  return compilerOptions;
+}
+// A retained checker cache reflects later queries in the same generation.
+class LiveTypeMap implements ReadonlyMap<string, TypeView> {
+  constructor(private readonly snapshot: () => Map<string, TypeView>) {}
+  get size() {
+    return this.snapshot().size;
+  }
+  get(key: string) {
+    return this.snapshot().get(key);
+  }
+  has(key: string) {
+    return this.snapshot().has(key);
+  }
+  keys() {
+    return this.snapshot().keys();
+  }
+  values() {
+    return this.snapshot().values();
+  }
+  entries() {
+    return this.snapshot().entries();
+  }
+  [Symbol.iterator]() {
+    return this.entries();
+  }
+  forEach(
+    cb: (
+      value: TypeView,
+      key: string,
+      map: ReadonlyMap<string, TypeView>,
+    ) => void,
+    thisArg?: unknown,
+  ) {
+    for (const [key, value] of this.entries())
+      cb.call(thisArg, value, key, this);
+  }
+}
 export interface TypeServiceClientOptions {
   maxFactsBytes: number;
   maxSyntaxBytes?: number;
@@ -304,6 +566,10 @@ export class TypeServiceClient {
   private readonly symbols = new WeakObjectCache<number, SymbolView>();
   private readonly signatures = new WeakObjectCache<number, SignatureView>();
   private readonly brands = new WeakMap<object, ObjectBrand>();
+  private readonly conditionalRoots = new WeakMap<
+    object,
+    ConditionalRootView
+  >();
   private shared: SharedTypeCacheReader | undefined;
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
@@ -378,6 +644,313 @@ export class TypeServiceClient {
     ) => this.type(this.query({ op: op, args: { id: this.id(t, 'type') } }));
     this.checker = guarded<CheckerView>(
       {
+        getAnyType: () => this.type(this.query({ op: 'anyType', args: {} }))!,
+        getUnknownType: () =>
+          this.type(this.query({ op: 'unknownType', args: {} }))!,
+        getStringType: () =>
+          this.type(this.query({ op: 'stringType', args: {} }))!,
+        getNumberType: () =>
+          this.type(this.query({ op: 'numberType', args: {} }))!,
+        getBooleanType: () =>
+          this.type(this.query({ op: 'booleanType', args: {} }))!,
+        getBigIntType: () =>
+          this.type(this.query({ op: 'bigIntType', args: {} }))!,
+        getESSymbolType: () =>
+          this.type(this.query({ op: 'eSSymbolType', args: {} }))!,
+        getNonPrimitiveType: () =>
+          this.type(this.query({ op: 'nonPrimitiveType', args: {} }))!,
+        getNeverType: () =>
+          this.type(this.query({ op: 'neverType', args: {} }))!,
+        getNullType: () => this.type(this.query({ op: 'nullType', args: {} }))!,
+        getUndefinedType: () =>
+          this.type(this.query({ op: 'undefinedType', args: {} }))!,
+        getTrueType: () => this.type(this.query({ op: 'trueType', args: {} }))!,
+        getFalseType: () =>
+          this.type(this.query({ op: 'falseType', args: {} }))!,
+        getAmbientModules: () =>
+          this.namedSymbolsFor(this.query({ op: 'ambientModules', args: {} })),
+        getAugmentedPropertiesOfType: (t) =>
+          this.namedSymbolsFor(
+            this.query({
+              op: 'augmentedPropertiesOfType',
+              args: { id: this.id(t, 'type') },
+            }),
+          ),
+        getRootSymbols: (s) =>
+          this.namedSymbolsFor(
+            this.query({
+              op: 'rootSymbols',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        getMergedSymbol: (s) =>
+          this.symbol(
+            this.query({
+              op: 'mergedSymbol',
+              args: { id: this.id(s, 'symbol') },
+            }),
+          ),
+        isArgumentsSymbol: (s) =>
+          this.query({
+            op: 'isArgumentsSymbol',
+            args: { id: this.id(s, 'symbol') },
+          }),
+        isUndefinedSymbol: (s) =>
+          this.query({
+            op: 'isUndefinedSymbol',
+            args: { id: this.id(s, 'symbol') },
+          }),
+        getExportSpecifierLocalTargetSymbol: (n) =>
+          this.symbol(
+            this.query({
+              op: 'exportSpecifierLocalTargetSymbol',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getPropertySymbolOfDestructuringAssignment: (n) =>
+          this.symbol(
+            this.query({
+              op: 'propertySymbolOfDestructuringAssignment',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getJsxIntrinsicTagNamesAt: (n) =>
+          this.namedSymbolsFor(
+            this.query({
+              op: 'jsxIntrinsicTagNamesAt',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        getTypeOfAssignmentPattern: (n) =>
+          this.type(
+            this.query({
+              op: 'typeOfAssignmentPattern',
+              args: { node: this.syntax.location(n) },
+            }),
+          ),
+        isOptionalParameter: (n) =>
+          this.query({
+            op: 'isOptionalParameter',
+            args: { node: this.syntax.location(n) },
+          }),
+        getConstantValue: (n) =>
+          this.query({
+            op: 'constantValue',
+            args: { node: this.syntax.location(n) },
+          }),
+        isImplementationOfOverload: (n) =>
+          this.query({
+            op: 'isImplementationOfOverload',
+            args: { node: this.syntax.location(n) },
+          }),
+        getTypeArgumentsForResolvedSignature: (s) => {
+          const ids = this.query({
+            op: 'typeArgumentsForResolvedSignature',
+            args: { id: this.id(s, 'signature') },
+          });
+          return ids && this.typesFor(ids);
+        },
+        getStringLiteralType: (value) =>
+          this.type(
+            this.query({
+              op: 'stringLiteralType',
+              args: { name: nameToUnits(value) },
+            }),
+          )!,
+        getNumberLiteralType: (value) =>
+          this.type(
+            this.query({
+              op: 'numberLiteralType',
+              args: { value: Object.is(value, -0) ? '-0' : String(value) },
+            }),
+          )!,
+        getBigIntLiteralType: (value) =>
+          this.type(
+            this.query({
+              op: 'bigintLiteralType',
+              args: { negative: value.negative, digits: value.base10Value },
+            }),
+          )!,
+        getNullableType: (t, flags) =>
+          this.type(
+            this.query({
+              op: 'nullableType',
+              args: {
+                id: this.id(t, 'type'),
+                nullable: !!(flags & typescript.TypeFlags.Null),
+                undefinable: !!(flags & typescript.TypeFlags.Undefined),
+              },
+            }),
+          )!,
+        getPrivateIdentifierPropertyOfType: (t, name, location) =>
+          this.symbol(
+            this.query({
+              op: 'privateIdentifierProperty',
+              args: {
+                id: this.id(t, 'type'),
+                name: nameToUnits(name),
+                node: this.syntax.location(location),
+              },
+            }),
+          ),
+        tryGetMemberInModuleExports: (name, moduleSymbol) =>
+          this.symbol(
+            this.query({
+              op: 'moduleMember',
+              args: {
+                id: this.id(moduleSymbol, 'symbol'),
+                name: nameToUnits(name),
+              },
+            }),
+          ),
+        isValidPropertyAccess: (n, name) =>
+          this.query({
+            op: 'validPropertyAccess',
+            args: { node: this.syntax.location(n), name: nameToUnits(name) },
+          }),
+        getSymbolsOfParameterPropertyDeclaration: (n, name) =>
+          this.symbolsFor(
+            this.query({
+              op: 'parameterPropertySymbols',
+              args: { node: this.syntax.location(n), name: nameToUnits(name) },
+            }),
+          ),
+        getSymbolOfExpando: (n, allowDeclaration) =>
+          this.symbol(
+            this.query({
+              op: 'expandoSymbol',
+              args: { node: this.syntax.location(n), allowDeclaration },
+            }),
+          ),
+        getIndexInfosOfIndexSymbol: (s, siblings) =>
+          this.query({
+            op: 'indexSymbolInfos',
+            args: {
+              id: this.id(s, 'symbol'),
+              siblings: siblings?.map((sibling) => this.id(sibling, 'symbol')),
+            },
+          }).map((info) => this.indexInfo(info)),
+        signatureToSignatureDeclaration: (s, kind, enclosing, flags) => {
+          const data = this.query({
+            op: 'signatureDeclaration',
+            args: {
+              id: this.id(s, 'signature'),
+              kind: nativeSyntaxKind[
+                typescript.SyntaxKind[kind] as keyof typeof nativeSyntaxKind
+              ],
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        symbolToParameterDeclaration: (s, enclosing, flags) => {
+          const data = this.query({
+            op: 'parameterDeclaration',
+            args: {
+              id: this.id(s, 'symbol'),
+              kind: 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        symbolToTypeParameterDeclarations: (s, enclosing, flags) => {
+          const data = this.query({
+            op: 'typeParameterDeclarations',
+            args: {
+              id: this.id(s, 'symbol'),
+              kind: 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return (
+            data &&
+            (
+              this.syntax.generatedTypeNode(data) as {
+                typeParameters: readonly object[];
+              }
+            ).typeParameters
+          );
+        },
+        typeParameterToDeclaration: (t, enclosing, flags) => {
+          const data = this.query({
+            op: 'typeParameterDeclaration',
+            args: {
+              id: this.id(t, 'type'),
+              kind: 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        symbolToEntityName: (s, meaning, enclosing, flags) => {
+          const data = this.query({
+            op: 'entityName',
+            args: {
+              id: this.id(s, 'symbol'),
+              kind: meaning >>> 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        symbolToExpression: (s, meaning, enclosing, flags) => {
+          const data = this.query({
+            op: 'symbolExpression',
+            args: {
+              id: this.id(s, 'symbol'),
+              kind: meaning >>> 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
+        symbolToString: (s, enclosing, meaning, flags) =>
+          this.query({
+            op: 'symbolString',
+            args: {
+              id: this.id(s, 'symbol'),
+              kind: (meaning ?? 0) >>> 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags === undefined ? undefined : flags >>> 0,
+            },
+          }),
+        typePredicateToString: (predicate, enclosing, flags) =>
+          this.query({
+            op: 'predicateString',
+            args: {
+              kind: predicate.kind,
+              name:
+                predicate.parameterName === undefined
+                  ? undefined
+                  : nameToUnits(predicate.parameterName),
+              position: predicate.parameterIndex,
+              type: predicate.type ? this.id(predicate.type, 'type') : 0,
+              node: enclosing && this.syntax.location(enclosing),
+              flags: flags ?? 16384,
+            },
+          }),
+        indexInfoToIndexSignatureDeclaration: (info, enclosing, flags) => {
+          const data = this.query({
+            op: 'indexDeclaration',
+            args: {
+              key: this.id(info.keyType, 'type'),
+              value: this.id(info.type, 'type'),
+              readonly: info.isReadonly,
+              declaration:
+                info.declaration && this.syntax.location(info.declaration),
+              node: enclosing && this.syntax.location(enclosing),
+              flags,
+            },
+          });
+          return data && this.syntax.generatedTypeNode(data);
+        },
         getTypeAtLocation: (n) => nodeType('type', n),
         getTypeFromTypeNode: (n) => nodeType('fromTypeNode', n),
         getContextualType: (n) => nodeType('context', n),
@@ -412,6 +985,18 @@ export class TypeServiceClient {
           });
           cancellation?.throwIfCancellationRequested();
           return diagnostics.map((d) => this.diagnostic(d));
+        },
+        runWithCancellationToken: (token, cb) => {
+          token.throwIfCancellationRequested();
+          const previous = this.cancellation;
+          this.cancellation = token;
+          try {
+            const result = cb(this.checker);
+            token.throwIfCancellationRequested();
+            return result;
+          } finally {
+            this.cancellation = previous;
+          }
         },
         getVoidType: () => this.type(this.query({ op: 'void', args: {} })),
         getBaseConstraintOfType: (t) => typeType('constraint', t),
@@ -645,24 +1230,87 @@ export class TypeServiceClient {
       },
       'checker',
     );
-    const compilerOptions = { ...descriptor.compilerOptions };
-    for (const [key, group] of [
-      ['jsx', typescript.JsxEmit],
-      ['moduleDetection', typescript.ModuleDetectionKind],
-    ] as const) {
-      const value = compilerOptions[key];
-      if (typeof value === 'string') {
-        const translated: unknown = Reflect.get(group, value);
-        if (typeof translated !== 'number')
-          unsupported(`compilerOptions.${key}.${value}`);
-        compilerOptions[key] = translated;
-      }
-    }
+    const compilerOptions = readCompilerOptions(
+      typescript,
+      descriptor.compilerOptions,
+    );
     this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
         getCompilerOptions: () => ({ ...compilerOptions }),
         getCurrentDirectory: () => descriptor.currentDirectory,
+        emit: () => {
+          throw new Error('unsupported TypeScript operation: Program.emit');
+        },
+        getSourceFileByPath: (path) => this.syntax.sourceByPath(path),
+        getConfigFileParsingDiagnostics: () =>
+          this.diagnostics({ op: 'configFileParsingDiagnostics', args: {} }),
+        getOptionsDiagnostics: (cancellation) =>
+          this.diagnostics(
+            { op: 'optionsDiagnostics', args: {} },
+            cancellation,
+          ),
+        getGlobalDiagnostics: (cancellation) =>
+          this.diagnostics({ op: 'globalDiagnostics', args: {} }, cancellation),
+        getSyntacticDiagnostics: (source, cancellation) =>
+          this.diagnostics(
+            {
+              op: 'syntacticDiagnostics',
+              args: { node: source && this.syntax.location(source) },
+            },
+            cancellation,
+          ),
+        getSemanticDiagnostics: (source, cancellation) =>
+          this.diagnostics(
+            {
+              op: 'semanticDiagnostics',
+              args: { node: source && this.syntax.location(source) },
+            },
+            cancellation,
+          ),
+        getDeclarationDiagnostics: (source, cancellation) =>
+          this.diagnostics(
+            {
+              op: 'declarationDiagnostics',
+              args: { node: source && this.syntax.location(source) },
+            },
+            cancellation,
+          ),
+        getNodeCount: () => this.query({ op: 'nodeCount', args: {} }),
+        getIdentifierCount: () =>
+          this.query({ op: 'identifierCount', args: {} }),
+        getSymbolCount: () => this.query({ op: 'symbolCount', args: {} }),
+        getTypeCount: () => this.query({ op: 'typeCount', args: {} }),
+        getInstantiationCount: () =>
+          this.query({ op: 'instantiationCount', args: {} }),
+        getRelationCacheSizes: () => {
+          const [assignable, identity, subtype, strictSubtype] = this.query({
+            op: 'relationCacheSizes',
+            args: {},
+          });
+          return { assignable, identity, subtype, strictSubtype };
+        },
+        getRootFileNames: () => this.query({ op: 'rootFileNames', args: {} }),
+        getModeForUsageLocation: (source, usage) =>
+          this.query({
+            op: 'modeForUsageLocation',
+            args: {
+              file: this.syntax.location(source).file,
+              node: this.syntax.location(usage),
+            },
+          }) || undefined,
+        getModeForResolutionAtIndex: (source, index) =>
+          this.query({
+            op: 'modeForResolutionAtIndex',
+            args: { node: this.syntax.location(source), index },
+          }) || undefined,
+        getProjectReferences: () => {
+          const refs: ts.ProjectReference[] | null = JSON.parse(
+            this.query({ op: 'projectReferences', args: {} }),
+          );
+          return refs ?? undefined;
+        },
+        getResolvedProjectReferences: () => this.resolvedReferences(),
         getSourceFile: (name) => this.syntax.sourceView(name),
         getSourceFiles: () =>
           descriptor.sources.map((s) => {
@@ -690,9 +1338,61 @@ export class TypeServiceClient {
   get syntaxStats() {
     return this.syntax.stats;
   }
+  private resolvedReferences():
+    readonly (ResolvedReferenceView | undefined)[] | undefined {
+    const graph: { roots: number[]; configs: ReferenceConfig[] } | null =
+      JSON.parse(this.query({ op: 'resolvedProjectReferences', args: {} }));
+    if (!graph) return undefined;
+    const configs: ResolvedReferenceView[] = graph.configs.map((config) => {
+      const {
+        name,
+        path,
+        options,
+        diagnostics,
+        references: _references,
+        ...commandLine
+      } = config;
+      const errors = diagnostics
+        ? new TypePacketReader(Buffer.from(diagnostics, 'base64'))
+            .scalar('configFileParsingDiagnostics')
+            .map((d) => this.diagnostic(d))
+        : [];
+      return {
+        sourceFile: this.syntax.configSource(name, path),
+        commandLine: {
+          ...commandLine,
+          fileNames: commandLine.fileNames ?? [],
+          options: readCompilerOptions(this.typescript, options),
+          errors,
+        },
+      };
+    });
+    const lookup = (id: number) => configs[id - 1];
+    graph.configs.forEach((config, i) => {
+      if (config.references)
+        configs[i].references = config.references.map(lookup);
+    });
+    return graph.roots.map(lookup);
+  }
+  private diagnostics(
+    request: ServiceRequest<
+      | 'configFileParsingDiagnostics'
+      | 'optionsDiagnostics'
+      | 'globalDiagnostics'
+      | 'syntacticDiagnostics'
+      | 'semanticDiagnostics'
+      | 'declarationDiagnostics'
+    >,
+    token?: ts.CancellationToken,
+  ): DiagnosticView[] {
+    token?.throwIfCancellationRequested();
+    const result = this.query(request).map((d) => this.diagnostic(d));
+    token?.throwIfCancellationRequested();
+    return result;
+  }
   private diagnostic(d: DiagnosticFact): DiagnosticView {
     return {
-      file: d.fileName ? this.syntax.sourceView(d.fileName) : undefined,
+      file: d.fileName ? this.syntax.diagnosticSource(d.fileName) : undefined,
       start: d.fileName ? d.start : undefined,
       length: d.fileName ? d.length : undefined,
       code: d.code,
@@ -706,7 +1406,9 @@ export class TypeServiceClient {
         : undefined,
     };
   }
+  private cancellation?: ts.CancellationToken;
   private ensure(): void {
+    this.cancellation?.throwIfCancellationRequested();
     if (this.closed) throw new Error('type service client is closed');
     this.shared?.assertOpen();
   }
@@ -901,6 +1603,36 @@ export class TypeServiceClient {
       kind,
       kind === 'type'
         ? (view, key) => {
+            switch (key) {
+              case 'root':
+                return !!(
+                  this.type(id)!.flags & this.typescript.TypeFlags.Conditional
+                );
+              case 'texts':
+                return !!(
+                  this.type(id)!.flags &
+                  this.typescript.TypeFlags.TemplateLiteral
+                );
+              case 'elementFlags':
+              case 'minLength':
+              case 'fixedLength':
+              case 'hasRestElement':
+              case 'labeledElementDeclarations':
+                return this.typeField(id, 'tuple') !== undefined;
+              case 'baseType':
+                return !!(
+                  this.type(id)!.flags & this.typescript.TypeFlags.Substitution
+                );
+              case 'pattern':
+              case 'node':
+              case 'elementType':
+              case 'finalArrayType':
+              case 'simplifiedForReading':
+              case 'simplifiedForWriting':
+              case 'resolvedTrueType':
+              case 'resolvedFalseType':
+                return Reflect.get(view, key) !== undefined;
+            }
             if (
               key !== 'typeParameter' &&
               key !== 'constraintType' &&
@@ -940,6 +1672,7 @@ export class TypeServiceClient {
   }
   private indexInfo(fact: IndexInfoFact): IndexInfoView {
     return {
+      components: fact.components?.map((ref) => this.syntax.nodeRef(ref)!),
       keyType: this.type(fact.keyType)!,
       type: this.type(fact.type)!,
       isReadonly: fact.isReadonly,
@@ -958,6 +1691,39 @@ export class TypeServiceClient {
           return value | flag;
         }, 0),
       );
+      const details = memo(ensure, () =>
+        this.query({ op: 'typeDetails', args: { id } }),
+      );
+      const conditionalRoot = memo(ensure, () => {
+        const d = details();
+        const node = this.syntax.nodeRef(d.root);
+        if (!node) return undefined;
+        const old = this.conditionalRoots.get(node);
+        if (old) return old;
+        const root: ConditionalRootView = {
+          node,
+          checkType: this.type(d.rootCheck)!,
+          extendsType: this.type(d.rootExtends)!,
+          isDistributive: d.distributive,
+          inferTypeParameters: d.infer && this.typesFor(d.infer),
+          outerTypeParameters: d.rootOuter && this.typesFor(d.rootOuter),
+          aliasSymbol: this.symbol(d.rootAlias),
+          aliasTypeArguments: d.rootArguments && this.typesFor(d.rootArguments),
+          instantiations: d.rootOuter?.length
+            ? new LiveTypeMap(
+                () =>
+                  new Map(
+                    this.query({
+                      op: 'conditionalInstantiations',
+                      args: { id },
+                    }).map((entry) => [entry.name, this.type(entry.id)!]),
+                  ),
+              )
+            : undefined,
+        };
+        this.conditionalRoots.set(node, root);
+        return root;
+      });
       const objectFlags = memo(ensure, () =>
         this.typeField(id, 'objectFlags')?.reduce((value, name) => {
           const flag = Reflect.get(this.typescript.ObjectFlags, name);
@@ -1098,6 +1864,97 @@ export class TypeServiceClient {
         get extendsType() {
           return flag(tf.Conditional) ? typeOperands()?.[1] : undefined;
         },
+        get pattern() {
+          const d = details();
+          return client.syntax.nodeRef(d.pattern);
+        },
+        get node() {
+          const d = details();
+          return client.syntax.nodeRef(d.node);
+        },
+        get freshType() {
+          return client.type(
+            client.query({ op: 'freshLiteral', args: { id } }),
+          );
+        },
+        get elementType() {
+          return client.type(
+            client.query({ op: 'evolvingElement', args: { id } }),
+          );
+        },
+        get finalArrayType() {
+          return client.type(client.query({ op: 'finalArray', args: { id } }));
+        },
+        get simplifiedForReading() {
+          return client.type(
+            client.query({ op: 'simplifiedForReading', args: { id } }),
+          );
+        },
+        get simplifiedForWriting() {
+          return client.type(
+            client.query({ op: 'simplifiedForWriting', args: { id } }),
+          );
+        },
+        get regularType() {
+          const d = details();
+          return client.type(d.regular);
+        },
+        get baseType() {
+          const d = details();
+          return client.type(d.base);
+        },
+        get constraint() {
+          if (flag(tf.TypeParameter))
+            return client.type(
+              client.query({ op: 'typeParameterConstraint', args: { id } }),
+            );
+          return client.type(details().constraint);
+        },
+        get outerTypeParameters() {
+          const d = details();
+          return d.outer && client.typesFor(d.outer);
+        },
+        get localTypeParameters() {
+          const d = details();
+          return d.local && client.typesFor(d.local);
+        },
+        get elementFlags() {
+          const d = details();
+          return d.elements;
+        },
+        get minLength() {
+          const d = details();
+          return d.minLength;
+        },
+        get fixedLength() {
+          const d = details();
+          return d.fixedLength;
+        },
+        get hasRestElement() {
+          const d = details();
+          return d.elements?.some((flags) => (flags & 12) !== 0);
+        },
+        get labeledElementDeclarations() {
+          const d = details();
+          return d.labels?.map((ref) => client.syntax.nodeRef(ref));
+        },
+        get texts() {
+          const d = details();
+          return d.texts;
+        },
+        get root() {
+          return conditionalRoot();
+        },
+        get resolvedTrueType() {
+          return client.type(
+            client.query({ op: 'resolvedTrueType', args: { id } }),
+          );
+        },
+        get resolvedFalseType() {
+          return client.type(
+            client.query({ op: 'resolvedFalseType', args: { id } }),
+          );
+        },
         get target() {
           return target();
         },
@@ -1175,6 +2032,25 @@ export class TypeServiceClient {
       const ensure = () => {
         this.ensure();
       };
+      const readTable = (
+        flag: 'hasExports' | 'hasGlobalExports',
+        op: 'symbolExports' | 'symbolGlobalExports',
+      ) =>
+        memo(ensure, () =>
+          this.symbolField(id, flag)
+            ? new Map(
+                this.query({ op, args: { id } }).map((member) => [
+                  member.name,
+                  this.symbol(member.id)!,
+                ]),
+              )
+            : undefined,
+        );
+      const exportTable = readTable('hasExports', 'symbolExports');
+      const globalExportTable = readTable(
+        'hasGlobalExports',
+        'symbolGlobalExports',
+      );
       const name = memo(
           ensure,
           () => brand.knownName ?? this.symbolField(id, 'name'),
@@ -1215,6 +2091,12 @@ export class TypeServiceClient {
         },
         get valueDeclaration() {
           return value();
+        },
+        get exports() {
+          return exportTable();
+        },
+        get globalExports() {
+          return globalExportTable();
         },
         get members() {
           if (members || !client.symbolField(id, 'hasMembers')) return members;
@@ -1344,6 +2226,21 @@ export class TypeServiceClient {
   }
 }
 
+type NodeMaps = Pick<
+  FileSyntaxViews,
+  'esTreeNodeToTSNodeMap' | 'tsNodeToESTreeNodeMap'
+>;
+
+export function syntaxOnlyParserServices(maps: NodeMaps) {
+  return {
+    ...maps,
+    program: null,
+    emitDecoratorMetadata: undefined,
+    experimentalDecorators: undefined,
+    isolatedDeclarations: undefined,
+  };
+}
+
 export class TypeServiceFile {
   private closed = false;
   constructor(
@@ -1364,6 +2261,11 @@ export class TypeServiceFile {
   ) {
     if (this.closed) throw new Error('file type services are closed');
     this.syntax.attach(frame, projection, sourceFileName);
+    if (this.owner.descriptor.syntaxOnly)
+      return syntaxOnlyParserServices({
+        esTreeNodeToTSNodeMap: this.syntax.esTreeNodeToTSNodeMap,
+        tsNodeToESTreeNodeMap: this.syntax.tsNodeToESTreeNodeMap,
+      });
     const toTS = (node: ESTreeNode): object => {
       const native = this.syntax.esTreeNodeToTSNodeMap.get(node);
       if (!native)

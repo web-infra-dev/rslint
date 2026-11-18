@@ -31,7 +31,9 @@ export class TypePacketReader {
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
-    const words = [0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1][this.kind];
+    const words = [
+      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1, 3, 1, 1, 21,
+    ][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
   get retainedBytes(): number {
@@ -197,7 +199,13 @@ export class TypePacketReader {
         break;
       }
       case 'hasMembers':
-        value = this.word(32) !== 0;
+        value = (this.word(32) & 1) !== 0;
+        break;
+      case 'hasExports':
+        value = (this.word(32) & 2) !== 0;
+        break;
+      case 'hasGlobalExports':
+        value = (this.word(32) & 4) !== 0;
         break;
       case 'declarations': {
         const at = this.word(20);
@@ -242,14 +250,17 @@ export class TypePacketReader {
   private indexInfos(): readonly IndexInfoFact[] {
     const at = this.word(8),
       count = this.word(at);
-    if (at + 4 + count * 16 > this.view!.byteLength) return invalid();
+    if (at + 4 + count * 20 > this.view!.byteLength) return invalid();
     return Array.from({ length: count }, (_, i) => {
-      const pos = at + 4 + i * 16;
+      const pos = at + 4 + i * 20;
       return {
         keyType: this.word(pos),
         type: this.word(pos + 4),
         isReadonly: this.word(pos + 8) !== 0,
         declaration: this.node(this.word(pos + 12)),
+        components: this.word(pos + 16)
+          ? this.ids(this.word(pos + 16)).map((at) => this.node(at)!)
+          : undefined,
       };
     });
   }
@@ -373,6 +384,55 @@ export class TypePacketReader {
         value = len ? Uint8Array.from(this.bytes!.subarray(12)) : undefined;
         break;
       }
+      case 16:
+        switch (this.word(8)) {
+          case 0:
+            value = undefined;
+            break;
+          case 1:
+            value = this.text(this.word(12));
+            break;
+          case 2:
+            value = this.view!.getFloat64(12, true);
+            break;
+          default:
+            return invalid();
+        }
+        break;
+      case 19: {
+        const list = (offset: number) =>
+          this.word(offset) ? this.ids(this.word(offset)) : undefined;
+        value = {
+          pattern: this.node(this.word(8)),
+          node: this.node(this.word(12)),
+          fresh: this.word(16),
+          regular: this.word(20),
+          base: this.word(24),
+          constraint: this.word(28),
+          outer: list(32),
+          local: list(36),
+          elements: list(40),
+          minLength: this.word(44) ? this.word(44) - 1 : undefined,
+          fixedLength: this.word(48) ? this.word(48) - 1 : undefined,
+          labels: list(52)?.map((at) => this.node(at)),
+          texts: list(56)?.map((at) => this.text(at)),
+          root: this.node(this.word(60)),
+          rootCheck: this.word(64),
+          rootExtends: this.word(68),
+          rootAlias: this.word(72),
+          distributive: this.word(76) !== 0,
+          infer: list(80),
+          rootOuter: list(84),
+          rootArguments: list(88),
+        };
+        break;
+      }
+      case 18:
+        value = this.ids(this.word(8)).map((at) => this.text(at));
+        break;
+      case 17:
+        value = this.word(8) ? this.ids(this.word(8)) : undefined;
+        break;
       case 15:
         value = this.diagnostics(this.word(8));
         break;

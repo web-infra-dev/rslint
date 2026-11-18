@@ -64,6 +64,25 @@ type SignatureRequest struct {
 	Op Operation `json:"-"`
 	ID uint32    `json:"id"`
 }
+type ProgramRequest struct {
+	Op    Operation `json:"-"`
+	Node  *NodeRef  `json:"node"`
+	File  string    `json:"file"`
+	Index int       `json:"index"`
+}
+
+func (r *ProgramRequest) operation() Operation { return r.Op }
+
+type Strings []string
+
+func (Strings) result() {}
+
+type IntrinsicRequest struct {
+	Op Operation `json:"-"`
+}
+
+func (r *IntrinsicRequest) operation() Operation { return r.Op }
+
 type VoidRequest struct{}
 type PropertyRequest struct {
 	Op   Operation `json:"-"`
@@ -130,6 +149,94 @@ func (*ParameterTypeRequest) operation() Operation {
 func (r *PrintRequest) operation() Operation     { return r.Op }
 func (*ResolveNameRequest) operation() Operation { return "resolveName" }
 
+type StringLiteralRequest struct {
+	Op   Operation `json:"-"`
+	Name Name      `json:"name"`
+}
+
+func (r *StringLiteralRequest) operation() Operation { return r.Op }
+
+type NumberLiteralRequest struct {
+	Op    Operation `json:"-"`
+	Value string    `json:"value"`
+}
+
+func (r *NumberLiteralRequest) operation() Operation { return r.Op }
+
+type BigIntLiteralRequest struct {
+	Op       Operation `json:"-"`
+	Negative bool      `json:"negative"`
+	Digits   string    `json:"digits"`
+}
+
+func (r *BigIntLiteralRequest) operation() Operation { return r.Op }
+
+type NullableRequest struct {
+	Op          Operation `json:"-"`
+	ID          uint32    `json:"id"`
+	Nullable    bool      `json:"nullable"`
+	Undefinable bool      `json:"undefinable"`
+}
+
+func (r *NullableRequest) operation() Operation { return r.Op }
+
+type PrivatePropertyRequest struct {
+	Op   Operation `json:"-"`
+	ID   uint32    `json:"id"`
+	Name Name      `json:"name"`
+	Node NodeRef   `json:"node"`
+}
+
+func (r *PrivatePropertyRequest) operation() Operation { return r.Op }
+
+type NamedNodeRequest struct {
+	Op   Operation `json:"-"`
+	Name Name      `json:"name"`
+	Node NodeRef   `json:"node"`
+}
+
+func (r *NamedNodeRequest) operation() Operation { return r.Op }
+
+type ExpandoRequest struct {
+	Op               Operation `json:"-"`
+	AllowDeclaration bool      `json:"allowDeclaration"`
+	Node             NodeRef   `json:"node"`
+}
+
+func (r *ExpandoRequest) operation() Operation { return r.Op }
+
+type IndexSymbolRequest struct {
+	Op       Operation `json:"-"`
+	ID       uint32    `json:"id"`
+	Siblings []uint32  `json:"siblings"`
+}
+
+func (r *IndexSymbolRequest) operation() Operation { return r.Op }
+
+type PredicateStringRequest struct {
+	Op       Operation `json:"-"`
+	Kind     int32     `json:"kind"`
+	Name     Name      `json:"name"`
+	Position int32     `json:"position"`
+	Type     uint32    `json:"type"`
+	Node     *NodeRef  `json:"node"`
+	Flags    uint32    `json:"flags"`
+}
+
+func (r *PredicateStringRequest) operation() Operation { return r.Op }
+
+type IndexDeclarationRequest struct {
+	Op          Operation `json:"-"`
+	Key         uint32    `json:"key"`
+	Value       uint32    `json:"value"`
+	Readonly    bool      `json:"readonly"`
+	Declaration *NodeRef  `json:"declaration"`
+	Node        *NodeRef  `json:"node"`
+	Flags       uint32    `json:"flags"`
+}
+
+func (r *IndexDeclarationRequest) operation() Operation { return r.Op }
+
 type Query struct {
 	Scope
 	Request Request
@@ -146,6 +253,48 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
+	case "conditionalInstantiations", "freshLiteral", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
+		request = &TypeRequest{Op: wire.Op}
+	case "typeDetails", "resolvedTrueType", "resolvedFalseType":
+		request = &TypeRequest{Op: wire.Op}
+	case "symbolExports", "symbolGlobalExports":
+		request = &SymbolRequest{Op: wire.Op}
+	case "configFileParsingDiagnostics", "optionsDiagnostics", "globalDiagnostics", "syntacticDiagnostics", "semanticDiagnostics", "declarationDiagnostics", "nodeCount", "identifierCount", "symbolCount", "typeCount", "instantiationCount", "relationCacheSizes", "rootFileNames", "modeForUsageLocation", "modeForResolutionAtIndex", "projectReferences", "resolvedProjectReferences":
+		request = &ProgramRequest{Op: wire.Op}
+	case "stringLiteralType":
+		request = &StringLiteralRequest{Op: wire.Op}
+	case "numberLiteralType":
+		request = &NumberLiteralRequest{Op: wire.Op}
+	case "bigintLiteralType":
+		request = &BigIntLiteralRequest{Op: wire.Op}
+	case "nullableType":
+		request = &NullableRequest{Op: wire.Op}
+	case "privateIdentifierProperty":
+		request = &PrivatePropertyRequest{Op: wire.Op}
+	case "moduleMember":
+		request = &PropertyRequest{Op: wire.Op}
+	case "validPropertyAccess", "parameterPropertySymbols":
+		request = &NamedNodeRequest{Op: wire.Op}
+	case "expandoSymbol":
+		request = &ExpandoRequest{Op: wire.Op}
+	case "indexSymbolInfos":
+		request = &IndexSymbolRequest{Op: wire.Op}
+	case "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression", "symbolString":
+		request = &PrintRequest{Op: wire.Op}
+	case "predicateString":
+		request = &PredicateStringRequest{Op: wire.Op}
+	case "indexDeclaration":
+		request = &IndexDeclarationRequest{Op: wire.Op}
+	case "anyType", "unknownType", "stringType", "numberType", "booleanType", "bigIntType", "eSSymbolType", "nonPrimitiveType", "neverType", "nullType", "undefinedType", "trueType", "falseType", "ambientModules":
+		request = &IntrinsicRequest{Op: wire.Op}
+	case "augmentedPropertiesOfType":
+		request = &TypeRequest{Op: wire.Op}
+	case "rootSymbols", "mergedSymbol", "isArgumentsSymbol", "isUndefinedSymbol":
+		request = &SymbolRequest{Op: wire.Op}
+	case "exportSpecifierLocalTargetSymbol", "propertySymbolOfDestructuringAssignment", "jsxIntrinsicTagNamesAt", "typeOfAssignmentPattern", "isOptionalParameter", "constantValue", "isImplementationOfOverload":
+		request = &NodeRequest{Op: wire.Op}
+	case "typeArgumentsForResolvedSignature":
+		request = &SignatureRequest{Op: wire.Op}
 	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics":
 		request = &NodeRequest{Op: wire.Op}
 	case "contextualArgument":
@@ -193,6 +342,18 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 
 func requestNode(request Request) *NodeRef {
 	switch r := request.(type) {
+	case *ProgramRequest:
+		return r.Node
+	case *PrivatePropertyRequest:
+		return &r.Node
+	case *NamedNodeRequest:
+		return &r.Node
+	case *ExpandoRequest:
+		return &r.Node
+	case *PredicateStringRequest:
+		return r.Node
+	case *IndexDeclarationRequest:
+		return r.Node
 	case *NodeRequest:
 		return &r.Node
 	case *ResolvedSignatureRequest:
@@ -217,6 +378,11 @@ func requestNode(request Request) *NodeRef {
 type Result interface{ result() }
 type Handle uint32
 type Handles []uint32
+type OptionalHandles []uint32
+
+func (OptionalHandles) result() {}
+func (Literal) result()         {}
+
 type Boolean bool
 type Text string
 type EncodedTypeNode []byte
@@ -255,14 +421,14 @@ type Literal struct {
 	Negative bool
 }
 type SymbolFact struct {
-	Name, EscapedName string
-	Flags             uint32
-	CheckFlags        uint32
-	HasMembers        bool
-	Declarations      []NodeRef
-	ValueDeclaration  *NodeRef
-	nodes             []*ast.Node
-	valueNode         *ast.Node
+	Name, EscapedName                        string
+	Flags                                    uint32
+	CheckFlags                               uint32
+	HasMembers, HasExports, HasGlobalExports bool
+	Declarations                             []NodeRef
+	ValueDeclaration                         *NodeRef
+	nodes                                    []*ast.Node
+	valueNode                                *ast.Node
 }
 
 // NodeFact is a finite syntax summary. Structural traversal still uses exact
@@ -300,10 +466,12 @@ type NamedSymbol struct {
 }
 type IndexInfos []IndexInfo
 type IndexInfo struct {
-	KeyType, Type uint32
-	IsReadonly    bool
-	Declaration   *NodeRef
-	node          *ast.Node
+	KeyType, Type  uint32
+	IsReadonly     bool
+	Declaration    *NodeRef
+	node           *ast.Node
+	componentNodes []*ast.Node
+	Components     []*NodeRef
 }
 type TypePredicateFact struct {
 	Kind           uint32

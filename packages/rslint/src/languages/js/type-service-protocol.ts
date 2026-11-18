@@ -13,6 +13,7 @@ export interface FileBinding extends Scope {
   sourceFileName: string;
 }
 export interface TypeServiceDescriptor extends Scope {
+  syntaxOnly?: boolean;
   currentDirectory: string;
   compilerOptions: Record<string, unknown>;
   sources: Array<{
@@ -77,12 +78,37 @@ export interface TypeFact {
   readonly typeParameters: readonly number[] | undefined;
   readonly tuple: { combinedFlags: number; readonly: boolean } | undefined;
 }
+export interface TypeDetailFact {
+  pattern?: NodeRef;
+  node?: NodeRef;
+  fresh: number;
+  regular: number;
+  base: number;
+  constraint: number;
+  outer?: readonly number[];
+  local?: readonly number[];
+  elements?: readonly number[];
+  minLength?: number;
+  fixedLength?: number;
+  labels?: readonly (NodeRef | undefined)[];
+  texts?: readonly string[];
+  root?: NodeRef;
+  rootCheck: number;
+  rootExtends: number;
+  rootAlias: number;
+  distributive: boolean;
+  infer?: readonly number[];
+  rootOuter?: readonly number[];
+  rootArguments?: readonly number[];
+}
 export interface SymbolFact {
   readonly name: string;
   readonly escapedName: string;
   readonly flags: number;
   readonly checkFlags: number | undefined;
   readonly hasMembers: boolean;
+  readonly hasExports: boolean;
+  readonly hasGlobalExports: boolean;
   readonly declarations: readonly NodeRef[] | undefined;
   readonly valueDeclaration: NodeRef | undefined;
 }
@@ -107,6 +133,7 @@ export interface SignatureFact {
   readonly minArgumentCount: number;
 }
 export interface IndexInfoFact {
+  readonly components?: readonly NodeRef[];
   readonly keyType: number;
   readonly type: number;
   readonly isReadonly: boolean;
@@ -129,6 +156,95 @@ type PrintArgs = IDArgs & {
   flags: number | undefined;
 };
 export interface QueryArguments {
+  conditionalInstantiations: IDArgs;
+  freshLiteral: IDArgs;
+  evolvingElement: IDArgs;
+  finalArray: IDArgs;
+  simplifiedForReading: IDArgs;
+  simplifiedForWriting: IDArgs;
+  typeParameterConstraint: IDArgs;
+  typeDetails: IDArgs;
+  resolvedTrueType: IDArgs;
+  resolvedFalseType: IDArgs;
+  symbolExports: IDArgs;
+  symbolGlobalExports: IDArgs;
+  configFileParsingDiagnostics: Record<string, never>;
+  optionsDiagnostics: Record<string, never>;
+  globalDiagnostics: Record<string, never>;
+  syntacticDiagnostics: { node?: NodeRef };
+  semanticDiagnostics: { node?: NodeRef };
+  declarationDiagnostics: { node?: NodeRef };
+  nodeCount: Record<string, never>;
+  identifierCount: Record<string, never>;
+  symbolCount: Record<string, never>;
+  typeCount: Record<string, never>;
+  instantiationCount: Record<string, never>;
+  relationCacheSizes: Record<string, never>;
+  rootFileNames: Record<string, never>;
+  modeForUsageLocation: NodeArgs & { file: string };
+  modeForResolutionAtIndex: NodeArgs & { index: number };
+  projectReferences: Record<string, never>;
+  resolvedProjectReferences: Record<string, never>;
+  stringLiteralType: { name: readonly number[] };
+  numberLiteralType: { value: string };
+  bigintLiteralType: { negative: boolean; digits: string };
+  nullableType: IDArgs & { nullable: boolean; undefinable: boolean };
+  privateIdentifierProperty: IDArgs & NodeArgs & { name: readonly number[] };
+  moduleMember: IDArgs & { name: readonly number[] };
+  validPropertyAccess: NodeArgs & { name: readonly number[] };
+  parameterPropertySymbols: NodeArgs & { name: readonly number[] };
+  expandoSymbol: NodeArgs & { allowDeclaration: boolean };
+  indexSymbolInfos: IDArgs & { siblings?: readonly number[] };
+  signatureDeclaration: PrintArgs & { kind: number };
+  parameterDeclaration: PrintArgs & { kind: number };
+  typeParameterDeclarations: PrintArgs & { kind: number };
+  typeParameterDeclaration: PrintArgs & { kind: number };
+  entityName: PrintArgs & { kind: number };
+  symbolExpression: PrintArgs & { kind: number };
+  symbolString: PrintArgs & { kind: number };
+  predicateString: {
+    kind: number;
+    name?: readonly number[];
+    position?: number;
+    type: number;
+    node?: NodeRef;
+    flags?: number;
+  };
+  indexDeclaration: {
+    key: number;
+    value: number;
+    readonly: boolean;
+    declaration?: NodeRef;
+    node?: NodeRef;
+    flags?: number;
+  };
+  anyType: Record<string, never>;
+  unknownType: Record<string, never>;
+  stringType: Record<string, never>;
+  numberType: Record<string, never>;
+  booleanType: Record<string, never>;
+  bigIntType: Record<string, never>;
+  eSSymbolType: Record<string, never>;
+  nonPrimitiveType: Record<string, never>;
+  neverType: Record<string, never>;
+  nullType: Record<string, never>;
+  undefinedType: Record<string, never>;
+  trueType: Record<string, never>;
+  falseType: Record<string, never>;
+  ambientModules: Record<string, never>;
+  augmentedPropertiesOfType: IDArgs;
+  rootSymbols: IDArgs;
+  mergedSymbol: IDArgs;
+  isArgumentsSymbol: IDArgs;
+  isUndefinedSymbol: IDArgs;
+  exportSpecifierLocalTargetSymbol: NodeArgs;
+  propertySymbolOfDestructuringAssignment: NodeArgs;
+  jsxIntrinsicTagNamesAt: NodeArgs;
+  typeOfAssignmentPattern: NodeArgs;
+  isOptionalParameter: NodeArgs;
+  constantValue: NodeArgs;
+  isImplementationOfOverload: NodeArgs;
+  typeArgumentsForResolvedSignature: IDArgs;
   nodeRecord: NodeArgs;
   type: NodeArgs;
   fromTypeNode: NodeArgs;
@@ -204,6 +320,81 @@ export interface QueryArguments {
   };
 }
 export interface QueryResults {
+  conditionalInstantiations: readonly NamedSymbolFact[];
+  freshLiteral: number;
+  evolvingElement: number;
+  finalArray: number;
+  simplifiedForReading: number;
+  simplifiedForWriting: number;
+  typeParameterConstraint: number;
+  typeDetails: TypeDetailFact;
+  resolvedTrueType: number;
+  resolvedFalseType: number;
+  symbolExports: readonly NamedSymbolFact[];
+  symbolGlobalExports: readonly NamedSymbolFact[];
+  configFileParsingDiagnostics: DiagnosticFact[];
+  optionsDiagnostics: DiagnosticFact[];
+  globalDiagnostics: DiagnosticFact[];
+  syntacticDiagnostics: DiagnosticFact[];
+  semanticDiagnostics: DiagnosticFact[];
+  declarationDiagnostics: DiagnosticFact[];
+  nodeCount: number;
+  identifierCount: number;
+  symbolCount: number;
+  typeCount: number;
+  instantiationCount: number;
+  relationCacheSizes: readonly number[];
+  rootFileNames: readonly string[];
+  modeForUsageLocation: number;
+  modeForResolutionAtIndex: number;
+  projectReferences: string;
+  resolvedProjectReferences: string;
+  stringLiteralType: number;
+  numberLiteralType: number;
+  bigintLiteralType: number;
+  nullableType: number;
+  privateIdentifierProperty: number;
+  moduleMember: number;
+  validPropertyAccess: boolean;
+  parameterPropertySymbols: readonly number[];
+  expandoSymbol: number;
+  indexSymbolInfos: readonly IndexInfoFact[];
+  signatureDeclaration: Uint8Array | undefined;
+  parameterDeclaration: Uint8Array | undefined;
+  typeParameterDeclarations: Uint8Array | undefined;
+  typeParameterDeclaration: Uint8Array | undefined;
+  entityName: Uint8Array | undefined;
+  symbolExpression: Uint8Array | undefined;
+  symbolString: string;
+  predicateString: string;
+  indexDeclaration: Uint8Array | undefined;
+  anyType: number;
+  unknownType: number;
+  stringType: number;
+  numberType: number;
+  booleanType: number;
+  bigIntType: number;
+  eSSymbolType: number;
+  nonPrimitiveType: number;
+  neverType: number;
+  nullType: number;
+  undefinedType: number;
+  trueType: number;
+  falseType: number;
+  ambientModules: readonly NamedSymbolFact[];
+  augmentedPropertiesOfType: readonly NamedSymbolFact[];
+  rootSymbols: readonly NamedSymbolFact[];
+  mergedSymbol: number;
+  isArgumentsSymbol: boolean;
+  isUndefinedSymbol: boolean;
+  exportSpecifierLocalTargetSymbol: number;
+  propertySymbolOfDestructuringAssignment: number;
+  jsxIntrinsicTagNamesAt: readonly NamedSymbolFact[];
+  typeOfAssignmentPattern: number;
+  isOptionalParameter: boolean;
+  constantValue: string | number | undefined;
+  isImplementationOfOverload: boolean | undefined;
+  typeArgumentsForResolvedSignature: readonly number[] | undefined;
   nodeRecord: readonly NodeFact[];
   type: number;
   fromTypeNode: number;
@@ -289,6 +480,18 @@ export function isCacheableTypeQuery(
   if (
     operation === 'resolvedSignatureWithOptions' ||
     operation === 'symbolLinkType' ||
+    operation === 'symbolCount' ||
+    operation === 'typeCount' ||
+    operation === 'instantiationCount' ||
+    operation === 'relationCacheSizes' ||
+    operation === 'conditionalInstantiations' ||
+    operation === 'freshLiteral' ||
+    operation === 'typeParameterConstraint' ||
+    operation === 'finalArray' ||
+    operation === 'simplifiedForReading' ||
+    operation === 'simplifiedForWriting' ||
+    operation === 'resolvedTrueType' ||
+    operation === 'resolvedFalseType' ||
     operation === 'mappedModifiersType'
   )
     return false;
@@ -373,6 +576,81 @@ const operations = [
   'fullyQualifiedName',
   'symbolMembers',
   'symbolLinkType',
+  'anyType',
+  'unknownType',
+  'stringType',
+  'numberType',
+  'booleanType',
+  'bigIntType',
+  'eSSymbolType',
+  'nonPrimitiveType',
+  'neverType',
+  'nullType',
+  'undefinedType',
+  'trueType',
+  'falseType',
+  'ambientModules',
+  'augmentedPropertiesOfType',
+  'rootSymbols',
+  'mergedSymbol',
+  'isArgumentsSymbol',
+  'isUndefinedSymbol',
+  'exportSpecifierLocalTargetSymbol',
+  'propertySymbolOfDestructuringAssignment',
+  'jsxIntrinsicTagNamesAt',
+  'typeOfAssignmentPattern',
+  'isOptionalParameter',
+  'constantValue',
+  'isImplementationOfOverload',
+  'typeArgumentsForResolvedSignature',
+  'stringLiteralType',
+  'numberLiteralType',
+  'bigintLiteralType',
+  'nullableType',
+  'privateIdentifierProperty',
+  'moduleMember',
+  'validPropertyAccess',
+  'parameterPropertySymbols',
+  'expandoSymbol',
+  'indexSymbolInfos',
+  'signatureDeclaration',
+  'parameterDeclaration',
+  'typeParameterDeclarations',
+  'typeParameterDeclaration',
+  'entityName',
+  'symbolExpression',
+  'symbolString',
+  'predicateString',
+  'indexDeclaration',
+  'configFileParsingDiagnostics',
+  'optionsDiagnostics',
+  'globalDiagnostics',
+  'syntacticDiagnostics',
+  'semanticDiagnostics',
+  'declarationDiagnostics',
+  'nodeCount',
+  'identifierCount',
+  'symbolCount',
+  'typeCount',
+  'instantiationCount',
+  'relationCacheSizes',
+  'rootFileNames',
+  'modeForUsageLocation',
+  'modeForResolutionAtIndex',
+  'projectReferences',
+  'resolvedProjectReferences',
+  'typeDetails',
+  'resolvedTrueType',
+  'resolvedFalseType',
+  'symbolExports',
+  'symbolGlobalExports',
+  'conditionalInstantiations',
+  'freshLiteral',
+  'evolvingElement',
+  'finalArray',
+  'simplifiedForReading',
+  'simplifiedForWriting',
+  'typeParameterConstraint',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -387,6 +665,66 @@ export function typeQueryKey(
       : '-';
   const prefix = `${q.generation}:${q.checker}:${operationIDs.get(q.op)}:`;
   switch (q.op) {
+    case 'configFileParsingDiagnostics':
+    case 'optionsDiagnostics':
+    case 'globalDiagnostics':
+    case 'syntacticDiagnostics':
+    case 'semanticDiagnostics':
+    case 'declarationDiagnostics':
+    case 'nodeCount':
+    case 'identifierCount':
+    case 'symbolCount':
+    case 'typeCount':
+    case 'instantiationCount':
+    case 'relationCacheSizes':
+    case 'rootFileNames':
+    case 'modeForUsageLocation':
+    case 'modeForResolutionAtIndex':
+    case 'projectReferences':
+    case 'resolvedProjectReferences':
+      return prefix + JSON.stringify(q.args);
+    case 'stringLiteralType':
+    case 'numberLiteralType':
+    case 'bigintLiteralType':
+    case 'nullableType':
+    case 'privateIdentifierProperty':
+    case 'moduleMember':
+    case 'validPropertyAccess':
+    case 'parameterPropertySymbols':
+    case 'expandoSymbol':
+    case 'indexSymbolInfos':
+    case 'signatureDeclaration':
+    case 'parameterDeclaration':
+    case 'typeParameterDeclarations':
+    case 'typeParameterDeclaration':
+    case 'entityName':
+    case 'symbolExpression':
+    case 'symbolString':
+    case 'predicateString':
+    case 'indexDeclaration':
+      return prefix + JSON.stringify(q.args);
+    case 'anyType':
+    case 'unknownType':
+    case 'stringType':
+    case 'numberType':
+    case 'booleanType':
+    case 'bigIntType':
+    case 'eSSymbolType':
+    case 'nonPrimitiveType':
+    case 'neverType':
+    case 'nullType':
+    case 'undefinedType':
+    case 'trueType':
+    case 'falseType':
+    case 'ambientModules':
+    case 'exportSpecifierLocalTargetSymbol':
+    case 'propertySymbolOfDestructuringAssignment':
+    case 'jsxIntrinsicTagNamesAt':
+    case 'typeOfAssignmentPattern':
+    case 'isOptionalParameter':
+    case 'constantValue':
+    case 'isImplementationOfOverload':
+      return prefix + JSON.stringify(q.args);
     case 'nodeRecord':
     case 'type':
     case 'fromTypeNode':
@@ -437,6 +775,81 @@ export type ScalarOperation = Exclude<
   'typeRecord' | 'symbolRecord' | 'signatureRecord' | 'nodeRecord'
 >;
 export const SCALAR_KINDS: Record<ScalarOperation, number> = {
+  conditionalInstantiations: 11,
+  freshLiteral: 1,
+  evolvingElement: 1,
+  finalArray: 1,
+  simplifiedForReading: 1,
+  simplifiedForWriting: 1,
+  typeParameterConstraint: 1,
+  typeDetails: 19,
+  resolvedTrueType: 1,
+  resolvedFalseType: 1,
+  symbolExports: 11,
+  symbolGlobalExports: 11,
+  configFileParsingDiagnostics: 15,
+  optionsDiagnostics: 15,
+  globalDiagnostics: 15,
+  syntacticDiagnostics: 15,
+  semanticDiagnostics: 15,
+  declarationDiagnostics: 15,
+  nodeCount: 1,
+  identifierCount: 1,
+  symbolCount: 1,
+  typeCount: 1,
+  instantiationCount: 1,
+  relationCacheSizes: 4,
+  rootFileNames: 18,
+  modeForUsageLocation: 1,
+  modeForResolutionAtIndex: 1,
+  projectReferences: 3,
+  resolvedProjectReferences: 3,
+  stringLiteralType: 1,
+  numberLiteralType: 1,
+  bigintLiteralType: 1,
+  nullableType: 1,
+  privateIdentifierProperty: 1,
+  moduleMember: 1,
+  validPropertyAccess: 2,
+  parameterPropertySymbols: 4,
+  expandoSymbol: 1,
+  indexSymbolInfos: 9,
+  signatureDeclaration: 14,
+  parameterDeclaration: 14,
+  typeParameterDeclarations: 14,
+  typeParameterDeclaration: 14,
+  entityName: 14,
+  symbolExpression: 14,
+  symbolString: 3,
+  predicateString: 3,
+  indexDeclaration: 14,
+  anyType: 1,
+  unknownType: 1,
+  stringType: 1,
+  numberType: 1,
+  booleanType: 1,
+  bigIntType: 1,
+  eSSymbolType: 1,
+  nonPrimitiveType: 1,
+  neverType: 1,
+  nullType: 1,
+  undefinedType: 1,
+  trueType: 1,
+  falseType: 1,
+  ambientModules: 11,
+  augmentedPropertiesOfType: 11,
+  rootSymbols: 11,
+  mergedSymbol: 1,
+  isArgumentsSymbol: 2,
+  isUndefinedSymbol: 2,
+  exportSpecifierLocalTargetSymbol: 1,
+  propertySymbolOfDestructuringAssignment: 1,
+  jsxIntrinsicTagNamesAt: 11,
+  typeOfAssignmentPattern: 1,
+  isOptionalParameter: 2,
+  constantValue: 16,
+  isImplementationOfOverload: 2,
+  typeArgumentsForResolvedSignature: 17,
   type: 1,
   fromTypeNode: 1,
   context: 1,

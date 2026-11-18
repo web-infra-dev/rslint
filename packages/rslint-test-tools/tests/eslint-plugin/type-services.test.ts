@@ -1964,6 +1964,398 @@ test('signature options preserve TypeScript query order across clients', async (
   }
 });
 
+test('public checker, Program and source reads match TypeScript', async () => {
+  const dir = mkdtempSync(resolve(temp, 'public-'));
+  const file = resolve(dir, 'input.ts'),
+    config = resolve(dir, 'tsconfig.json');
+  const code =
+    [
+      "export enum Values { N = 3, S = 'three' }",
+      'export type Pair = readonly [first: string, second?: number];',
+      'export function id<T>(input: T): T { return input; }',
+      'export const result = id(42);',
+      "export const incorrect: number = 'bad';",
+      'export type Dictionary = { [name: string]: number };',
+      "export function isString(input: unknown): input is string { return typeof input === 'string'; }",
+      'export type Select<T> = T extends string ? true : false;',
+      'export class Box { #value = 0; constructor(public label: string) {} read() { return this.#value; } }',
+      'export { id as alias };',
+      'export const record = { n: 1 }; export const {n} = record;',
+      "import type { External } from './external'; export type Used = External;",
+      'export const grow = () => 1; grow.item = 1;',
+    ].join('\r\n') + '\r\n';
+  writeFileSync(file, code);
+  writeFileSync(resolve(dir, 'external.ts'), 'export type External = string;');
+  writeFileSync(
+    config,
+    JSON.stringify({
+      compilerOptions: { strict: true, target: 'esnext', module: 'esnext' },
+      files: ['input.ts'],
+    }),
+  );
+  const host = new Host();
+  const descriptor = host.request({ method: 'init', config });
+  const owner = new TypeServiceClient(
+    enums,
+    descriptor,
+    (query) => Buffer.from(host.request({ method: 'query', query }), 'base64'),
+    host.source,
+    { maxFactsBytes: 1 << 18 },
+  );
+  try {
+    const reference = ts.createProgram([file], {
+      strict: true,
+      target: ts.ScriptTarget.ESNext,
+      module: ts.ModuleKind.ESNext,
+    });
+    const publicAPI = ts.createSourceFile(
+      'typescript.d.ts',
+      readFileSync(
+        new URL(import.meta.resolve('typescript/lib/typescript.d.ts')),
+        'utf8',
+      ),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const declared = new Map<string, Set<string>>();
+    function collect(node: ts.Node) {
+      if (ts.isInterfaceDeclaration(node)) {
+        const methods = declared.get(node.name.text) ?? new Set<string>();
+        for (const member of node.members) {
+          if (
+            member.name &&
+            ts.isIdentifier(member.name) &&
+            (ts.isMethodSignature(member) ||
+              (ts.isPropertySignature(member) &&
+                member.type &&
+                ts.isFunctionTypeNode(member.type)))
+          )
+            methods.add(member.name.text);
+        }
+        declared.set(node.name.text, methods);
+      }
+      ts.forEachChild(node, collect);
+    }
+    collect(publicAPI);
+    for (const [name, view] of [
+      ['Program', owner.program],
+      ['TypeChecker', owner.checker],
+    ] as const) {
+      expect([...declared.get(name)!].filter((key) => !(key in view))).toEqual(
+        [],
+      );
+    }
+    const exercise = (p: ts.Program) => {
+      const c = p.getTypeChecker(),
+        src = p.getSourceFile(file)!;
+      const [enm, pair, fn, result, , dict, guard, select] = src.statements;
+      const decl = fn as ts.FunctionDeclaration,
+        sig = c.getSignatureFromDeclaration(decl)!;
+      const param = decl.parameters[0],
+        symbol = c.getSymbolAtLocation(param.name)!;
+      const call = (result as ts.VariableStatement).declarationList
+        .declarations[0].initializer as ts.CallExpression;
+      const t = c.getTypeFromTypeNode(
+        (pair as ts.TypeAliasDeclaration).type,
+      ) as ts.TupleTypeReference;
+      const tuple = t.target;
+      const index = c.getIndexInfosOfType(
+        c.getTypeFromTypeNode((dict as ts.TypeAliasDeclaration).type),
+      )[0];
+      const predicate = c.getTypePredicateOfSignature(
+        c.getSignatureFromDeclaration(guard as ts.FunctionDeclaration)!,
+      )!;
+      const cond = c.getTypeFromTypeNode(
+        (select as ts.TypeAliasDeclaration).type,
+      ) as ts.ConditionalType;
+      const format = (value: ts.Type) => c.typeToString(value);
+      const name = (node: ts.Node | undefined) =>
+        node && ts.SyntaxKind[node.kind];
+      const primitive = [
+        c.getAnyType(),
+        c.getUnknownType(),
+        c.getStringType(),
+        c.getNumberType(),
+        c.getBigIntType(),
+        c.getBooleanType(),
+        c.getTrueType(),
+        c.getFalseType(),
+        c.getESSymbolType(),
+        c.getNonPrimitiveType(),
+        c.getNeverType(),
+        c.getNullType(),
+        c.getUndefinedType(),
+      ];
+      const literal = c.getStringLiteralType('abc');
+      return {
+        additional: (() => {
+          const fnSymbol = c.getSymbolAtLocation(decl.name!)!;
+          const box = src.statements[8] as ts.ClassDeclaration;
+          const ctor = box.members[1] as ts.ConstructorDeclaration;
+          const access = (
+            (box.members[2] as ts.MethodDeclaration).body!
+              .statements[0] as ts.ReturnStatement
+          ).expression as ts.PropertyAccessExpression;
+          const left = c.getTypeAtLocation(access.expression);
+          const fileSymbol = c.getSymbolAtLocation(src)!;
+          const exportSpec = (
+            (src.statements[9] as ts.ExportDeclaration)
+              .exportClause as ts.NamedExports
+          ).elements[0];
+          const dictionary = c.getSymbolAtLocation(
+            (dict as ts.TypeAliasDeclaration).name,
+          )!;
+          const dictType = c.getDeclaredTypeOfSymbol(dictionary);
+          const indexSymbol = dictType
+            .getSymbol()!
+            .members!.get('__index' as ts.__String)!;
+          const imp = src.statements[12] as ts.ImportDeclaration;
+          const grow = (src.statements[14] as ts.VariableStatement)
+            .declarationList.declarations[0].initializer!;
+          return {
+            ambient: c.getAmbientModules().length,
+            expando: c.getSymbolOfExpando(grow, false)?.name,
+            entities: [
+              name(
+                c.symbolToExpression(fnSymbol, ts.SymbolFlags.Value, decl, 0),
+              ),
+              name(
+                c.symbolToEntityName(fnSymbol, ts.SymbolFlags.Value, decl, 0),
+              ),
+            ],
+            parameters: c
+              .symbolToTypeParameterDeclarations(fnSymbol, decl, 0)
+              ?.map((node) => node.name.text),
+            aliasParameters: c
+              .symbolToTypeParameterDeclarations(
+                c.getSymbolAtLocation(
+                  (select as ts.TypeAliasDeclaration).name,
+                )!,
+                decl,
+                0,
+              )
+              ?.map((n) => n.name.text),
+            emptyParameters: c
+              .symbolToTypeParameterDeclarations(dictionary, decl, 0)
+              ?.map((n) => n.name.text),
+            private: c.getPrivateIdentifierPropertyOfType(
+              left,
+              '#value',
+              access,
+            )?.name,
+            valid: c.isValidPropertyAccess(access, 'read'),
+            parameterProperty: c
+              .getSymbolsOfParameterPropertyDeclaration(
+                ctor.parameters[0],
+                'label',
+              )
+              .map((s) => s.name),
+            local: c.getExportSpecifierLocalTargetSymbol(exportSpec)?.name,
+            exp: c.tryGetMemberInModuleExports('alias', fileSymbol)?.name,
+            rawExports: [...(fileSymbol.exports?.keys() ?? [])].sort(),
+            indices: c
+              .getIndexInfosOfIndexSymbol(indexSymbol)
+              .map((i) => format(i.type)),
+            modes: [
+              p.getModeForUsageLocation(
+                src,
+                imp.moduleSpecifier as ts.StringLiteral,
+              ),
+              p.getModeForResolutionAtIndex(src, 0),
+            ],
+          };
+        })(),
+        shape: [
+          'root' in cond,
+          'root' in literal,
+          'elementFlags' in tuple,
+          'elementFlags' in t,
+          'texts' in literal,
+        ],
+        primitive: primitive.map(format),
+        interned: c.getStringType() === c.getStringType(),
+        literals: [
+          literal.value,
+          c.getNumberLiteralType(-2.5).value,
+          c.getBigIntLiteralType({ negative: true, base10Value: '42' }).value,
+        ],
+        nullable: format(
+          c.getNullableType(
+            c.getStringType(),
+            ts.TypeFlags.Null | ts.TypeFlags.Undefined,
+          ),
+        ),
+        constants: (enm as ts.EnumDeclaration).members.map((member) =>
+          c.getConstantValue(member),
+        ),
+        signatureArguments: c
+          .getTypeArgumentsForResolvedSignature(c.getResolvedSignature(call)!)
+          ?.map(format),
+        parameters: c.getRootSymbols(symbol).map((s) => s.name),
+        merged: c.getMergedSymbol(symbol) === symbol,
+        flags: [
+          c.isArgumentsSymbol(symbol),
+          c.isUndefinedSymbol(symbol),
+          c.isOptionalParameter(param),
+          c.isImplementationOfOverload(decl),
+        ],
+        builds: [
+          name(
+            c.signatureToSignatureDeclaration(
+              sig,
+              ts.SyntaxKind.CallSignature,
+              decl,
+              0,
+            ),
+          ),
+          name(c.symbolToParameterDeclaration(symbol, decl, 0)),
+          name(c.typeParameterToDeclaration(sig.typeParameters![0], decl, 0)),
+          name(c.indexInfoToIndexSignatureDeclaration(index, decl, 0)),
+        ],
+        printed: [
+          c.symbolToString(symbol, decl),
+          c.typePredicateToString(predicate, guard),
+        ],
+        tuple: [
+          tuple.minLength,
+          tuple.fixedLength,
+          tuple.hasRestElement,
+          tuple.elementFlags,
+          tuple.labeledElementDeclarations?.map(name),
+        ],
+        conditional: [
+          name(cond.root.node),
+          cond.root.isDistributive,
+          format(cond.root.checkType),
+          format(cond.root.extendsType),
+        ],
+        roots: p.getRootFileNames(),
+        sourceByPath:
+          p.getSourceFileByPath(
+            (src as ts.SourceFile & { path: ts.Path }).path,
+          ) === src,
+        lines: [0, code.indexOf('\n'), code.length].map((pos) =>
+          src.getLineEndOfPosition(pos),
+        ),
+        diagnostics: p
+          .getSemanticDiagnostics(src)
+          .map((d) => [d.code, d.start, d.length, d.file === src]),
+        other: [
+          p.getSyntacticDiagnostics(src).length,
+          p.getOptionsDiagnostics().length,
+          p.getConfigFileParsingDiagnostics().length,
+          p.getProjectReferences(),
+          p.getResolvedProjectReferences(),
+        ],
+        counts: [
+          p.getNodeCount(),
+          p.getIdentifierCount(),
+          p.getSymbolCount(),
+          p.getTypeCount(),
+        ].map((n) => n > 0),
+        relationKeys: Object.keys(p.getRelationCacheSizes()).sort(),
+        cancel: c.runWithCancellationToken(
+          {
+            isCancellationRequested: () => false,
+            throwIfCancellationRequested() {},
+          },
+          (inner) => inner === c,
+        ),
+      };
+    };
+    expect(exercise(owner.program as unknown as ts.Program)).toEqual(
+      exercise(reference),
+    );
+    expect(() => owner.program.emit()).toThrow('Program.emit');
+    const src = owner.program.getSourceFile(file) as ts.SourceFile;
+    expect(() =>
+      src.update('', { span: { start: 0, length: 0 }, newLength: 0 }),
+    ).toThrow('SourceFile.update');
+  } finally {
+    owner.close();
+    await host.close();
+  }
+});
+test('resolved project references retain config syntax, nesting and missing entries', async () => {
+  const dir = mkdtempSync(resolve(temp, 'references-')),
+    file = resolve(dir, 'input.ts'),
+    config = resolve(dir, 'tsconfig.json');
+  const child = resolve(dir, 'child.json'),
+    nested = resolve(dir, 'nested.json');
+  writeFileSync(file, 'export const n = 1;');
+  writeFileSync(resolve(dir, 'nested.ts'), 'export const nested = 1;');
+  writeFileSync(resolve(dir, 'child.ts'), 'export const child = 2;');
+  const compilerOptions = { composite: true, target: 'esnext' };
+  writeFileSync(
+    nested,
+    JSON.stringify({ compilerOptions, files: ['nested.ts'] }),
+  );
+  writeFileSync(
+    child,
+    JSON.stringify({
+      compilerOptions,
+      files: ['child.ts'],
+      references: [{ path: './nested.json' }],
+    }),
+  );
+  writeFileSync(
+    config,
+    JSON.stringify({
+      compilerOptions,
+      files: ['input.ts'],
+      references: [
+        { path: './child.json' },
+        { path: './nested.json' },
+        { path: './missing.json' },
+      ],
+    }),
+  );
+  const h = new Host(),
+    descriptor = h.request({ method: 'init', config });
+  const owner = new TypeServiceClient(
+    enums,
+    descriptor,
+    (q) => Buffer.from(h.request({ method: 'query', query: q }), 'base64'),
+    h.source,
+    { maxFactsBytes: 1 << 16 },
+  );
+  try {
+    const parsed = ts.getParsedCommandLineOfConfigFile(
+      config,
+      {},
+      { ...ts.sys, onUnRecoverableConfigFileDiagnostic() {} },
+    )!;
+    const tsProgram = ts.createProgram({
+      ...parsed,
+      rootNames: parsed.fileNames,
+    });
+    const inspect = (p: ts.Program) => {
+      const refs = p.getResolvedProjectReferences()!;
+      return {
+        direct: p.getProjectReferences(),
+        configs: refs.map(
+          (ref) =>
+            ref && [
+              ref.sourceFile.fileName,
+              ref.sourceFile.text,
+              ref.sourceFile.getSourceFile() === ref.sourceFile,
+              ref.commandLine.fileNames,
+              ref.commandLine.options.target,
+              ref.commandLine.raw.compilerOptions.target,
+            ],
+        ),
+        nested: refs[0]!.references![0] === refs[1],
+        excluded: !p.getSourceFiles().some((f) => f.fileName === child),
+      };
+    };
+    expect(inspect(owner.program as unknown as ts.Program)).toEqual(
+      inspect(tsProgram),
+    );
+  } finally {
+    owner.close();
+    await h.close();
+  }
+});
 test('shared cache capacity and publication stay bounded', () => {
   const owner = new SharedTypeCacheOwner(1, 1 << 16, 8),
     reader = new SharedTypeCacheReader(owner.descriptor);

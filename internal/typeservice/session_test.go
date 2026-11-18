@@ -42,6 +42,26 @@ func TestSessionReleasesCheckerLeaseAndPreservesEligibility(t *testing.T) {
 	if _, err := New(t.Context(), sourceOnly, []*ast.SourceFile{file}); err == nil {
 		t.Fatal("source-only Program admitted typed rules")
 	}
+	for _, owner := range []*program.Program{p, sourceOnly} {
+		syntax, err := NewSyntaxOnly(t.Context(), owner, []*ast.SourceFile{file})
+		if err != nil {
+			t.Fatal(err)
+		}
+		binding, err := syntax.BindTarget(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &NodeRequest{Op: "nodeRecord", Node: NodeRef{name, 1}}}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := syntax.Query(t.Context(), Query{binding.Scope, &VoidRequest{}}); err == nil {
+			t.Fatal("syntax-only session acquired a checker")
+		}
+		if syntax.checker != nil {
+			t.Fatal("syntax query constructed a checker")
+		}
+		syntax.Close()
+	}
 	session, err := New(t.Context(), p, []*ast.SourceFile{file})
 	if err != nil {
 		t.Fatal(err)
