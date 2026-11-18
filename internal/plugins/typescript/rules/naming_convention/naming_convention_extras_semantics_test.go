@@ -518,3 +518,134 @@ func TestNamingConventionReferenceBoundaries(t *testing.T) {
 			{Code: "type bad_type={next:bad_type};", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_type` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
 		})
 }
+
+// Expectations were independently checked against typescript-eslint 8.67.0.
+// Keep external-use and direct-export controls beside the self-use cases.
+func TestNamingConventionUnusedAssignmentBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule,
+		[]rule_tester.ValidTestCase{
+			// external read ()=>bad_name
+			{Code: "let bad_name; bad_name=()=>bad_name; consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read function(){return bad_name;}
+			{Code: "let bad_name; bad_name=function(){return bad_name;}; consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (()=>bad_name)()
+			{Code: "let bad_name; bad_name=(()=>bad_name)(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (function(){return bad_name;})()
+			{Code: "let bad_name; bad_name=(function(){return bad_name;})(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read ((()=>bad_name))()
+			{Code: "let bad_name; bad_name=((()=>bad_name))(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (()=>()=>bad_name)()
+			{Code: "let bad_name; bad_name=(()=>()=>bad_name)(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read {read:()=>bad_name}
+			{Code: "let bad_name; bad_name={read:()=>bad_name}; consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read {read:()=>bad_name}.read()
+			{Code: "let bad_name; bad_name={read:()=>bad_name}.read(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// self RHS consume(()=>bad_name)
+			{Code: "let bad_name; bad_name=consume(()=>bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read consume(()=>bad_name)
+			{Code: "let bad_name; bad_name=consume(()=>bad_name); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// self RHS new Holder(()=>bad_name)
+			{Code: "let bad_name; bad_name=new Holder(()=>bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read new Holder(()=>bad_name)
+			{Code: "let bad_name; bad_name=new Holder(()=>bad_name); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// self RHS (saved=()=>bad_name)
+			{Code: "let bad_name; bad_name=(saved=()=>bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (saved=()=>bad_name)
+			{Code: "let bad_name; bad_name=(saved=()=>bad_name); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (0,()=>bad_name)
+			{Code: "let bad_name; bad_name=(0,()=>bad_name); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (()=>bad_name,()=>1)
+			{Code: "let bad_name; bad_name=(()=>bad_name,()=>1); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// self RHS (()=>{const callback=()=>bad_name;return callback;})()
+			{Code: "let bad_name; bad_name=(()=>{const callback=()=>bad_name;return callback;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (()=>{const callback=()=>bad_name;return callback;})()
+			{Code: "let bad_name; bad_name=(()=>{const callback=()=>bad_name;return callback;})(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external read (()=>consume(bad_name))()
+			{Code: "let bad_name; bad_name=(()=>consume(bad_name))(); consume(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// let bad_name=0; consume(bad_name=(()=>bad_name)());
+			{Code: "let bad_name=0; consume(bad_name=(()=>bad_name)());", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// let bad_name=0; for(let good=0;good<1;good++){bad_name=(()=>bad_name)();}
+			{Code: "let bad_name=0; for(let good=0;good<1;good++){bad_name=(()=>bad_name)();}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// let bad_name=0; function later(){bad_name=(()=>bad_name)();}
+			{Code: "let bad_name=0; function later(){bad_name=(()=>bad_name)();}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// function* good(){let bad_name;bad_name=yield (()=>bad_name);}
+			{Code: "function* good(){let bad_name;bad_name=yield (()=>bad_name);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// let bad_name=0; bad_name=tag`${()=>bad_name}`;
+			{Code: "let bad_name=0; bad_name=tag`${()=>bad_name}`;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// let bad_name=0; bad_name=consume(()=>bad_name);
+			{Code: "let bad_name=0; bad_name=consume(()=>bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// merged unused function bad_function(){} export namespace bad_function {}
+			{Code: "function bad_function(){} export namespace bad_function {}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// direct exported function bad_function(){} export namespace bad_function {}
+			{Code: "function bad_function(){} export namespace bad_function {}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// merged unused function bad_function(){} export namespace bad_function {export type Options={};}
+			{Code: "function bad_function(){} export namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// direct exported function bad_function(){} export namespace bad_function {export type Options={};}
+			{Code: "function bad_function(){} export namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// direct exported function bad_function(){} namespace bad_function {export type Options={};}
+			{Code: "function bad_function(){} namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// merged unused export function bad_function(){} namespace bad_function {export type Options={};}
+			{Code: "export function bad_function(){} namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// direct exported function bad_function(){} namespace Outer {export namespace bad_function {export type Options={};}}
+			{Code: "function bad_function(){} namespace Outer {export namespace bad_function {export type Options={};}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// merged unused namespace Outer {function bad_function(){} export namespace bad_function {export type Options={};}}
+			{Code: "namespace Outer {function bad_function(){} export namespace bad_function {export type Options={};}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// direct exported namespace Outer {function bad_function(){} export namespace bad_function {export type Options={};}}
+			{Code: "namespace Outer {function bad_function(){} export namespace bad_function {export type Options={};}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// direct exported function bad_function(){} export namespace other_function {export type Options={};}
+			{Code: "function bad_function(){} export namespace other_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+			// merged class/interface
+			{Code: "class bad_class {} export interface bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// merged interface/class
+			{Code: "interface bad_class {} export class bad_class {}", Options: []any{map[string]any{"selector": "interface", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// execution boundary let bad_name; class Good {field=(bad_name=()=>bad_name,0);}
+			{Code: "let bad_name; class Good {field=(bad_name=()=>bad_name,0);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// execution boundary let bad_name; class Good {field=(bad_name=(()=>bad_name)(),0);}
+			{Code: "let bad_name; class Good {field=(bad_name=(()=>bad_name)(),0);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// execution boundary let bad_name; class Good {static {bad_name=()=>bad_name;}}
+			{Code: "let bad_name; class Good {static {bad_name=()=>bad_name;}}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+		}, []rule_tester.InvalidTestCase{
+			// self RHS ()=>bad_name
+			{Code: "let bad_name; bad_name=()=>bad_name;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS function(){return bad_name;}
+			{Code: "let bad_name; bad_name=function(){return bad_name;};", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (()=>bad_name)()
+			{Code: "let bad_name; bad_name=(()=>bad_name)();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (function(){return bad_name;})()
+			{Code: "let bad_name; bad_name=(function(){return bad_name;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS ((()=>bad_name))()
+			{Code: "let bad_name; bad_name=((()=>bad_name))();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (()=>()=>bad_name)()
+			{Code: "let bad_name; bad_name=(()=>()=>bad_name)();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS {read:()=>bad_name}
+			{Code: "let bad_name; bad_name={read:()=>bad_name};", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS {read:()=>bad_name}.read()
+			{Code: "let bad_name; bad_name={read:()=>bad_name}.read();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (0,()=>bad_name)
+			{Code: "let bad_name; bad_name=(0,()=>bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (()=>bad_name,()=>1)
+			{Code: "let bad_name; bad_name=(()=>bad_name,()=>1);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// self RHS (()=>consume(bad_name))()
+			{Code: "let bad_name; bad_name=(()=>consume(bad_name))();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// let bad_name=0; bad_name+=(()=>bad_name)();
+			{Code: "let bad_name=0; bad_name+=(()=>bad_name)();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// let bad_name; bad_name=new (function(){return bad_name;})();
+			{Code: "let bad_name; bad_name=new (function(){return bad_name;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// let bad_name=0; bad_name=(()=>{const bad_name=1;return bad_name;})();
+			{Code: "let bad_name=0; bad_name=(()=>{const bad_name=1;return bad_name;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// let bad_name=0; bad_name=(other=1,bad_name+1);
+			{Code: "let bad_name=0; bad_name=(other=1,bad_name+1);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// merged unused function bad_function(){} namespace bad_function {export type Options={};}
+			{Code: "function bad_function(){} namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 22}}},
+			// direct exported export function bad_function(){} namespace bad_function {export type Options={};}
+			{Code: "export function bad_function(){} namespace bad_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 17, EndLine: 1, EndColumn: 29}}},
+			// merged unused function bad_function(){} namespace Outer {export namespace bad_function {export type Options={};}}
+			{Code: "function bad_function(){} namespace Outer {export namespace bad_function {export type Options={};}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 22}}},
+			// merged unused function bad_function(){} export namespace other_function {export type Options={};}
+			{Code: "function bad_function(){} export namespace other_function {export type Options={};}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 22}}},
+			// merged class control
+			{Code: "class bad_class {} interface bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// execution boundary let bad_name; class Good {[(bad_name=()=>bad_name, "field")]=0;}
+			{Code: "let bad_name; class Good {[(bad_name=()=>bad_name, \"field\")]=0;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+		})
+}
