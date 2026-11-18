@@ -251,34 +251,204 @@ type deprecationInfo struct {
 	inherit    bool
 }
 
-func ownDeprecation(c *checker.Checker, node *ast.Node) deprecationInfo {
-	var result deprecationInfo
-	for current := node; current != nil; current = ast.GetNextJSDocCommentLocation(current) {
-		docs := current.JSDoc(nil)
-		if len(docs) == 0 {
+// Keep the tag collector separate from inheritance: initializer and parameter
+// documentation are local tags too, and can prevent an inherited deprecation.
+func appendOwnedJSDocTags(tags []*ast.Node, host, node *ast.Node) []*ast.Node {
+	docs := node.JSDoc(nil)
+	for i, doc := range docs {
+		list := doc.AsJSDoc().Tags
+		if list == nil {
 			continue
 		}
-		// Only the last JSDoc block owns ordinary tags; earlier blocks can carry
-		// JSDoc overloads, but cannot contribute a deprecated tag to this host.
-		tags := docs[len(docs)-1].AsJSDoc().Tags
-		if tags == nil {
-			continue
-		}
-		result.hasTags = result.hasTags || len(tags.Nodes) > 0
-		for _, tag := range tags.Nodes {
-			if tag.TagName().Text() == "inheritDoc" || tag.TagName().Text() == "inheritdoc" {
-				result.inherit = true
+		for _, tag := range list.Nodes {
+			if i != len(docs)-1 && !ast.IsJSDocOverloadTag(tag) {
+				continue
 			}
-			if !result.deprecated && ast.IsJSDocDeprecatedTag(tag) {
-				result.deprecated = true
-				result.reason = jsDocCommentText(c, tag.AsJSDocDeprecatedTag().Comment)
+			if (tag.Kind == ast.KindJSDocTypeTag || tag.Kind == ast.KindJSDocSatisfiesTag) && node.Kind == ast.KindParenthesizedExpression && node != host {
+				continue
 			}
+			tags = append(tags, tag)
 		}
 	}
+	return tags
+}
+
+func localJSDocTags(node *ast.Node) []*ast.Node {
+	if node == nil {
+		return nil
+	}
+	var tags []*ast.Node
+	if ast.IsVariableLike(node) && ast.HasInitializer(node) {
+		tags = appendOwnedJSDocTags(tags, node, node.Initializer())
+	}
+	for current := node; current != nil; current = ast.GetNextJSDocCommentLocation(current) {
+		tags = appendOwnedJSDocTags(tags, node, current)
+		if current.Kind == ast.KindParameter && current.Parent != nil && current.Name() != nil {
+			parentTags := localJSDocTags(current.Parent)
+			if ast.IsIdentifier(current.Name()) {
+				for _, tag := range parentTags {
+					if ast.IsJSDocParameterTag(tag) && ast.IsIdentifier(tag.Name()) && tag.Name().Text() == current.Name().Text() {
+						tags = append(tags, tag)
+					}
+				}
+			} else {
+				index := -1
+				for i, param := range current.Parent.Parameters() {
+					if param == current {
+						index = i
+						break
+					}
+				}
+				for _, tag := range parentTags {
+					if ast.IsJSDocParameterTag(tag) {
+						if index == 0 {
+							tags = append(tags, tag)
+							break
+						}
+						index--
+					}
+				}
+			}
+			break
+		}
+		if current.Kind == ast.KindTypeParameter && current.Parent != nil {
+			for _, tag := range localJSDocTags(current.Parent) {
+				if !ast.IsJSDocTemplateTag(tag) {
+					continue
+				}
+				parameters := tag.AsJSDocTemplateTag().TypeParameters
+				if parameters == nil {
+					continue
+				}
+				for _, param := range parameters.Nodes {
+					if param.Name().Text() == current.Name().Text() {
+						tags = append(tags, tag)
+						break
+					}
+				}
+			}
+			break
+		}
+	}
+	return tags
+}
+
+func ownDeprecation(c *checker.Checker, node *ast.Node) deprecationInfo {
+	var result deprecationInfo
+	tags := localJSDocTags(node)
+	hasTypeDefinition, hasParameterOrReturn := false, false
+	for _, tag := range tags {
+		switch tag.Kind {
+		case ast.KindJSDocTypedefTag, ast.KindJSDocCallbackTag:
+			hasTypeDefinition = true
+		case ast.KindJSDocParameterTag, ast.KindJSDocReturnTag:
+			hasParameterOrReturn = true
+		}
+		if tag.TagName().Text() == "inheritDoc" || tag.TagName().Text() == "inheritdoc" {
+			result.inherit = true
+		}
+		if !result.deprecated && ast.IsJSDocDeprecatedTag(tag) {
+			result.deprecated = true
+			result.reason = jsDocCommentText(c, tag.AsJSDocDeprecatedTag().Comment)
+		}
+	}
+	// TypeScript excludes standalone typedef/callback blocks from the host's
+	// displayed tags. Their tags belong to the type they define instead.
+	if hasTypeDefinition && !hasParameterOrReturn {
+		return deprecationInfo{inherit: result.inherit}
+	}
+	result.hasTags = len(tags) > 0
 	return result
 }
 
-func inheritedDeprecation(c *checker.Checker, declaration *ast.Node, seen map[*ast.Node]bool) deprecationInfo {
+type deprecationQuery struct {
+	symbol      *ast.Symbol
+	declaration *ast.Node
+	accessor    ast.Kind
+}
+
+type deprecationResult struct {
+	info     deprecationInfo
+	complete bool
+}
+
+// A resolver belongs to one RuleContext and its checker. Cache both positive
+// and negative lookups, keeping signature and accessor contexts distinct.
+type deprecationResolver struct {
+	checker *checker.Checker
+	readOwn func(*ast.Node) deprecationInfo
+	results map[deprecationQuery]*deprecationResult
+}
+
+func newDeprecationResolver(c *checker.Checker) *deprecationResolver {
+	return &deprecationResolver{
+		checker: c,
+		readOwn: func(node *ast.Node) deprecationInfo { return ownDeprecation(c, node) },
+		results: make(map[deprecationQuery]*deprecationResult),
+	}
+}
+
+func (r *deprecationResolver) resolve(query deprecationQuery, declarations []*ast.Node) deprecationInfo {
+	if cached, ok := r.results[query]; ok {
+		if cached.complete {
+			return cached.info
+		}
+		// Like TypeScript's initially empty tag cache, stop recursive re-entry.
+		// Only the outer lookup can publish this query's completed result.
+		return deprecationInfo{}
+	}
+	entry := &deprecationResult{}
+	r.results[query] = entry
+	var result deprecationInfo
+	for _, declaration := range declarations {
+		info := r.readOwn(declaration)
+		result.hasTags = result.hasTags || info.hasTags
+		result.inherit = result.inherit || info.inherit
+		if !result.deprecated && info.deprecated {
+			result.deprecated, result.reason = true, info.reason
+		}
+	}
+	if !result.hasTags || result.inherit {
+		// This set is shared across sibling declarations, not across unrelated
+		// queries. The first accessor to visit a base property owns that result.
+		seenSymbols := map[*ast.Symbol]bool{}
+		for _, declaration := range declarations {
+			info := r.inherited(declaration, seenSymbols)
+			result.hasTags = result.hasTags || info.hasTags
+			if info.deprecated {
+				result.deprecated, result.reason = true, info.reason
+			}
+		}
+	}
+	entry.info, entry.complete = result, true
+	return result
+}
+
+func (r *deprecationResolver) symbolTags(symbol *ast.Symbol, accessor ast.Kind) deprecationInfo {
+	if symbol == nil {
+		return deprecationInfo{}
+	}
+	declarations := symbol.Declarations
+	if accessor == ast.KindGetAccessor || accessor == ast.KindSetAccessor {
+		contextual := make([]*ast.Node, 0, len(declarations))
+		for _, declaration := range declarations {
+			if declaration.Kind == accessor {
+				contextual = append(contextual, declaration)
+			}
+		}
+		if len(contextual) != len(declarations) {
+			info := r.resolve(deprecationQuery{symbol: symbol, accessor: accessor}, contextual)
+			if info.hasTags {
+				return info
+			}
+		}
+		// A getter-only (or setter-only) property has the same declarations in
+		// both paths. Use the complete-property lookup once, even with no tags.
+	}
+	return r.resolve(deprecationQuery{symbol: symbol}, declarations)
+}
+
+func (r *deprecationResolver) inherited(declaration *ast.Node, seenSymbols map[*ast.Symbol]bool) deprecationInfo {
 	parent := declaration.Parent
 	if parent != nil && parent.Kind == ast.KindConstructor {
 		parent = parent.Parent
@@ -300,95 +470,56 @@ func inheritedDeprecation(c *checker.Checker, declaration *ast.Node, seen map[*a
 	}
 	for _, clause := range clauses.Nodes {
 		for _, baseNode := range clause.AsHeritageClause().Types.Nodes {
-			typ := c.GetTypeAtLocation(baseNode)
+			typ := r.checker.GetTypeAtLocation(baseNode)
 			if typ == nil {
 				continue
 			}
 			if ast.HasStaticModifier(declaration) && typ.Symbol() != nil {
-				typ = c.GetTypeOfSymbolAtLocation(typ.Symbol(), declaration)
+				typ = r.checker.GetTypeOfSymbolAtLocation(typ.Symbol(), declaration)
 			}
-			symbol := checker.Checker_getPropertyOfType(c, typ, declaration.Symbol().Name)
-			if symbol == nil {
+			symbol := checker.Checker_getPropertyOfType(r.checker, typ, declaration.Symbol().Name)
+			if symbol == nil || seenSymbols[symbol] {
 				continue
 			}
-			declarations := symbol.Declarations
+			seenSymbols[symbol] = true
 			if declaration.Kind == ast.KindGetAccessor || declaration.Kind == ast.KindSetAccessor {
-				var contextual []*ast.Node
-				for _, d := range declarations {
-					if d.Kind == declaration.Kind {
-						contextual = append(contextual, d)
-					}
-				}
-				info := declarationsDeprecation(c, contextual, seen)
-				if info.hasTags {
-					return info
-				}
-			} else if len(declarations) != 1 {
-				continue
+				return r.symbolTags(symbol, declaration.Kind)
 			}
-			return declarationsDeprecation(c, declarations, seen)
+			if len(symbol.Declarations) == 1 {
+				return r.symbolTags(symbol, ast.KindUnknown)
+			}
 		}
 	}
 	return deprecationInfo{}
 }
 
-func declarationsDeprecation(c *checker.Checker, declarations []*ast.Node, seen map[*ast.Node]bool) deprecationInfo {
-	var result deprecationInfo
-	var active []*ast.Node
-	for _, declaration := range declarations {
-		if declaration == nil || seen[declaration] {
-			continue
-		}
-		seen[declaration] = true
-		active = append(active, declaration)
-		info := ownDeprecation(c, declaration)
-		result.hasTags = result.hasTags || info.hasTags
-		result.inherit = result.inherit || info.inherit
-		if !result.deprecated && info.deprecated {
-			result.deprecated, result.reason = true, info.reason
-		}
+func (r *deprecationResolver) declarationDeprecation(node *ast.Node) (bool, string) {
+	if node == nil {
+		return false, ""
 	}
-	if !result.hasTags || result.inherit {
-		for _, declaration := range active {
-			info := inheritedDeprecation(c, declaration, seen)
-			result.hasTags = result.hasTags || info.hasTags
-			if info.deprecated {
-				result.deprecated, result.reason = true, info.reason
-			}
-		}
-	}
-	for _, declaration := range active {
-		delete(seen, declaration)
-	}
-	return result
-}
-
-func declarationDeprecation(c *checker.Checker, node *ast.Node) (bool, string) {
-	info := declarationsDeprecation(c, []*ast.Node{node}, map[*ast.Node]bool{})
+	info := r.resolve(deprecationQuery{declaration: node}, []*ast.Node{node})
 	return info.deprecated, info.reason
 }
 
-func symbolDeprecation(c *checker.Checker, symbol *ast.Symbol) (bool, string) {
-	if symbol == nil {
-		return false, ""
-	}
-	info := declarationsDeprecation(c, symbol.Declarations, map[*ast.Node]bool{})
+func (r *deprecationResolver) symbolDeprecation(symbol *ast.Symbol) (bool, string) {
+	info := r.symbolTags(symbol, ast.KindUnknown)
 	return info.deprecated, info.reason
 }
 
 // An export alias can carry its own tag, independently of the final target.
 // Use cycle detection rather than an arbitrary depth limit for re-exports.
-func aliasDeprecation(c *checker.Checker, symbol *ast.Symbol, includeTarget bool) (bool, string) {
+func (r *deprecationResolver) aliasDeprecation(symbol *ast.Symbol, includeTarget bool) (bool, string) {
+	c := r.checker
 	seen := map[*ast.Symbol]bool{}
 	for symbol != nil && !seen[symbol] {
 		seen[symbol] = true
 		if symbol.Flags&ast.SymbolFlagsAlias == 0 {
 			if includeTarget {
-				return symbolDeprecation(c, symbol)
+				return r.symbolDeprecation(symbol)
 			}
 			return false, ""
 		}
-		if deprecated, reason := symbolDeprecation(c, symbol); deprecated {
+		if deprecated, reason := r.symbolDeprecation(symbol); deprecated {
 			return true, reason
 		}
 		if len(symbol.Declarations) == 0 {
@@ -399,7 +530,8 @@ func aliasDeprecation(c *checker.Checker, symbol *ast.Symbol, includeTarget bool
 	return false, ""
 }
 
-func callDeprecation(c *checker.Checker, callee *ast.Node) (bool, string) {
+func (r *deprecationResolver) callDeprecation(callee *ast.Node) (bool, string) {
+	c := r.checker
 	signature := checker.Checker_getResolvedSignature(c, callee.Parent, nil, checker.CheckModeNormal)
 	symbol := c.GetSymbolAtLocation(ast.SkipParentheses(callee))
 	target := symbol
@@ -413,16 +545,16 @@ func callDeprecation(c *checker.Checker, callee *ast.Node) (bool, string) {
 	// Function and method declarations collect tags across all overloads.
 	// Calls must instead use the selected signature, after export alias tags.
 	includeTarget := kind != ast.KindMethodDeclaration && kind != ast.KindFunctionDeclaration && kind != ast.KindMethodSignature
-	if deprecated, reason := aliasDeprecation(c, symbol, includeTarget); deprecated {
+	if deprecated, reason := r.aliasDeprecation(symbol, includeTarget); deprecated {
 		return true, reason
 	}
 	if signature != nil {
-		if deprecated, reason := declarationDeprecation(c, signature.Declaration()); deprecated {
+		if deprecated, reason := r.declarationDeprecation(signature.Declaration()); deprecated {
 			return true, reason
 		}
 	}
 	if includeTarget {
-		return symbolDeprecation(c, target)
+		return r.symbolDeprecation(target)
 	}
 	return false, ""
 }
@@ -448,10 +580,10 @@ func isDeclaration(node *ast.Node) bool {
 		return parent.Name() == node
 	case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindFunctionExpression,
 		ast.KindEnumDeclaration, ast.KindInterfaceDeclaration, ast.KindMethodSignature,
-		ast.KindModuleDeclaration, ast.KindParameter, ast.KindPropertySignature,
+		ast.KindModuleDeclaration, ast.KindPropertySignature,
 		ast.KindTypeAliasDeclaration, ast.KindTypeParameter:
 		return true
-	case ast.KindImportEqualsDeclaration:
+	case ast.KindParameter, ast.KindImportEqualsDeclaration:
 		return parent.Name() == node
 	}
 	return false
@@ -472,16 +604,17 @@ func isInsideImport(node *ast.Node) bool {
 	return false
 }
 
-func identifierDeprecation(c *checker.Checker, node *ast.Node) (bool, string) {
+func (r *deprecationResolver) identifierDeprecation(node *ast.Node) (bool, string) {
+	c := r.checker
 	if callee := getCallLikeNode(node); callee != nil {
-		return callDeprecation(c, callee)
+		return r.callDeprecation(callee)
 	}
 	parent := node.Parent
 	if parent.Kind == ast.KindJsxAttribute {
 		opening := parent.Parent.Parent
 		contextual := checker.Checker_getContextualType(c, opening.TagName(), checker.ContextFlagsNone)
 		if contextual != nil {
-			return symbolDeprecation(c, checker.Checker_getPropertyOfType(c, contextual, node.Text()))
+			return r.symbolDeprecation(checker.Checker_getPropertyOfType(c, contextual, node.Text()))
 		}
 		return false, ""
 	}
@@ -496,18 +629,18 @@ func identifierDeprecation(c *checker.Checker, node *ast.Node) (bool, string) {
 		if key == node {
 			typ := c.GetTypeAtLocation(parent.Parent)
 			if typ != nil {
-				if deprecated, reason := symbolDeprecation(c, checker.Checker_getPropertyOfType(c, typ, node.Text())); deprecated {
+				if deprecated, reason := r.symbolDeprecation(checker.Checker_getPropertyOfType(c, typ, node.Text())); deprecated {
 					return true, reason
 				}
 			}
 		}
 	}
 	symbol := c.GetSymbolAtLocation(node)
-	if deprecated, reason := aliasDeprecation(c, symbol, true); deprecated {
+	if deprecated, reason := r.aliasDeprecation(symbol, true); deprecated {
 		return true, reason
 	}
 	if parent.Kind == ast.KindShorthandPropertyAssignment {
-		return aliasDeprecation(c, c.GetShorthandAssignmentValueSymbol(parent), true)
+		return r.aliasDeprecation(c.GetShorthandAssignmentValueSymbol(parent), true)
 	}
 	return false, ""
 }
@@ -521,6 +654,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 		if c == nil {
 			return rule.RuleListeners{}
 		}
+		r := newDeprecationResolver(c)
 		allow := parseAllowSpecifiers(options)
 		report := func(node *ast.Node, name, reason string) {
 			message := buildDeprecatedMessage(name)
@@ -536,7 +670,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if isDeclaration(node) || isInsideImport(node) {
 				return
 			}
-			deprecated, reason := identifierDeprecation(c, node)
+			deprecated, reason := r.identifierDeprecation(node)
 			if !deprecated {
 				return
 			}
@@ -574,9 +708,9 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if contextual == nil {
 				return
 			}
-			deprecated, reason := symbolDeprecation(c, checker.Checker_getPropertyOfType(c, contextual, name))
+			deprecated, reason := r.symbolDeprecation(checker.Checker_getPropertyOfType(c, contextual, name))
 			if deprecated && !typeAllowed(contextual) {
-				report(key, name, reason)
+				report(ast.SkipParentheses(key), name, reason)
 			}
 		}
 		return rule.RuleListeners{
@@ -595,7 +729,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					if parent.AsExportSpecifier().PropertyName == node {
 						return
 					}
-					if deprecated, _ := symbolDeprecation(c, c.GetSymbolAtLocation(node)); deprecated {
+					if deprecated, _ := r.symbolDeprecation(c.GetSymbolAtLocation(node)); deprecated {
 						return
 					}
 				}
@@ -613,9 +747,9 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if typ == nil {
 					return
 				}
-				deprecated, reason := symbolDeprecation(c, checker.Checker_getPropertyOfType(c, typ, name))
+				deprecated, reason := r.symbolDeprecation(checker.Checker_getPropertyOfType(c, typ, name))
 				if deprecated && !typeAllowed(typ) {
-					report(access.ArgumentExpression, name, reason)
+					report(ast.SkipParentheses(access.ArgumentExpression), name, reason)
 				}
 			},
 			ast.KindPropertyAssignment:          checkProperty,
