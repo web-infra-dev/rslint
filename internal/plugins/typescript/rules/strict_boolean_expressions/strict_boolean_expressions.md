@@ -157,6 +157,31 @@ including comments containing parentheses. For `(x, /* ) */) => 1`, Rslint
 produces `(x, /* ) */): boolean => 1`. Upstream v8.67.0 misidentifies this
 as a parameter without parentheses and produces an invalid annotation.
 
+The string-length suggestion defaults an optional chain's short-circuit result
+to an empty string before accessing `.length`. For example, `user?.name!` becomes
+`((user?.name!) ?? "").length > 0`; the original expression is evaluated once.
+Upstream v8.67.0 can suggest `(user?.name!).length > 0`, which throws when
+`user` is nullish. Negated conditions use the corresponding `=== 0` check. This protection is
+consistent for all authored optional chains, including receivers whose static
+types are non-nullish.
+
+Suggestions that begin with a parenthesis insert a leading semicolon when needed
+inside `case` and `default` clauses as well as ordinary blocks. This prevents a
+suggestion from joining a preceding expression statement through automatic
+semicolon insertion; upstream v8.67.0 misses the switch-clause boundary.
+
+Array-predicate checks use the callback element of a spread tuple and exclude
+its `thisArg`. Empty tuples allow selection of the next argument. A possibly
+empty spread admits both its element type and the following argument as possible
+callbacks. No inline callback edits are offered for a spread argument.
+Upstream v8.67.0 can report `conditionErrorOther` on a valid tuple containing a
+boolean callback and its `thisArg`.
+
+Computed array-method names are treated as unknown when their backing objects
+may have been modified by a function call. Strings copied from those objects
+before the call remain stable. This avoids classifying a runtime `forEach` call
+as a predicate method based on an object's initial property value.
+
 The `noStrictNullCheck` diagnostic uses an empty range at the start of the file
 (line 1, column 1). Upstream uses line 0 for this file-level diagnostic; Rslint's
 API reports 1-based source locations.

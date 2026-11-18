@@ -1054,7 +1054,7 @@ func IsArrayMethodCallWithPredicate(
 
 	propertyName, ok := checker.Checker_getAccessedPropertyName(typeChecker, callee)
 	if staticEvaluator != nil {
-		propertyName, ok = staticEvaluator.EvalAccessExpressionName(callee)
+		propertyName, ok = staticEvaluator.EvalAccessExpressionNameAtLocation(callee)
 	}
 	if !ok || !slices.Contains(arrayPredicateFunctions, propertyName) {
 		return false

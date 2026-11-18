@@ -2146,13 +2146,15 @@ func TestStrictBooleanExpressionsSyntaxEdges(t *testing.T) {
 				},
 			}},
 		// chain-string
+		// Always default the optional-chain result before accessing length,
+		// including when its receiver is statically non-nullish.
 		{Code: "declare const x: {s: string}; if (x?.s) {}",
 			Options: map[string]any{"allowString": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "conditionErrorString", Message: "Unexpected string value in conditional. An explicit empty string check is required.",
 					Line: 1, Column: 35, EndLine: 1, EndColumn: 39,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: {s: string}; if ((x?.s).length > 0) {}"},
+						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: {s: string}; if (((x?.s) ?? \"\").length > 0) {}"},
 						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: {s: string}; if ((x?.s) !== \"\") {}"},
 						{MessageId: "conditionFixCastBoolean", Output: "declare const x: {s: string}; if (Boolean((x?.s))) {}"},
 					},
@@ -2172,13 +2174,14 @@ func TestStrictBooleanExpressionsSyntaxEdges(t *testing.T) {
 				},
 			}},
 		// chain-call
+		// Use the same nullish-safe length suggestion for optional calls.
 		{Code: "declare const x: () => string; if (x?.()) {}",
 			Options: map[string]any{"allowString": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "conditionErrorString", Message: "Unexpected string value in conditional. An explicit empty string check is required.",
 					Line: 1, Column: 36, EndLine: 1, EndColumn: 41,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: () => string; if ((x?.()).length > 0) {}"},
+						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: () => string; if (((x?.()) ?? \"\").length > 0) {}"},
 						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: () => string; if ((x?.()) !== \"\") {}"},
 						{MessageId: "conditionFixCastBoolean", Output: "declare const x: () => string; if (Boolean((x?.()))) {}"},
 					},

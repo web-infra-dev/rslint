@@ -39,6 +39,7 @@ type StaticStringEvaluator struct {
 	trackCallEscapes       bool
 	escapeFacts            *staticEscapeFacts
 	capturePoint           *ast.Node
+	observationPoint       *ast.Node
 	arrayPrototypeMutated  bool
 	stringPrototypeMutated bool
 }
@@ -220,6 +221,29 @@ func (staticEvaluator *StaticStringEvaluator) EvalAccessExpressionName(node *ast
 		return staticEvaluator.EvalToString(node.AsElementAccessExpression().ArgumentExpression)
 	}
 	return AccessExpressionStaticName(node)
+}
+
+// EvalAccessExpressionNameAtLocation observes a method name after its receiver
+// and key have been evaluated, before the call's arguments execute. Calls that
+// can mutate its backing object later in the same execution root do not change
+// that captured name. Explicit writes and loops retain conservative analysis.
+func (staticEvaluator *StaticStringEvaluator) EvalAccessExpressionNameAtLocation(node *ast.Node) (string, bool) {
+	if node == nil || node.Kind != ast.KindElementAccessExpression || !staticEvaluator.trackCallEscapes {
+		return staticEvaluator.EvalAccessExpressionName(node)
+	}
+	staticEvaluator.ensureReferenceFlags()
+	view := NewStaticStringEvaluatorWithCallEscapes(staticEvaluator.typeChecker, staticEvaluator.sourceFile, staticEvaluator.referenceResolver)
+	view.GlobalAccess = staticEvaluator.GlobalAccess
+	view.resolveIdentifiers = staticEvaluator.resolveIdentifiers
+	view.useReferenceFacts(staticEvaluator)
+	view.observationPoint = node
+	for parent := node.Parent; parent != nil && parent != executionRoot(node); parent = parent.Parent {
+		if ast.IsIterationStatement(parent, false) {
+			view.observationPoint = nil
+			break
+		}
+	}
+	return view.EvalAccessExpressionName(node)
 }
 
 // EvalPropertyName returns the string name of an object/class property or
@@ -1920,6 +1944,14 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 		return true
 	}
 	flags := staticEvaluator.referenceFlagsFor(symbol)
+	if staticEvaluator.observationPoint != nil && staticEvaluator.escapeFacts != nil && !staticEvaluator.escapeFacts.explicit[symbol] {
+		for site := range staticEvaluator.escapeFacts.sites[symbol] {
+			if executionRoot(site) != executionRoot(staticEvaluator.observationPoint) || site.End() <= staticEvaluator.observationPoint.End() {
+				return true
+			}
+		}
+		return false
+	}
 	if staticEvaluator.capturePoint != nil && staticEvaluator.escapeFacts != nil {
 		if staticEvaluator.escapeFacts.explicit[symbol] {
 			return flags&staticReferencePropertyMutation != 0

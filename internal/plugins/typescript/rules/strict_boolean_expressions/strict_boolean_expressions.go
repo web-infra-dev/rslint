@@ -258,7 +258,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile
-		staticEvaluator := utils.NewStaticStringEvaluatorWithReferenceResolver(tc, sf, ctx.Refs)
+		staticEvaluator := utils.NewStaticStringEvaluatorWithCallEscapes(tc, sf, ctx.Refs)
 
 		// strictNullChecks gate. Matches upstream: when strictNullChecks is
 		// off and the user has not opted in via the long-named "I know what
@@ -395,7 +395,10 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
 				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
-					checkArrayMethodPredicate(ctx, sf, tc, callExpr.Arguments.Nodes[0], opts)
+					predicate, predicateType := firstArrayPredicateArgument(tc, callExpr.Arguments.Nodes)
+					if predicate != nil {
+						checkArrayMethodPredicate(ctx, sf, tc, predicate, predicateType, opts)
+					}
 				}
 			},
 		}
@@ -854,10 +857,19 @@ func getSuggestionsForConditionError(
 		}
 
 	case "conditionErrorString":
+		// A trailing non-null assertion can hide an optional chain's nullish
+		// result from the checker. Default that result before accessing length,
+		// preserving short-circuiting and evaluating the original expression once.
+		lengthCode := func(code string) string {
+			if hasOptionalChain(node) {
+				return "(" + code + ` ?? "").length`
+			}
+			return code + ".length"
+		}
 		if neg != nil {
 			return []rule.RuleSuggestion{
 				wrappingFix(sf, sugCompareStringLength(), neg, node, func(code string) string {
-					return code + ".length === 0"
+					return lengthCode(code) + " === 0"
 				}),
 				wrappingFix(sf, sugCompareEmptyString(), neg, node, func(code string) string {
 					return code + ` === ""`
@@ -869,7 +881,7 @@ func getSuggestionsForConditionError(
 		}
 		return []rule.RuleSuggestion{
 			wrappingFix(sf, sugCompareStringLength(), node, node, func(code string) string {
-				return code + ".length > 0"
+				return lengthCode(code) + " > 0"
 			}),
 			wrappingFix(sf, sugCompareEmptyString(), node, node, func(code string) string {
 				return code + ` !== ""`
@@ -888,11 +900,138 @@ func getSuggestionsForConditionError(
 
 // ----- Array predicate checking ----------------------------------------
 
+// Protect every authored optional chain consistently, including assertions
+// and await wrappers. Non-nullish static receiver types do not remove the
+// runtime optional syntax or change how the length suggestion is constructed.
+func hasOptionalChain(node *ast.Node) bool {
+	const wrappers = ast.OEKNonNullAssertions | ast.OEKAssertions | ast.OEKParentheses
+	for node = ast.SkipOuterExpressions(node, wrappers); node != nil; node = ast.SkipOuterExpressions(node.Expression(), wrappers) {
+		optional := false
+		switch node.Kind {
+		case ast.KindPropertyAccessExpression:
+			optional = node.AsPropertyAccessExpression().QuestionDotToken != nil
+		case ast.KindElementAccessExpression:
+			optional = node.AsElementAccessExpression().QuestionDotToken != nil
+		case ast.KindCallExpression:
+			optional = node.AsCallExpression().QuestionDotToken != nil
+		case ast.KindAwaitExpression:
+			// Await preserves the nullish result of a short-circuited call.
+		default:
+			return false
+		}
+		if optional {
+			return true
+		}
+	}
+	return false
+}
+
+// firstArrayPredicateArgument selects the actual first argument after spreads.
+// A possibly empty spread also admits the next argument. Keep the authored
+// spread as the diagnostic node: its element types do not identify a safe
+// inline function to edit.
+func firstArrayPredicateArgument(tc *checker.Checker, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+	var firstTypes []*checker.Type
+	var reportNode *ast.Node
+	for _, argument := range arguments {
+		if !ast.IsSpreadElement(argument) {
+			if reportNode == nil {
+				reportNode = ast.SkipParentheses(argument)
+			}
+			firstTypes = append(firstTypes, utils.GetConstrainedTypeAtLocation(tc, argument))
+			break
+		}
+		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
+		types, mayBeEmpty, known := firstSpreadElementTypes(tc, spreadType, map[*checker.Type]bool{})
+		if !known {
+			// An opaque iterable cannot establish which argument is the
+			// callback. Do not guess from the iterator or a later thisArg.
+			return nil, nil
+		}
+		if len(types) != 0 && reportNode == nil {
+			reportNode = argument
+		}
+		firstTypes = append(firstTypes, types...)
+		if !mayBeEmpty {
+			break
+		}
+	}
+	if len(firstTypes) == 0 {
+		return nil, nil
+	}
+	return reportNode, tc.GetUnionType(firstTypes)
+}
+
+// Read tuple elements in order and stop at the first guaranteed argument. For
+// [...Callback[], Callback, object], the object can never be the callback, even
+// though it appears in the tuple's numeric index type. Variadic elements recurse
+// through their constraints, with a cycle guard for recursive generic types.
+func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[*checker.Type]bool) ([]*checker.Type, bool, bool) {
+	if t == nil || visiting[t] {
+		return nil, false, false
+	}
+	visiting[t] = true
+	defer delete(visiting, t)
+	if utils.IsTypeParameter(t) {
+		return firstSpreadElementTypes(tc, checker.Checker_getBaseConstraintOfType(tc, t), visiting)
+	}
+	if t.IsUnion() {
+		var types []*checker.Type
+		mayBeEmpty := false
+		for _, part := range t.Types() {
+			first, empty, known := firstSpreadElementTypes(tc, part, visiting)
+			if !known {
+				return nil, false, false
+			}
+			types = append(types, first...)
+			mayBeEmpty = mayBeEmpty || empty
+		}
+		return types, mayBeEmpty, true
+	}
+	if !checker.IsTupleType(t) {
+		first := tc.GetNumberIndexType(t)
+		if first == nil {
+			return nil, false, false
+		}
+		return []*checker.Type{first}, true, true
+	}
+	infos := t.TargetTupleType().ElementInfos()
+	elements := tc.GetTypeArguments(t)
+	if len(infos) != len(elements) {
+		return nil, false, false
+	}
+	var types []*checker.Type
+	for i, info := range infos {
+		flags := info.TupleElementFlags()
+		element := elements[i]
+		if flags&checker.ElementFlagsVariadic != 0 {
+			first, empty, known := firstSpreadElementTypes(tc, element, visiting)
+			if !known {
+				return nil, false, false
+			}
+			types = append(types, first...)
+			if !empty {
+				return types, false, true
+			}
+			continue
+		}
+		if flags&checker.ElementFlagsOptional != 0 {
+			element = tc.GetUnionType([]*checker.Type{element, tc.GetUndefinedType()})
+		}
+		types = append(types, element)
+		if flags&checker.ElementFlagsRequired != 0 {
+			return types, false, true
+		}
+	}
+	return types, true, true
+}
+
 func checkArrayMethodPredicate(
 	ctx rule.RuleContext,
 	sf *ast.SourceFile,
 	tc *checker.Checker,
 	predicateNode *ast.Node,
+	predicateType *checker.Type,
 	opts resolvedOptions,
 ) {
 	predicateNode = ast.SkipParentheses(predicateNode)
@@ -904,7 +1043,6 @@ func checkArrayMethodPredicate(
 		return
 	}
 
-	predicateType := utils.GetConstrainedTypeAtLocation(tc, predicateNode)
 	sigs := utils.GetCallSignatures(tc, predicateType)
 	var collected []*checker.Type
 	for _, sig := range sigs {
@@ -1141,7 +1279,6 @@ func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool
 	if !leadingSemiTrigger.MatchString(code) {
 		return false
 	}
-	src := sf.Text()
 	// Walk up: while the node is in a left-hand position relative to its
 	// parent, keep going. Then check whether the previous statement (if any)
 	// in the surrounding block / program terminated with `;`.
@@ -1153,13 +1290,13 @@ func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool
 		}
 		if ast.IsExpressionStatement(parent) {
 			block := parent.Parent
-			if block != nil && (block.Kind == ast.KindSourceFile || block.Kind == ast.KindBlock) {
+			if block != nil {
 				statements := getBlockStatements(block)
 				idx := indexOfNode(statements, parent)
 				if idx > 0 {
 					prev := statements[idx-1]
-					last := lastSignificantChar(src, prev.End())
-					if last != ';' {
+					last, ok := utils.TokenBeforePosition(sf, prev.End())
+					if ok && last.Kind != ast.KindSemicolonToken {
 						return true
 					}
 				}
@@ -1179,6 +1316,8 @@ func getBlockStatements(block *ast.Node) []*ast.Node {
 		return block.AsSourceFile().Statements.Nodes
 	case ast.KindBlock:
 		return block.AsBlock().Statements.Nodes
+	case ast.KindCaseClause, ast.KindDefaultClause:
+		return block.AsCaseOrDefaultClause().Statements.Nodes
 	}
 	return nil
 }
@@ -1190,19 +1329,6 @@ func indexOfNode(nodes []*ast.Node, target *ast.Node) int {
 		}
 	}
 	return -1
-}
-
-// lastSignificantChar returns the last non-whitespace character at or before
-// `endExclusive`, skipping common trivia. Used by the ASI hazard check.
-func lastSignificantChar(src string, endExclusive int) byte {
-	for i := endExclusive - 1; i >= 0; i-- {
-		ch := src[i]
-		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-			continue
-		}
-		return ch
-	}
-	return 0
 }
 
 // isLeftHandSide mirrors upstream's `isLeftHandSide` (the private helper used
