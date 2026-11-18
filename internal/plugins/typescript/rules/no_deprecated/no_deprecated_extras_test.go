@@ -1050,8 +1050,9 @@ f(1);`, want: []expected{{"deprecated", "`f` is deprecated.", 115, 116}}},
 m(x:1):void;
 }
 declare const a:A; a['m'](1);`, want: []expected{{"deprecatedWithReason", "`m` is deprecated. old", 86, 89}}},
+		// Check the key's own binding even though upstream misses this read.
 		{name: "computed-key-reference", code: `/** @deprecated key */ const k='x';
-const a={x:1};a[k];`, want: []expected{}},
+const a={x:1};a[k];`, want: []expected{{"deprecatedWithReason", "`k` is deprecated. key", 52, 53}}},
 		{name: "computed-empty-key", code: `const a={
 /** @deprecated empty */ '':1
 };a[''];`, want: []expected{{"deprecatedWithReason", "`` is deprecated. empty", 44, 46}}},

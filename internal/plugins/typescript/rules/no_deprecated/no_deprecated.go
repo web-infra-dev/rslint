@@ -209,11 +209,11 @@ func parseAllowSpecifiers(options []any) []utils.TypeOrValueSpecifier {
 	return utils.ParseTypeOrValueSpecifiers(optsMap["allow"])
 }
 
-func elementAccessPropertyName(ctx rule.RuleContext, argument *ast.Node) (string, bool) {
-	if ctx.TypeChecker == nil || argument == nil {
+func elementAccessPropertyName(c *checker.Checker, argument *ast.Node) (string, bool) {
+	if c == nil || argument == nil {
 		return "", false
 	}
-	propertyType := ctx.TypeChecker.GetTypeAtLocation(argument)
+	propertyType := c.GetTypeAtLocation(argument)
 	if propertyType == nil {
 		return "", false
 	}
@@ -281,6 +281,9 @@ func nextJSDocCommentLocation(node *ast.Node) *ast.Node {
 		parent.AsModuleDeclaration().Body == node {
 		return parent
 	}
+	if parent := node.Parent; parent != nil && ast.IsInJSFile(node) && ast.IsAssignmentExpression(parent, true) {
+		return parent
+	}
 	return ast.GetNextJSDocCommentLocation(node)
 }
 
@@ -289,6 +292,17 @@ func localJSDocTags(node *ast.Node) []*ast.Node {
 		return nil
 	}
 	var tags []*ast.Node
+	if ast.IsInJSFile(node) && ast.IsAssignmentExpression(node, true) {
+		// JS attaches leading documentation to a parenthesized receiver in
+		// `(Box.prototype).method = ...`, rather than to the statement.
+		leading := node.AsBinaryExpression().Left
+		for ast.IsAccessExpression(leading) {
+			leading = leading.Expression()
+		}
+		if leading.Pos() == node.Pos() {
+			tags = appendOwnedJSDocTags(tags, node, leading)
+		}
+	}
 	if ast.IsVariableLike(node) && ast.HasInitializer(node) {
 		tags = appendOwnedJSDocTags(tags, node, node.Initializer())
 	}
@@ -386,9 +400,10 @@ type deprecationResult struct {
 // A resolver belongs to one RuleContext and its checker. Cache both positive
 // and negative lookups, keeping signature and accessor contexts distinct.
 type deprecationResolver struct {
-	checker *checker.Checker
-	readOwn func(*ast.Node) deprecationInfo
-	results map[deprecationQuery]*deprecationResult
+	checker    *checker.Checker
+	readOwn    func(*ast.Node) deprecationInfo
+	results    map[deprecationQuery]*deprecationResult
+	prototypes *prototypeReferences
 }
 
 func newDeprecationResolver(c *checker.Checker) *deprecationResolver {
@@ -565,7 +580,12 @@ func (r *deprecationResolver) callDeprecation(callee *ast.Node) (bool, string) {
 		}
 	}
 	if includeTarget {
-		return r.symbolDeprecation(target)
+		if deprecated, reason := r.symbolDeprecation(target); deprecated {
+			return true, reason
+		}
+	}
+	if symbol == nil {
+		return r.prototypeDeprecation(ast.SkipParentheses(callee))
 	}
 	return false, ""
 }
@@ -653,6 +673,9 @@ func (r *deprecationResolver) identifierDeprecation(node *ast.Node) (bool, strin
 	if parent.Kind == ast.KindShorthandPropertyAssignment {
 		return r.aliasDeprecation(c.GetShorthandAssignmentValueSymbol(parent), true)
 	}
+	if symbol == nil && node.Parent.Kind == ast.KindPropertyAccessExpression && node.Parent.Name() == node {
+		return r.prototypeDeprecation(node.Parent)
+	}
 	return false, ""
 }
 
@@ -666,6 +689,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			return rule.RuleListeners{}
 		}
 		r := newDeprecationResolver(c)
+		r.prototypes = newPrototypeReferences(c, ctx.SourceFile)
 		allow := parseAllowSpecifiers(options)
 		report := func(node *ast.Node, name, reason string) {
 			message := buildDeprecatedMessage(name)
@@ -681,12 +705,20 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if isDeclaration(node) || isInsideImport(node) {
 				return
 			}
+			if node.Parent.Kind == ast.KindPropertyAccessExpression && node.Parent.Name() == node && r.isDeprecatedAssignmentDefinition(node.Parent) {
+				return
+			}
 			deprecated, reason := r.identifierDeprecation(node)
 			if !deprecated {
 				return
 			}
 			if len(allow) > 0 {
 				typ := c.GetTypeAtLocation(node)
+				if node.Parent.Kind == ast.KindPropertyAccessExpression && node.Parent.Name() == node && c.GetSymbolAtLocation(node) == nil {
+					if valueType := r.prototypeValueType(node.Parent); valueType != nil {
+						typ = valueType
+					}
+				}
 				if typeAllowed(typ) || utils.ValueMatchesSomeSpecifier(node, allow, ctx.Program(), typ) {
 					return
 				}
@@ -707,7 +739,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				key = key.AsComputedPropertyName().Expression
 				typ := c.GetTypeAtLocation(key)
 				if typ != nil && checker.Type_flags(typ)&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral) != 0 {
-					name, known = elementAccessPropertyName(ctx, key)
+					name, known = elementAccessPropertyName(c, key)
 				}
 			} else {
 				name, known = utils.GetStaticPropertyName(key)
@@ -733,9 +765,6 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if parent.Kind == ast.KindExportDeclaration || parent.Kind == ast.KindNamespaceExport || parent.Kind == ast.KindJsxClosingElement {
 					return
 				}
-				if parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().ArgumentExpression == node {
-					return
-				}
 				if parent.Kind == ast.KindExportSpecifier {
 					if parent.AsExportSpecifier().PropertyName == node {
 						return
@@ -750,7 +779,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			ast.KindSuperKeyword:      checkIdentifier,
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				access := node.AsElementAccessExpression()
-				name, known := elementAccessPropertyName(ctx, access.ArgumentExpression)
+				name, known := elementAccessPropertyName(c, access.ArgumentExpression)
 				if !known {
 					return
 				}
@@ -758,8 +787,25 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if typ == nil {
 					return
 				}
-				deprecated, reason := r.symbolDeprecation(checker.Checker_getPropertyOfType(c, typ, name))
-				if deprecated && !typeAllowed(typ) {
+				if r.isDeprecatedAssignmentDefinition(node) {
+					return
+				}
+				symbol := checker.Checker_getPropertyOfType(c, typ, name)
+				deprecated, reason := r.symbolDeprecation(symbol)
+				if !deprecated && symbol == nil {
+					deprecated, reason = r.prototypeDeprecation(node)
+					if deprecated {
+						_, name, _ = accessParts(c, node)
+					}
+				}
+				allowed := typeAllowed(typ)
+				if deprecated && symbol == nil && !allowed && len(allow) > 0 {
+					key, _ := r.prototypes.declarations(node)
+					if key.constructor != nil {
+						allowed = typeAllowed(c.GetTypeAtLocation(key.constructor))
+					}
+				}
+				if deprecated && !allowed {
 					report(ast.SkipParentheses(access.ArgumentExpression), name, reason)
 				}
 			},
