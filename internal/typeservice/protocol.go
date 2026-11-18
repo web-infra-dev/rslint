@@ -43,6 +43,10 @@ type ResolvedSignatureRequest struct {
 	WithCandidates bool    `json:"withCandidates"`
 	ArgumentCount  *int    `json:"argumentCount"`
 }
+type ContextualArgumentRequest struct {
+	Node  NodeRef `json:"node"`
+	Index int     `json:"index"`
+}
 type TypeRequest struct {
 	Op Operation `json:"-"`
 	ID uint32    `json:"id"`
@@ -104,7 +108,8 @@ type ResolveNameRequest struct {
 	ExcludeGlobals bool     `json:"excludeGlobals"`
 }
 
-func (r *NodeRequest) operation() Operation { return r.Op }
+func (r *NodeRequest) operation() Operation             { return r.Op }
+func (*ContextualArgumentRequest) operation() Operation { return "contextualArgument" }
 func (*ResolvedSignatureRequest) operation() Operation {
 	return "resolvedSignatureWithOptions"
 }
@@ -141,14 +146,16 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol":
+	case "type", "fromTypeNode", "context", "symbol", "signature", "resolvedSignature", "nodeRecord", "shorthandValueSymbol", "suggestionDiagnostics":
 		request = &NodeRequest{Op: wire.Op}
+	case "contextualArgument":
+		request = &ContextualArgumentRequest{}
 	case "resolvedSignatureWithOptions":
 		request = &ResolvedSignatureRequest{}
 	case "constraint", "apparent", "baseLiteral", "nonNullable", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "stringIndexType", "typeRecord",
-		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos", "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType":
+		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos", "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType", "classThisType":
 		request = &TypeRequest{Op: wire.Op}
-	case "aliasedSymbol", "declaredType", "symbolRecord", "typeOfSymbol", "exportsOfModule", "exportSymbol", "immediateAliasedSymbol", "isUnknownSymbol":
+	case "aliasedSymbol", "declaredType", "symbolRecord", "typeOfSymbol", "exportsOfModule", "exportSymbol", "immediateAliasedSymbol", "isUnknownSymbol", "fullyQualifiedName", "symbolMembers", "symbolLinkType":
 		request = &SymbolRequest{Op: wire.Op}
 	case "symbolDocumentation", "symbolJSDocTags":
 		request = &SymbolDocsRequest{Op: wire.Op}
@@ -170,7 +177,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 		request = &ScopeSymbolsRequest{}
 	case "parameterType":
 		request = &ParameterTypeRequest{}
-	case "typeString", "signatureString":
+	case "typeString", "signatureString", "typeNode":
 		request = &PrintRequest{Op: wire.Op}
 	case "resolveName":
 		request = &ResolveNameRequest{}
@@ -189,6 +196,8 @@ func requestNode(request Request) *NodeRef {
 	case *NodeRequest:
 		return &r.Node
 	case *ResolvedSignatureRequest:
+		return &r.Node
+	case *ContextualArgumentRequest:
 		return &r.Node
 	case *SymbolTypeRequest:
 		return &r.Node
@@ -210,6 +219,18 @@ type Handle uint32
 type Handles []uint32
 type Boolean bool
 type Text string
+type EncodedTypeNode []byte
+type SuggestionDiagnostics []DiagnosticFact
+type DiagnosticFact struct {
+	File, Message, Source         string
+	Start, Length, Category, Code uint32
+	Deprecated, Unnecessary       bool
+	Chain, Related                SuggestionDiagnostics
+}
+
+func (EncodedTypeNode) result()       {}
+func (SuggestionDiagnostics) result() {}
+
 type TypeFact struct {
 	Flags               []string
 	Symbol, AliasSymbol uint32
@@ -236,6 +257,8 @@ type Literal struct {
 type SymbolFact struct {
 	Name, EscapedName string
 	Flags             uint32
+	CheckFlags        uint32
+	HasMembers        bool
 	Declarations      []NodeRef
 	ValueDeclaration  *NodeRef
 	nodes             []*ast.Node

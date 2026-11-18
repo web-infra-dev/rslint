@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -24,6 +25,8 @@ const (
 	packetNamedSymbols
 	packetDisplayParts
 	packetJSDocTags
+	packetTypeNode
+	packetDiagnostics
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -45,7 +48,7 @@ func EncodePacket(result Result) ([]byte, error) {
 	case *TypeFact:
 		kind, words = packetType, 13
 	case *SymbolFact:
-		kind, words = packetSymbol, 5
+		kind, words = packetSymbol, 7
 	case *SignatureFact:
 		kind, words = packetSignature, 5
 	case NodeFacts:
@@ -60,6 +63,10 @@ func EncodePacket(result Result) ([]byte, error) {
 		kind, words = packetDisplayParts, 1
 	case JSDocTags:
 		kind, words = packetJSDocTags, 1
+	case EncodedTypeNode:
+		kind, words = packetTypeNode, 1
+	case SuggestionDiagnostics:
+		kind, words = packetDiagnostics, 1
 	default:
 		return nil, errors.New("unsupported semantic fact")
 	}
@@ -147,6 +154,17 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(20, offset)
 		}
 		w.put(24, w.node(fact.ValueDeclaration))
+		if fact.Flags&uint32(ast.SymbolFlagsTransient) != 0 {
+			w.put(28, fact.CheckFlags+1)
+		}
+		if fact.HasMembers {
+			w.put(32, 1)
+		}
+	case EncodedTypeNode:
+		w.put(8, uint32(len(fact)))
+		w.data = append(w.data, fact...)
+	case SuggestionDiagnostics:
+		w.put(8, w.diagnostics(fact))
 	case NodeFacts:
 		offset := uint32(len(w.data))
 		w.data = append(w.data, make([]byte, 4+len(fact)*28)...)
@@ -224,6 +242,40 @@ func EncodePacket(result Result) ([]byte, error) {
 type packetWriter struct {
 	data    []byte
 	strings map[string]uint32
+}
+
+func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {
+	if len(facts) == 0 {
+		return 0
+	}
+	at := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 4+40*len(facts))...)
+	w.put(at, uint32(len(facts)))
+	for i, d := range facts {
+		pos := at + 4 + uint32(i)*40
+		if d.File != "" {
+			w.put(pos, w.text(d.File))
+		}
+		w.put(pos+4, d.Start)
+		w.put(pos+8, d.Length)
+		w.put(pos+12, d.Category)
+		w.put(pos+16, d.Code)
+		w.put(pos+20, w.text(d.Message))
+		if d.Source != "" {
+			w.put(pos+24, w.text(d.Source))
+		}
+		var flags uint32
+		if d.Deprecated {
+			flags |= 1
+		}
+		if d.Unnecessary {
+			flags |= 2
+		}
+		w.put(pos+28, flags)
+		w.put(pos+32, w.diagnostics(d.Chain))
+		w.put(pos+36, w.diagnostics(d.Related))
+	}
+	return at
 }
 
 func (w *packetWriter) put(at, value uint32) { binary.LittleEndian.PutUint32(w.data[at:], value) }

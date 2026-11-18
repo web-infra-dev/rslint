@@ -10,6 +10,21 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/scanner"
 )
 
+// CachedSymbolType reads the same transient-symbol slot exposed as links.type
+// by the JavaScript checker. Merely inspecting it must not resolve a type.
+func CachedSymbolType(c *Checker, symbol *ast.Symbol) *Type {
+	links := (*extra_Checker)(unsafe.Pointer(c)).valueSymbolLinks.store.TryGet(uint64(ast.GetSymbolId(symbol)))
+	if links == nil || *links == nil {
+		return nil
+	}
+	return ValueSymbolLinks_resolvedType(*links)
+}
+
+// TypeNodeForPlugin accepts the JavaScript NodeBuilderFlags bitmask.
+func TypeNodeForPlugin(c *Checker, typ *Type, enclosing *ast.Node, flags uint32) *ast.Node {
+	return c.TypeToTypeNode(typ, enclosing, nodebuilder.Flags(flags), nil)
+}
+
 // ResolveSignatureWithOptions uses the same overload mode and cached
 // resolution as TypeScript's getResolvedSignature API.
 func ResolveSignatureWithOptions(c *Checker, node *ast.Node, candidates *[]*Signature, argumentCount *int) *Signature {

@@ -80,8 +80,23 @@ export interface SymbolFact {
   readonly name: string;
   readonly escapedName: string;
   readonly flags: number;
+  readonly checkFlags: number | undefined;
+  readonly hasMembers: boolean;
   readonly declarations: readonly NodeRef[] | undefined;
   readonly valueDeclaration: NodeRef | undefined;
+}
+export interface DiagnosticFact {
+  fileName?: string;
+  start: number;
+  length: number;
+  code: number;
+  category: number;
+  text: string;
+  source?: string;
+  reportsDeprecated?: true;
+  reportsUnnecessary?: true;
+  chain: DiagnosticFact[];
+  related: DiagnosticFact[];
 }
 export interface SignatureFact {
   readonly parameters: readonly number[];
@@ -117,6 +132,8 @@ export interface QueryArguments {
   type: NodeArgs;
   fromTypeNode: NodeArgs;
   context: NodeArgs;
+  contextualArgument: NodeArgs & { index: number };
+  suggestionDiagnostics: NodeArgs;
   symbol: NodeArgs;
   signature: NodeArgs;
   resolvedSignature: NodeArgs;
@@ -130,6 +147,7 @@ export interface QueryArguments {
   baseLiteral: IDArgs;
   nonNullable: IDArgs;
   typeString: PrintArgs;
+  typeNode: PrintArgs;
   signatureString: PrintArgs & { kind: number };
   awaited: IDArgs;
   widened: IDArgs;
@@ -150,6 +168,11 @@ export interface QueryArguments {
   mappedTypeParameter: IDArgs;
   mappedConstraintType: IDArgs;
   mappedTemplateType: IDArgs;
+  mappedModifiersType: IDArgs;
+  classThisType: IDArgs;
+  fullyQualifiedName: IDArgs;
+  symbolMembers: IDArgs;
+  symbolLinkType: IDArgs;
   aliasedSymbol: IDArgs;
   immediateAliasedSymbol: IDArgs;
   isUnknownSymbol: IDArgs;
@@ -184,6 +207,8 @@ export interface QueryResults {
   type: number;
   fromTypeNode: number;
   context: number;
+  contextualArgument: number;
+  suggestionDiagnostics: DiagnosticFact[];
   symbol: number;
   signature: number;
   resolvedSignature: number;
@@ -194,6 +219,7 @@ export interface QueryResults {
   baseLiteral: number;
   nonNullable: number;
   typeString: string;
+  typeNode: Uint8Array | undefined;
   signatureString: string;
   awaited: number;
   widened: number;
@@ -214,6 +240,11 @@ export interface QueryResults {
   mappedTypeParameter: number;
   mappedConstraintType: number;
   mappedTemplateType: number;
+  mappedModifiersType: number;
+  classThisType: number;
+  fullyQualifiedName: string;
+  symbolMembers: readonly NamedSymbolFact[];
+  symbolLinkType: number;
   aliasedSymbol: number;
   immediateAliasedSymbol: number;
   isUnknownSymbol: boolean;
@@ -253,12 +284,19 @@ export function isCacheableTypeQuery(
   operation: Operation,
   signatureOptionsUsed: boolean,
 ): boolean {
-  if (operation === 'resolvedSignatureWithOptions') return false;
+  // The checker populates these slots during later semantic queries.
+  if (
+    operation === 'resolvedSignatureWithOptions' ||
+    operation === 'symbolLinkType' ||
+    operation === 'mappedModifiersType'
+  )
+    return false;
   if (!signatureOptionsUsed) return true;
   switch (operation) {
     case 'type':
     case 'fromTypeNode':
     case 'context':
+    case 'contextualArgument':
     case 'symbol':
     case 'signature':
     case 'resolvedSignature':
@@ -326,6 +364,14 @@ const operations = [
   'symbolJSDocTags',
   'signatureDocumentation',
   'signatureJSDocTags',
+  'contextualArgument',
+  'suggestionDiagnostics',
+  'typeNode',
+  'mappedModifiersType',
+  'classThisType',
+  'fullyQualifiedName',
+  'symbolMembers',
+  'symbolLinkType',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -348,7 +394,10 @@ export function typeQueryKey(
     case 'signature':
     case 'resolvedSignature':
     case 'shorthandValueSymbol':
+    case 'suggestionDiagnostics':
       return prefix + nodeKey(q.args.node);
+    case 'contextualArgument':
+      return `${prefix}${nodeKey(q.args.node)}:${q.args.index}`;
     case 'resolvedSignatureWithOptions':
       return `${prefix}${nodeKey(q.args.node)}:${q.args.withCandidates}:${q.args.argumentCount ?? '-'}`;
     case 'void':
@@ -371,6 +420,7 @@ export function typeQueryKey(
     case 'symbolJSDocTags':
       return `${prefix}${q.args.id}:${q.args.withChecker}`;
     case 'typeString':
+    case 'typeNode':
       return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}`;
     case 'signatureString':
       return `${prefix}${q.args.id}:${nodeKey(q.args.node)}:${q.args.flags ?? '-'}:${q.args.kind}`;
@@ -389,6 +439,8 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   type: 1,
   fromTypeNode: 1,
   context: 1,
+  contextualArgument: 1,
+  suggestionDiagnostics: 15,
   symbol: 1,
   signature: 1,
   resolvedSignature: 1,
@@ -399,6 +451,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   baseLiteral: 1,
   nonNullable: 1,
   typeString: 3,
+  typeNode: 14,
   signatureString: 3,
   awaited: 1,
   widened: 1,
@@ -411,6 +464,11 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   mappedTypeParameter: 1,
   mappedConstraintType: 1,
   mappedTemplateType: 1,
+  mappedModifiersType: 1,
+  classThisType: 1,
+  fullyQualifiedName: 3,
+  symbolMembers: 11,
+  symbolLinkType: 1,
   isArray: 2,
   isArrayLike: 2,
   isTuple: 2,

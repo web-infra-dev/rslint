@@ -47,6 +47,20 @@ function translateFlags(flags: number, from: object, to: object): number {
   return result;
 }
 
+function wrapList(
+  value: unknown[],
+  wrap: (item: unknown) => unknown,
+): unknown[] {
+  const list = value.map(wrap);
+  for (const key of ['pos', 'end', 'hasTrailingComma'])
+    if (key in value)
+      Object.defineProperty(list, key, {
+        value: Reflect.get(value, key),
+        enumerable: true,
+      });
+  return list;
+}
+
 /** A worker/generation owns stable native identities and a bounded decoded
  * source LRU. Proxies retain identities, never a dependency source buffer. */
 export class GenerationSyntaxViews {
@@ -354,16 +368,7 @@ export class GenerationSyntaxViews {
     return this.wrapRef(ref, key);
   }
   wrap(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      const list = value.map((v) => this.wrap(v));
-      for (const key of ['pos', 'end', 'hasTrailingComma'])
-        if (key in value)
-          Object.defineProperty(list, key, {
-            value: (value as unknown as Bag)[key],
-            enumerable: true,
-          });
-      return list;
-    }
+    if (Array.isArray(value)) return wrapList(value, (item) => this.wrap(item));
     if (
       value instanceof RemoteNode ||
       (typeof value === 'object' &&
@@ -462,8 +467,6 @@ export class GenerationSyntaxViews {
     const raw = this.rawSyntax(ref);
     if (key === 'children' && raw.kind === SyntaxKind.SyntaxList)
       return this.childNodes(ref, proxy);
-    if (key === 'default' && raw.kind === SyntaxKind.TypeParameter)
-      return this.wrap(Reflect.get(raw, 'defaultType', raw));
     const heritageReference =
       raw.kind === SyntaxKind.TypeReference &&
       raw.parent?.kind === SyntaxKind.HeritageClause;
@@ -479,29 +482,7 @@ export class GenerationSyntaxViews {
       return this.wrap(
         Reflect.get(raw, key === 'expression' ? 'left' : 'right', raw),
       );
-    if (
-      key === 'kind' ||
-      key === 'operator' ||
-      key === 'token' ||
-      key === 'keywordToken' ||
-      key === 'keyword' ||
-      key === 'phaseModifier'
-    ) {
-      const native = Reflect.get(raw, key, raw) as number;
-      if (native === undefined) return undefined;
-      return this.translateKind(SyntaxKind[native]);
-    }
-    if (key === 'flags')
-      return translateFlags(raw.flags, NodeFlags, this.typescript.NodeFlags);
-    if (
-      key === 'escapedText' &&
-      (raw.kind === SyntaxKind.Identifier ||
-        raw.kind === SyntaxKind.PrivateIdentifier)
-    ) {
-      const text = (raw as unknown as { text: string }).text;
-      return text.startsWith('__') ? `_${text}` : text;
-    }
-    const member: unknown = Reflect.get(raw, key, raw);
+    const member = this.syntaxMember(raw, key);
     if (typeof member === 'function')
       return (...args: unknown[]) => {
         this.ensure();
@@ -527,6 +508,98 @@ export class GenerationSyntaxViews {
     )
       unsupported(`node.${key}`);
     return this.wrap(member);
+  }
+  private syntaxMember(raw: Node, key: string | symbol): unknown {
+    if (
+      key === 'kind' ||
+      key === 'operator' ||
+      key === 'token' ||
+      key === 'keywordToken' ||
+      key === 'keyword' ||
+      key === 'phaseModifier'
+    ) {
+      const kind = Reflect.get(raw, key) as number | undefined;
+      return kind === undefined
+        ? undefined
+        : this.translateKind(SyntaxKind[kind]);
+    }
+    if (key === 'flags')
+      return translateFlags(raw.flags, NodeFlags, this.typescript.NodeFlags);
+    if (
+      key === 'escapedText' &&
+      (raw.kind === SyntaxKind.Identifier ||
+        raw.kind === SyntaxKind.PrivateIdentifier)
+    ) {
+      const text = Reflect.get(raw, 'text') as string;
+      return text.startsWith('__') ? `_${text}` : text;
+    }
+    return Reflect.get(
+      raw,
+      key === 'default' && raw.kind === SyntaxKind.TypeParameter
+        ? 'defaultType'
+        : key,
+    );
+  }
+
+  // A checker-generated tree owns its packet. Its nodes have no Program source
+  // indices and must never enter the session's source-node identity map.
+  generatedTypeNode(bytes: Uint8Array): object {
+    const root = new RemoteSourceFile(
+      bytes,
+      new Wtf8Decoder('utf-8', { ignoreBOM: true }),
+    );
+    const views = new WeakMap<object, object>();
+    const wrap = (value: unknown): unknown => {
+      if (typeof value !== 'object' || value === null) return value;
+      const old = views.get(value);
+      if (old) return old;
+      if (Array.isArray(value)) {
+        const list = wrapList(value, wrap);
+        views.set(value, list);
+        return list;
+      }
+      if (!(value instanceof RemoteNode)) return value;
+      const proxy = new Proxy(
+        {},
+        {
+          get: (target, key) => {
+            this.ensure();
+            if (Object.hasOwn(target, key)) return Reflect.get(target, key);
+            if (key === 'parent') return undefined;
+            if (key === 'getSourceFile')
+              return () => {
+                this.ensure();
+                return undefined;
+              };
+            if (key === 'forEachChild')
+              return (
+                cb: (n: unknown) => unknown,
+                cbNodes?: (nodes: unknown) => unknown,
+              ) => {
+                this.ensure();
+                return value.forEachChild(
+                  (n) => cb(wrap(n)),
+                  cbNodes ? (nodes) => cbNodes(wrap(nodes)) : undefined,
+                );
+              };
+            const member = this.syntaxMember(value, key);
+            if (typeof member === 'function')
+              return (...args: unknown[]) => {
+                this.ensure();
+                return wrap(Reflect.apply(member, value, args));
+              };
+            return wrap(member);
+          },
+          has: (target, key) => {
+            this.ensure();
+            return Object.hasOwn(target, key) || key in value;
+          },
+        },
+      );
+      views.set(value, proxy);
+      return proxy;
+    };
+    return wrap(root) as object;
   }
   private childNodes(ref: SyntaxRef, proxy: object): object[] {
     let children = this.children.get(proxy);
