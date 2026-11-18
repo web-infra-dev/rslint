@@ -1375,3 +1375,75 @@ func TestNoUnusedVarsReviewBoundaries(t *testing.T) {
 		},
 	)
 }
+
+// TestNoUnusedVarsCallbackExecutionBoundaries covers deferred execution, literal
+// extraction, and metadata reads without invoking a callback. ESLint 10.14.0
+// and typescript-eslint 8.72.1 also miss some deferred reads and explicit
+// return consumers; these expectations preserve runtime behavior instead.
+func TestNoUnusedVarsCallbackExecutionBoundaries(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `let x; x = (async () => { await 0; (() => consume(x))(); })();`},
+		{Code: `let x; x = (function* () { (() => consume(x))(); })();`},
+		{Code: `let x; x = (() => { return async () => { await 0; (() => consume(x))(); }; })()();`},
+		{Code: `let x; x = (() => x).bind(null, consume(() => x)).name;`},
+		{Code: `let x; x = (() => { return async () => { await 0; consume(x); }; })()();`},
+		{Code: `let x; x = (() => async () => { await 0; consume(x); })()();`},
+		{Code: `let x; x = (async () => { await 0; consume(x); })();`},
+		{Code: `let x; x = (() => { return function* () { yield x; }; })()();`},
+		{Code: `let x; x = (function* () { yield x; })();`},
+		{Code: `let x; x = (() => async () => { await 0; consume(x); })().call(null);`},
+		{Code: `let x; x = (() => function* () { yield x; })().bind(null)();`},
+		{Code: `let x; x = [(async () => { await 0; consume(x); })][0]();`},
+		{Code: `let x; x = ({ async run() { await 0; consume(x); } }).run();`},
+		{Code: `let x; x = [() => x][index]();`},
+		{Code: `let x; x = ({run: () => x})[key]();`},
+		{Code: `let x; x = ({run: () => x, ...source}).run();`},
+		{Code: `let x; x = ({run: () => x, [key]: replacement}).run();`},
+		{Code: `let x; x = ({get run() { return () => x; }}).run();`},
+		{Code: `let x; x = consume([() => x]);`},
+		{Code: `let x; x = consume({run: () => x});`},
+		{Code: `let x; x = (() => x).custom();`},
+		{Code: `let x; x = (() => x).bind(null, consume(() => x)).length;`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		`[() => x + 1][0]()`,
+		`[() => x + 1]["0"]()`,
+		`({run: () => x + 1}).run()`,
+		`({run() { return x + 1; }}).run()`,
+		`({["run"]: () => x + 1})["run"]()`,
+		`({run: () => x + 1}).run.call(null)`,
+		`[{run: () => x + 1}][0].run()`,
+		`({run: [() => x + 1]}).run[0]()`,
+		`(() => [() => x + 1])()[0]()`,
+		`(() => { return {run: () => x + 1}; })().run()`,
+		`(() => x).length`,
+		`(() => x)["name"]`,
+		`(() => x).bind(null).length`,
+		`(() => () => x)().name`,
+		`[() => x][0].length`,
+		`({run() { return x; }}).run.name`,
+		`(async () => x).length`,
+		`(function* () { yield x; }).name`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "let x = 0;\nx = " + expression + ";",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}
+
+func TestNoUnusedVarsAuthoredJavaScriptLibraryNames(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, sourceType := range []string{"script", "module"} {
+		for _, name := range []string{"RequestInit", "Window", "Promise"} {
+			invalid = append(invalid, rule_tester.InvalidTestCase{
+				Code: "var " + name + " = {};", FileName: "authored-library.js", TSConfig: "tsconfig.allow-js.json",
+				LanguageOptions: rule.LanguageOptions{SourceType: sourceType},
+				Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'" + name + "' is assigned a value but never used."}},
+			})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, nil, invalid)
+}

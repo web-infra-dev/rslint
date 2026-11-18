@@ -2927,6 +2927,11 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 // value-only globals such as NaN or host declarations from user .d.ts files.
 // Resolve in the compiler global scope so module locals do not hide them.
 func isImplicitLibraryGlobal(ctx rule.RuleContext, name string, ac *analysisContext) bool {
+	// JavaScript scope does not acquire TypeScript's implicit type bindings.
+	// A DOM interface with the same name must not hide an authored JS global.
+	if ast.IsInJSFile(ctx.SourceFile.AsNode()) {
+		return false
+	}
 	if used, ok := ac.implicitLibraryGlobals[name]; ok {
 		return used
 	}

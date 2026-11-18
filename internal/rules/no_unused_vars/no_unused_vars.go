@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"sort"
+	"strconv"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
@@ -680,15 +681,16 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 	return false
 }
 
-// isInsideOfStorableFunction reports whether the nearest function containing
-// a RHS reference can escape through another value path. A function invoked as
-// the RHS callee is not storable; one passed as an argument or assigned/yielded
-// within the RHS can execute later and therefore makes the reference a real use.
+// isInsideOfStorableFunction preserves a RHS reference if any enclosing
+// function can escape or execute later. A synchronous nested IIFE does not
+// make a surrounding callback, async body, or generator synchronous.
 func isInsideOfStorableFunction(node *ast.Node, rhs *ast.Node) bool {
-	function := ast.FindAncestor(node.Parent, func(current *ast.Node) bool {
-		return ast.IsFunctionLike(current)
-	})
-	return function != nil && ast.IsNodeDescendantOf(function, rhs) && IsStorableFunction(function, rhs)
+	for current := node.Parent; current != nil && ast.IsNodeDescendantOf(current, rhs); current = current.Parent {
+		if ast.IsFunctionLike(current) && IsStorableFunction(current, rhs) {
+			return true
+		}
+	}
+	return false
 }
 
 // IsStorableFunction follows the function value through returns and binding.
@@ -730,6 +732,7 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 	node := function
 	returned := false
 	direct := true
+	var containers []functionValueContainer
 	method := ""
 	for node.Parent != nil && ast.IsNodeDescendantOf(node.Parent, flow.rhs) {
 		parent := node.Parent
@@ -761,7 +764,7 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 				wrapper = ast.GetContainingFunction(parent)
 			}
 			use := flow.wrapperUse(wrapper)
-			if use.invocation == nil {
+			if use.stored || use.invocation == nil {
 				return functionValueUse{stored: true}
 			}
 			// Continue from the wrapper's result, preserving whether it is the
@@ -771,11 +774,31 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 			method = ""
 			continue
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			if !direct || utils.AccessExpressionObject(parent) != node {
+			if utils.AccessExpressionObject(parent) != node {
 				return functionValueUse{stored: true}
 			}
 			name, ok := utils.AccessExpressionStaticName(parent)
-			if !ok || (name != "bind" && name != "call" && name != "apply") {
+			if !ok {
+				return functionValueUse{stored: true}
+			}
+			if len(containers) != 0 {
+				container := containers[len(containers)-1]
+				if !container.selectsMember(name) {
+					return functionValueUse{stored: true}
+				}
+				containers = containers[:len(containers)-1]
+				direct = len(containers) == 0
+				break
+			}
+			if !direct || method != "" {
+				return functionValueUse{stored: true}
+			}
+			// These own properties describe a fresh callable without executing
+			// or exposing its captured reads. Unknown members may expose it.
+			if name == "length" || name == "name" {
+				return functionValueUse{}
+			}
+			if name != "bind" && name != "call" && name != "apply" {
 				return functionValueUse{stored: true}
 			}
 			method = name
@@ -790,16 +813,27 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 				node = parent
 				continue
 			}
-			return functionValueUse{invocation: parent}
+			// Async bodies may resume after assignment; generators execute
+			// on iteration. Do not follow their call result as a synchronous
+			// return value either (it is a promise or iterator).
+			deferred := ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0
+			return functionValueUse{invocation: parent, stored: deferred}
 		case ast.KindNewExpression:
 			if direct && parent.AsNewExpression().Expression == node {
 				return functionValueUse{invocation: parent}
 			}
 			return functionValueUse{stored: true}
-		case ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment,
-			ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression, ast.KindSpreadAssignment,
-			ast.KindSpreadElement:
+		case ast.KindPropertyAssignment:
+			if parent.AsPropertyAssignment().Initializer != node {
+				return functionValueUse{stored: true}
+			}
+		case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
+			// Remember each literal along the path so nested extraction can
+			// recover the original callable, including through wrapper returns.
+			containers = append(containers, functionValueContainer{literal: parent, member: node})
 			direct = false
+		case ast.KindShorthandPropertyAssignment, ast.KindSpreadAssignment, ast.KindSpreadElement:
+			return functionValueUse{stored: true}
 		case ast.KindTaggedTemplateExpression, ast.KindYieldExpression:
 			return functionValueUse{stored: true}
 		default:
@@ -813,6 +847,44 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 	// stored as the assignment's result. A further call or discard above has
 	// already been distinguished from storing that value.
 	return functionValueUse{stored: returned}
+}
+
+// functionValueContainer tracks a fresh literal containing a callable. Only
+// extraction of the same statically known member restores callable identity.
+// Spreads, accessors and dynamic keys can change the result or run user code.
+type functionValueContainer struct {
+	literal *ast.Node
+	member  *ast.Node
+}
+
+func (container functionValueContainer) selectsMember(name string) bool {
+	switch container.literal.Kind {
+	case ast.KindArrayLiteralExpression:
+		for index, element := range container.literal.AsArrayLiteralExpression().Elements.Nodes {
+			if element.Kind == ast.KindSpreadElement {
+				return false
+			}
+			if element == container.member {
+				return name == strconv.Itoa(index)
+			}
+		}
+	case ast.KindObjectLiteralExpression:
+		var selected *ast.Node
+		for _, property := range container.literal.AsObjectLiteralExpression().Properties.Nodes {
+			if property.Kind != ast.KindPropertyAssignment && property.Kind != ast.KindMethodDeclaration && property.Kind != ast.KindShorthandPropertyAssignment {
+				return false
+			}
+			key, ok := utils.GetStaticPropertyName(property.Name())
+			if !ok || key == "__proto__" {
+				return false
+			}
+			if key == name {
+				selected = property
+			}
+		}
+		return selected == container.member
+	}
+	return false
 }
 
 // isParamUsed checks if a parameter name (Identifier or binding pattern) has any usage.
