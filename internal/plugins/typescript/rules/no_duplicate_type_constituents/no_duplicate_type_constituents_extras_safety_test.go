@@ -201,3 +201,40 @@ func TestNoDuplicateTypeConstituentsAncestorTypes(t *testing.T) {
 		t.Fatalf("alias fix did not converge: %v", after)
 	}
 }
+
+// Go's shared tester registers this rule as "test". These cases use that name
+// in directives, and preserve the v8.72.2 messages, ranges and fix passes.
+func TestNoDuplicateTypeConstituentsSuppressedFixes(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDuplicateTypeConstituentsRule, nil, []rule_tester.InvalidTestCase{
+		{Code: "type T = string | number | (\n// eslint-disable-next-line test\nstring |\nnumber\n);", Output: []string{"type T = string | number | (\n// eslint-disable-next-line test\nstring \n\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Union type constituent is duplicated with number.", Line: 4, Column: 1, EndLine: 4, EndColumn: 7},
+		}},
+		{Code: "type T = string | number | (\nstring |\n// eslint-disable-next-line test\nnumber\n);", Output: []string{"type T = string | number | (\n \n// eslint-disable-next-line test\nnumber\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: 2, Column: 1, EndLine: 2, EndColumn: 7},
+		}},
+		{Code: "type T = string | number | (|\n// eslint-disable-next-line test\nstring |\nnumber\n);", Output: []string{"type T = string | number | (|\n// eslint-disable-next-line test\nstring \n\n);", "type T = string | number   \n\n;"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Union type constituent is duplicated with number.", Line: 4, Column: 1, EndLine: 4, EndColumn: 7},
+		}},
+		{Code: "type T = string | number | (|\nstring |\n// eslint-disable-next-line test\nnumber\n);", Output: []string{"type T = string | number | (\n |\n// eslint-disable-next-line test\nnumber\n);", "type T = string | number  \n \n;"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: 2, Column: 1, EndLine: 2, EndColumn: 7},
+		}},
+		{Code: "type T = {a: string} & {b: number} & (\n// eslint-disable-next-line test\n{a: string} &\n{b: number}\n);", Output: []string{"type T = {a: string} & {b: number} & (\n// eslint-disable-next-line test\n{a: string} \n\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {b: number}.", Line: 4, Column: 1, EndLine: 4, EndColumn: 12},
+		}},
+		{Code: "type T = {a: string} & {b: number} & (\n{a: string} &\n// eslint-disable-next-line test\n{b: number}\n);", Output: []string{"type T = {a: string} & {b: number} & (\n \n// eslint-disable-next-line test\n{b: number}\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {a: string}.", Line: 2, Column: 1, EndLine: 2, EndColumn: 12},
+		}},
+		{Code: "type T = {a: string} & {b: number} & (&\n// eslint-disable-next-line test\n{a: string} &\n{b: number}\n);", Output: []string{"type T = {a: string} & {b: number} & (&\n// eslint-disable-next-line test\n{a: string} \n\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {b: number}.", Line: 4, Column: 1, EndLine: 4, EndColumn: 12},
+		}},
+		{Code: "type T = {a: string} & {b: number} & (&\n{a: string} &\n// eslint-disable-next-line test\n{b: number}\n);", Output: []string{"type T = {a: string} & {b: number} & (\n &\n// eslint-disable-next-line test\n{b: number}\n);"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {a: string}.", Line: 2, Column: 1, EndLine: 2, EndColumn: 12},
+		}},
+		{Code: "function f(x?: (\n// eslint-disable-next-line test\nundefined |\nundefined\n)) {}", Output: []string{"function f(x?: (\n// eslint-disable-next-line test\nundefined \n\n)) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "duplicate", Message: "Union type constituent is duplicated with undefined.", Line: 4, Column: 1, EndLine: 4, EndColumn: 10},
+		}},
+		{Code: "function f(x?: (\nundefined |\n// eslint-disable-next-line test\nundefined\n)) {}", Output: []string{"function f(x?: (\n \n// eslint-disable-next-line test\nundefined\n)) {}"}, Errors: []rule_tester.InvalidTestCaseError{
+			{MessageId: "unnecessary", Message: "Explicit undefined is unnecessary on an optional parameter.", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
+		}},
+	})
+}

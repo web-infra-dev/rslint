@@ -71,9 +71,9 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
 		syntax := newTypeSyntaxIndex(ctx.SourceFile)
-		// A fix must not remove the last member of a surviving group. Track
-		// both duplicate and unnecessary-undefined removals, independently of
-		// whether the consumer requests edits.
+		// A fix must not remove the last member of a surviving group. Reserve
+		// removals only inside fix builders, after inline-disable suppression
+		// and edit-demand checks, so suppressed diagnostics do not consume them.
 		remaining := make(map[*ast.Node]int)
 
 		unwindedParentType := func(node *ast.Node, kind ast.Kind) *ast.Node {
@@ -138,16 +138,15 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 					types = parent.AsIntersectionTypeNode().Types.Nodes
 				}
 			}
-			count, seen := remaining[parent]
-			if !seen {
-				count = len(types)
-			}
-			if count <= 1 {
-				ctx.ReportRange(textRange, message)
-				return
-			}
-			remaining[parent] = count - 1
 			ctx.ReportRangeWithDeferredFixes(textRange, message, func() []rule.RuleFix {
+				count, seen := remaining[parent]
+				if !seen {
+					count = len(types)
+				}
+				if count <= 1 {
+					return nil
+				}
+				remaining[parent] = count - 1
 				index := 0
 				for types[index] != outer {
 					index++
