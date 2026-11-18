@@ -14,6 +14,7 @@ import (
 	lintprogram "github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -159,7 +160,7 @@ func TestNoDuplicateTypeConstituentsLeadingSeparatorOutputs(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDuplicateTypeConstituentsRule, nil, []rule_tester.InvalidTestCase{
 		{
 			Code:   "type T = string | number | (| string | number);",
-			Output: []string{"type T = string | number | (  | number);", "type T = string | number    ;"},
+			Output: []string{"type T = string | number | (  | number);", "type T = string | number     ;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: 1, Column: 31, EndLine: 1, EndColumn: 37},
 				{MessageId: "duplicate", Message: "Union type constituent is duplicated with number.", Line: 1, Column: 40, EndLine: 1, EndColumn: 46},
@@ -167,7 +168,7 @@ func TestNoDuplicateTypeConstituentsLeadingSeparatorOutputs(t *testing.T) {
 		},
 		{
 			Code:   "type T = {a: string} & {b: number} & (& {a: string} & {b: number});",
-			Output: []string{"type T = {a: string} & {b: number} & (  & {b: number});", "type T = {a: string} & {b: number}    ;"},
+			Output: []string{"type T = {a: string} & {b: number} & (  & {b: number});", "type T = {a: string} & {b: number}     ;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {a: string}.", Line: 1, Column: 41, EndLine: 1, EndColumn: 52},
 				{MessageId: "duplicate", Message: "Intersection type constituent is duplicated with {b: number}.", Line: 1, Column: 55, EndLine: 1, EndColumn: 66},
@@ -202,8 +203,8 @@ func TestNoDuplicateTypeConstituentsAncestorTypes(t *testing.T) {
 	}
 }
 
-// Go's shared tester registers this rule as "test". These cases use that name
-// in directives, and preserve the v8.72.2 messages, ranges and fix passes.
+// Go's shared tester registers this rule as "test". Messages and ranges match
+// v8.72.2; singleton fixes deliberately retain directive comments.
 func TestNoDuplicateTypeConstituentsSuppressedFixes(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDuplicateTypeConstituentsRule, nil, []rule_tester.InvalidTestCase{
 		{Code: "type T = string | number | (\n// eslint-disable-next-line test\nstring |\nnumber\n);", Output: []string{"type T = string | number | (\n// eslint-disable-next-line test\nstring \n\n);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -212,10 +213,10 @@ func TestNoDuplicateTypeConstituentsSuppressedFixes(t *testing.T) {
 		{Code: "type T = string | number | (\nstring |\n// eslint-disable-next-line test\nnumber\n);", Output: []string{"type T = string | number | (\n \n// eslint-disable-next-line test\nnumber\n);"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: 2, Column: 1, EndLine: 2, EndColumn: 7},
 		}},
-		{Code: "type T = string | number | (|\n// eslint-disable-next-line test\nstring |\nnumber\n);", Output: []string{"type T = string | number | (|\n// eslint-disable-next-line test\nstring \n\n);", "type T = string | number   \n\n;"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "type T = string | number | (|\n// eslint-disable-next-line test\nstring |\nnumber\n);", Output: []string{"type T = string | number | (|\n// eslint-disable-next-line test\nstring \n\n);", "type T = string | number  \n// eslint-disable-next-line test\n \n\n;"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "duplicate", Message: "Union type constituent is duplicated with number.", Line: 4, Column: 1, EndLine: 4, EndColumn: 7},
 		}},
-		{Code: "type T = string | number | (|\nstring |\n// eslint-disable-next-line test\nnumber\n);", Output: []string{"type T = string | number | (\n |\n// eslint-disable-next-line test\nnumber\n);", "type T = string | number  \n \n;"}, Errors: []rule_tester.InvalidTestCaseError{
+		{Code: "type T = string | number | (|\nstring |\n// eslint-disable-next-line test\nnumber\n);", Output: []string{"type T = string | number | (\n |\n// eslint-disable-next-line test\nnumber\n);", "type T = string | number  \n \n// eslint-disable-next-line test\n\n;"}, Errors: []rule_tester.InvalidTestCaseError{
 			{MessageId: "duplicate", Message: "Union type constituent is duplicated with string.", Line: 2, Column: 1, EndLine: 2, EndColumn: 7},
 		}},
 		{Code: "type T = {a: string} & {b: number} & (\n// eslint-disable-next-line test\n{a: string} &\n{b: number}\n);", Output: []string{"type T = {a: string} & {b: number} & (\n// eslint-disable-next-line test\n{a: string} \n\n);"}, Errors: []rule_tester.InvalidTestCaseError{
@@ -237,4 +238,175 @@ func TestNoDuplicateTypeConstituentsSuppressedFixes(t *testing.T) {
 			{MessageId: "unnecessary", Message: "Explicit undefined is unnecessary on an optional parameter.", Line: 2, Column: 1, EndLine: 2, EndColumn: 10},
 		}},
 	})
+}
+
+func TestNoDuplicateTypeConstituentsUniqueSymbols(t *testing.T) {
+	for _, code := range []string{
+		"type Token = { readonly tag: unique symbol } & { readonly tag: unique symbol }; declare const tag: Token['tag']; const value: never = tag;",
+		"type Token = { readonly tag: unique symbol } | { readonly tag: unique symbol };",
+		"type Token = {inner: { readonly tag: unique symbol }} & {inner: { readonly tag: unique symbol }}; declare const tag: Token['inner']['tag']; const value: never = tag;",
+		"type Token = (() => { readonly tag: unique symbol }) | (() => { readonly tag: unique symbol });",
+	} {
+		if diagnostics := lintSafetyFixture(t, code, rule.EditDemandAll); len(diagnostics) != 0 {
+			t.Fatalf("distinct unique-symbol declarations reported as duplicates: %v", diagnostics)
+		}
+	}
+	for _, code := range []string{
+		"declare const token: unique symbol; type T = {tag: typeof token} & {tag: typeof token};",
+		"type Brand = { readonly tag: unique symbol }; type T = Brand & Brand;",
+		"type Brand = { readonly tag: unique symbol }; type Alias = Brand; type T = Brand | Alias;",
+		"declare const token: unique symbol; type Alias = typeof token; type T = Alias | typeof token;",
+	} {
+		diagnostics := lintSafetyFixture(t, code, rule.EditDemandAll)
+		if len(diagnostics) != 1 || diagnostics[0].Message.Id != "duplicate" {
+			t.Fatalf("same declared symbol should remain fixable: %v", diagnostics)
+		}
+		fixed, _, changed := linter.ApplyRuleFixes(code, diagnostics)
+		if !changed {
+			t.Fatal("same-identity duplicate has no fix")
+		}
+		if after := lintSafetyFixture(t, fixed, rule.EditDemandAll); len(after) != 0 {
+			t.Fatalf("symbol-reference fix did not converge: %v", after)
+		}
+	}
+}
+
+func TestNoDuplicateTypeConstituentsReservationIdentity(t *testing.T) {
+	for _, code := range []string{
+		"function f(x?: string | (| undefined) | undefined) {}",
+		"function f(x?: string | (| (| undefined)) | undefined) {}",
+		"function f(x?: string | (| undefined) | (| undefined) | undefined) {}",
+	} {
+		diagnostics := lintSafetyFixture(t, code, rule.EditDemandAll)
+		if len(diagnostics) < 3 {
+			t.Fatal("fixture must report both a group and its member")
+		}
+		for _, diagnostic := range diagnostics {
+			if len(diagnostic.Fixes()) == 0 {
+				t.Fatalf("reservation counted the same member twice: %v", diagnostic)
+			}
+			// An editor may apply any single quick fix independently.
+			fixed, _, changed := linter.ApplyRuleFixes(code, []rule.RuleDiagnostic{diagnostic})
+			if !changed {
+				t.Fatal("quick fix did not apply")
+			}
+			lintSafetyFixture(t, fixed, rule.EditDemandNone)
+		}
+		if !reflect.DeepEqual(diagnostics[0].Fixes(), diagnostics[1].Fixes()) {
+			t.Fatal("group and child should reserve the same edit")
+		}
+		fixed, _, changed := linter.ApplyRuleFixes(code, diagnostics)
+		if !changed {
+			t.Fatal("fix-all did not apply")
+		}
+		if after := lintSafetyFixture(t, fixed, rule.EditDemandAll); len(after) != 0 {
+			t.Fatalf("fix-all left unnecessary constituents: %v", after)
+		}
+	}
+}
+
+// Run both rules through the production dispatcher so inline directives and
+// their effect on another rule are observed on every rebuilt source snapshot.
+func lintDirectiveFixture(t *testing.T, code string) []rule.RuleDiagnostic {
+	t.Helper()
+	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
+	program, source, err := helper.CreateTestProgram(code, "directives.ts", "tsconfig.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if diagnostics := program.GetSyntacticDiagnostics(t.Context(), source); len(diagnostics) != 0 {
+		t.Fatalf("invalid fixed syntax: %v\n%s", diagnostics, code)
+	}
+	plan, err := linter.PrepareLintPlan(linter.PrepareLintPlanOptions{
+		Programs:         []*lintprogram.Program{lintprogram.NewFromCompiler(program)},
+		TargetsByProgram: [][]string{{source.FileName()}},
+		SingleThreaded:   true,
+		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
+			var configured []rule.ConfiguredRule
+			for _, r := range []*rule.Rule{&NoDuplicateTypeConstituentsRule, &no_debugger.NoDebuggerRule} {
+				configured = append(configured, rule.ConfiguredRule{Name: r.Name, Environment: &rule.RuleEnvironment{}, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return r.Run(ctx, nil) }})
+			}
+			return configured
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var diagnostics []rule.RuleDiagnostic
+	_, err = linter.RunLinter(linter.RunLinterOptions{SingleThreaded: true, LintPlan: plan, Consumer: rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return diagnostics
+}
+
+func TestNoDuplicateTypeConstituentsDirectivePreservation(t *testing.T) {
+	for _, prefix := range []string{"eslint", "rslint"} {
+		for _, action := range []string{"enable", "disable"} {
+			for _, member := range []string{
+				"(| /* DIRECTIVE */ {a: string})",
+				"(| (| /* DIRECTIVE */ {a: string}))",
+				"(/* DIRECTIVE */ {a: string})",
+			} {
+				directive := prefix + "-" + action + " no-debugger"
+				code := "/* " + prefix + "-disable no-debugger */\ntype T = {a: string} | " + strings.ReplaceAll(member, "DIRECTIVE", directive) + ";\ndebugger;"
+				if action == "disable" {
+					code = strings.Replace(code, prefix+"-disable", prefix+"-enable", 1)
+				}
+				wantDebugger := 0
+				if action == "enable" {
+					wantDebugger = 1
+				}
+				for pass := range 10 {
+					diagnostics := lintDirectiveFixture(t, code)
+					debuggerCount := 0
+					for _, diagnostic := range diagnostics {
+						if diagnostic.RuleName == "no-debugger" {
+							debuggerCount++
+						}
+					}
+					if debuggerCount != wantDebugger {
+						t.Fatalf("fix changed directive effect: %s", code)
+					}
+					fixed, _, changed := linter.ApplyRuleFixes(code, diagnostics)
+					if !changed {
+						if pass == 0 {
+							t.Fatal("singleton duplicate was not fixed")
+						}
+						if !strings.Contains(code, directive) {
+							t.Fatal("directive was deleted")
+						}
+						break
+					}
+					code = fixed
+					if pass == 9 {
+						t.Fatal("directive-preserving fixes did not converge")
+					}
+				}
+			}
+		}
+	}
+	// A directive inside the actual type body is not removable safely. This
+	// guard also covers duplicates that are not singleton groups.
+	code := "/* eslint-disable no-debugger */\ntype T = {a: string} | { /* eslint-enable no-debugger */ a: string };\ndebugger;"
+	diagnostics := lintDirectiveFixture(t, code)
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected duplicate and debugger diagnostics: %v", diagnostics)
+	}
+	if _, _, changed := linter.ApplyRuleFixes(code, diagnostics); changed {
+		t.Fatal("unsafe directive-bearing body received a fix")
+	}
+	// Directive-looking text inside a string is not a comment.
+	code = "/* eslint-disable no-debugger */\ntype T = {a: '/* eslint-enable no-debugger */'} | {a: '/* eslint-enable no-debugger */'};\ndebugger;"
+	diagnostics = lintDirectiveFixture(t, code)
+	if len(diagnostics) != 1 {
+		t.Fatalf("unexpected diagnostics for directive-looking string: %v", diagnostics)
+	}
+	fixed, _, changed := linter.ApplyRuleFixes(code, diagnostics)
+	if !changed {
+		t.Fatal("ordinary string prevented a safe fix")
+	}
+	if after := lintDirectiveFixture(t, fixed); len(after) != 0 {
+		t.Fatalf("string fix changed directive behavior: %v", after)
+	}
 }

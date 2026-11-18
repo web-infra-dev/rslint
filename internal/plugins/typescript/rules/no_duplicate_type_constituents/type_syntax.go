@@ -27,6 +27,7 @@ func syntaxNode(node *ast.Node) *ast.Node {
 // presence and list boundaries so that, for example, a mapped key cannot match
 // a value type. Both hashing and equality use this same representation.
 type typeSyntaxHeader struct {
+	identity   *ast.Node
 	kind       ast.Kind
 	text       string
 	operator   ast.Kind
@@ -101,6 +102,12 @@ func (s *typeSyntaxIndex) header(node *ast.Node) typeSyntaxHeader {
 		h.typeArgs = syntaxListLength(node.TypeArgumentList())
 	case ast.KindTypeOperator:
 		h.operator = node.AsTypeOperatorNode().Operator
+		// Each authored unique-symbol type introduces its own nominal
+		// identity. Identical spelling cannot establish equivalence between
+		// separate declarations, including inside object or function types.
+		if h.operator == ast.KindUniqueKeyword {
+			h.identity = node
+		}
 	case ast.KindPrefixUnaryExpression:
 		h.operator = node.AsPrefixUnaryExpression().Operator
 	case ast.KindPostfixUnaryExpression:

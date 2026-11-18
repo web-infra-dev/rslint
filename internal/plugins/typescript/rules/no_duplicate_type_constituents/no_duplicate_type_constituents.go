@@ -3,6 +3,7 @@ package no_duplicate_type_constituents
 import (
 	_ "embed"
 	"fmt"
+	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -10,6 +11,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_duplicate_type_constituents.schema.json
@@ -75,6 +77,11 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 		// removals only inside fix builders, after inline-disable suppression
 		// and edit-demand checks, so suppressed diagnostics do not consume them.
 		remaining := make(map[*ast.Node]int)
+		reserved := make(map[*ast.Node]struct{})
+		comments := ctx.Comments
+		if comments == nil {
+			comments = rule.NewCommentStore(ctx.SourceFile)
+		}
 
 		unwindedParentType := func(node *ast.Node, kind ast.Kind) *ast.Node {
 			for {
@@ -139,28 +146,58 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 				}
 			}
 			ctx.ReportRangeWithDeferredFixes(textRange, message, func() []rule.RuleFix {
-				count, seen := remaining[parent]
-				if !seen {
-					count = len(types)
+				// A singleton wrapper can contain comments between its leading
+				// separator and its member. Keep those comments by deleting
+				// wrapper tokens separately from the actual type body.
+				body := fixNode
+				for {
+					body = ast.SkipTypeParentheses(body)
+					if body.Kind == ast.KindUnionType && len(body.AsUnionTypeNode().Types.Nodes) == 1 {
+						body = body.AsUnionTypeNode().Types.Nodes[0]
+					} else if body.Kind == ast.KindIntersectionType && len(body.AsIntersectionTypeNode().Types.Nodes) == 1 {
+						body = body.AsIntersectionTypeNode().Types.Nodes[0]
+					} else {
+						break
+					}
 				}
-				if count <= 1 {
-					return nil
+				bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, body)
+				// Directives inside the type body itself cannot be discarded
+				// safely. Keep the diagnostic without a fix in that case.
+				allComments := comments.All()
+				first := sort.Search(len(allComments), func(i int) bool { return allComments[i].Pos() >= bodyRange.Pos() })
+				for _, comment := range allComments[first:] {
+					if comment.Pos() >= bodyRange.End() {
+						break
+					}
+					if utils.IsDirectiveComment(comment.Kind, ecmascript.StringTrim(utils.CommentValue(ctx.SourceFile.Text(), comment))) {
+						return nil
+					}
 				}
-				remaining[parent] = count - 1
+				if _, alreadyReserved := reserved[outer]; !alreadyReserved {
+					count, seen := remaining[parent]
+					if !seen {
+						count = len(types)
+					}
+					if count <= 1 {
+						return nil
+					}
+					remaining[parent] = count - 1
+					reserved[outer] = struct{}{}
+				}
 				index := 0
 				for types[index] != outer {
 					index++
 				}
 				// Remove tokens separately to preserve whitespace and comments.
-				fixes := []rule.RuleFix{rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, fixNode))}
+				fixes := []rule.RuleFix{rule.RuleFixRemoveRange(bodyRange)}
 				scanTokens := func(start, end int) {
 					scanner := scanner.GetScannerForSourceFile(ctx.SourceFile, start)
 					for ; scanner.TokenStart() < end && scanner.Token() != ast.KindEndOfFile; scanner.Scan() {
 						fixes = append(fixes, rule.RuleFixRemoveRange(scanner.TokenRange()))
 					}
 				}
-				scanTokens(outer.Pos(), utils.TrimNodeTextRange(ctx.SourceFile, fixNode).Pos())
-				scanTokens(fixNode.End(), outer.End())
+				scanTokens(outer.Pos(), bodyRange.Pos())
+				scanTokens(body.End(), outer.End())
 				if index > 0 {
 					scanTokens(types[index-1].End(), utils.TrimNodeTextRange(ctx.SourceFile, outer).Pos())
 				} else {

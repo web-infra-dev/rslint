@@ -40,6 +40,10 @@ Rslint keeps at least one member in each surviving group during a fix pass. It s
 
 Rslint also excludes a containing group when looking for a previous occurrence of the same type. For example, `(string | never)` simplifies to `string`, but that does not make its own `string` member a duplicate. Removing that member would change the type.
 
+Separate `unique symbol` declarations retain their distinct identities, even when their syntax is identical. Repeated references to the same declared symbol or branded type can still be duplicates.
+
+Comments around a singleton group's member are preserved when its wrapping tokens are removed. If a lint directive is inside the type body that would be deleted, Rslint reports the duplicate without an autofix to avoid changing which rules apply elsewhere in the file.
+
 ## Original Documentation
 
 - [typescript-eslint: no-duplicate-type-constituents](https://typescript-eslint.io/rules/no-duplicate-type-constituents)

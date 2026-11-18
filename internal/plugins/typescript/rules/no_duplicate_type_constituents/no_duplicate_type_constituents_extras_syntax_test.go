@@ -41,6 +41,10 @@ func TestNoDuplicateTypeConstituentsSyntax(t *testing.T) {
 		{"{a: string; b: number}", "{a: string, b: number,}", true},
 		{"{a: string; b: number}", "{b: number; a: string}", false},
 		{"(string | number)", "((string | number))", true},
+		{"{readonly tag: unique symbol}", "{readonly tag: unique symbol}", false},
+		{"{inner: {readonly tag: unique symbol}}", "{inner: {readonly tag: unique symbol}}", false},
+		{"(() => {readonly tag: unique symbol})", "(() => {readonly tag: unique symbol})", false},
+		{"{tag: typeof token}", "{tag: typeof token}", true},
 	} {
 		t.Run(test.left+" vs "+test.right, func(t *testing.T) {
 			source, members := parseSyntaxMembers("type T = " + test.left + " | " + test.right + ";")
