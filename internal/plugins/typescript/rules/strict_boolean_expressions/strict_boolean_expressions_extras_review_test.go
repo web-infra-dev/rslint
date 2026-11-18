@@ -129,6 +129,8 @@ func TestStrictBooleanExpressionsReviewCallEscapes(t *testing.T) {
 	const declarations = `type Options = {method: 'some' | 'forEach'}; declare function configure(opts: Options): void; const opts: Options = {method: 'some'}; `
 	valid := []rule_tester.ValidTestCase{
 		{Code: declarations + `configure(opts); [1, 2][opts.method](n => console.log(n));`},
+		{Code: declarations + `(() => configure(opts))(); const method = opts.method; [1, 2][method](n => console.log(n));`},
+
 		{Code: declarations + `const alias = opts; configure(alias); [1, 2][opts.method](n => console.log(n));`},
 		{Code: declarations + `const holder = {opts}; declare function change(value: typeof holder): void; change(holder); [1, 2][opts.method](n => console.log(n));`},
 		{Code: declarations + `declare const change: ((opts: Options) => void) | undefined; change?.(opts); [1, 2][opts.method](n => console.log(n));`},
@@ -138,19 +140,32 @@ func TestStrictBooleanExpressionsReviewCallEscapes(t *testing.T) {
 	for _, suffix := range []string{
 		`[1, 2][opts.method](n => console.log(n));`,
 		`const method = opts.method; configure(opts); [1, 2][method](n => console.log(n));`,
+		`const method = opts.method; [1, 2][method](n => configure(opts));`,
+		`const method = opts.method; [1, 2][method](function (n) { return configure(opts); });`,
+		`const method = opts.method; (() => configure(opts))(); [1, 2][method](n => configure(opts));`,
+
 		`configure({method: 'some'}); [1, 2][opts.method](n => console.log(n));`,
 		`const copied = {method: opts.method}; configure(opts); [1, 2][copied.method](n => console.log(n));`,
 		`[1, 2][opts.method]((configure(opts), (n: number) => console.log(n)));`,
 	} {
 		code := declarations + suffix
 		callback := "n => console.log(n)"
+		if strings.Contains(suffix, "n => configure(opts)") {
+			callback = "n => configure(opts)"
+		}
+		if strings.Contains(suffix, "function (n)") {
+			callback = "function (n) { return configure(opts); }"
+		}
 		if strings.Contains(suffix, "(n: number)") {
 			callback = "(n: number) => console.log(n)"
 		}
 		suggestion := strings.Replace(code, callback, strings.Replace(callback, " =>", ": boolean =>", 1), 1)
 		// A parenless arrow needs parentheses around its parameter.
-		if callback == "n => console.log(n)" {
-			suggestion = strings.Replace(code, callback, "(n): boolean => console.log(n)", 1)
+		if strings.HasPrefix(callback, "n => ") {
+			suggestion = strings.Replace(code, callback, "(n): boolean"+strings.TrimPrefix(callback, "n"), 1)
+		}
+		if strings.HasPrefix(callback, "function (n)") {
+			suggestion = strings.Replace(code, callback, "function (n): boolean { return configure(opts); }", 1)
 		}
 		// Sequence expressions are not editable inline function nodes.
 		var suggestions []rule_tester.InvalidTestCaseSuggestion
@@ -201,5 +216,96 @@ func TestStrictBooleanExpressionsReviewSpreadArguments(t *testing.T) {
 	}
 	code := `declare const args: readonly [() => boolean, ...object[]] | readonly [() => void, object]; [1, 2].filter(...args);`
 	invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "...args", "conditionErrorNullableBoolean", "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.", nil)}})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
+}
+
+func TestStrictBooleanExpressionsReviewAssertionLengths(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct{ declaration, expression, inner string }{
+		{`declare const value: string | undefined;`, `value!`, `value!`},
+		{`declare const flag: boolean; declare const user: {name:string} | undefined;`, `(flag ? user?.name : undefined)!`, `(flag ? user?.name : undefined)!`},
+		{`declare const user: {name:string} | undefined;`, `(user?.name ?? undefined) as string`, `((user?.name ?? undefined) as string)`},
+		{`declare const value: unknown;`, `value as string`, `(value as string)`},
+		{`declare const value: string | null;`, `<string>value`, `(<string>value)`},
+	} {
+		for _, negated := range []bool{false, true} {
+			target := test.expression
+			if negated {
+				target = "!(" + target + ")"
+			}
+			code := test.declaration + " if (" + target + ") {}"
+			length := "(" + test.inner + ` ?? "").length > 0`
+			compare := test.inner + ` !== ""`
+			cast := "Boolean(" + test.inner + ")"
+			if negated {
+				length = "(" + test.inner + ` ?? "").length === 0`
+				compare = test.inner + ` === ""`
+				cast = "!Boolean(" + test.inner + ")"
+			}
+			suggestions := []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, target, length, 1)},
+				{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, target, compare, 1)},
+				{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, target, cast, 1)},
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}})
+		}
+	}
+	// A non-nullish literal does not need a default merely because an
+	// intermediate assertion gives it the opaque unknown type.
+	expression := `("ok" as unknown) as string`
+	code := "if (" + expression + ") {}"
+	inner := "(" + expression + ")"
+	suggestions := []rule_tester.InvalidTestCaseSuggestion{
+		{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, expression, inner+".length > 0", 1)},
+		{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, expression, inner+` !== ""`, 1)},
+		{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, expression, "Boolean("+inner+")", 1)},
+	}
+	invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
+}
+
+func TestStrictBooleanExpressionsReviewAssertionASI(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct{ before, after string }{
+		{"record()\n", " as boolean"},
+		{"record()\n", " satisfies boolean"},
+		{"record()\n", " as boolean satisfies boolean"},
+		{"switch (1) { case 1: record()\n", " as boolean\nbreak; }"},
+		{"switch (1) { default: record()\n", " satisfies boolean\nbreak; }"},
+	} {
+		code := `declare const state: {active?: boolean} | undefined; declare function record(): void; ` + test.before + "!state?.active" + test.after
+		suggestions := []rule_tester.InvalidTestCaseSuggestion{
+			{MessageId: "conditionFixDefaultFalse", Output: strings.Replace(code, "!state?.active", "!((state?.active) ?? false)", 1)},
+			{MessageId: "conditionFixCompareFalse", Output: strings.Replace(code, "!state?.active", ";(state?.active) === false", 1)},
+		}
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "state?.active", "conditionErrorNullableBoolean", "Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.", suggestions)}})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
+}
+
+func TestStrictBooleanExpressionsReviewIterableAndIndexedSpreads(t *testing.T) {
+	// The rest overload keeps these iterator/structural cases valid TypeScript;
+	// runtime behavior is still the native array predicate method.
+	const overload = `interface Array<T> {filter(...args: unknown[]): T[]} `
+	valid := []rule_tester.ValidTestCase{
+		{Code: overload + `declare const args: Iterable<() => boolean>; [1,2].filter(...args);`},
+		{Code: overload + `declare const args: Set<() => boolean>; [1,2].filter(...args);`},
+		{Code: overload + `declare const args: Iterable<() => boolean> | readonly [() => boolean, object]; [1,2].filter(...args);`},
+
+		{Code: overload + `declare const args: readonly [() => boolean, object] & {brand:true}; [1,2].filter(...args);`},
+		{Code: overload + `declare const args: (() => boolean)[] & {0: () => boolean}; [1,2].filter(...args, {});`},
+		{Code: overload + `interface Args extends Readonly<[() => boolean, object]> {brand:true} declare const args: Args; [1,2].filter(...args);`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, code := range []string{
+		overload + `declare const args: Iterable<() => void>; [1,2].filter(...args);`,
+		overload + `declare const args: Set<() => void>; [1,2].filter(...args);`,
+		overload + `declare const args: readonly [() => void, object] & {brand:true}; [1,2].filter(...args);`,
+		overload + `declare const args: (() => void)[] & {0: () => void}; [1,2].filter(...args, {});`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "...args", "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", nil)}})
+	}
+	code := overload + `declare const args: (() => boolean)[] & {0?: () => boolean}; [1,2].filter(...args, {});`
+	invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, "...args", "conditionErrorOther", "Unexpected value in conditional. A boolean expression is required.", nil)}})
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
 }

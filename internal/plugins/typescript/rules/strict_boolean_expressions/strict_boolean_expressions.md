@@ -158,28 +158,36 @@ produces `(x, /* ) */): boolean => 1`. Upstream v8.67.0 misidentifies this
 as a parameter without parentheses and produces an invalid annotation.
 
 The string-length suggestion defaults an optional chain's short-circuit result
-to an empty string before accessing `.length`. For example, `user?.name!` becomes
+or a potentially nullish value hidden by a type assertion to an empty string
+before accessing `.length`. For example, `user?.name!` becomes
 `((user?.name!) ?? "").length > 0`; the original expression is evaluated once.
 Upstream v8.67.0 can suggest `(user?.name!).length > 0`, which throws when
 `user` is nullish. Negated conditions use the corresponding `=== 0` check. This protection is
 consistent for all authored optional chains, including receivers whose static
-types are non-nullish.
+types are non-nullish. For `value: string | undefined`, the suggestion for
+`value!` is `(value! ?? "").length > 0`. The same protection applies when an
+assertion wraps a conditional expression.
 
 Suggestions that begin with a parenthesis insert a leading semicolon when needed
 inside `case` and `default` clauses as well as ordinary blocks. This prevents a
 suggestion from joining a preceding expression statement through automatic
-semicolon insertion; upstream v8.67.0 misses the switch-clause boundary.
+semicolon insertion, including when `as` or `satisfies` wraps the expression.
+Upstream v8.67.0 misses these boundaries.
 
 Array-predicate checks use the callback element of a spread tuple and exclude
 its `thisArg`. Empty tuples allow selection of the next argument. A possibly
 empty spread admits both its element type and the following argument as possible
 callbacks. No inline callback edits are offered for a spread argument.
 Upstream v8.67.0 can report `conditionErrorOther` on a valid tuple containing a
-boolean callback and its `thisArg`.
+boolean callback and its `thisArg`. For array-like intersection types, an
+explicit required `0` property retains the first callback and nonempty status.
+`Set` and `Iterable` spreads use the compiler's iterated element type. Opaque
+collections and unresolved mixed collection unions remain conservative.
 
 Computed array-method names are treated as unknown when their backing objects
-may have been modified by a function call. Strings copied from those objects
-before the call remain stable. This avoids classifying a runtime `forEach` call
+may have been modified by a function call. Primitive strings copied from those objects
+before a later-created callback remain stable; defining that callback does not
+execute its body. Calls before the copy still invalidate the backing object. This avoids classifying a runtime `forEach` call
 as a predicate method based on an object's initial property value.
 
 The `noStrictNullCheck` diagnostic uses an empty range at the start of the file

@@ -1968,7 +1968,8 @@ if ((<string | null>x) ?? "") {}`},
 			}},
 		},
 
-		// ---- NonNullAssertion `x!`: strong precedence (no inner paren). ----
+		// ---- NonNullAssertion `x!`: preserve precedence and guard erased nullish values. ----
+		// The previous length suggestion threw when x was undefined; default it once.
 		// `declare const x: number | undefined; if (x!.toString())` — the `.toString()` makes the whole thing string.
 		// For this fixer test, use `x!` directly in a position where `!`-narrowed `string | undefined` ⇒ `string`.
 		{
@@ -1977,7 +1978,7 @@ if ((<string | null>x) ?? "") {}`},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "conditionErrorString", Line: 2, Column: 5,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-					{MessageId: "conditionFixCompareStringLength", Output: "declare const x: string | undefined;\nif (x!.length > 0) {}"},
+					{MessageId: "conditionFixCompareStringLength", Output: "declare const x: string | undefined;\nif ((x! ?? \"\").length > 0) {}"},
 					{MessageId: "conditionFixCompareEmptyString", Output: `declare const x: string | undefined;
 if (x! !== "") {}`},
 					{MessageId: "conditionFixCastBoolean", Output: "declare const x: string | undefined;\nif (Boolean(x!)) {}"},

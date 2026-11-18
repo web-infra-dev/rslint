@@ -34,6 +34,23 @@ func executionRoot(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// A function expression created after a primitive capture in the same execution
+// root cannot have run before that capture. Keep declarations (which hoist),
+// earlier functions and other execution roots conservative. Enclosing calls
+// still contribute their own escape sites, including calls before the capture.
+func (e *StaticStringEvaluator) callMayPrecedeCapture(site *ast.Node) bool {
+	root := executionRoot(site)
+	captureRoot := executionRoot(e.capturePoint)
+	if root == captureRoot {
+		return site.End() <= e.capturePoint.Pos()
+	}
+	if root != nil && (ast.IsArrowFunction(root) || ast.IsFunctionExpression(root)) &&
+		root.Pos() >= e.capturePoint.End() && executionRoot(root.Parent) == captureRoot {
+		return false
+	}
+	return true
+}
+
 // Capture immutable values at initialization, including primitive elements
 // copied into a fresh literal container. Containers retaining object references
 // use ordinary evaluation. Capture views share facts without another file scan.

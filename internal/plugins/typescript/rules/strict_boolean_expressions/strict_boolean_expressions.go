@@ -857,11 +857,11 @@ func getSuggestionsForConditionError(
 		}
 
 	case "conditionErrorString":
-		// A trailing non-null assertion can hide an optional chain's nullish
-		// result from the checker. Default that result before accessing length,
+		// Assertions can hide nullish values from the final expression type.
+		// Default their result before accessing length,
 		// preserving short-circuiting and evaluating the original expression once.
 		lengthCode := func(code string) string {
-			if hasOptionalChain(node) {
+			if hasOptionalChain(node) || assertionCanBeNullish(tc, node) {
 				return "(" + code + ` ?? "").length`
 			}
 			return code + ".length"
@@ -899,6 +899,26 @@ func getSuggestionsForConditionError(
 }
 
 // ----- Array predicate checking ----------------------------------------
+
+// Inspect only authored outer assertions. The checker already knows whether
+// their operands, including conditional expressions and aliases, can be nullish;
+// no expression evaluator or whole-tree scan is needed.
+func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
+	for node = ast.SkipParentheses(node); node != nil; node = ast.SkipParentheses(node.Expression()) {
+		switch node.Kind {
+		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		default:
+			return false
+		}
+		operand := ast.SkipOuterExpressions(node.Expression(), ast.OEKParentheses|ast.OEKAssertions|ast.OEKNonNullAssertions)
+		for _, part := range utils.UnionTypeParts(utils.GetConstrainedTypeAtLocation(tc, operand)) {
+			if utils.IsTypeFlagSet(part, checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoidLike|checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsTypeParameter) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // Protect every authored optional chain consistently, including assertions
 // and await wrappers. Non-nullish static receiver types do not remove the
@@ -944,9 +964,19 @@ func firstArrayPredicateArgument(tc *checker.Checker, arguments []*ast.Node) (*a
 		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
 		types, mayBeEmpty, known := firstSpreadElementTypes(tc, spreadType, map[*checker.Type]bool{})
 		if !known {
-			// An opaque iterable cannot establish which argument is the
-			// callback. Do not guess from the iterator or a later thisArg.
-			return nil, nil
+			// Keep unresolved mixed collection unions conservative instead of
+			// losing tuple argument positions in an iterated-type union.
+			if spreadType.IsUnion() {
+				return nil, nil
+			}
+			// A spread node exposes the compiler's iterated element type for
+			// Set/Iterable even when the collection has no numeric index.
+			// Error/any/unknown types do not establish a callback type.
+			element := utils.GetConstrainedTypeAtLocation(tc, argument)
+			if element == nil || utils.IsTypeFlagSet(element, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsNever) {
+				return nil, nil
+			}
+			types, mayBeEmpty = []*checker.Type{element}, true
 		}
 		if len(types) != 0 && reportNode == nil {
 			reportNode = argument
@@ -989,6 +1019,15 @@ func firstSpreadElementTypes(tc *checker.Checker, t *checker.Type, visiting map[
 		return types, mayBeEmpty, true
 	}
 	if !checker.IsTupleType(t) {
+		// A required zero property on an array-like type preserves its
+		// callback and nonempty information through branding/intersections.
+		// Do not infer iterator order for an arbitrary indexed object.
+		arrayLike := tc.IsArrayLikeType(t)
+		if zero := tc.GetPropertyOfType(t, "0"); arrayLike && zero != nil && zero.Flags&ast.SymbolFlagsOptional == 0 {
+			if first := tc.GetTypeOfPropertyOfType(t, "0"); first != nil {
+				return []*checker.Type{first}, false, true
+			}
+		}
 		first := tc.GetNumberIndexType(t)
 		if first == nil {
 			return nil, false, false
@@ -1276,7 +1315,7 @@ func isObjectExpressionInOneLineReturn(node, innerNode *ast.Node) bool {
 var leadingSemiTrigger = regexp.MustCompile("^[`(\\[]")
 
 func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool {
-	if !leadingSemiTrigger.MatchString(code) {
+	if !leadingSemiTrigger.MatchString(code) || !utils.IsStartOfExpressionStatement(sf, node) {
 		return false
 	}
 	// Walk up: while the node is in a left-hand position relative to its
@@ -1303,9 +1342,6 @@ func needsLeadingSemicolon(sf *ast.SourceFile, node *ast.Node, code string) bool
 			}
 			return false
 		}
-		if !isLeftHandSide(current) {
-			return false
-		}
 		current = parent
 	}
 }
@@ -1329,42 +1365,6 @@ func indexOfNode(nodes []*ast.Node, target *ast.Node) int {
 		}
 	}
 	return -1
-}
-
-// isLeftHandSide mirrors upstream's `isLeftHandSide` (the private helper used
-// by the wrapping fixer's ASI check). Upstream only treats `UpdateExpression`
-// (`a++` / `++a`) as a left-hand parent on the unary side, not the broader
-// `UnaryExpression` (`!a`, `~a`, `typeof a`, ...). tsgo collapses both shapes
-// into PrefixUnary / PostfixUnary, so we differentiate by operator: only the
-// update operators `++` and `--` should return true.
-func isLeftHandSide(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	if parent.Kind == ast.KindPostfixUnaryExpression {
-		// `a++` / `a--` — operand is the leftmost token. Upstream UpdateExpression.
-		return true
-	}
-	if parent.Kind == ast.KindPrefixUnaryExpression {
-		op := parent.AsPrefixUnaryExpression().Operator
-		// Only `++a` / `--a` count as UpdateExpression upstream-side; `!a`,
-		// `~a`, `+a`, `-a` are UnaryExpression and upstream returns false.
-		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
-	}
-	if ast.IsBinaryExpression(parent) {
-		return parent.AsBinaryExpression().Left == node
-	}
-	if ast.IsConditionalExpression(parent) {
-		return parent.AsConditionalExpression().Condition == node
-	}
-	if ast.IsCallExpression(parent) {
-		return parent.AsCallExpression().Expression == node
-	}
-	if ast.IsTaggedTemplateExpression(parent) {
-		return parent.AsTaggedTemplateExpression().Tag == node
-	}
-	return false
 }
 
 // ----- Array length detection -------------------------------------------

@@ -68,6 +68,11 @@ func TestStaticMethodNameObservationOrder(t *testing.T) {
 		{"escape inside key", ``, `array[(unknown(opts), opts.current)](0)`, false},
 		{"unrelated escape", `unknown({current: "other"});`, `array[opts.current](0)`, true},
 		{"captured primitive", `const key = opts.current; unknown(opts);`, `array[key](0)`, true},
+		{"captured primitive before later arrow", `const key = opts.current;`, `array[key](() => unknown(opts))`, true},
+		{"captured primitive before later function", `const key = opts.current;`, `array[key](function () { unknown(opts); })`, true},
+		{"capture after invoked arrow", `(() => unknown(opts))(); const key = opts.current;`, `array[key](0)`, false},
+		{"capture after hoisted call", `change(); const key = opts.current; function change() { unknown(opts); }`, `array[key](0)`, false},
+
 		{"loop can repeat later escape", ``, `array[opts.current](unknown(opts))`, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {

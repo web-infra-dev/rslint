@@ -1957,7 +1957,7 @@ func (staticEvaluator *StaticStringEvaluator) hasPropertyMutation(symbol *ast.Sy
 			return flags&staticReferencePropertyMutation != 0
 		}
 		for site := range staticEvaluator.escapeFacts.sites[symbol] {
-			if executionRoot(site) != executionRoot(staticEvaluator.capturePoint) || site.End() <= staticEvaluator.capturePoint.Pos() {
+			if staticEvaluator.callMayPrecedeCapture(site) {
 				return true
 			}
 		}
