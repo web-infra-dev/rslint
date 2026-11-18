@@ -1859,6 +1859,20 @@ lease, then resolve declaration indices and encode packets after releasing it.
 The session retains its Program directly until close, outside the Program's
 weak derived cache.
 
+A syntax-only session admits exact source files and exposes both parser-service
+node maps. The JS parser services return `program: null` and leave compiler
+option flags undefined. A map lookup projects the existing compiler tree.
+The session rejects semantic requests even if its Program also has a checker.
+
+Rules with a project can inspect Program diagnostics, source roots, references,
+module resolution, and compiler statistics. Program-wide queries acquire their
+own checker leases. The JS checker also exposes intrinsic and literal types,
+symbol lookup and formatting, type predicates, and inspection of generated
+declaration nodes. Statistics and the checker's mutable result slots are read
+on demand. Compiler output through `Program.emit()` and source replacement
+through `SourceFile.update()` are unsupported and throw. Conditional-type
+instantiation keys are opaque to rules and scoped to the native checker.
+
 The reusable ESTree `Builder.Project` owns syntax encoding and exact numeric
 forward origins and preferred reverse aliases from the original compiler AST.
 `ProjectOrigins` provides the same mappings for an existing compact frame,

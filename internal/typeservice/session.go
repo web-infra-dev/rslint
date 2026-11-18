@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,6 +60,7 @@ var publicObjectFlags = [...]struct {
 type Session struct {
 	mu         sync.Mutex
 	program    *program.Program
+	syntaxOnly bool
 	anchor     *ast.SourceFile
 	eligible   map[*ast.SourceFile]bool
 	checker    *checker.Checker
@@ -69,6 +71,7 @@ type Session struct {
 }
 
 type Descriptor struct {
+	SyntaxOnly       bool           `json:"syntaxOnly,omitempty"`
 	Generation       uint32         `json:"generation"`
 	Checker          uint32         `json:"checker"`
 	CurrentDirectory string         `json:"currentDirectory"`
@@ -114,18 +117,35 @@ func (s *Session) Source(generation uint32, name string) (*ast.SourceFile, error
 	if generation != s.generation {
 		return nil, errors.New("stale type service generation")
 	}
-	return s.program.GetSourceFile(name), nil //nolint:nilnil // A missing Program source is a legitimate result.
+	file := s.program.GetSourceFile(name)
+	if file == nil && !s.syntaxOnly {
+		file = configFile(s.program, name)
+	}
+	if s.syntaxOnly && !s.eligible[file] {
+		return nil, errors.New("foreign syntax service source")
+	}
+	return file, nil //nolint:nilnil // A missing Program source is a legitimate result.
 }
 
 // New accepts exact Program sources that the caller has explicitly admitted
 // for typed rules. Checker capability alone is never eligibility.
 func New(ctx context.Context, p *program.Program, eligible []*ast.SourceFile) (*Session, error) {
+	return newSession(ctx, p, eligible, false)
+}
+
+// NewSyntaxOnly exposes the admitted files' compiler syntax without authorizing
+// a type checker, including when the underlying Program also serves typed files.
+func NewSyntaxOnly(ctx context.Context, p *program.Program, eligible []*ast.SourceFile) (*Session, error) {
+	return newSession(ctx, p, eligible, true)
+}
+
+func newSession(ctx context.Context, p *program.Program, eligible []*ast.SourceFile, syntaxOnly bool) (*Session, error) {
 	if !p.IsValid() || len(eligible) == 0 {
 		return nil, errors.New("type services require a bound Program and explicitly eligible sources")
 	}
-	s := &Session{program: p, anchor: eligible[0], eligible: make(map[*ast.SourceFile]bool, len(eligible)), generation: nextGeneration.Add(1)}
+	s := &Session{program: p, syntaxOnly: syntaxOnly, anchor: eligible[0], eligible: make(map[*ast.SourceFile]bool, len(eligible)), generation: nextGeneration.Add(1)}
 	for _, f := range eligible {
-		if !p.CanProvideTypeChecker(f) {
+		if !p.OwnsSourceFile(f) || (!syntaxOnly && !p.CanProvideTypeChecker(f)) {
 			return nil, errors.New("ineligible or foreign type service source")
 		}
 		s.eligible[f] = true
@@ -147,23 +167,63 @@ func (s *Session) Close() {
 	s.symbols = nil
 	s.signatures = nil
 }
+
+// SyntaxDescriptor opens only the requested target for a file-scoped reader.
+func (s *Session) SyntaxDescriptor(file *ast.SourceFile) (Descriptor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.program == nil {
+		return Descriptor{}, ErrClosed
+	}
+	if !s.syntaxOnly || !s.eligible[file] {
+		return Descriptor{}, errors.New("foreign syntax projection target")
+	}
+	d := s.syntaxDescriptor()
+	d.Sources = []Source{syntaxSource(file)}
+	return d, nil
+}
+func (s *Session) syntaxDescriptor() Descriptor {
+	return Descriptor{SyntaxOnly: true, Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: map[string]any{}}
+}
+func syntaxSource(f *ast.SourceFile) Source {
+	return Source{FileName: f.FileName(), Path: string(f.Path()), IsDeclarationFile: f.IsDeclarationFile}
+}
 func (s *Session) Descriptor() (Descriptor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.program == nil {
 		return Descriptor{}, ErrClosed
 	}
-	// The compiler's JSON contract preserves explicit false and omitted values.
-	data, err := json.Marshal(s.program.Options())
+	if s.syntaxOnly {
+		d := s.syntaxDescriptor()
+		for _, file := range s.program.SourceFiles() {
+			if s.eligible[file] {
+				d.Sources = append(d.Sources, syntaxSource(file))
+			}
+		}
+		return d, nil
+	}
+	options, err := compilerOptions(s.program.Options())
 	if err != nil {
 		return Descriptor{}, err
 	}
+	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options}
+	for _, f := range s.program.SourceFiles() {
+		d.Sources = append(d.Sources, s.source(f))
+	}
+	return d, nil
+}
+func compilerOptions(opts *core.CompilerOptions) (map[string]any, error) {
+	// The compiler's JSON contract preserves explicit false and omitted values.
+	data, err := json.Marshal(opts)
+	if err != nil {
+		return nil, err
+	}
 	options := map[string]any{}
 	if err = json.Unmarshal(data, &options); err != nil {
-		return Descriptor{}, err
+		return nil, err
 	}
 	// These compiler enums differ from TypeScript's JavaScript enum layout.
-	opts := s.program.Options()
 	if opts.NewLine != core.NewLineKindNone {
 		options["newLine"] = int(opts.NewLine) - 1
 	}
@@ -173,11 +233,7 @@ func (s *Session) Descriptor() (Descriptor, error) {
 	if opts.ModuleDetection != core.ModuleDetectionKindNone {
 		options["moduleDetection"] = map[core.ModuleDetectionKind]string{core.ModuleDetectionKindAuto: "Auto", core.ModuleDetectionKindLegacy: "Legacy", core.ModuleDetectionKindForce: "Force"}[opts.ModuleDetection]
 	}
-	d := Descriptor{Generation: s.generation, Checker: 1, CurrentDirectory: s.program.CurrentDirectory(), CompilerOptions: options}
-	for _, f := range s.program.SourceFiles() {
-		d.Sources = append(d.Sources, s.source(f))
-	}
-	return d, nil
+	return options, nil
 }
 func (s *Session) source(f *ast.SourceFile) Source {
 	return Source{FileName: f.FileName(), Path: string(f.Path()), Packages: s.program.PackageNamesForSourceFile(f), External: s.program.IsSourceFileFromExternalLibrary(f), DefaultLibrary: s.program.IsSourceFileDefaultLibrary(f), IsDeclarationFile: f.IsDeclarationFile}
@@ -214,6 +270,7 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 		return nil, ErrClosed
 	}
 	p := s.program
+	eligible := s.eligible // immutable after construction
 	for _, q := range queries {
 		if q.Generation != s.generation || q.Checker != 1 {
 			s.mu.Unlock()
@@ -223,42 +280,63 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 			s.mu.Unlock()
 			return nil, errors.New("missing type service request")
 		}
+		if s.syntaxOnly && q.Request.operation() != "nodeRecord" {
+			s.mu.Unlock()
+			return nil, errors.New("semantic queries require a typed project")
+		}
 	}
 	s.mu.Unlock()
-	natives := make([]*ast.Node, len(queries))
+	natives := make([]queryNodes, len(queries))
 	for i, q := range queries {
-		if node := requestNode(q.Request); node != nil {
-			f := p.GetSourceFile(node.File)
-			if f == nil {
-				return nil, errors.New("foreign source handle")
+		if ref := requestNode(q.Request); ref != nil {
+			f := p.GetSourceFile(ref.File)
+			if s.syntaxOnly && !eligible[f] {
+				return nil, errors.New("foreign syntax service source")
 			}
-			table := encoder.GetNodeIndexTable(f)
-			if node.Index == 0 || int(node.Index) >= len(table.Nodes) || table.Nodes[node.Index] == nil {
-				return nil, errors.New("invalid compiler node handle")
+			natives[i].primary, err = resolveNode(f, *ref)
+			if err != nil {
+				return nil, err
 			}
-			natives[i] = table.Nodes[node.Index]
+		}
+		if r, ok := q.Request.(*IndexDeclarationRequest); ok && r.Declaration != nil {
+			natives[i].declaration, err = resolveNode(p.GetSourceFile(r.Declaration.File), *r.Declaration)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	results := make([]Result, len(queries))
 	records := make([][]Record, len(queries))
-	semantic := false
-	for _, query := range queries {
-		if query.Request.operation() != "nodeRecord" {
-			semantic = true
-			break
+	// Program diagnostics and statistics may acquire all checker shards.
+	// Preserve request order, releasing the file checker before these reads.
+	for start := 0; start < len(queries); {
+		if r, ok := queries[start].Request.(*ProgramRequest); ok {
+			results[start], err = programQuery(ctx, p, r, natives[start].primary)
+			if err != nil {
+				return nil, err
+			}
+			start++
+			continue
 		}
-	}
-	if semantic {
-		err = s.checkBatch(ctx, queries, natives, results, records)
-		if err != nil {
+		if queries[start].Request.operation() == "nodeRecord" {
+			results[start] = nodeFacts(p, natives[start].primary)
+			start++
+			continue
+		}
+		end := start + 1
+		for end < len(queries) {
+			if _, ok := queries[end].Request.(*ProgramRequest); ok || queries[end].Request.operation() == "nodeRecord" {
+				break
+			}
+			end++
+		}
+		if err = s.checkBatch(ctx, queries[start:end], natives[start:end], results[start:end], records[start:end]); err != nil {
 			return nil, err
 		}
+		start = end
 	}
 	packets = make([][]byte, len(queries))
 	for i, result := range results {
-		if queries[i].Request.operation() == "nodeRecord" {
-			result = nodeFacts(p, natives[i])
-		}
 		materializeReferences(p, result)
 		for _, record := range records[i] {
 			materializeReferences(p, record.Fact)
@@ -275,6 +353,9 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 }
 func materializeReferences(p *program.Program, result Result) {
 	switch fact := result.(type) {
+	case *TypeDetails:
+		fact.patternRef, fact.nodeRef, fact.rootRef = nodeReference(p, fact.pattern), nodeReference(p, fact.node), nodeReference(p, fact.rootNode)
+		fact.labelRefs = nodeRefs(p, fact.labels)
 	case *SymbolFact:
 		if fact.nodes != nil {
 			fact.Declarations = make([]NodeRef, 0, len(fact.nodes))
@@ -291,11 +372,13 @@ func materializeReferences(p *program.Program, result Result) {
 	case IndexInfos:
 		for i := range fact {
 			fact[i].Declaration = nodeReference(p, fact[i].node)
+			fact[i].Components = nodeRefs(p, fact[i].componentNodes)
+			fact[i].componentNodes = nil
 			fact[i].node = nil
 		}
 	}
 }
-func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*ast.Node, results []Result, records [][]Record) error {
+func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []queryNodes, results []Result, records [][]Record) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.program == nil {
@@ -323,9 +406,6 @@ func (s *Session) checkBatch(ctx context.Context, queries []Query, natives []*as
 	for i, q := range queries {
 		if err := ctx.Err(); err != nil {
 			return err
-		}
-		if q.Request.operation() == "nodeRecord" {
-			continue
 		}
 		var err error
 		results[i], err = s.execute(ctx, c, q.Request, natives[i])
@@ -398,7 +478,7 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 		case "signatureRecord":
 			request = &SignatureRequest{Op: kind, ID: id}
 		}
-		fact, err := s.execute(ctx, c, request, nil)
+		fact, err := s.execute(ctx, c, request, queryNodes{})
 		if err != nil {
 			return err
 		}
@@ -553,16 +633,35 @@ func (s *Session) namedSymbols(symbols []*ast.Symbol) NamedSymbols {
 }
 func (s *Session) indexInfo(info *checker.IndexInfo) IndexInfo {
 	return IndexInfo{
-		KeyType:    s.typeID(info.KeyType()),
-		Type:       s.typeID(info.ValueType()),
-		IsReadonly: info.IsReadonly(),
-		node:       info.Declaration(),
+		KeyType:        s.typeID(info.KeyType()),
+		Type:           s.typeID(info.ValueType()),
+		IsReadonly:     info.IsReadonly(),
+		node:           info.Declaration(),
+		componentNodes: checker.IndexInfo_components(info),
 	}
 }
-func (s *Session) execute(ctx context.Context, c *checker.Checker, request Request, native *ast.Node) (Result, error) {
+
+type queryNodes struct{ primary, declaration *ast.Node }
+
+func (s *Session) execute(ctx context.Context, c *checker.Checker, request Request, nodes queryNodes) (Result, error) {
+	native := nodes.primary
 	switch r := request.(type) {
 	case *NodeRequest:
 		switch r.Op {
+		case "exportSpecifierLocalTargetSymbol":
+			return Handle(s.symbolID(c.GetExportSpecifierLocalTargetSymbol(native))), nil
+		case "propertySymbolOfDestructuringAssignment":
+			return Handle(s.symbolID(c.GetPropertySymbolOfDestructuringAssignment(native))), nil
+		case "jsxIntrinsicTagNamesAt":
+			return s.namedSymbols(c.GetJsxIntrinsicTagNamesAt(native)), nil
+		case "typeOfAssignmentPattern":
+			return Handle(s.typeID(checker.Checker_getTypeOfAssignmentPattern(c, native))), nil
+		case "isOptionalParameter":
+			return Boolean(checker.Checker_isOptionalParameter(c, native)), nil
+		case "constantValue":
+			return constantValue(c.GetConstantValue(native)), nil
+		case "isImplementationOfOverload":
+			return overloadImplementation(c, native), nil
 		case "type":
 			return Handle(s.typeID(c.GetTypeAtLocation(native))), nil
 		case "fromTypeNode":
@@ -586,6 +685,61 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			return diagnosticFacts(c.GetSuggestionDiagnostics(ctx, native.AsSourceFile())), ctx.Err()
 		}
+	case *StringLiteralRequest:
+		return Handle(s.typeID(checker.Checker_getStringLiteralType(c, string(r.Name)))), nil
+	case *NumberLiteralRequest:
+		value, err := strconv.ParseFloat(r.Value, 64)
+		if err != nil {
+			return nil, err
+		}
+		return Handle(s.typeID(checker.Checker_getNumberLiteralType(c, jsnum.Number(value)))), nil
+	case *BigIntLiteralRequest:
+		return Handle(s.typeID(checker.Checker_getBigIntLiteralType(c, jsnum.NewPseudoBigInt(r.Digits, r.Negative)))), nil
+	case *NullableRequest:
+		flags := checker.TypeFlagsNone
+		if r.Nullable {
+			flags |= checker.TypeFlagsNull
+		}
+		if r.Undefinable {
+			flags |= checker.TypeFlagsUndefined
+		}
+		return Handle(s.typeID(checker.Checker_getNullableType(c, s.typeByID(r.ID), flags))), nil
+	case *PrivatePropertyRequest:
+		symbol := checker.Checker_lookupSymbolForPrivateIdentifierDeclaration(c, string(r.Name), native)
+		if symbol == nil {
+			return Handle(0), nil
+		}
+		return Handle(s.symbolID(checker.Checker_getPrivateIdentifierPropertyOfType(c, s.typeByID(r.ID), symbol))), nil
+	case *NamedNodeRequest:
+		if r.Op == "validPropertyAccess" {
+			return Boolean(c.IsValidPropertyAccess(native, string(r.Name))), nil
+		}
+		parameter, property := c.GetSymbolsOfParameterPropertyDeclaration(native, string(r.Name))
+		return Handles{s.symbolID(parameter), s.symbolID(property)}, nil
+	case *IndexSymbolRequest:
+		siblings := make([]*ast.Symbol, len(r.Siblings))
+		for i, id := range r.Siblings {
+			siblings[i] = s.symbolByID(id)
+		}
+		infos := checker.Checker_getIndexInfosOfIndexSymbol(c, s.symbolByID(r.ID), siblings)
+		result := make(IndexInfos, len(infos))
+		for i, info := range infos {
+			result[i] = s.indexInfo(info)
+		}
+		return result, nil
+	case *ExpandoRequest:
+		return Handle(s.symbolID(expandoSymbol(c, native, r.AllowDeclaration))), nil
+	case *PredicateStringRequest:
+		var typ *checker.Type
+		if r.Type != 0 {
+			typ = s.typeByID(r.Type)
+		}
+		return Text(checker.PluginPredicateString(c, checker.TypePredicateKind(r.Kind), string(r.Name), r.Position, typ, native, checker.TypeFormatFlags(r.Flags))), nil
+	case *IndexDeclarationRequest:
+		info := checker.NewPluginIndexInfo(s.typeByID(r.Key), s.typeByID(r.Value), r.Readonly, nodes.declaration)
+		builder, release := checker.Checker_getNodeBuilder(c)
+		defer release()
+		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(info, native, checker.PluginNodeBuilderFlags(r.Flags), 0, nil))
 	case *ContextualArgumentRequest:
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *ResolvedSignatureRequest:
@@ -606,6 +760,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		return ids, nil
 	case *TypeRequest:
 		switch r.Op {
+		case "augmentedPropertiesOfType":
+			return s.namedSymbols(checker.Checker_getAugmentedPropertiesOfType(c, s.typeByID(r.ID))), nil
 		case "constraint":
 			return Handle(s.typeID(c.GetBaseConstraintOfType(s.typeByID(r.ID)))), nil
 		case "apparent":
@@ -626,6 +782,54 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return s.typeIDs(c.GetBaseTypes(t)), nil
 		case "defaultType":
 			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
+		case "conditionalInstantiations":
+			root := checker.ConditionalType_root(s.typeByID(r.ID).AsConditionalType())
+			table := checker.ConditionalRoot_instantiations(root)
+			entries := make(NamedSymbols, 0, len(table))
+			for key, typ := range table {
+				entries = append(entries, NamedSymbol{Name: fmt.Sprintf("%016x%016x", key.Hi, key.Lo), ID: s.typeID(typ)})
+			}
+			slices.SortFunc(entries, func(a, b NamedSymbol) int { return strings.Compare(a.Name, b.Name) })
+			return entries, nil
+		case "freshLiteral", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
+			t := s.typeByID(r.ID)
+			var value *checker.Type
+			switch r.Op {
+			case "freshLiteral":
+				if t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsBigIntLiteral|checker.TypeFlagsEnumLiteral) != 0 && t.Flags()&checker.TypeFlagsUnion == 0 {
+					value = t.AsLiteralType().FreshType()
+				}
+			case "evolvingElement", "finalArray":
+				if t.ObjectFlags()&checker.ObjectFlagsEvolvingArray != 0 {
+					arr := t.AsEvolvingArrayType()
+					if r.Op == "evolvingElement" {
+						value = checker.EvolvingArrayType_elementType(arr)
+					} else {
+						value = checker.EvolvingArrayType_finalArrayType(arr)
+					}
+				}
+			case "simplifiedForReading", "simplifiedForWriting":
+				if t.Flags()&checker.TypeFlagsIndexedAccess != 0 {
+					value = checker.CachedIndexedAccess(c, t, r.Op == "simplifiedForWriting")
+				}
+			case "typeParameterConstraint":
+				if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
+					value = checker.TypeParameter_constraint(t.AsTypeParameter())
+				}
+			}
+			return Handle(s.typeID(value)), nil
+		case "typeDetails":
+			return s.typeDetails(c, s.typeByID(r.ID)), nil
+		case "resolvedTrueType", "resolvedFalseType":
+			t := s.typeByID(r.ID)
+			if t.Flags()&checker.TypeFlagsConditional == 0 {
+				return Handle(0), nil
+			}
+			cond := t.AsConditionalType()
+			if r.Op == "resolvedTrueType" {
+				return Handle(s.typeID(checker.ConditionalType_resolvedTrueType(cond))), nil
+			}
+			return Handle(s.typeID(checker.ConditionalType_resolvedFalseType(cond))), nil
 		case "classThisType":
 			t := s.typeByID(r.ID).AsInterfaceType()
 			if t == nil {
@@ -750,6 +954,14 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 	case *SymbolRequest:
 		switch r.Op {
+		case "rootSymbols":
+			return s.namedSymbols(c.GetRootSymbols(s.symbolByID(r.ID))), nil
+		case "mergedSymbol":
+			return Handle(s.symbolID(c.GetMergedSymbol(s.symbolByID(r.ID)))), nil
+		case "isArgumentsSymbol":
+			return Boolean(c.GetArgumentsSymbol() == s.symbolByID(r.ID)), nil
+		case "isUndefinedSymbol":
+			return Boolean(c.GetUndefinedSymbol() == s.symbolByID(r.ID)), nil
 		case "aliasedSymbol":
 			return Handle(s.symbolID(c.GetAliasedSymbol(s.symbolByID(r.ID)))), nil
 		case "immediateAliasedSymbol":
@@ -762,8 +974,16 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
 		case "symbolLinkType":
 			return Handle(s.typeID(checker.CachedSymbolType(c, s.symbolByID(r.ID)))), nil
-		case "symbolMembers":
-			members := slices.Collect(maps.Values(s.symbolByID(r.ID).Members))
+		case "symbolMembers", "symbolExports", "symbolGlobalExports":
+			symbol := s.symbolByID(r.ID)
+			table := symbol.Members
+			if r.Op == "symbolExports" {
+				table = symbol.Exports
+			}
+			if r.Op == "symbolGlobalExports" {
+				table = globalExports(symbol)
+			}
+			members := slices.Collect(maps.Values(table))
 			checker.Checker_sortSymbols(c, members)
 			result := make(NamedSymbols, len(members))
 			for i, member := range members {
@@ -778,7 +998,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			return Handle(s.typeID(c.GetTypeOfSymbol(s.symbolByID(r.ID)))), nil
 		case "symbolRecord":
 			sym := s.symbolByID(r.ID)
-			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
+			return &SymbolFact{Name: symbolName(sym), EscapedName: ast.EscapeSymbolName(sym.Name), Flags: uint32(sym.Flags), CheckFlags: jsCheckFlags(sym.CheckFlags), HasMembers: sym.Members != nil, HasExports: sym.Exports != nil, HasGlobalExports: globalExports(sym) != nil, nodes: appendNodes(sym.Declarations), valueNode: sym.ValueDeclaration}, nil
 		}
 	case *SymbolDocsRequest:
 		if !r.WithChecker {
@@ -792,6 +1012,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		return jsDocTags(c, symbol.Declarations, active), nil
 	case *SignatureRequest:
 		switch r.Op {
+		case "typeArgumentsForResolvedSignature":
+			return OptionalHandles(s.typeIDs(checker.ResolvedSignatureTypeArguments(c, s.signatureByID(r.ID)))), nil
 		case "returnType":
 			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
 		case "signatureDocumentation":
@@ -820,10 +1042,43 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				node:             sig.Declaration(),
 			}, nil
 		}
+	case *IntrinsicRequest:
+		switch r.Op {
+		case "anyType":
+			return Handle(s.typeID(c.GetAnyType())), nil
+		case "unknownType":
+			return Handle(s.typeID(c.GetUnknownType())), nil
+		case "stringType":
+			return Handle(s.typeID(c.GetStringType())), nil
+		case "numberType":
+			return Handle(s.typeID(c.GetNumberType())), nil
+		case "booleanType":
+			return Handle(s.typeID(c.GetBooleanType())), nil
+		case "bigIntType":
+			return Handle(s.typeID(c.GetBigIntType())), nil
+		case "eSSymbolType":
+			return Handle(s.typeID(c.GetESSymbolType())), nil
+		case "nonPrimitiveType":
+			return Handle(s.typeID(c.GetNonPrimitiveType())), nil
+		case "neverType":
+			return Handle(s.typeID(c.GetNeverType())), nil
+		case "nullType":
+			return Handle(s.typeID(c.GetNullType())), nil
+		case "undefinedType":
+			return Handle(s.typeID(c.GetUndefinedType())), nil
+		case "trueType":
+			return Handle(s.typeID(checker.Checker_regularTrueType(c))), nil
+		case "falseType":
+			return Handle(s.typeID(checker.Checker_regularFalseType(c))), nil
+		case "ambientModules":
+			return s.namedSymbols(c.GetAmbientModules()), nil
+		}
 	case *VoidRequest:
 		return Handle(s.typeID(c.GetVoidType())), nil
 	case *PropertyRequest:
 		switch r.Op {
+		case "moduleMember":
+			return Handle(s.symbolID(c.TryGetMemberInModuleExports(string(r.Name), s.symbolByID(r.ID)))), nil
 		case "property":
 			return Handle(s.symbolID(c.GetPropertyOfType(s.typeByID(r.ID), string(r.Name)))), nil
 		case "propertyType":
@@ -850,17 +1105,49 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *ParameterTypeRequest:
 		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
 	case *PrintRequest:
-		if r.Op == "typeNode" {
-			var flags uint32
+		var builderFlags checker.PluginNodeBuilderFlags
+		if r.Flags != nil {
+			builderFlags = checker.PluginNodeBuilderFlags(*r.Flags)
+		}
+		switch r.Op {
+		case "typeNode":
+			return encodeGeneratedNode(checker.TypeNodeForPlugin(c, s.typeByID(r.ID), native, uint32(builderFlags)))
+		case "symbolString":
+			flags := checker.SymbolFormatFlagsAllowAnyNodeKind
 			if r.Flags != nil {
-				flags = *r.Flags
+				flags = checker.SymbolFormatFlags(*r.Flags)
 			}
-			node := checker.TypeNodeForPlugin(c, s.typeByID(r.ID), native, flags)
-			if node == nil {
-				return EncodedTypeNode(nil), nil
+			return Text(checker.Checker_symbolToStringEx(c, s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
+		case "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression":
+			builder, release := checker.Checker_getNodeBuilder(c)
+			defer release()
+			const internal = 0
+			var node *ast.Node
+			switch r.Op {
+			case "signatureDeclaration":
+				node = builder.SignatureToSignatureDeclaration(s.signatureByID(r.ID), ast.Kind(r.Kind), native, builderFlags, internal, nil)
+			case "parameterDeclaration":
+				node = builder.SymbolToParameterDeclaration(s.symbolByID(r.ID), native, builderFlags, internal, nil)
+			case "typeParameterDeclaration":
+				node = builder.TypeParameterToDeclaration(s.typeByID(r.ID), native, builderFlags, internal, nil)
+			case "entityName":
+				node = builder.SymbolToEntityName(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, internal, nil)
+			case "symbolExpression":
+				node = builder.SymbolToExpression(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, internal, nil)
+			case "typeParameterDeclarations":
+				symbol := s.symbolByID(r.ID)
+				target := checker.Checker_getTargetSymbol(c, symbol)
+				if target.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface|ast.SymbolFlagsTypeAlias) != 0 {
+					params := checker.Checker_getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(c, symbol)
+					decls := make([]*ast.Node, len(params))
+					for i, param := range params {
+						decls[i] = builder.TypeParameterToDeclaration(param, native, builderFlags, internal, nil)
+					}
+					factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+					node = factory.NewFunctionTypeNode(factory.NewNodeList(decls), factory.NewNodeList(nil), nil)
+				}
 			}
-			data, _, err := encoder.EncodeNode(node, nil)
-			return EncodedTypeNode(data), err
+			return encodeGeneratedNode(node)
 		}
 		flags := checker.TypeFormatFlagsNone
 		if r.Flags != nil {
@@ -915,6 +1202,44 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 
 // Go inserts three write-access bits before ContainsStatic and has private
 // cache flags above Unresolved. Neither group exists in JS CheckFlags.
+func resolveNode(f *ast.SourceFile, node NodeRef) (*ast.Node, error) {
+	if f == nil {
+		return nil, errors.New("foreign source handle")
+	}
+	table := encoder.GetNodeIndexTable(f)
+	if node.Index == 0 || int(node.Index) >= len(table.Nodes) || table.Nodes[node.Index] == nil {
+		return nil, errors.New("invalid compiler node handle")
+	}
+	return table.Nodes[node.Index], nil
+}
+
+func encodeGeneratedNode(node *ast.Node) (Result, error) {
+	if node == nil {
+		return EncodedTypeNode(nil), nil
+	}
+	data, _, err := encoder.EncodeNode(node, nil)
+	return EncodedTypeNode(data), err
+}
+
+func constantValue(value any) Literal {
+	switch v := value.(type) {
+	case string:
+		return Literal{Kind: 1, Text: v}
+	case jsnum.Number:
+		return Literal{Kind: 2, Number: float64(v)}
+	default:
+		return Literal{}
+	}
+}
+
+func overloadImplementation(c *checker.Checker, node *ast.Node) Boolean {
+	if !ast.NodeIsPresent(node.Body()) || ast.IsGetAccessorDeclaration(node) || ast.IsSetAccessorDeclaration(node) {
+		return false
+	}
+	signatures := checker.Checker_getSignaturesOfSymbol(c, checker.Checker_getSymbolOfDeclaration(c, node))
+	return Boolean(len(signatures) > 1 || len(signatures) == 1 && signatures[0].Declaration() != node)
+}
+
 func jsCheckFlags(flags ast.CheckFlags) uint32 {
 	const low = ast.CheckFlagsContainsWritePublic - 1
 	const high = (ast.CheckFlagsUnresolved*2 - 1) &^ (ast.CheckFlagsContainsStatic - 1)

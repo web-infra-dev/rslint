@@ -10,6 +10,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/internal/scanner"
 )
 
+type PluginNodeBuilderFlags = nodebuilder.Flags
+
 // CachedSymbolType reads the same transient-symbol slot exposed as links.type
 // by the JavaScript checker. Merely inspecting it must not resolve a type.
 func CachedSymbolType(c *Checker, symbol *ast.Symbol) *Type {
@@ -123,4 +125,47 @@ func (w *signatureTextWriter) WriteStringLiteral(text string) {
 		}
 	}
 	w.EmitTextWriter.WriteStringLiteral(text)
+}
+
+// ResolvedSignatureTypeArguments applies the instantiation mapper of this call.
+func ResolvedSignatureTypeArguments(c *Checker, sig *Signature) []*Type {
+	mapper := Signature_mapper(sig)
+	if mapper == nil {
+		return nil
+	}
+	target := sig.Target()
+	if target == nil {
+		target = sig
+	}
+	return Checker_instantiateTypes(c, target.TypeParameters(), mapper)
+}
+
+func NewPluginIndexInfo(key, value *Type, readonly bool, declaration *ast.Node) *IndexInfo {
+	return (*IndexInfo)(unsafe.Pointer(&extra_IndexInfo{keyType: key, valueType: value, isReadonly: readonly, declaration: declaration}))
+}
+
+func PluginPredicateString(c *Checker, kind TypePredicateKind, name string, index int32, typ *Type, enclosing *ast.Node, flags TypeFormatFlags) string {
+	predicate := &extra_TypePredicate{kind: kind, parameterName: name, parameterIndex: index, t: typ}
+	return Checker_typePredicateToStringEx(c, (*TypePredicate)(unsafe.Pointer(predicate)), enclosing, flags)
+}
+
+// PluginRelationCacheSizes reads the four tables while the caller owns the checker.
+func PluginRelationCacheSizes(c *Checker) [4]uint32 {
+	ch := (*extra_Checker)(unsafe.Pointer(c))
+	return [4]uint32{
+		uint32(len(Relation_results(ch.assignableRelation))),
+		uint32(len(Relation_results(ch.identityRelation))),
+		uint32(len(Relation_results(ch.subtypeRelation))),
+		uint32(len(Relation_results(ch.strictSubtypeRelation))),
+	}
+}
+
+// CachedIndexedAccess reads the simplification without triggering a new one.
+func CachedIndexedAccess(c *Checker, t *Type, writing bool) *Type {
+	kind := CachedTypeKindIndexedAccessForReading
+	if writing {
+		kind = CachedTypeKindIndexedAccessForWriting
+	}
+	k := extra_CachedTypeKey{kind: kind, typeId: t.Id()}
+	return Checker_cachedTypes(c)[*(*CachedTypeKey)(unsafe.Pointer(&k))]
 }
