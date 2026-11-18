@@ -70,6 +70,11 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options)
+		syntax := newTypeSyntaxIndex(ctx.SourceFile)
+		// A fix must not remove the last member of a surviving group. Track
+		// both duplicate and unnecessary-undefined removals, independently of
+		// whether the consumer requests edits.
+		remaining := make(map[*ast.Node]int)
 
 		unwindedParentType := func(node *ast.Node, kind ast.Kind) *ast.Node {
 			for {
@@ -91,6 +96,7 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 		report := func(
 			message rule.RuleMessage,
 			constituentNode *ast.Node,
+			previous *ast.Node,
 		) {
 			constituentNode = ast.SkipTypeParentheses(constituentNode)
 			outer := constituentNode
@@ -101,28 +107,61 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 			// ESTree omits wrapping parentheses. Upstream starts at the inner
 			// node, but includes the closing parentheses in the diagnostic.
 			textRange = core.NewTextRange(textRange.Pos(), outer.End())
-			ctx.ReportRangeWithDeferredFixes(textRange, message, func() []rule.RuleFix {
-				parent := outer.Parent
-				var types []*ast.Node
+			parent := outer.Parent
+			var types []*ast.Node
+			if parent.Kind == ast.KindUnionType {
+				types = parent.AsUnionTypeNode().Types.Nodes
+			} else {
+				types = parent.AsIntersectionTypeNode().Types.Nodes
+			}
+			fixNode := constituentNode
+			// A preceding pass may leave a one-member group with a leading
+			// separator. Its anonymous member need not share a checker type
+			// with the earlier occurrence. Remove the redundant group through
+			// its enclosing same-kind group, but never remove the previous
+			// occurrence that establishes the duplication.
+			for len(types) == 1 {
+				if previous != nil && parent.Pos() <= previous.Pos() && previous.End() <= parent.End() {
+					break
+				}
+				group := parent
+				for group.Parent.Kind == ast.KindParenthesizedType {
+					group = group.Parent
+				}
+				if group.Parent.Kind != parent.Kind {
+					break
+				}
+				fixNode, outer, parent = parent, group, group.Parent
 				if parent.Kind == ast.KindUnionType {
 					types = parent.AsUnionTypeNode().Types.Nodes
 				} else {
 					types = parent.AsIntersectionTypeNode().Types.Nodes
 				}
+			}
+			count, seen := remaining[parent]
+			if !seen {
+				count = len(types)
+			}
+			if count <= 1 {
+				ctx.ReportRange(textRange, message)
+				return
+			}
+			remaining[parent] = count - 1
+			ctx.ReportRangeWithDeferredFixes(textRange, message, func() []rule.RuleFix {
 				index := 0
 				for types[index] != outer {
 					index++
 				}
 				// Remove tokens separately to preserve whitespace and comments.
-				fixes := []rule.RuleFix{rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, constituentNode))}
+				fixes := []rule.RuleFix{rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, fixNode))}
 				scanTokens := func(start, end int) {
 					scanner := scanner.GetScannerForSourceFile(ctx.SourceFile, start)
 					for ; scanner.TokenStart() < end && scanner.Token() != ast.KindEndOfFile; scanner.Scan() {
 						fixes = append(fixes, rule.RuleFixRemoveRange(scanner.TokenRange()))
 					}
 				}
-				scanTokens(outer.Pos(), utils.TrimNodeTextRange(ctx.SourceFile, constituentNode).Pos())
-				scanTokens(constituentNode.End(), outer.End())
+				scanTokens(outer.Pos(), utils.TrimNodeTextRange(ctx.SourceFile, fixNode).Pos())
+				scanTokens(fixNode.End(), outer.End())
 				if index > 0 {
 					scanTokens(types[index-1].End(), utils.TrimNodeTextRange(ctx.SourceFile, outer).Pos())
 				} else {
@@ -140,45 +179,48 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 		var checkDuplicateRecursively func(
 			unionOrIntersection unionOrIntersection,
 			constituentNode *ast.Node,
-			cachedTypeMap map[*checker.Type]*ast.Node,
-			uniqueConstituents *[]*ast.Node,
+			cachedTypeMap map[*checker.Type][]*ast.Node,
+			uniqueConstituents map[uint64][]*ast.Node,
 			forEachNodeType func(t *checker.Type, node *ast.Node),
 		)
 		checkDuplicateRecursively = func(
 			unionOrIntersection unionOrIntersection,
 			constituentNode *ast.Node,
-			cachedTypeMap map[*checker.Type]*ast.Node,
-			uniqueConstituents *[]*ast.Node,
+			cachedTypeMap map[*checker.Type][]*ast.Node,
+			uniqueConstituents map[uint64][]*ast.Node,
 			forEachNodeType func(t *checker.Type, node *ast.Node),
 		) {
 			constituentNode = ast.SkipTypeParentheses(constituentNode)
 			reportDuplicate := func(previous *ast.Node) {
 				previousRange := utils.TrimNodeTextRange(ctx.SourceFile, previous)
-				report(buildDuplicateMessage(unionOrIntersection, ctx.SourceFile.Text()[previousRange.Pos():previousRange.End()]), constituentNode)
+				report(buildDuplicateMessage(unionOrIntersection, ctx.SourceFile.Text()[previousRange.Pos():previousRange.End()]), constituentNode, previous)
 			}
-			for _, previous := range *uniqueConstituents {
-				if sameTypeSyntax(ctx.SourceFile, previous, constituentNode) {
-					reportDuplicate(previous)
-					return
-				}
+			fingerprint := syntax.hash(constituentNode)
+			if previous := syntax.find(uniqueConstituents[fingerprint], constituentNode); previous != nil {
+				reportDuplicate(previous)
+				return
 			}
 			t := ctx.TypeChecker.GetTypeAtLocation(constituentNode)
 			if utils.IsIntrinsicErrorType(t) {
 				return
 			}
 
-			duplicatedPreviousNode, duplicatedPrevious := cachedTypeMap[t]
-
-			if duplicatedPrevious {
-				reportDuplicate(duplicatedPreviousNode)
+			for _, previous := range cachedTypeMap[t] {
+				// A union such as (string | never) has the same checker type
+				// as its string child. The containing group is not another
+				// occurrence: removing its child would change the type.
+				if previous.Pos() <= constituentNode.Pos() && constituentNode.End() <= previous.End() {
+					continue
+				}
+				reportDuplicate(previous)
 				return
 			}
 
 			if forEachNodeType != nil {
 				forEachNodeType(t, constituentNode)
 			}
-			cachedTypeMap[t] = constituentNode
-			*uniqueConstituents = append(*uniqueConstituents, constituentNode)
+			cachedTypeMap[t] = append(cachedTypeMap[t], constituentNode)
+			uniqueConstituents[fingerprint] = append(uniqueConstituents[fingerprint], constituentNode)
 
 			var types []*ast.Node
 			withoutParens := ast.SkipTypeParentheses(constituentNode)
@@ -202,8 +244,8 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 				constituentNode *ast.Node,
 			),
 		) {
-			cachedTypeMap := map[*checker.Type]*ast.Node{}
-			uniqueConstituents := []*ast.Node{}
+			cachedTypeMap := map[*checker.Type][]*ast.Node{}
+			uniqueConstituents := make(map[uint64][]*ast.Node)
 
 			var unionOrIntersection unionOrIntersection
 			var types []*ast.Node
@@ -223,7 +265,7 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 					unionOrIntersection,
 					t,
 					cachedTypeMap,
-					&uniqueConstituents,
+					uniqueConstituents,
 					forEachNodeType,
 				)
 			}
@@ -259,7 +301,7 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 						return
 					}
 					if utils.IsTypeFlagSet(constituentNodeType, checker.TypeFlagsUndefined) {
-						report(buildUnnecessaryMessage(), constituentNode)
+						report(buildUnnecessaryMessage(), constituentNode, nil)
 					}
 				})
 			}
@@ -268,54 +310,3 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 		return ruleListeners
 	},
 })
-
-// Compare the syntax before consulting type identity, just as upstream does.
-// Raw literal spelling is part of ESTree's Literal nodes; punctuation between
-// members and redundant parentheses are not.
-func sameTypeSyntax(sf *ast.SourceFile, left, right *ast.Node) bool {
-	left = ast.SkipTypeParentheses(ast.SkipParentheses(left))
-	right = ast.SkipTypeParentheses(ast.SkipParentheses(right))
-	if left.Kind != right.Kind {
-		return false
-	}
-	switch left.Kind {
-	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
-		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral,
-		ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail:
-		a, b := utils.TrimNodeTextRange(sf, left), utils.TrimNodeTextRange(sf, right)
-		return sf.Text()[a.Pos():a.End()] == sf.Text()[b.Pos():b.End()]
-	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
-	case ast.KindTypeParameter:
-		// Constraints and defaults occupy different ESTree fields even when
-		// their child types have identical syntax.
-		a, b := left.AsTypeParameterDeclaration(), right.AsTypeParameterDeclaration()
-		if (a.Constraint == nil) != (b.Constraint == nil) || (a.DefaultType == nil) != (b.DefaultType == nil) {
-			return false
-		}
-	case ast.KindImportType:
-		if left.AsImportTypeNode().IsTypeOf != right.AsImportTypeNode().IsTypeOf {
-			return false
-		}
-	case ast.KindTypeOperator:
-		if left.AsTypeOperatorNode().Operator != right.AsTypeOperatorNode().Operator {
-			return false
-		}
-	case ast.KindPrefixUnaryExpression:
-		if left.AsPrefixUnaryExpression().Operator != right.AsPrefixUnaryExpression().Operator {
-			return false
-		}
-	}
-	var a, b []*ast.Node
-	left.ForEachChild(func(node *ast.Node) bool { a = append(a, node); return false })
-	right.ForEachChild(func(node *ast.Node) bool { b = append(b, node); return false })
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if !sameTypeSyntax(sf, a[i], b[i]) {
-			return false
-		}
-	}
-	return true
-}
