@@ -498,3 +498,100 @@ function f(){}`, kind: ast.KindFunctionDeclaration, index: 0, tags: []tag{{ast.K
 		})
 	}
 }
+
+// Usage diagnostics are pinned to typescript-eslint v8.72.2. Namespace
+// declaration identifiers intentionally do not report; see the rule docs.
+func TestNoDeprecatedNamespaceOwnership(t *testing.T) {
+	type diagnostic struct {
+		id, message string
+		start, end  int
+	}
+	for _, tc := range []struct {
+		name, code string
+		allow      []any
+		want       []diagnostic
+	}{
+		{name: "dotted-declaration-only", code: `/** @deprecated old */
+namespace A.B { export const value=1; }`, want: []diagnostic{}},
+		{name: "dotted-direct-access", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+A.B.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 63, 64}, {"deprecatedWithReason", "`B` is deprecated. old", 65, 66}}},
+		{name: "dotted-import-alias", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+import short=A.B;
+short.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 76, 77}, {"deprecatedWithReason", "`B` is deprecated. old", 78, 79}, {"deprecatedWithReason", "`short` is deprecated. old", 81, 86}}},
+		{name: "dotted-destructuring", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+const {B}=A;
+B.value;`, want: []diagnostic{{"deprecatedWithReason", "`B` is deprecated. old", 70, 71}, {"deprecatedWithReason", "`A` is deprecated. old", 73, 74}}},
+		{name: "dotted-assignment", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+const short=A.B;
+short.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 75, 76}, {"deprecatedWithReason", "`B` is deprecated. old", 77, 78}}},
+		{name: "dotted-type-query", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+type T=typeof A.B;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 77, 78}, {"deprecatedWithReason", "`B` is deprecated. old", 79, 80}}},
+		{name: "block-declaration-only", code: `/** @deprecated old */
+namespace A { export namespace B { export const value=1; } }`, want: []diagnostic{}},
+		{name: "block-direct-access", code: `/** @deprecated old */
+namespace A { export namespace B { export const value=1; } }
+A.B.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 84, 85}}},
+		{name: "block-import-alias", code: `/** @deprecated old */
+namespace A { export namespace B { export const value=1; } }
+import short=A.B;
+short.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 97, 98}}},
+		{name: "block-destructuring", code: `/** @deprecated old */
+namespace A { export namespace B { export const value=1; } }
+const {B}=A;
+B.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 94, 95}}},
+		{name: "three-levels", code: `/** @deprecated nested */
+namespace A.B.C {export const value=1;}
+import short=A.B.C;
+short.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. nested", 79, 80}, {"deprecatedWithReason", "`B` is deprecated. nested", 81, 82}, {"deprecatedWithReason", "`C` is deprecated. nested", 83, 84}, {"deprecatedWithReason", "`short` is deprecated. nested", 86, 91}}},
+		{name: "block-then-dotted", code: `namespace A {
+/** @deprecated inner */
+export namespace B.C {export const value=1;}
+}
+import short=A.B.C;
+short.value;`, want: []diagnostic{{"deprecatedWithReason", "`B` is deprecated. inner", 101, 102}, {"deprecatedWithReason", "`C` is deprecated. inner", 103, 104}, {"deprecatedWithReason", "`short` is deprecated. inner", 106, 111}}},
+		{name: "non-deprecated", code: `namespace A.B {export const value=1;}
+import short=A.B;
+short.value;`, want: []diagnostic{}},
+		{name: "allow-outer-only", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+A.B.value;`, allow: []any{"A"}, want: []diagnostic{{"deprecatedWithReason", "`B` is deprecated. old", 65, 66}}},
+		{name: "allow-inner-only", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+A.B.value;`, allow: []any{"B"}, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 63, 64}}},
+		{name: "merged-namespace", code: `/** @deprecated old */
+namespace A.B { export const value=1; }
+namespace A.B {export const other=2;}
+A.B.other;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 101, 102}, {"deprecatedWithReason", "`B` is deprecated. old", 103, 104}}},
+		{name: "module-keyword", code: `/** @deprecated old */
+module A.B {export const value=1;}
+A.B.value;`, want: []diagnostic{{"deprecatedWithReason", "`A` is deprecated. old", 58, 59}, {"deprecatedWithReason", "`B` is deprecated. old", 60, 61}}},
+		{name: "empty-reason", code: `/** @deprecated */
+namespace A.B {export const value=1;}
+A.B.value;`, want: []diagnostic{{"deprecated", "`A` is deprecated.", 57, 58}, {"deprecated", "`B` is deprecated.", 59, 60}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var options any
+			if tc.allow != nil {
+				options = []any{map[string]any{"allow": tc.allow}}
+			}
+			got := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{"main.ts": tc.code}, "main.ts", options)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %d diagnostics, want %d: %#v", len(got), len(tc.want), got)
+			}
+			for i, w := range tc.want {
+				d := got[i]
+				if d.Message.Id != w.id || d.Message.Description != w.message || d.Range.Pos() != w.start || d.Range.End() != w.end {
+					t.Errorf("got %s %q [%d,%d), want %s %q [%d,%d)", d.Message.Id, d.Message.Description, d.Range.Pos(), d.Range.End(), w.id, w.message, w.start, w.end)
+				}
+				if d.FixesPtr != nil || d.Suggestions != nil {
+					t.Error("unexpected fix or suggestion")
+				}
+			}
+		})
+	}
+}

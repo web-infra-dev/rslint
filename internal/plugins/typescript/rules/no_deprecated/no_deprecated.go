@@ -273,6 +273,17 @@ func appendOwnedJSDocTags(tags []*ast.Node, host, node *ast.Node) []*ast.Node {
 	return tags
 }
 
+func nextJSDocCommentLocation(node *ast.Node) *ast.Node {
+	// In `namespace A.B`, B is the body of A and shares the declaration's
+	// JSDoc. A namespace inside a ModuleBlock is a separate declaration.
+	if parent := node.Parent; node.Kind == ast.KindModuleDeclaration &&
+		parent != nil && parent.Kind == ast.KindModuleDeclaration &&
+		parent.AsModuleDeclaration().Body == node {
+		return parent
+	}
+	return ast.GetNextJSDocCommentLocation(node)
+}
+
 func localJSDocTags(node *ast.Node) []*ast.Node {
 	if node == nil {
 		return nil
@@ -281,7 +292,7 @@ func localJSDocTags(node *ast.Node) []*ast.Node {
 	if ast.IsVariableLike(node) && ast.HasInitializer(node) {
 		tags = appendOwnedJSDocTags(tags, node, node.Initializer())
 	}
-	for current := node; current != nil; current = ast.GetNextJSDocCommentLocation(current) {
+	for current := node; current != nil; current = nextJSDocCommentLocation(current) {
 		tags = appendOwnedJSDocTags(tags, node, current)
 		if current.Kind == ast.KindParameter && current.Parent != nil && current.Name() != nil {
 			parentTags := localJSDocTags(current.Parent)
