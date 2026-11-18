@@ -439,6 +439,15 @@ func nodeFacts(p *program.Program, node *ast.Node) NodeFacts {
 		}
 		seen[n] = true
 		fact := NodeFact{Node: *nodeReference(p, n), Kind: strings.TrimPrefix(n.Kind.String(), "Kind"), Flags: uint32(n.Flags), Parent: nodeReference(p, n.Parent)}
+		if n.Flags&ast.NodeFlagsPossiblyContainsDeprecatedTag != 0 && ast.GetJSDocDeprecatedTag(n) == nil {
+			fact.Flags &^= uint32(ast.NodeFlagsPossiblyContainsDeprecatedTag)
+		}
+		if ast.IsModuleDeclaration(n) {
+			fact.ModuleKeyword = uint32(n.AsModuleDeclaration().Keyword)
+			if n.Parent != nil && ast.IsModuleDeclaration(n.Parent) {
+				fact.Flags |= uint32(ast.NodeFlagsNestedNamespace)
+			}
+		}
 		if ast.IsIdentifier(n) || ast.IsPrivateIdentifier(n) || ast.IsStringLiteral(n) || ast.IsNumericLiteral(n) {
 			text := n.Text()
 			fact.Text = &text
@@ -618,11 +627,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "defaultType":
 			return Handle(s.typeID(c.GetDefaultFromTypeParameter(s.typeByID(r.ID)))), nil
 		case "classThisType":
-			t := s.typeByID(r.ID)
-			if t.ObjectFlags()&checker.ObjectFlagsClassOrInterface == 0 {
+			t := s.typeByID(r.ID).AsInterfaceType()
+			if t == nil {
 				return Handle(0), nil
 			}
-			return Handle(s.typeID(checker.InterfaceType_thisType(t.AsInterfaceType()))), nil
+			return Handle(s.typeID(checker.InterfaceType_thisType(t))), nil
 		case "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType":
 			t := s.typeByID(r.ID)
 			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
@@ -689,16 +698,18 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				if objectFlags&checker.ObjectFlagsReference != 0 {
 					fact.Target = s.typeID(t.Target())
 				}
-				if objectFlags&(checker.ObjectFlagsClassOrInterface|checker.ObjectFlagsTuple) != 0 {
-					if parameters := t.AsInterfaceType().TypeParameters(); len(parameters) > 0 {
+				// Fresh array literals can copy the target's Tuple flag onto a
+				// reference. Only the definition owns type parameters and tuple data.
+				if definition := t.AsInterfaceType(); definition != nil {
+					if parameters := definition.TypeParameters(); len(parameters) > 0 {
 						fact.TypeParameters = s.typeIDs(parameters)
 					}
-				}
-				if objectFlags&checker.ObjectFlagsTuple != 0 {
-					tuple := t.AsTupleType()
-					fact.Tuple = &TupleFact{
-						Readonly:      tuple.IsReadonly(),
-						CombinedFlags: uint32(checker.TupleType_combinedFlags(tuple)),
+					if objectFlags&checker.ObjectFlagsTuple != 0 {
+						tuple := t.AsTupleType()
+						fact.Tuple = &TupleFact{
+							Readonly:      tuple.IsReadonly(),
+							CombinedFlags: uint32(checker.TupleType_combinedFlags(tuple)),
+						}
 					}
 				}
 			}
