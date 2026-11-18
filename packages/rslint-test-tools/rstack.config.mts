@@ -888,6 +888,7 @@ const ecosystemTests = {
     './tests/eslint-plugin-unicorn/rules/no-document-cookie.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-duplicate-logical-operands.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-duplicate-loops.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-duplicate-set-values.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-empty-file.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-exports-in-scripts.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-for-each.test.ts',

@@ -27,6 +27,12 @@ func IsPrimitiveStaticValue(value any) bool {
 	return staticValueKindOf(value) != staticKindUnknown
 }
 
+// StaticUndefinedValue returns the folded representation of JavaScript
+// undefined, e.g. for an array hole that has no expression to evaluate.
+func StaticUndefinedValue() any {
+	return staticUndefinedValue{}
+}
+
 // IsNullishStaticValue reports whether a folded value is null or undefined.
 func IsNullishStaticValue(value any) bool {
 	return staticValueNullish(value)

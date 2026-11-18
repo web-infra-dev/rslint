@@ -39,6 +39,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_double_comparison"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_logical_operands"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_loops"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_duplicate_set_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_empty_file"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_exports_in_scripts"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_for_each"
@@ -188,6 +189,7 @@ func GetAllRules() []rule.Rule {
 		no_double_comparison.NoDoubleComparisonRule,
 		no_duplicate_logical_operands.NoDuplicateLogicalOperandsRule,
 		no_duplicate_loops.NoDuplicateLoopsRule,
+		no_duplicate_set_values.NoDuplicateSetValuesRule,
 		no_empty_file.NoEmptyFileRule,
 		no_exports_in_scripts.NoExportsInScriptsRule,
 		no_for_each.NoForEachRule,

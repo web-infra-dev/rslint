@@ -4,6 +4,7 @@ package utils
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1625,6 +1626,77 @@ func TestStaticStringEvaluatorControlFlowNullish(t *testing.T) {
 	var evaluator *StaticStringEvaluator
 	if nullish, known := evaluator.EvalControlFlowNullish(nil); nullish || known {
 		t.Fatalf("nil evaluator = (%v, %v), want (false, false)", nullish, known)
+	}
+}
+
+func TestStaticUndefinedValue(t *testing.T) {
+	for _, test := range []struct {
+		expression string
+		equal      bool
+	}{
+		{"undefined", true},
+		{"void 0", true},
+		{"null", false},
+		{"0", false},
+		{"''", false},
+	} {
+		t.Run(test.expression, func(t *testing.T) {
+			source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/undefined.js"}, "const value = "+test.expression+";", core.ScriptKindJS)
+			value, known := NewStaticStringEvaluator(nil).EvalValue(findVariableInitializer(t, source, "value"))
+			if !known {
+				t.Fatalf("EvalValue(%s) is unknown", test.expression)
+			}
+			equal, ok := StaticValuesSameValueZero(StaticUndefinedValue(), value)
+			if equal != test.equal || !ok {
+				t.Fatalf("StaticValuesSameValueZero = (%v, %v), want (%v, true)", equal, ok, test.equal)
+			}
+		})
+	}
+	if !IsNullishStaticValue(StaticUndefinedValue()) {
+		t.Fatal("StaticUndefinedValue is not nullish")
+	}
+}
+
+func TestStaticValueSameValueZeroKey(t *testing.T) {
+	expressions := []string{
+		"undefined", "void 0", "null",
+		"0", "-0", "+0", "NaN", "0 / 0", "1", "1.0", "1e0",
+		"'1'", "`1`", "'a'", "\"a\"", "`a`", "'\\u0061'", "'b'", "''",
+		"1n", "0x1n", "2n",
+		"true", "!0", "false",
+		"Symbol.iterator", "Symbol.asyncIterator", "Symbol.for('x')", "Symbol.for('y')",
+	}
+	var code strings.Builder
+	for i, expression := range expressions {
+		code.WriteString("const v" + strconv.Itoa(i) + " = " + expression + ";\n")
+	}
+	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/keys.js"}, code.String(), core.ScriptKindJS)
+	evaluator := NewStaticStringEvaluator(nil)
+	values := []any{StaticUndefinedValue()}
+	labels := []string{"StaticUndefinedValue()"}
+	for i, expression := range expressions {
+		value, known := evaluator.EvalValue(findVariableInitializer(t, source, "v"+strconv.Itoa(i)))
+		if !known || !IsPrimitiveStaticValue(value) {
+			t.Fatalf("EvalValue(%s) = (%v, %v), want a known primitive", expression, value, known)
+		}
+		values = append(values, value)
+		labels = append(labels, expression)
+	}
+	for i, left := range values {
+		leftKey, ok := StaticValueSameValueZeroKey(left)
+		if !ok {
+			t.Fatalf("StaticValueSameValueZeroKey(%s) has no key", labels[i])
+		}
+		for j, right := range values {
+			rightKey, _ := StaticValueSameValueZeroKey(right)
+			equal, _ := StaticValuesSameValueZero(left, right)
+			if (leftKey == rightKey) != equal {
+				t.Errorf("%s vs %s: keys equal = %v, SameValueZero = %v", labels[i], labels[j], leftKey == rightKey, equal)
+			}
+		}
+	}
+	if _, ok := StaticValueSameValueZeroKey(&staticObjectValue{}); ok {
+		t.Error("an aggregate value must not have a SameValueZero key")
 	}
 }
 
