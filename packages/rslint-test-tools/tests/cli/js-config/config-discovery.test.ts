@@ -255,6 +255,14 @@ describe('CLI config discovery (upward traversal)', () => {
       );
       expect(result.stdout).toContain('no-debugger');
       expect(result.stderr).toContain('Warning: skipping config');
+      const update = await runRslint(
+        ['--suppress-all', 'packages/broken/index.ts'],
+        tempDir,
+      );
+      expect(update.exitCode).toBe(2);
+      expect(
+        fs.existsSync(path.join(tempDir, 'rslint-suppressions.json')),
+      ).toBe(false);
     } finally {
       await cleanupTempDir(tempDir);
     }

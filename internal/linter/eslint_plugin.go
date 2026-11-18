@@ -963,6 +963,7 @@ func eslintPluginSourceFile(f EslintPluginFileInput) (ast.SourceFileLike, bool) 
 
 func makeEslintPluginErrorDiagnostic(path string, sf ast.SourceFileLike, ruleName, msg string) rule.RuleDiagnostic {
 	return rule.RuleDiagnostic{
+		Origin:     rule.DiagnosticOriginPluginFailure,
 		RuleName:   ruleName,
 		Range:      core.NewTextRange(0, 0),
 		Message:    rule.RuleMessage{Description: msg},

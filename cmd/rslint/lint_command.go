@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/program/loader"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/term"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -180,9 +181,21 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		return 0
 	}
+	var baseline *suppressions.File
+	if !typeCheckOnly {
+		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 2
+		}
+	}
 	if configCatalog == nil {
 		fmt.Fprintln(os.Stderr, "error: config discovery did not produce a catalog")
 		return 1
+	}
+	if args.Suppressions.Mode != suppressions.Check && len(configCatalog.Failures) > 0 {
+		fmt.Fprintln(os.Stderr, "error: cannot update suppressions because a lint configuration failed to load")
+		return 2
 	}
 	if !configCatalog.Explicit && len(configCatalog.Configs) == 0 {
 		fmt.Fprintln(os.Stderr, "error: no rslint config found; run `rslint --init` to create one")
@@ -532,7 +545,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	demand := linter.ArtifactDemand{}
+	demand := linter.ArtifactDemand{LintedFiles: baseline != nil}
 	if fix {
 		demand.Native = rule.EditDemandAutofix
 		demand.Plugin = rule.EditDemandAll
@@ -551,8 +564,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			linter.AutofixPolicy{
 				VerifyAfterLastRound: true,
 				VerificationDemand: linter.ArtifactDemand{
-					Native: rule.EditDemandNone,
-					Plugin: rule.EditDemandAll,
+					LintedFiles: baseline != nil,
+					Native:      rule.EditDemandNone,
+					Plugin:      rule.EditDemandAll,
 				},
 			},
 			dispatch,
@@ -567,7 +581,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return abortRun(loadError.Error(), fmt.Sprintf("error: %v", loadError))
 	}
 
-	for _, pluginRecord := range pipelineResult.PluginOutcomes() {
+	pluginRecords := pipelineResult.PluginOutcomes()
+	for _, pluginRecord := range pluginRecords {
 		reportEslintPluginDispatchOutcome(linter.EslintPluginDispatchOutcome{
 			Notices:       pluginRecord.Notices,
 			DispatchError: pluginRecord.DispatchError,
@@ -611,7 +626,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
-	if format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
+	var suppressionError string
+	if baseline != nil {
+		if err := ctx.Err(); err != nil {
+			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		}
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args)
+	}
+	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -645,11 +667,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	report, err := assembleLintReport(lintReportInput{
-		Mode:          mode,
-		Diagnostics:   allDiags,
-		Summary:       summary,
-		MaxWarnings:   maxWarnings,
-		IncludeSource: format == output.FormatDefault,
+		Mode:             mode,
+		Diagnostics:      allDiags,
+		Summary:          summary,
+		MaxWarnings:      maxWarnings,
+		SuppressionError: suppressionError,
+		IncludeSource:    format == output.FormatDefault,
 	})
 	if err != nil {
 		return abortRun(
@@ -671,6 +694,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	if format != output.FormatDefault && outcome.Kind == output.OutcomeWarningLimitExceeded {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
+	if format != output.FormatDefault && outcome.SuppressionError != "" {
+		fmt.Fprintln(os.Stderr, outcome.SuppressionError)
+	}
 
 	// The timing table goes to stderr so machine-readable stdout formats
 	// (jsonline/github/gitlab) stay parseable with --timing enabled. It is
@@ -687,6 +713,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
+	if outcome.SuppressionError != "" {
+		return 2
+	}
 	if outcome.Failed() {
 		return 1
 	}

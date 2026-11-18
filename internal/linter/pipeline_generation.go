@@ -71,7 +71,7 @@ func projectGenerationTargets(
 			}
 			sources[path] = source
 			if collectLintedFiles {
-				file := LintedFile{Path: path}
+				file := LintedFile{Path: path, SyntaxError: filePlan.syntaxError}
 				if demand.SourceFiles {
 					file.SourceFile = source
 				}

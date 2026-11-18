@@ -42,11 +42,12 @@ func renderLintReport(
 }
 
 type lintReportInput struct {
-	Mode          output.Mode
-	Diagnostics   []rule.RuleDiagnostic
-	Summary       *output.Summary
-	MaxWarnings   int
-	IncludeSource bool
+	Mode             output.Mode
+	Diagnostics      []rule.RuleDiagnostic
+	Summary          *output.Summary
+	MaxWarnings      int
+	SuppressionError string
+	IncludeSource    bool
 }
 
 // assembleLintReport is the command-owned projection from completed linter
@@ -86,6 +87,7 @@ func assembleLintReport(input lintReportInput) (output.Report, error) {
 	}
 	counts.LintErrors = counts.Errors - counts.TypeErrors
 	outcome := lintReportOutcome(counts, input.MaxWarnings)
+	outcome.SuppressionError = input.SuppressionError
 	return output.NewReport(input.Mode, diagnostics, counts, input.Summary, outcome), nil
 }
 
@@ -166,7 +168,7 @@ func projectLintReportDiagnostic(
 
 func lintReportDiagnosticHasTypeScriptOrigin(origin rule.DiagnosticOrigin) (bool, error) {
 	switch origin {
-	case rule.DiagnosticOriginLint:
+	case rule.DiagnosticOriginLint, rule.DiagnosticOriginPluginFailure:
 		return false, nil
 	case rule.DiagnosticOriginTypeScript:
 		return true, nil

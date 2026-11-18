@@ -94,7 +94,7 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 					results := make([]EslintPluginFileResult, len(req.Files))
 					for i, file := range req.Files {
 						results[i] = EslintPluginFileResult{FilePath: file.Path, Diagnostics: []EslintPluginDiagnostic{{
-							RuleName: "plugin/check", Message: file.Path,
+							RuleName: "plugin/unconfigured", Message: file.Path,
 						}}}
 					}
 					return &EslintPluginLintResult{Results: results}, nil
@@ -125,6 +125,15 @@ func TestPluginSourceReadsShareBudgetAndPreserveOrder(t *testing.T) {
 				for i, diagnostic := range diagnostics {
 					if diagnostic.FilePath != "target:"+paths[i] || diagnostic.Message.Description != "wire:"+paths[i] {
 						t.Errorf("input %d produced %q at %q, want wire and target for %q", i, diagnostic.Message.Description, diagnostic.FilePath, paths[i])
+					}
+				}
+				outcomes := result.PluginOutcomes()
+				if len(outcomes) != 1 || len(outcomes[0].Notices) != len(paths) {
+					t.Fatalf("expected one unconfigured rule notice per target, got %+v", outcomes)
+				}
+				for i, notice := range outcomes[0].Notices {
+					if notice.FilePath != "target:"+paths[i] {
+						t.Errorf("notice %d has path %q, want target for %q", i, notice.FilePath, paths[i])
 					}
 				}
 			})

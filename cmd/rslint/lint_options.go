@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -31,13 +33,15 @@ type lintArgs struct {
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
 	// unavailable (for example in the wasm build).
-	StdoutIsTTY bool
-	Quiet       bool
-	Timing      bool
-	TimingLimit int
-	MaxWarnings int
-	StartTimeMs int64
-	RuleFlags   []string
+	StdoutIsTTY    bool
+	Quiet          bool
+	Timing         bool
+	TimingLimit    int
+	MaxWarnings    int
+	StartTimeMs    int64
+	RuleFlags      []string
+	Suppressions   suppressions.Options
+	PassOnUnpruned bool
 	// AllowFiles and AllowDirs are prepared target paths. Positional retains raw
 	// arguments until the run-scoped filesystem is available.
 	AllowFiles      []string
@@ -93,6 +97,11 @@ Options:
   --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
+  --suppress-all        Record all current lint errors
+  --suppress-rule RULE  Record errors for a rule (repeatable or comma-separated)
+  --suppressions-location PATH  Use a different suppressions file or directory
+  --prune-suppressions  Remove unused suppressions
+  --pass-on-unpruned-suppressions  Allow unused suppressions
   -h, --help            Show help
 `
 
@@ -126,6 +135,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var ruleFlags repeatedFlag
+	var suppressAll, prune bool
 
 	fs.StringVar(&args.Format, "format", "default", "output format")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
@@ -146,12 +156,46 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
 	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
 	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
+	fs.BoolVar(&suppressAll, "suppress-all", false, "record all lint errors")
+	fs.BoolVar(&prune, "prune-suppressions", false, "remove unused suppressions")
+	fs.BoolVar(&args.PassOnUnpruned, "pass-on-unpruned-suppressions", false, "allow unused suppressions")
+	fs.Func("suppressions-location", "suppressions file or directory", func(value string) error {
+		if value == "" {
+			return errors.New("expected a file or directory")
+		}
+		args.Suppressions.Location = value
+		return nil
+	})
+	fs.Func("suppress-rule", "rule IDs to record", func(value string) error {
+		for id := range strings.SplitSeq(value, ",") {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				return errors.New("expected a rule ID")
+			}
+			args.Suppressions.Rules = append(args.Suppressions.Rules, id)
+		}
+		return nil
+	})
 
 	if err := fs.Parse(argv); err != nil {
 		// ContinueOnError: fs already printed the diagnostic to stderr.
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
+	hasRules := len(args.Suppressions.Rules) > 0
+	switch {
+	case suppressAll && hasRules || prune && (suppressAll || hasRules):
+		fmt.Fprintln(os.Stderr, "error: choose only one of --suppress-all, --suppress-rule and --prune-suppressions")
+		return args, help, 2
+	case suppressAll || hasRules:
+		args.Suppressions.Mode = suppressions.Record
+	case prune:
+		args.Suppressions.Mode = suppressions.Prune
+	}
+	if args.TypeCheckOnly && args.Suppressions.Mode != suppressions.Check {
+		fmt.Fprintln(os.Stderr, "error: --type-check-only cannot record or prune lint suppressions")
+		return args, help, 2
+	}
 
 	// The Node.js entry point fills in the default "all" when the user
 	// passes a bare --timing, so the value is always present here.
