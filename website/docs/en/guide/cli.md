@@ -12,21 +12,26 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                  | Description                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `-c, --config <path>` | Specify which JS/TS module config file to use                                                  |
-| `--fix`               | Automatically fix problems                                                                     |
-| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--type-check-only`   | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
-| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`             | Report errors only, suppress warnings                                                          |
-| `--timing [all\|n]`   | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
-| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`        | Show help information                                                                          |
+| Flag                              | Description                                                                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `--init`                          | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
+| `-c, --config <path>`             | Specify which JS/TS module config file to use                                                  |
+| `--fix`                           | Automatically fix problems                                                                     |
+| `--type-check`                    | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
+| `--type-check-only`               | Run TypeScript semantic type checking without lint rules ([details](/guide/type-checking))     |
+| `--format <format>`               | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
+| `--quiet`                         | Report errors only, suppress warnings                                                          |
+| `--timing [all\|n]`               | Print a per-rule timing table after the run (see [details](#rule-timing))                      |
+| `--max-warnings <n>`              | Exit with error if warning count exceeds this number                                           |
+| `--rule <rule>`                   | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
+| `--no-color`                      | Disable colored output ([details](/guide/environment-variables))                               |
+| `--force-color`                   | Force colored output ([details](/guide/environment-variables))                                 |
+| `--help`, `-h`                    | Show help information                                                                          |
+| `--suppress-all`                  | Record current error counts for all lint rules                                                 |
+| `--suppress-rule <id>`            | Record errors for selected rules (repeatable or comma-separated)                               |
+| `--suppressions-location <path>`  | Select the suppressions file or its directory                                                  |
+| `--prune-suppressions`            | Reduce or remove unused counts and remove entries for deleted files                            |
+| `--pass-on-unpruned-suppressions` | Allow unused counts when checking the exit status                                              |
 
 ## File and Directory Arguments
 
@@ -86,6 +91,22 @@ Use `--config` or `-c` to override automatic config discovery:
 rslint --config custom.config.ts src/
 rslint -c custom.config.ts src/
 ```
+
+## Bulk suppressions
+
+To enable a rule on an existing project, run it at error severity and record the current violations. Commit the resulting `rslint-suppressions.json` to share the baseline with CI.
+
+```bash
+rslint --suppress-rule no-var
+rslint
+rslint --prune-suppressions
+```
+
+Rslint counts errors per file and rule. If a file has two recorded errors for a rule, a third violation makes all three visible. Fixing one leaves an unused count and exits with code 2. Run `--prune-suppressions` to lower the count, or `--pass-on-unpruned-suppressions` to report other problems and apply the usual warning limit. Recording updates positive counts for the selected rules. Pruning only lowers counts. Choose one recording or pruning action per invocation.
+
+File keys use paths relative to the working directory with forward slashes. Run checks and baseline updates from the same directory, including when using an external config. A partial run keeps entries for existing files outside its scope. Pruning also removes deleted files. Ignored files and files with syntax errors keep their recorded counts. Plugin execution failures prevent updates. Warnings and TypeScript compiler errors remain visible under the normal reporting options. Autofix runs before counts are compared.
+
+Use `--suppressions-location` on every invocation to select a custom file, including an existing ESLint suppressions file. Rule IDs must match exactly. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory, using the absolute working directory to compute the hash. Create the directory first. With `--type-check-only`, baseline checks are skipped and recording or pruning is a usage error.
 
 ## Rule Overrides
 
@@ -148,10 +169,10 @@ The table is written to stderr, so machine-readable output formats such as `json
 
 ## Exit Codes
 
-| Code | Meaning                                           |
-| ---- | ------------------------------------------------- |
-| `0`  | No errors (warnings may be present)               |
-| `1`  | Errors found, or warnings exceed `--max-warnings` |
-| `2`  | Invalid command-line usage or flag combinations   |
+| Code | Meaning                                                          |
+| ---- | ---------------------------------------------------------------- |
+| `0`  | No errors (warnings may be present)                              |
+| `1`  | Errors found, or warnings exceed `--max-warnings`                |
+| `2`  | Invalid usage, a suppressions file error, or unused suppressions |
 
 Terminating Rslint stops the current check even when output is paused. On macOS and Linux, `SIGHUP`, `SIGINT`, and `SIGTERM` exit with status `129`, `130`, and `143`, respectively.

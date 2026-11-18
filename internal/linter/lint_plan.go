@@ -42,6 +42,7 @@ type lintFilePlan struct {
 	file           *ast.SourceFile
 	rules          *preparedRuleSet
 	hasTypeChecker bool
+	syntaxError    bool
 }
 
 type lintPlanFileRef struct {
@@ -280,6 +281,7 @@ func resolveProgramLintPlanFile(
 	if !opts.SkipSyntaxCheck {
 		diagnostics := CollectFileSyntacticDiagnostics(ctx, opts.Program, file)
 		if len(diagnostics) > 0 {
+			filePlan.syntaxError = true
 			return diagnostics
 		}
 	}

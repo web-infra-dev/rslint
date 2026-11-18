@@ -90,6 +90,11 @@ func (t pluginTask) runRaw(ctx context.Context, dispatcher EslintPluginDispatche
 			diagnostics[index].FilePath = targetPath
 		}
 	}
+	for index := range notices {
+		if targetPath, ok := t.targetPathByWire[notices[index].FilePath]; ok {
+			notices[index].FilePath = targetPath
+		}
+	}
 	return EslintPluginDispatchOutcome{Diagnostics: diagnostics, Notices: notices, DispatchError: err, failurePath: failurePath, batches: batches}
 }
 

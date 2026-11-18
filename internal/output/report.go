@@ -108,12 +108,13 @@ const (
 )
 
 type Outcome struct {
-	Kind         OutcomeKind
-	WarningLimit int
+	Kind             OutcomeKind
+	WarningLimit     int
+	SuppressionError string
 }
 
 func (outcome Outcome) Failed() bool {
-	return outcome.Kind != OutcomePassed
+	return outcome.Kind != OutcomePassed || outcome.SuppressionError != ""
 }
 
 // Summary contains the default formatter's completed-run facts that are not

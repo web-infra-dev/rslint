@@ -1487,6 +1487,14 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
+The file CLI reads its optional bulk suppressions file in the calling working
+directory. After the final lint or fix observation, it gives
+`internal/suppressions` the completed rule diagnostics and paths whose rules
+could run. That package owns baseline counts and persistence. The CLI supplies
+visible diagnostics and any baseline failure to report assembly. The pipeline
+exposes target syntax failures and plugin failure origins independently of this
+CLI policy.
+
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider
 plans acquisition over the request's existing file-content/canonical-path

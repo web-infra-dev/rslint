@@ -10,6 +10,8 @@ import (
 // selection through diagnostic side effects.
 type LintedFile struct {
 	Path string
+	// SyntaxError means syntax diagnostics prevented rule execution for this target.
+	SyntaxError bool
 	// SourceFile is populated only when ArtifactDemand.SourceFiles is requested.
 	SourceFile *ast.SourceFile
 }

@@ -40,6 +40,142 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
 }
 
 describe('CLI Configuration Tests', () => {
+  test('records and checks per-file error counts through the package CLI', async () => {
+    const cwd = await createTempDir({
+      'rslint.config.mjs':
+        "export default [{rules: {'no-var':'error','no-debugger':'error'}}];",
+      'a.js': 'var a = 1; debugger;',
+      'eslint-suppressions.json': '{}',
+    });
+    const check = (...flags: string[]) =>
+      runRslint(['a.js', '--format', 'jsonline', ...flags], cwd);
+    try {
+      expect((await check('--suppress-rule')).exitCode).toBe(2);
+      expect((await check('--suppress-all=false')).exitCode).toBe(1);
+      await expect(
+        fs.access(path.join(cwd, 'rslint-suppressions.json')),
+      ).rejects.toThrow();
+      expect(
+        (
+          await check(
+            '--suppress-rule',
+            'no-var',
+            '--suppress-rule',
+            'no-debugger',
+          )
+        ).exitCode,
+      ).toBe(0);
+      const baseline = path.join(cwd, 'rslint-suppressions.json');
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+        'a.js': { 'no-var': { count: 1 }, 'no-debugger': { count: 1 } },
+      });
+      expect(
+        await fs.readFile(path.join(cwd, 'eslint-suppressions.json'), 'utf8'),
+      ).toBe('{}');
+      await fs.writeFile(path.join(cwd, 'a.js'), 'var a = 1; var b = 2;');
+      const exceeded = await check();
+      expect(exceeded.exitCode).toBe(2);
+      expect(
+        exceeded.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line).ruleName),
+      ).toEqual(['no-var', 'no-var']);
+      expect(exceeded.stderr).toContain('--prune-suppressions');
+      expect((await check('--pass-on-unpruned-suppressions')).exitCode).toBe(1);
+      expect((await check('--prune-suppressions')).exitCode).toBe(1);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+        'a.js': { 'no-var': { count: 1 } },
+      });
+
+      const directory = path.join(cwd, 'baselines');
+      await fs.mkdir(directory);
+      expect(
+        (await check('--suppressions-location', directory, '--suppress-all'))
+          .exitCode,
+      ).toBe(0);
+      expect(await fs.readdir(directory)).toEqual([
+        expect.stringMatching(/^rslint-suppressions_[a-z0-9]+$/),
+      ]);
+      expect(
+        (await check('--suppressions-location', directory + path.sep)).exitCode,
+      ).toBe(0);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
+  test('prunes after fixes and preserves files skipped by lint', async () => {
+    const cwd = await createTempDir({
+      'rslint.config.mjs':
+        "export default [{ignores:['ignored.js']},{rules:{'no-var':'error'}}];",
+      'ok.js': 'var a = 1;',
+      'broken.js': 'const = ;',
+      'ignored.js': 'var b = 2;',
+      'rslint-suppressions.json': JSON.stringify(
+        Object.fromEntries(
+          ['ok.js', 'broken.js', 'ignored.js'].map((file) => [
+            file,
+            { 'no-var': { count: 1 } },
+          ]),
+        ),
+      ),
+    });
+    try {
+      const result = await runRslint(
+        ['--fix', '--prune-suppressions', 'ok.js', 'broken.js', 'ignored.js'],
+        cwd,
+      );
+      expect(result.exitCode).toBe(1);
+      expect(await fs.readFile(path.join(cwd, 'ok.js'), 'utf8')).toContain(
+        'let a',
+      );
+      expect(
+        Object.keys(
+          JSON.parse(
+            await fs.readFile(
+              path.join(cwd, 'rslint-suppressions.json'),
+              'utf8',
+            ),
+          ),
+        ),
+      ).toEqual(['broken.js', 'ignored.js']);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
+  test('keeps plugin failures visible and preserves the baseline on an incomplete update', async () => {
+    const saved = JSON.stringify({
+      'good.js': { 'no-debugger': { count: 1 } },
+      'bad.js': { 'local/throws': { count: 1 } },
+    });
+    const cwd = await createTempDir({
+      'good.js': 'debugger;',
+      'bad.js': 'debugger;',
+      'local.mjs':
+        "export default {rules:{throws:{meta:{schema:[]},create(){return {Program(){throw Error('fixture failure')}}}}}};",
+      'rslint.config.mjs':
+        "import local from './local.mjs'; export default [{files:['good.js'],rules:{'no-debugger':'error'}},{files:['bad.js'],plugins:{local},rules:{'local/throws':'warn'}}];",
+      'rslint-suppressions.json': saved,
+    });
+    try {
+      const args = ['--format', 'jsonline', 'good.js', 'bad.js'];
+      const read = await runRslint(args, cwd);
+      expect(read.exitCode).toBe(1);
+      expect(read.stdout).toContain('fixture failure');
+      expect(read.stdout).not.toContain('no-debugger');
+      const write = await runRslint(['--prune-suppressions', ...args], cwd);
+      expect(write.exitCode).toBe(2);
+      expect(write.stderr).toContain('incomplete');
+      expect(
+        await fs.readFile(path.join(cwd, 'rslint-suppressions.json'), 'utf8'),
+      ).toBe(saved);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
   test('should show help when --help flag is used', async () => {
     const result = await runRslint(['--help']);
     expect(result.exitCode).toBe(0);
