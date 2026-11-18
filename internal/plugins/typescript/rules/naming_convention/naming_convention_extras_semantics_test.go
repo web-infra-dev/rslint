@@ -375,3 +375,146 @@ func TestNamingConventionSemanticRegressions(t *testing.T) {
 			{Code: "const bad_name=1;", Options: []any{map[string]any{"selector": "variable", "format": nil, "custom": map[string]any{"regex": "\\[/", "match": true}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "satisfyCustom", Message: "Variable name `bad_name` must match the RegExp: /\\[\\//u", Line: 1, Column: 7, EndLine: 1, EndColumn: 15}}},
 		})
 }
+
+// Cover absent initializers and the scope boundary of class decorators.
+// Full diagnostic expectations were checked against typescript-eslint 8.67.0.
+func TestNamingConventionReferenceBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule,
+		[]rule_tester.ValidTestCase{
+			// uninitialized let bad_name; console.log(bad_name);
+			{Code: "let bad_name;\nconsole.log(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized let bad_name; function read(){return bad_name;}
+			{Code: "let bad_name;\nfunction read(){return bad_name;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized let bad_name: number; console.log(bad_name);
+			{Code: "let bad_name: number;\nconsole.log(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized let bad_name: number; function read(){return bad_name;}
+			{Code: "let bad_name: number;\nfunction read(){return bad_name;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized var bad_name; console.log(bad_name);
+			{Code: "var bad_name;\nconsole.log(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized var bad_name; function read(){return bad_name;}
+			{Code: "var bad_name;\nfunction read(){return bad_name;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized declare let bad_name: number; console.log(bad_name);
+			{Code: "declare let bad_name: number;\nconsole.log(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// uninitialized declare let bad_name: number; function read(){return bad_name;}
+			{Code: "declare let bad_name: number;\nfunction read(){return bad_name;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for const of console.log(bad_item);
+			{Code: "for (const bad_item of [1]) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for let of console.log(bad_item);
+			{Code: "for (let bad_item of [1]) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for var of console.log(bad_item);
+			{Code: "for (var bad_item of [1]) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for const in console.log(bad_item);
+			{Code: "for (const bad_item in {a:1}) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for let in console.log(bad_item);
+			{Code: "for (let bad_item in {a:1}) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for var in console.log(bad_item);
+			{Code: "for (var bad_item in {a:1}) { console.log(bad_item); }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// review loop
+			{Code: "for (const item of [1]) {\n  console.log(item);\n}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// destructured loop
+			{Code: "for (const {bad_item} of [{bad_item:1}]) {console.log(bad_item);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// renamed destructured loop
+			{Code: "for (const {value:bad_item} of [{value:1}]) {console.log(bad_item);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// array loop
+			{Code: "for (const [bad_item] of [[1]]) {console.log(bad_item);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// loop closure
+			{Code: "for (const bad_item of [1]) {(() => bad_item)();}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// for init read
+			{Code: "for (let bad_item: number; bad_item < 1; bad_item++) {}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @register(() => bad_class) class bad_class {}
+			{Code: "@register(() => bad_class)\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @register(bad_class) class bad_class {}
+			{Code: "@register(bad_class)\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @register(() => (bad_class)) class bad_class {}
+			{Code: "@register(() => (bad_class))\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @first(() => bad_class) @second() export class bad_class {}
+			{Code: "@first(() => bad_class)\n@second()\nexport class bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @first() /* comment */ @second(() => bad_class) class bad_class {}
+			{Code: "@first()\n/* comment */ @second(() => bad_class)\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references @register(() => bad_class) class bad_class {method(){return bad_class;}}
+			{Code: "@register(() => bad_class)\nclass bad_class {method(){return bad_class;}}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references class bad_class { method(){return bad_class;} } console.log(bad_class);
+			{Code: "class bad_class { method(){return bad_class;} }\nconsole.log(bad_class);", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class references const good = class bad_class {method(){return bad_class;}};
+			{Code: "const good = class bad_class {method(){return bad_class;}};", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// numeric initializer read
+			{Code: "const bad_name=1; console.log(bad_name);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// type external read
+			{Code: "type bad_type={next:bad_type}; declare const good:bad_type;", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+		}, []rule_tester.InvalidTestCase{
+			// uninitialized let bad_name;
+			{Code: "let bad_name;\n", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized let bad_name; bad_name=1;
+			{Code: "let bad_name;\nbad_name=1;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized let bad_name; bad_name++;
+			{Code: "let bad_name;\nbad_name++;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized let bad_name: number;
+			{Code: "let bad_name: number;\n", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 21}}},
+			// uninitialized let bad_name: number; bad_name=1;
+			{Code: "let bad_name: number;\nbad_name=1;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 21}}},
+			// uninitialized let bad_name: number; bad_name++;
+			{Code: "let bad_name: number;\nbad_name++;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 21}}},
+			// uninitialized var bad_name;
+			{Code: "var bad_name;\n", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized var bad_name; bad_name=1;
+			{Code: "var bad_name;\nbad_name=1;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized var bad_name; bad_name++;
+			{Code: "var bad_name;\nbad_name++;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// uninitialized declare let bad_name: number;
+			{Code: "declare let bad_name: number;\n", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 13, EndLine: 1, EndColumn: 29}}},
+			// uninitialized declare let bad_name: number; bad_name=1;
+			{Code: "declare let bad_name: number;\nbad_name=1;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 13, EndLine: 1, EndColumn: 29}}},
+			// uninitialized declare let bad_name: number; bad_name++;
+			{Code: "declare let bad_name: number;\nbad_name++;", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 13, EndLine: 1, EndColumn: 29}}},
+			// for const of bad_item=1;
+			{Code: "for (const bad_item of [1]) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 12, EndLine: 1, EndColumn: 20}}},
+			// for const of
+			{Code: "for (const bad_item of [1]) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 12, EndLine: 1, EndColumn: 20}}},
+			// for let of bad_item=1;
+			{Code: "for (let bad_item of [1]) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for let of
+			{Code: "for (let bad_item of [1]) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for var of bad_item=1;
+			{Code: "for (var bad_item of [1]) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for var of
+			{Code: "for (var bad_item of [1]) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for const in bad_item=1;
+			{Code: "for (const bad_item in {a:1}) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 12, EndLine: 1, EndColumn: 20}}},
+			// for const in
+			{Code: "for (const bad_item in {a:1}) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 12, EndLine: 1, EndColumn: 20}}},
+			// for let in bad_item=1;
+			{Code: "for (let bad_item in {a:1}) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for let in
+			{Code: "for (let bad_item in {a:1}) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for var in bad_item=1;
+			{Code: "for (var bad_item in {a:1}) { bad_item=1; }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// for var in
+			{Code: "for (var bad_item in {a:1}) {  }", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// loop shadowing
+			{Code: "let bad_item; for (const bad_item of [1]) {console.log(bad_item);}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_item` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// class references @register(() => {const bad_class=1;return bad_class;}) class bad_class {}
+			{Code: "@register(() => {const bad_class=1;return bad_class;})\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 2, Column: 7, EndLine: 2, EndColumn: 16}}},
+			// class references @register(() => other_class) class bad_class {}
+			{Code: "@register(() => other_class)\nclass bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 2, Column: 7, EndLine: 2, EndColumn: 16}}},
+			// class references class bad_class {}
+			{Code: "class bad_class {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class { method(){return bad_class;} }
+			{Code: "class bad_class { method(){return bad_class;} }", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class { static value=bad_class; }
+			{Code: "class bad_class { static value=bad_class; }", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class { @register(() => bad_class) method(){} }
+			{Code: "class bad_class { @register(() => bad_class) method(){} }", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class { @register(() => bad_class) field=1; }
+			{Code: "class bad_class { @register(() => bad_class) field=1; }", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class { [key(bad_class)](){} }
+			{Code: "class bad_class { [key(bad_class)](){} }", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// class references class bad_class extends base(bad_class) {}
+			{Code: "class bad_class extends base(bad_class) {}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_class` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 16}}},
+			// named function recursive
+			{Code: "function bad_function(){return bad_function();}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 22}}},
+			// function initializer recursive
+			{Code: "const bad_function=(() => bad_function());", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_function` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 19}}},
+			// type recursion
+			{Code: "type bad_type={next:bad_type};", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_type` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+		})
+}

@@ -1641,7 +1641,7 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 			}
 		}
 		for _, reference := range refInfo.refs.References(symbol) {
-			if isNamingRead(reference, symbol, refInfo.refs) {
+			if isNamingRead(ctx.SourceFile, reference, symbol, refInfo.refs) {
 				return false
 			}
 		}
@@ -1673,7 +1673,7 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 // isNamingRead mirrors collectVariables' distinction between a reference
 // and a use: writes, discarded self-updates, type queries and recursive
 // references inside the binding's own definition do not make it used.
-func isNamingRead(reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) bool {
+func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) bool {
 	if ast.IsPartOfTypeQuery(reference) {
 		return false
 	}
@@ -1685,8 +1685,12 @@ func isNamingRead(reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) 
 	for _, declaration := range symbol.Declarations {
 		container := declaration
 		if declaration.Kind == ast.KindVariableDeclaration {
-			container = ast.SkipParentheses(declaration.Initializer())
-			if container == nil || (!ast.IsArrowFunction(container) && !ast.IsFunctionExpression(container)) {
+			initializer := declaration.Initializer()
+			if initializer == nil {
+				continue
+			}
+			container = ast.SkipParentheses(initializer)
+			if !ast.IsArrowFunction(container) && !ast.IsFunctionExpression(container) {
 				continue
 			}
 		} else {
@@ -1696,7 +1700,13 @@ func isNamingRead(reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) 
 				continue
 			}
 		}
-		if reference.Pos() >= container.Pos() && reference.End() <= container.End() {
+		start := container.Pos()
+		if container.Kind == ast.KindClassDeclaration {
+			// A class's own decorators execute outside its class scope. tsgo
+			// includes them in the declaration range, unlike the upstream AST.
+			start = utils.NodeTextRangeSkippingDecorators(sourceFile, container).Pos()
+		}
+		if reference.Pos() >= start && reference.End() <= container.End() {
 			return false
 		}
 	}
