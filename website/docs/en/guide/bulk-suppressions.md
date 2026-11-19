@@ -40,7 +40,7 @@ File paths in the baseline use `/` and are relative to the working directory, in
 
 ESLint can record separate counts for a relative path and an absolute path through a symlink. When you pass one path, Rslint looks for that exact entry first, then for the path it normally records from the working directory.
 
-If both inputs select the same linted filename in one run, each must cover the error count. A missing entry allows zero errors. For example, if the entries allow one and two errors for a rule, Rslint reports the two errors once. Recording or pruning updates both entries.
+If a relative path and an absolute path resolve to the same baseline key, passing both uses the same entry as passing either one alone. If two inputs select the same linted filename under different keys, each key must cover the error count. A missing entry allows zero errors. For example, if the entries allow one and two errors for a rule, Rslint reports the two errors once. Recording or pruning updates both entries.
 
 When two different filenames resolve to the same file, a plugin can report different errors for each name. Rslint updates counts only for filenames it linted. An existing entry for a skipped alias keeps its counts.
 

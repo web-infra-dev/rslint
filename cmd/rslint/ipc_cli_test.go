@@ -208,7 +208,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 			}
 			payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
 
-			if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
+			if err := discoverCLIConfigCatalog(context.Background(), root, &args, &payload, cli); err != nil {
 				t.Fatalf("discoverCLIConfigCatalog: %v", err)
 			}
 			if args.ConfigCatalog == nil || !args.ConfigCatalog.Explicit {
@@ -484,6 +484,66 @@ func TestRunCLIRejectsPayloadFormatBeforeConfigDiscovery(t *testing.T) {
 	}
 	if output != "" {
 		t.Fatalf("invalid format unexpectedly produced stdout: %q", output)
+	}
+}
+
+func TestRunCLIMissingDiscoveryIntentPrecedesFilesystem(t *testing.T) {
+	stderr, err := os.CreateTemp(t.TempDir(), "stderr-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stderr
+	os.Stderr = stderr
+	defer func() {
+		os.Stderr = previous
+		_ = stderr.Close()
+	}()
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if runtime.GOOS != "windows" { // Unix permits unlinking the current directory.
+		if err := os.Remove(dir); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, format := range []string{"stylish", "jsonline"} {
+		cli, peer := newCLIChannelPair(t)
+		peer.Start()
+		done := make(chan int, 1)
+		go func() { done <- runIPCCommand(cli, nil) }()
+		if _, err := peer.SendRequest(t.Context(), kindInit, initPayload{Format: format, Files: []string{"relative.js"}}); err != nil {
+			t.Fatal(err)
+		}
+		if code := <-done; code != 2 {
+			t.Fatalf("%s exit code = %d, want 2", format, code)
+		}
+	}
+	data, err := os.ReadFile(stderr.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `invalid output format "stylish"`) ||
+		lines[1] != "error: CLI host did not provide config discovery intent" {
+		t.Fatalf("preflight diagnostics: %q", data)
+	}
+}
+
+func TestRunCLIConfigDiscoveryPrecedesBaselineError(t *testing.T) {
+	dir := t.TempDir()
+	writeLintTargetContractFiles(t, dir, map[string]string{"rslint-suppressions.json": "invalid"})
+	payload := map[string]any{
+		"workingDirectory": dir,
+		"format":           "jsonline",
+		"configDiscovery":  map[string]any{},
+	}
+	code, output := runCLIInitForTest(t, payload, nil, 0, true)
+	if code != 1 || output != "" {
+		t.Fatalf("missing configuration: exit code = %d, stdout = %q", code, output)
+	}
+	writeLintTargetContractFiles(t, dir, map[string]string{"rslint.config.mjs": "export default [];"})
+	code, output = runCLIInitForTest(t, payload, config.RslintConfig{}, 0, true)
+	if code != 2 || output != "" {
+		t.Fatalf("invalid baseline: exit code = %d, stdout = %q", code, output)
 	}
 }
 

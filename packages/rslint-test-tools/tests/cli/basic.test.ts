@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
@@ -113,7 +114,7 @@ describe('CLI Configuration Tests', () => {
 
   test('reads and prunes the selected ESLint path when two spellings have different counts', async () => {
     const temp = await createTempDir({
-      'repo/rslint.config.mjs':
+      'rslint.config.mjs':
         "export default [{files:['**/*.js'],rules:{'no-debugger':'error'}}];",
       'repo/a/clean.js': '',
       'repo/b/file.js': 'debugger; debugger;',
@@ -126,6 +127,7 @@ describe('CLI Configuration Tests', () => {
       const cwd = path.join(link, 'a');
       const windows = process.platform === 'win32';
       const alternate = path.join(windows ? repo : link, 'b', 'file.js');
+      const physical = path.join(repo, 'b', 'file.js');
       const relative = '../b/file.js';
       const otherKey = path
         .relative(windows ? cwd : path.join(repo, 'a'), alternate)
@@ -174,6 +176,8 @@ describe('CLI Configuration Tests', () => {
         for (const args of [
           [relative, alternate],
           [alternate, relative],
+          [relative, physical],
+          [physical, relative],
         ]) {
           const result = await check(...args);
           expect(result.exitCode).toBe(1);
@@ -186,7 +190,8 @@ describe('CLI Configuration Tests', () => {
         }
       }
       await fs.writeFile(alternate, '');
-      expect((await check('--prune-suppressions', alternate)).exitCode).toBe(0);
+      const pruned = await check('--prune-suppressions', alternate);
+      expect(pruned.exitCode, pruned.stderr).toBe(0);
       expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
         [relative]: one,
       });
@@ -204,6 +209,59 @@ describe('CLI Configuration Tests', () => {
           (await check('--prune-suppressions', relative, alternate)).exitCode,
         ).toBe(0);
         expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
+
+        // Both arguments select the same baseline key from the native cwd.
+        await fs.writeFile(physical, 'debugger; debugger;');
+        const recorded = await check('--suppress-all', relative, physical);
+        expect(recorded.exitCode, recorded.stderr).toBe(0);
+        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+          [relative]: two,
+        });
+        expect((await check(relative)).exitCode).toBe(0);
+        await fs.writeFile(
+          baseline,
+          JSON.stringify({ [relative]: one, [otherKey]: two }),
+        );
+        await fs.writeFile(physical, '');
+        expect(
+          (await check('--prune-suppressions', physical, relative)).exitCode,
+        ).toBe(0);
+        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+          [otherKey]: two,
+        });
+
+        const upperDir = path.join(parent, 'LINK', 'b');
+        if (existsSync(upperDir)) {
+          // Discovery can coalesce two spellings of the same scan root.
+          const upperKey = path.relative(
+            path.join(repo, 'a'),
+            path.join(upperDir, 'file.js'),
+          );
+          await fs.writeFile(
+            baseline,
+            JSON.stringify({ [relative]: one, [upperKey]: two }),
+          );
+          await fs.writeFile(physical, 'debugger; debugger;');
+          for (const args of [
+            ['../b/*.js', upperDir],
+            [
+              '--config',
+              path.join(parent, 'rslint.config.mjs'),
+              '../b',
+              path.join(upperDir, '*.js'),
+            ],
+          ]) {
+            const mixed = await check(...args);
+            expect(mixed.exitCode, mixed.stderr).toBe(1);
+            expect(mixed.stdout.trim().split('\n')).toHaveLength(2);
+          }
+          await fs.writeFile(physical, '');
+          expect(
+            (await check('--prune-suppressions', upperDir, '../b/*.js'))
+              .exitCode,
+          ).toBe(0);
+          expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
+        }
       }
     } finally {
       await cleanupTempDir(temp);

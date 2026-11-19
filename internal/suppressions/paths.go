@@ -151,6 +151,16 @@ func relativeFilePath(dir, path string) (string, error) {
 	return rel, nil
 }
 
+// SamePathSpelling accepts native case and Unicode variants of the same
+// sequence of directory entries. Two separately named symlinks stay distinct.
+func SamePathSpelling(left, right string) bool {
+	if left == right {
+		return true
+	}
+	rel, err := relativeFilePath(filepath.FromSlash(left), filepath.FromSlash(right))
+	return err == nil && rel == "."
+}
+
 // ESLint keys are relative to the native process cwd and retain the spelling
 // of the linted input.
 func (f *File) operandKey(path string) string {
@@ -166,33 +176,31 @@ func (f *File) operandKey(path string) string {
 	return filepath.ToSlash(key)
 }
 
+// Compare after substituting only the links traversed to reach cwd. A link in
+// the selected path keeps its own name, even if another link has the same target.
+func (f *File) sameProjectedPath(left, right string) bool {
+	return SamePathSpelling(f.projectPath(filepath.FromSlash(left)), f.projectPath(filepath.FromSlash(right)))
+}
+
 func (f *File) matchFiles(selected []FileResult) map[string]*checkedFile {
 	files := make(map[string]*checkedFile)
-	byPortableKey := make(map[string][]*checkedFile)
-	exactMatches := make(map[string]bool)
-	if f.options.Mode == Check {
-		// An exact entry can belong to a group whose portable key is absent.
-		// Retain that group, including peers with no baseline entry of their own.
-		hasEntry := func(path string) bool { return f.entries[f.operandKey(path)] != nil }
-		for _, result := range selected {
-			if hasEntry(result.Path) || slices.ContainsFunc(result.InputPaths, hasEntry) {
-				if portable := f.fileKey(result.Path); f.entries[portable] == nil {
-					exactMatches[portable] = true
-				}
-			}
-		}
-	}
+	groups := make(map[string][]*checkedFile)
+	// With operand aliases, even a filename absent from the baseline can own
+	// an exact key that another result would otherwise use.
+	hasOrigins := slices.ContainsFunc(selected, func(result FileResult) bool {
+		return len(result.InputPaths) != 0 || result.CoalescedInto != ""
+	})
+	resolveNames := hasOrigins
 	for _, result := range selected {
-		portable := f.fileKey(result.Path)
-		if f.options.Mode == Check && f.entries[portable] == nil && !exactMatches[portable] {
+		portable, literal := f.fileKey(result.Path), f.operandKey(result.Path)
+		if f.options.Mode == Check && !hasOrigins && f.entries[portable] == nil && f.entries[literal] == nil {
 			continue
 		}
-		literal := f.operandKey(result.Path)
 		keys := make([]string, 0, max(1, len(result.InputPaths)))
 		for _, input := range result.InputPaths {
 			key := literal
 			// From a symlinked cwd, .. can name a different physical file.
-			if input != result.Path && f.fileKey(input) == portable {
+			if input != result.Path && f.sameProjectedPath(input, result.Path) {
 				key = f.operandKey(input)
 			}
 			keys = append(keys, key)
@@ -206,47 +214,90 @@ func (f *File) matchFiles(selected []FileResult) map[string]*checkedFile {
 			literal:      literal,
 			portable:     portable,
 			skippedRules: result.SkippedRules,
+			unchecked:    result.Unchecked,
 		}
-		byPortableKey[portable] = append(byPortableKey[portable], file)
+		group := portable
+		if result.CoalescedInto != "" && f.sameProjectedPath(result.Path, result.CoalescedInto) {
+			group = f.fileKey(result.CoalescedInto)
+		}
+		resolveNames = resolveNames || literal != portable || len(groups[group]) != 0
+		groups[group] = append(groups[group], file)
 		if !result.Unchecked {
 			files[result.Path] = file
 		}
 	}
-	for _, group := range byPortableKey {
-		if len(group) > 1 {
-			separateFilenames(group)
-		}
+	if resolveNames {
+		separateFilenames(groups)
 	}
 	return files
 }
 
-// Rules can inspect the filename, so separately selected paths that share a
-// portable key cannot use each other's counts. Keep a disputed operand on the
-// name passed to the rule. Unchecked aliases reserve names by the same logic.
-func separateFilenames(group []*checkedFile) {
-	owners := make(map[string]string)
-	claim := func(key, literal string) {
-		if owner, ok := owners[key]; ok && owner != literal {
-			owners[key] = ""
+// A single execution requested through a single exact key can also use its
+// portable entry. Repeating the same key through a skipped alias changes nothing.
+func hasSingleInput(group []*checkedFile) bool {
+	key := group[0].keys[0]
+	checked := 0
+	for _, file := range group {
+		if len(file.keys) != 1 || file.keys[0] != key {
+			return false
+		}
+		if !file.unchecked {
+			checked++
+		}
+	}
+	return checked == 1
+}
+
+// Exact keys share one JSON namespace across all files. Independent executions
+// may need distinct names even when their portable paths differ in spelling.
+func separateFilenames(groups map[string][]*checkedFile) {
+	observed := make(map[string]*checkedFile)
+	reserved := make(map[string]bool)
+	claim := func(key string, file *checkedFile) {
+		if owner, ok := observed[key]; ok && owner != file {
+			observed[key] = nil // Multiple executions can have different counts.
 		} else {
-			owners[key] = literal
+			observed[key] = file
 		}
 	}
-	for _, file := range group {
-		claim(file.literal, file.literal)
-		for _, key := range file.keys {
-			claim(key, file.literal)
-		}
-	}
-	for _, file := range group {
-		file.portable = ""
-		for i, key := range file.keys {
-			if owners[key] != file.literal {
-				file.keys[i] = file.literal
+	for _, group := range groups {
+		for _, file := range group {
+			if file.unchecked {
+				if slices.Contains(file.keys, file.literal) {
+					reserved[file.literal] = true
+				}
+				continue
+			}
+			claim(file.literal, file)
+			for _, key := range file.keys {
+				claim(key, file)
 			}
 		}
-		slices.Sort(file.keys)
-		file.keys = slices.Compact(file.keys)
+	}
+	for _, group := range groups {
+		single := hasSingleInput(group)
+		for _, file := range group {
+			if file.unchecked {
+				continue
+			}
+			owner, claimed := observed[file.portable]
+			if !single || claimed && owner != file || reserved[file.portable] && file.keys[0] != file.portable {
+				file.portable = ""
+			}
+			hasOwnName := slices.Contains(file.keys, file.literal)
+			keys := file.keys[:0]
+			for _, key := range file.keys {
+				switch {
+				case observed[key] != file:
+					key = file.literal // Give each actual lint result its own key.
+				case hasOwnName && key != file.literal && reserved[key]:
+					continue // This separately requested filename was never linted.
+				}
+				keys = append(keys, key)
+			}
+			slices.Sort(keys)
+			file.keys = slices.Compact(keys)
+		}
 	}
 }
 

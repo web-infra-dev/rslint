@@ -424,8 +424,12 @@ func TestDefaultStartWriterCompletesBeforePostStartWarnings(t *testing.T) {
 		},
 	}
 	prepareCommandCatalogForTest(tspath.NormalizePath(dir), &args)
+	preflight, preflightCode := prepareLintCommand(args)
+	if preflightCode != 0 {
+		t.Fatalf("preflight exit code = %d", preflightCode)
+	}
 	go func() {
-		codeCh <- handleLintCommand(args, context.Background(), nil)
+		codeCh <- handleLintCommand(args, preflight, context.Background(), nil)
 	}()
 
 	select {

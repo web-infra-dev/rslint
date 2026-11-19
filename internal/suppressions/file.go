@@ -8,10 +8,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
@@ -60,6 +62,9 @@ func Open(cwd string, options Options) (*File, error) {
 	f.entries = data
 	return f, nil
 }
+
+// NativeCWD is the process working directory used to resolve CLI operands.
+func (f *File) NativeCWD() string { return f.baseDir }
 
 func (f *File) fileMissing(key string) (bool, error) {
 	if strings.HasPrefix(key, "//") {
@@ -117,17 +122,40 @@ func (f *File) read(path string) (entries, error) {
 	return data, nil
 }
 
+func resolveUpdatePath(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return path, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if runtime.GOOS == "windows" {
+		// EvalSymlinks treats an intermediate junction as a non-directory.
+		// The native resolver follows junctions and returns its input on failure.
+		absolute, err := filepath.Abs(path)
+		if err != nil {
+			return "", err
+		}
+		physical := filepath.FromSlash(osvfs.FS().Realpath(filepath.ToSlash(absolute)))
+		if physical != absolute || info.Mode()&fs.ModeSymlink == 0 {
+			return physical, nil
+		}
+	}
+	// Preserve a final symlink, including a dangling one, when replacing the file.
+	physical, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve suppressions destination %q: %w", path, err)
+	}
+	return physical, nil
+}
+
 // Stage in the destination directory so a reader always sees complete JSON.
 // Exclusive creation serializes the read/modify/replace operation for writers.
 func (f *File) update(ctx context.Context, files map[string]*checkedFile) error {
-	path := f.path
-	physical, err := filepath.EvalSymlinks(path)
-	if err == nil {
-		path = physical
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	path, err := resolveUpdatePath(f.path)
+	if err != nil {
 		return err
-	} else if _, linkErr := os.Lstat(path); linkErr == nil {
-		return fmt.Errorf("cannot resolve suppressions destination %q: %w", path, err)
 	}
 	stagePath := path + ".tmp"
 	stage, err := os.OpenFile(stagePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o666)

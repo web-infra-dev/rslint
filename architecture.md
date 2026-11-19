@@ -1489,22 +1489,24 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-The file CLI reads its optional bulk suppressions file in the calling working
+Before expanding file operands and discovering configurations, the file CLI
+reads its optional bulk suppressions file in the calling working directory.
+Only an active baseline needs operand spellings from a symlinked working
 directory. After the final lint or fix observation, the CLI passes diagnostics
 and selected files to `internal/suppressions`. It marks files with syntax errors
 as unchecked.
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. When a shell working
-directory has a different spelling from the OS working directory, the CLI also
-retains the spellings of the operands that selected each linted path. The
-baseline compares its rule counts against every requested key. A rule's
-findings are suppressed only when every key covers the count. Target selection
-and config ownership keep their caller-visible paths. If several selected
-filenames share a portable key, the baseline uses their distinct spellings
-because rules can inspect the filename. An alias removed by target
-deduplication reserves its name without contributing a rule count. The CLI
+completed rule counts and owns baseline persistence. For a symlinked working
+directory, discovery retains the operands that reached each file or scan
+root. The target plan identifies the filename kept when it coalesces aliases.
+The CLI uses both facts to associate input spellings with completed lint
+results. Each distinct key for a result must cover that rule's error count.
+Repeating an operand that resolves to the same key preserves the single-input
+lookup. A separately requested filename that was skipped can retain its own
+entry. Rules can inspect the filename, so each completed lint result owns
+its keys. A portable fallback is used only when no other result claims it. The CLI
 blocks baseline writes after configuration or plugin failures and supplies
 visible diagnostics and any baseline failure to report assembly.
 
