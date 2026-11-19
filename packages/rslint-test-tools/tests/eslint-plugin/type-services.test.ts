@@ -2285,7 +2285,15 @@ test('declared members and source metadata follow TypeScript query order', async
   writeFileSync(
     file,
     [
+      '// 😀',
       '/// <reference no-default-lib="true" />',
+      '/// <reference path="./esm.mts" />',
+      '/// <reference path="./cjs.cts" preserve="true" />',
+      '/// <reference types="a" />',
+      '/// <reference types="b" resolution-mode="import" preserve="true" />',
+      '/// <reference types="c" resolution-mode="require" preserve="false" />',
+      '/// <reference lib="es2020" />',
+      '/// <reference lib="es2015" preserve="true" />',
       'export interface Parent { inherited: string; }',
       'export interface Child extends Parent { own: number; (): string; new(): Child; [index: number]: boolean; }',
       'export interface Empty {}',
@@ -2323,6 +2331,7 @@ test('declared members and source metadata follow TypeScript query order', async
           Object.hasOwn(type, key),
           Reflect.ownKeys(type).includes(key),
           type[key] !== undefined,
+          Object.getOwnPropertyDescriptor(type, key)?.value === type[key],
         ]);
       const before = presence();
       const props = checker.getPropertiesOfType(type);
@@ -2372,8 +2381,26 @@ test('declared members and source metadata follow TypeScript query order', async
           src.languageVersion,
           src.hasNoDefaultLib,
           src.impliedNodeFormat,
+          ...(
+            [
+              'referencedFiles',
+              'typeReferenceDirectives',
+              'libReferenceDirectives',
+            ] as const
+          ).map((key) => ({
+            sameList: src[key] === src[key],
+            own: Object.hasOwn(src, key),
+            descriptorMatches:
+              Object.getOwnPropertyDescriptor(src, key)?.value === src[key],
+            entries: src[key].map((ref) => [Object.keys(ref), ref]),
+          })),
           ...['languageVersion', 'hasNoDefaultLib', 'impliedNodeFormat'].map(
-            (k) => [k in src, Object.hasOwn(src, k)],
+            (k) => [
+              k in src,
+              Object.hasOwn(src, k),
+              Object.getOwnPropertyDescriptor(src, k)?.value ===
+                Reflect.get(src, k),
+            ],
           ),
         ];
       }),
@@ -2425,6 +2452,7 @@ test('resolved project references retain config syntax, nesting and missing entr
   writeFileSync(resolve(dir, 'nested.ts'), 'export const nested = 1;');
   writeFileSync(resolve(dir, 'child.ts'), 'export const child = 2;');
   const compilerOptions = { composite: true, target: 'esnext' };
+  writeFileSync(resolve(dir, 'base.json'), '{}');
   writeFileSync(
     nested,
     JSON.stringify({ compilerOptions, files: ['nested.ts'] }),
@@ -2433,7 +2461,9 @@ test('resolved project references retain config syntax, nesting and missing entr
     child,
     JSON.stringify({
       compilerOptions,
+      extends: './base.json',
       files: ['child.ts'],
+      include: ['shallow/*.ts', 'deep/**/*.ts'],
       references: [{ path: './nested.json' }],
     }),
   );
@@ -2481,6 +2511,8 @@ test('resolved project references retain config syntax, nesting and missing entr
               ref.commandLine.fileNames,
               ref.commandLine.options.target,
               ref.commandLine.raw.compilerOptions.target,
+              ref.commandLine.wildcardDirectories,
+              (ref.sourceFile as ts.TsConfigSourceFile).extendedSourceFiles,
             ],
         ),
         nested: refs[0]!.references![0] === refs[1],
