@@ -8,7 +8,7 @@ const HEADER = 8,
   SLOT = 4;
 const SIGNATURE_OPTIONS_USED = 5;
 export const MIN_SHARED_TYPE_CACHE_BYTES = (HEADER + SLOT) * 4;
-export const MAX_SHARED_TYPE_PROBES = 64;
+const MAX_SHARED_TYPE_PROBES = 64;
 function keyBytes(key: string): Uint8Array {
   const bytes = new Uint8Array(key.length * 2);
   for (let i = 0; i < key.length; i++) {
@@ -43,17 +43,12 @@ function storage(descriptor: SharedTypeCacheDescriptor): Storage {
 }
 export class SharedTypeCacheReader {
   private storage: Storage | undefined;
-  readonly stats = { probes: 0 };
   constructor(descriptor: SharedTypeCacheDescriptor) {
     this.storage = storage(descriptor);
     this.assertOpen();
-    Atomics.add(this.storage.control, 3, 1);
   }
   get descriptor(): SharedTypeCacheDescriptor {
     return this.open().descriptor;
-  }
-  get retainedBytes(): number {
-    return this.storage?.bytes.byteLength ?? 0;
   }
   private open(): Storage {
     const current = this.storage;
@@ -79,7 +74,6 @@ export class SharedTypeCacheReader {
       step < Math.min(descriptor.entries, MAX_SHARED_TYPE_PROBES);
       step++
     ) {
-      this.stats.probes++;
       const slot =
         HEADER + (((value >>> 0) + step) % descriptor.entries) * SLOT;
       const found = Atomics.load(control, slot);
@@ -97,17 +91,13 @@ export class SharedTypeCacheReader {
     return undefined;
   }
   close(): void {
-    if (this.storage) {
-      Atomics.sub(this.storage.control, 3, 1);
-      this.storage = undefined;
-    }
+    this.storage = undefined;
   }
 }
 /** Existing hits survive saturation. A collision only declines that insertion.
  * JavaScript wrappers never receive these shared byte views. */
 export class SharedTypeCacheOwner {
   private storage: Storage | undefined;
-  readonly stats = { probes: 0 };
   constructor(
     generation: number,
     budgetBytes: number,
@@ -138,7 +128,11 @@ export class SharedTypeCacheOwner {
     control[1] = generation;
     control[2] = start;
     Atomics.store(control, 0, 1);
-    this.storage = storage(descriptor);
+    this.storage = {
+      descriptor,
+      control,
+      bytes: new Uint8Array(descriptor.buffer),
+    };
   }
   private open(): Storage {
     if (!this.storage) throw new Error('shared type cache is closed');
@@ -160,7 +154,6 @@ export class SharedTypeCacheOwner {
       step < Math.min(descriptor.entries, MAX_SHARED_TYPE_PROBES);
       step++
     ) {
-      this.stats.probes++;
       const slot =
         HEADER + (((value >>> 0) + step) % descriptor.entries) * SLOT;
       const found = Atomics.load(control, slot);
@@ -182,22 +175,12 @@ export class SharedTypeCacheOwner {
     control[available + 2] = packet.length;
     control[available + 3] = encoded.length;
     control[2] = end;
-    control[4]++;
     Atomics.store(control, available, value);
     return true;
   }
   close(): void {
     if (this.storage) Atomics.store(this.storage.control, 0, 0);
     this.storage = undefined;
-  }
-  get readers(): number {
-    return Atomics.load(this.open().control, 3);
-  }
-  get usedBytes(): number {
-    return this.open().control[2];
-  }
-  get entries(): number {
-    return this.open().control[4];
   }
   get retainedBytes(): number {
     return this.storage?.bytes.byteLength ?? 0;

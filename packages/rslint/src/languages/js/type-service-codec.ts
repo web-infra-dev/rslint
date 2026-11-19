@@ -25,7 +25,6 @@ export class TypePacketReader {
   private view: DataView | undefined;
   private readonly strings = new Map<number, string>();
   readonly kind: number;
-  readonly stats = { strings: 0, lists: 0 };
   constructor(bytes: Uint8Array) {
     this.bytes = bytes;
     this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -64,12 +63,10 @@ export class TypePacketReader {
       chunks.push(String.fromCharCode(...units));
     }
     const value = chunks.join('');
-    this.stats.strings++;
     this.strings.set(offset, value);
     return value;
   }
   private ids(offset: number): number[] {
-    this.stats.lists++;
     const size = this.word(offset);
     if (offset + 4 + size * 4 > this.view!.byteLength) return invalid();
     return Array.from({ length: size }, (_, i) =>
@@ -211,7 +208,6 @@ export class TypePacketReader {
         const at = this.word(20);
         if (!at) value = undefined;
         else {
-          this.stats.lists++;
           const size = this.word(at);
           if (at + 4 + size * 8 > this.view!.byteLength) return invalid();
           value = Array.from({ length: size }, (_, i) =>

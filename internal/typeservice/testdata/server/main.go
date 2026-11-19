@@ -108,12 +108,27 @@ func main() {
 					err = bindErr
 					return
 				}
-				projection, projectErr := projector.Project(context.Background(), f, estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(f.Text(), "\ufeff")})
+				ctx := context.Background()
+				options := estree.Options{SourceType: "module", HasBOM: strings.HasPrefix(f.Text(), "\ufeff")}
+				frame, frameErr := projector.Build(ctx, f, options)
+				if frameErr != nil {
+					err = frameErr
+					return
+				}
+				tree, table, encodeErr := encoder.EncodeSourceFile(f)
+				if encodeErr != nil {
+					err = encodeErr
+					return
+				}
+				origins, projectErr := projector.ProjectOrigins(ctx, f, options, table)
 				projector.Reset()
 				value = struct {
-					estree.Projection
-					Binding typeservice.Binding `json:"binding"`
-				}{projection, binding}
+					estree.OriginTables
+					Frame          []byte              `json:"frame"`
+					Tree           []byte              `json:"tree"`
+					SourceFileName string              `json:"sourceFileName"`
+					Binding        typeservice.Binding `json:"binding"`
+				}{origins, frame, tree, f.FileName(), binding}
 				err = projectErr
 			case "source":
 				f, sourceErr := session.Source(req.Generation, tspath.NormalizePath(req.File))

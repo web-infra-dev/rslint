@@ -7,14 +7,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 )
 
-// Projection is syntax owned by one file client. Admission and generation are
-// supplied separately by its semantic-session binding, never inferred here.
-type Projection struct {
-	SourceFileName string `json:"sourceFileName"`
-	Frame          []byte `json:"frame"`
-	Tree           []byte `json:"tree"`
-	OriginTables
-}
 type OriginTables struct {
 	Origins         []uint32            `json:"origins"`
 	Reverse         map[uint32]uint32   `json:"reverse"`
@@ -38,57 +30,40 @@ type ChainAlias struct {
 	End        uint32 `json:"end"`
 }
 
-func (b *Builder) Project(ctx context.Context, file *ast.SourceFile, options Options) (Projection, error) {
-	tree, table, err := encoder.EncodeSourceFile(file)
-	if err != nil {
-		return Projection{}, err
-	}
-	origins := newOriginTables(file)
-	frame, err := b.Build(ctx, file, origins.record(options, table))
-	return Projection{SourceFileName: file.FileName(), Frame: frame, Tree: tree, OriginTables: origins}, err
+type originProjection struct {
+	OriginTables
+	table        *encoder.NodeIndexTable
+	nodes        []*ast.Node
+	reverse      map[*ast.Node]uint32
+	chainRecord  uint32
+	chainReverse []*ast.Node
 }
 
-// ProjectOrigins reproduces the immutable frame's node IDs without scanning
-// tokens or writing another frame.
+// ProjectOrigins reproduces the existing frame's node IDs without scanning
+// tokens or encoding another frame.
 func (b *Builder) ProjectOrigins(ctx context.Context, file *ast.SourceFile, options Options, table *encoder.NodeIndexTable) (OriginTables, error) {
-	origins := newOriginTables(file)
-	_, err := b.build(ctx, file, origins.record(options, table), nil, true)
-	return origins, err
+	mapping := originProjection{table: table, reverse: make(map[*ast.Node]uint32)}
+	if _, err := b.build(ctx, file, options, nil, &mapping); err != nil {
+		return OriginTables{}, err
+	}
+	return mapping.OriginTables, nil
 }
 
-func newOriginTables(file *ast.SourceFile) OriginTables {
-	return OriginTables{Origins: make([]uint32, 1, min(file.NodeCount+1, maxInitialFrameBytes/4)), Reverse: make(map[uint32]uint32)}
-}
-
-func (result *OriginTables) record(options Options, table *encoder.NodeIndexTable) Options {
-	options.RecordOrigin = func(id uint32, node *ast.Node) {
-		if int(id) != len(result.Origins) {
-			panic("unordered projection origins")
-		}
-		var index uint32
+func (m *originProjection) finish() {
+	// Projected IDs start at one. Synthetic nodes have no compiler index.
+	m.Origins = make([]uint32, len(m.nodes)+1)
+	for i, node := range m.nodes {
 		if node != nil {
-			index = table.GetIndex(node)
-		}
-		result.Origins = append(result.Origins, index)
-	}
-	options.RecordReverse = func(node *ast.Node, id uint32) {
-		if index := table.GetIndex(node); index != 0 {
-			result.Reverse[index] = id
+			m.Origins[i+1] = m.table.GetIndex(node)
 		}
 	}
-	options.RecordSequenceAlias = func(node *ast.Node, sequence, count, start, end uint32) {
-		result.Aliases = append(result.Aliases, SequenceAlias{table.GetIndex(node), sequence, count, start, end})
-	}
-	options.sequenceMembers = func(sequenceID uint32, members []uint32) {
-		if result.SequenceMembers == nil {
-			result.SequenceMembers = make(map[uint32][]uint32)
+	m.Reverse = make(map[uint32]uint32, len(m.reverse))
+	for node, id := range m.reverse {
+		if id == detachedChainReverse {
+			continue
 		}
-		result.SequenceMembers[sequenceID] = members
-	}
-	options.recordChainAlias = func(node, origin *ast.Node, expression, start, end uint32) {
-		if index := table.GetIndex(node); index != 0 {
-			result.ChainAliases = append(result.ChainAliases, ChainAlias{index, table.GetIndex(origin), expression, start, end})
+		if index := m.table.GetIndex(node); index != 0 {
+			m.Reverse[index] = id
 		}
 	}
-	return options
 }

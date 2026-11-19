@@ -112,13 +112,8 @@ export class GenerationSyntaxViews {
     string,
     TypeServiceDescriptor['sources'][number]
   >();
-  readonly stats = {
-    nodes: 0,
-    aliases: 0,
-    sourceBytes: 0,
-    sourceRequests: 0,
-    summaryBytes: 0,
-  };
+  private sourceBytes = 0;
+  private summaryBytes = 0;
   constructor(
     private readonly typescript: Pick<
       typeof ts,
@@ -210,15 +205,15 @@ export class GenerationSyntaxViews {
     }
     // A source larger than the budget can service this access without retention.
     if (bytes > this.maxSourceBytes) return;
-    while (this.stats.sourceBytes + bytes > this.maxSourceBytes) {
+    while (this.sourceBytes + bytes > this.maxSourceBytes) {
       const key = this.sources.keys().next().value!;
-      this.stats.sourceBytes -= this.sourceSizes.get(key)!;
+      this.sourceBytes -= this.sourceSizes.get(key)!;
       this.sourceSizes.delete(key);
       this.sources.delete(key);
     }
     this.sources.set(source.fileName, source);
     this.sourceSizes.set(source.fileName, bytes);
-    this.stats.sourceBytes += bytes;
+    this.sourceBytes += bytes;
   }
   private readonly sourceSizes = new Map<string, number>();
   attach(
@@ -249,7 +244,6 @@ export class GenerationSyntaxViews {
       this.sources.set(metadata.fileName, old);
       return old;
     }
-    this.stats.sourceRequests++;
     const reply = this.lookup!(this.descriptor, metadata.fileName);
     if (!reply) return undefined;
     if (reply.fileName !== metadata.fileName)
@@ -297,13 +291,13 @@ export class GenerationSyntaxViews {
             (fact.parent?.file.length ?? 0) +
             (fact.name?.file.length ?? 0));
       if (bytes > this.maxSummaryBytes) continue;
-      while (this.stats.summaryBytes + bytes > this.maxSummaryBytes) {
+      while (this.summaryBytes + bytes > this.maxSummaryBytes) {
         const oldest = this.summaries.keys().next().value!;
-        this.stats.summaryBytes -= this.summaries.get(oldest)!.bytes;
+        this.summaryBytes -= this.summaries.get(oldest)!.bytes;
         this.summaries.delete(oldest);
       }
       this.summaries.set(key, { fact, bytes });
-      this.stats.summaryBytes += bytes;
+      this.summaryBytes += bytes;
     }
     if (!result) throw new Error('missing syntax fact');
     return result;
@@ -412,7 +406,6 @@ export class GenerationSyntaxViews {
     );
     if (!('owner' in identity)) this.identities.set(proxy, identity);
     this.wrapped.set(cacheKey, proxy);
-    this.stats.nodes++;
     return proxy;
   }
   private ref(value: RemoteNode): NodeRef {
@@ -784,8 +777,8 @@ export class GenerationSyntaxViews {
     this.sourceSizes.clear();
     this.summaries.clear();
     this.wrapped.clear();
-    this.stats.sourceBytes = 0;
-    this.stats.summaryBytes = 0;
+    this.sourceBytes = 0;
+    this.summaryBytes = 0;
   }
 }
 
@@ -927,7 +920,6 @@ export class FileSyntaxViews {
       const origin = chain ? info.origin : index;
       this.materializedAliases.set(key, alias);
       if (origin) this.forward.set(alias, origin);
-      this.registry.stats.aliases++;
       return alias;
     },
     has: (node: object): boolean => {
