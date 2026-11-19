@@ -112,6 +112,64 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	if err := f.prune(data, nil); err != nil || len(data) != 1 {
 		t.Fatalf("pruning an existing sibling: entries %v, error %v", data, err)
 	}
+
+	packages := filepath.Join(repo, "packages")
+	if err := os.MkdirAll(packages, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	inner := filepath.Join(parent, "inner")
+	for _, name := range []string{"a", "b"} {
+		if err := os.MkdirAll(filepath.Join(inner, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(inner, filepath.Join(packages, "view")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sibling, filepath.Join(inner, "b", "file.ts")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("b", filepath.Join(inner, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	lexical := filepath.Join(alias, "packages", "view")
+	f, err = Open(filepath.Join(lexical, "a"), Options{Mode: Record})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = make(entries)
+	for _, base := range []string{lexical, filepath.Join(packages, "view"), inner} {
+		for _, name := range []string{"b", "linked"} {
+			key := f.fileKey(filepath.Join(base, name, "file.ts"))
+			if want := "../" + name + "/file.ts"; key != want {
+				t.Errorf("sibling key under %s = %q, want %q", base, key, want)
+			}
+			data[key] = map[string]entry{"x": {Count: 1}}
+		}
+	}
+	t.Run("case-only spelling of an ancestor link", func(t *testing.T) {
+		alternate := filepath.Join(parent, "LINK")
+		path := filepath.Join(alternate, "packages", "view", "b", "file.ts")
+		// Windows filepath.Rel folds link and LINK even when they can name
+		// two independent links to the same directory. Supply that result on
+		// every host so the fixture exercises the volume's actual behavior.
+		folded := filepath.Join("b", "file.ts")
+		want := folded
+		if err := os.Symlink(repo, alternate); err == nil {
+			want = filepath.Join("..", "..", "..", "LINK", "packages", "view", "b", "file.ts")
+		} else if !os.IsExist(err) {
+			t.Fatal(err)
+		}
+		if got := verifyRelativePathCase(lexical, path, folded); got != want {
+			t.Errorf("case-aware relative path = %q, want %q", got, want)
+		}
+	})
+	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.prune(data, nil); err != nil || len(data) != 2 {
+		t.Fatalf("pruning after removing the working directory alias: entries %v, error %v", data, err)
+	}
 }
 
 func TestUpdatePreservesOtherWriter(t *testing.T) {
