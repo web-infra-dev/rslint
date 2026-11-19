@@ -1643,8 +1643,13 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 				break
 			}
 		}
+		// References are source-ordered. Retain an enclosing RHS while its
+		// nested references are visited, just as collectVariables does.
+		var rhs *ast.Node
 		for _, reference := range refInfo.refs.References(symbol) {
-			if isNamingRead(ctx.SourceFile, reference, symbol, refInfo.refs) {
+			read := isNamingRead(ctx.SourceFile, reference, symbol, rhs)
+			rhs = namingAssignmentRHS(reference, rhs, symbol)
+			if read {
 				return false
 			}
 		}
@@ -1676,7 +1681,7 @@ func isUnusedByNameNode(ctx rule.RuleContext, nameNode *ast.Node, refInfo *refer
 // isNamingRead mirrors collectVariables' distinction between a reference
 // and a use: writes, discarded self-updates, type queries and recursive
 // references inside the binding's own definition do not make it used.
-func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) bool {
+func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.Symbol, rhs *ast.Node) bool {
 	if ast.IsPartOfTypeQuery(reference) {
 		return false
 	}
@@ -1733,7 +1738,7 @@ func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.S
 			}
 		}
 	}
-	return !isNamingSelfAssignmentRead(reference, symbol, refs)
+	return rhs == nil || reference.Pos() < rhs.Pos() || reference.End() > rhs.End() || isNamingStorableFunctionRead(reference, rhs)
 }
 
 // A merge can make the binding used without giving every declaration the
@@ -1743,6 +1748,14 @@ func isNamingMergedExported(symbol *ast.Symbol) bool {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
+		if declaration.Kind == ast.KindModuleDeclaration {
+			body := declaration.Body()
+			// A.B is a qualified namespace declaration in the upstream AST;
+			// its export does not mark a local function named A as used.
+			if body != nil && body.Kind == ast.KindModuleDeclaration {
+				continue
+			}
+		}
 		switch declaration.Kind {
 		case ast.KindFunctionDeclaration, ast.KindClassDeclaration,
 			ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration,
@@ -1755,48 +1768,45 @@ func isNamingMergedExported(symbol *ast.Symbol) bool {
 	return false
 }
 
-// A read inside a discarded assignment's RHS only updates the same binding,
-// unless it belongs to a callback that can escape that RHS. Compare the
-// assignment's execution scope, not the scope of a function inside its RHS.
-func isNamingSelfAssignmentRead(reference *ast.Node, symbol *ast.Symbol, refs *rule.RefStore) bool {
-	if len(symbol.Declarations) == 0 {
-		return false
+// Maintain the RHS selected by an earlier write reference. A nested
+// assignment must not replace the enclosing RHS: it can store the callback
+// elsewhere within that outer expression.
+func namingAssignmentRHS(reference, previous *ast.Node, symbol *ast.Symbol) *ast.Node {
+	if previous != nil && reference.Pos() >= previous.Pos() && reference.End() <= previous.End() {
+		return previous
 	}
-	for parent := reference.Parent; parent != nil; parent = parent.Parent {
-		if parent.Kind != ast.KindBinaryExpression {
-			continue
-		}
-		assignment := parent.AsBinaryExpression()
-		if !ast.IsAssignmentOperator(assignment.OperatorToken.Kind) || !unusedNamingExpression(parent) {
-			continue
-		}
-		left := ast.SkipParentheses(assignment.Left)
-		if !ast.IsIdentifier(left) || refs.ResolveInFile(left) != symbol ||
-			reference.Pos() < assignment.Right.Pos() || reference.End() > assignment.Right.End() {
-			continue
-		}
-		if namingExecutionScope(parent) != namingExecutionScope(symbol.Declarations[0]) {
-			return false
-		}
-		for ancestor := parent.Parent; ancestor != nil; ancestor = ancestor.Parent {
-			if ast.IsIterationStatement(ancestor, false) {
-				return false
-			}
-			if ast.IsFunctionLikeDeclaration(ancestor) {
-				break
-			}
-		}
-		return !isNamingStorableFunctionRead(reference, assignment.Right)
+	node := reference
+	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+		node = node.Parent
 	}
-	return false
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindBinaryExpression || len(symbol.Declarations) == 0 {
+		return nil
+	}
+	assignment := parent.AsBinaryExpression()
+	if assignment.Left != node || !ast.IsAssignmentOperator(assignment.OperatorToken.Kind) || !unusedNamingExpression(parent) {
+		return nil
+	}
+	if namingExecutionScope(reference) != namingExecutionScope(symbol.Declarations[0]) {
+		return nil
+	}
+	for child, ancestor := reference, reference.Parent; ancestor != nil; child, ancestor = ancestor, ancestor.Parent {
+		if namingFunctionOwnsChild(ancestor, child) {
+			break
+		}
+		if ast.IsIterationStatement(ancestor, false) {
+			return nil
+		}
+	}
+	return assignment.Right
 }
 
 // Follow collectVariables' bounded "storable function" test. Passing a
 // callback to a call, storing it elsewhere, or yielding it is an observable
 // use; calling it immediately to compute the same binding's new value is not.
 func isNamingStorableFunctionRead(reference, rhs *ast.Node) bool {
-	for function := reference.Parent; function != nil; function = function.Parent {
-		if !ast.IsFunctionLikeDeclaration(function) {
+	for child, function := reference, reference.Parent; function != nil; child, function = function, function.Parent {
+		if !namingFunctionOwnsChild(function, child) {
 			continue
 		}
 		if function.Pos() < rhs.Pos() || function.End() > rhs.End() {
@@ -1823,7 +1833,7 @@ func isNamingStorableFunctionRead(reference, rhs *ast.Node) bool {
 			case ast.KindTaggedTemplateExpression, ast.KindYieldExpression:
 				return true
 			default:
-				if ast.IsStatement(parent) || parent.Kind == ast.KindVariableDeclarationList {
+				if parent.Kind == ast.KindBlock || ast.IsStatement(parent) || parent.Kind == ast.KindVariableDeclarationList {
 					return true
 				}
 			}
@@ -1833,12 +1843,26 @@ func isNamingStorableFunctionRead(reference, rhs *ast.Node) bool {
 	return false
 }
 
+// ESTree methods contain a separate function value. Computed names and
+// member decorators are outside it; parameters and the body are inside it.
+func namingFunctionOwnsChild(function, child *ast.Node) bool {
+	if !ast.IsFunctionLikeDeclaration(function) {
+		return false
+	}
+	switch function.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		return child != function.Name() && child.Kind != ast.KindDecorator
+	default:
+		return true
+	}
+}
+
 func namingExecutionScope(node *ast.Node) *ast.Node {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		if parent.Kind == ast.KindPropertyDeclaration && parent.Initializer() == node {
 			return parent
 		}
-		if ast.IsFunctionLikeDeclaration(parent) || parent.Kind == ast.KindSourceFile || parent.Kind == ast.KindClassStaticBlockDeclaration || parent.Kind == ast.KindModuleBlock {
+		if namingFunctionOwnsChild(parent, node) || parent.Kind == ast.KindSourceFile || parent.Kind == ast.KindClassStaticBlockDeclaration || parent.Kind == ast.KindModuleBlock {
 			return parent
 		}
 		node = parent

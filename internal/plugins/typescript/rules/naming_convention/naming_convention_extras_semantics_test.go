@@ -649,3 +649,72 @@ func TestNamingConventionUnusedAssignmentBoundaries(t *testing.T) {
 			{Code: "let bad_name; class Good {[(bad_name=()=>bad_name, \"field\")]=0;}", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
 		})
 }
+
+// Full expectations were independently checked against typescript-eslint 8.67.0.
+// Cover callback ownership, ordered RHS state, and namespace syntax projection.
+func TestNamingConventionCallbackAndNamespaceBoundaries(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule,
+		[]rule_tester.ValidTestCase{
+			// named queued callback
+			{Code: "let bad_name = 0;\nbad_name = (() => {\n  function read() { console.log(bad_name); }\n  queueMicrotask(read);\n  return 1;\n})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// computed method key
+			{Code: "declare function register(make: () => string): string;\nlet bad_key = 'run';\nbad_key = register(() => ({ [bad_key]() { return 'next'; } }).run());", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// nested callback assignment
+			{Code: "declare function wrap(fn: () => void): () => void;\nlet bad_task: () => void = () => {};\nbad_task = (bad_task = () => bad_task(), wrap(bad_task));", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// external queued callback control
+			{Code: "let bad_name=0; function read(){console.log(bad_name);} queueMicrotask(read);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// simple namespace control
+			{Code: "function bad_name() {} export namespace bad_name {export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// function block let bad_name=0;bad_name=(()=>{function read(){return bad_name;}setTimeout(read,0);return 1;})();
+			{Code: "let bad_name=0;bad_name=(()=>{function read(){return bad_name;}setTimeout(read,0);return 1;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// function block let bad_name=0;bad_name=(()=>{try {function read(){return bad_name;}queueMicrotask(read);}catch {} return 1;})();
+			{Code: "let bad_name=0;bad_name=(()=>{try {function read(){return bad_name;}queueMicrotask(read);}catch {} return 1;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// function block let bad_name=0;bad_name=(()=>{function read(){return bad_name;}return 1;})();
+			{Code: "let bad_name=0;bad_name=(()=>{function read(){return bad_name;}return 1;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// function block let bad_name=0;bad_name=(()=>{queueMicrotask(()=>console.log(bad_name));return 1;})();
+			{Code: "let bad_name=0;bad_name=(()=>{queueMicrotask(()=>console.log(bad_name));return 1;})();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// method position declare function register(make:()=>string):string;let bad_key="run";bad_key=register(()=>({get [bad_key](){return "next";}}).run);
+			{Code: "declare function register(make:()=>string):string;let bad_key=\"run\";bad_key=register(()=>({get [bad_key](){return \"next\";}}).run);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// method position declare function register(make:()=>string):string;let bad_key="run";bad_key=register(()=>({set [bad_key](value:string){},run:"next"}).run);
+			{Code: "declare function register(make:()=>string):string;let bad_key=\"run\";bad_key=register(()=>({set [bad_key](value:string){},run:\"next\"}).run);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// method position declare function register(make:()=>string):string;let bad_key="run";bad_key=register(()=>{class Good{[bad_key](){return "next";}}return "next";});
+			{Code: "declare function register(make:()=>string):string;let bad_key=\"run\";bad_key=register(()=>{class Good{[bad_key](){return \"next\";}}return \"next\";});", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// RHS state let bad_task:()=>void;bad_task=(bad_task=()=>bad_task(),0 as any);
+			{Code: "let bad_task:()=>void;bad_task=(bad_task=()=>bad_task(),0 as any);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// RHS state declare function wrap(fn:()=>void):()=>void;let bad_task:()=>void=()=>{};bad_task=(0,bad_task=()=>bad_task(),wrap(bad_task));
+			{Code: "declare function wrap(fn:()=>void):()=>void;let bad_task:()=>void=()=>{};bad_task=(0,bad_task=()=>bad_task(),wrap(bad_task));", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// RHS state declare function wrap(fn:()=>void):()=>void;let bad_task:()=>void=()=>{};bad_task=(bad_task=()=>bad_task(),wrap(bad_task));bad_task();
+			{Code: "declare function wrap(fn:()=>void):()=>void;let bad_task:()=>void=()=>{};bad_task=(bad_task=()=>bad_task(),wrap(bad_task));bad_task();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// RHS state let bad_task:()=>void;bad_task=()=>bad_task();bad_task();
+			{Code: "let bad_task:()=>void;bad_task=()=>bad_task();bad_task();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// RHS state let bad_task:any;let saved:any;bad_task=(saved=()=>bad_task(),0);
+			{Code: "let bad_task:any;let saved:any;bad_task=(saved=()=>bad_task(),0);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// namespace shape function bad_name(){} export namespace bad_name{export namespace Inner{export type Entry=string;}}
+			{Code: "function bad_name(){} export namespace bad_name{export namespace Inner{export type Entry=string;}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// namespace shape export function bad_name(){} export namespace bad_name.Inner{export type Entry=string;}
+			{Code: "export function bad_name(){} export namespace bad_name.Inner{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// dotted direct exported modifier
+			{Code: "function bad_name(){} export namespace bad_name.Inner{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"exported"}, "format": []any{"camelCase"}}}},
+		}, []rule_tester.InvalidTestCase{
+			// dotted namespace
+			{Code: "function bad_name() {}\nexport namespace bad_name.Inner { export type Entry = string; }", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// method body self-read control
+			{Code: "let bad_name;bad_name={run(){return bad_name;}};", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 13}}},
+			// direct callback assignment control
+			{Code: "let bad_task:()=>void; bad_task=()=>bad_task();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_task` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 22}}},
+			// method position let bad_key="run";bad_key=(()=>({[bad_key](){return "next";}}).run())();
+			{Code: "let bad_key=\"run\";bad_key=(()=>({[bad_key](){return \"next\";}}).run())();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_key` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 12}}},
+			// method position let bad_key="run";bad_key=(()=>({run(){return bad_key;}}).run())();
+			{Code: "let bad_key=\"run\";bad_key=(()=>({run(){return bad_key;}}).run())();", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_key` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 12}}},
+			// RHS state let bad_task:()=>void;bad_task=()=>bad_task();let good=1;console.log(good);
+			{Code: "let bad_task:()=>void;bad_task=()=>bad_task();let good=1;console.log(good);", Options: []any{map[string]any{"selector": "variable", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Variable name `bad_task` must match one of the following formats: camelCase", Line: 1, Column: 5, EndLine: 1, EndColumn: 22}}},
+			// namespace shape function bad_name(){} export namespace bad_name.Inner.Deep{export type Entry=string;}
+			{Code: "function bad_name(){} export namespace bad_name.Inner.Deep{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// namespace shape function bad_name(){} namespace bad_name.Inner{export type Entry=string;}
+			{Code: "function bad_name(){} namespace bad_name.Inner{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// namespace shape function bad_name(){} namespace bad_name{export namespace Inner{export type Entry=string;}}
+			{Code: "function bad_name(){} namespace bad_name{export namespace Inner{export type Entry=string;}}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+			// namespace shape function bad_name(){} export namespace other_name.Inner{export type Entry=string;}
+			{Code: "function bad_name(){} export namespace other_name.Inner{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+		})
+}
