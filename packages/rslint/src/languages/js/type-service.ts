@@ -876,13 +876,14 @@ export class TypeServiceClient {
             },
           }).map((info) => this.indexInfo(info)),
         signatureToSignatureDeclaration: (s, kind, enclosing, flags) => {
+          const name = typescript.SyntaxKind[kind];
+          const nativeKind: unknown = Reflect.get(nativeSyntaxKind, name);
+          if (typeof nativeKind !== 'number') unsupported(`SyntaxKind.${name}`);
           const data = this.query({
             op: 'signatureDeclaration',
             args: {
               id: this.id(s, 'signature'),
-              kind: nativeSyntaxKind[
-                typescript.SyntaxKind[kind] as keyof typeof nativeSyntaxKind
-              ],
+              kind: nativeKind,
               node: enclosing && this.syntax.location(enclosing),
               flags: flags === undefined ? undefined : flags >>> 0,
             },
@@ -911,14 +912,14 @@ export class TypeServiceClient {
               flags: flags === undefined ? undefined : flags >>> 0,
             },
           });
-          return (
-            data &&
-            (
-              this.syntax.generatedTypeNode(data) as {
-                typeParameters: readonly object[];
-              }
-            ).typeParameters
+          if (!data) return undefined;
+          const parameters: unknown = Reflect.get(
+            this.syntax.generatedTypeNode(data),
+            'typeParameters',
           );
+          if (parameters === undefined || Array.isArray(parameters))
+            return parameters;
+          throw new Error('invalid generated type parameter list');
         },
         typeParameterToDeclaration: (t, enclosing, flags) => {
           const data = this.query({
@@ -1641,7 +1642,7 @@ export class TypeServiceClient {
     map: WeakObjectCache<number, T>,
     kind: ObjectKind,
     id: number,
-    create: (brand: ObjectBrand) => T,
+    create: (client: this, brand: ObjectBrand) => T,
   ): T | undefined {
     this.ensure();
     if (!id) return undefined;
@@ -1649,7 +1650,7 @@ export class TypeServiceClient {
     if (old) return old;
     const brand = { kind, id };
     const object = guarded(
-      create(brand),
+      create(this, brand),
       () => {
         this.ensure();
       },
@@ -1741,7 +1742,7 @@ export class TypeServiceClient {
     return info;
   }
   private type(id: number): TypeView | undefined {
-    return this.intern(this.types, 'type', id, () => {
+    return this.intern(this.types, 'type', id, (client) => {
       const ensure = () => {
         this.ensure();
       };
@@ -1856,7 +1857,6 @@ export class TypeServiceClient {
         }
         return resolvedMembers;
       };
-      const client = this;
       const calls = memo(ensure, () =>
           this.signaturesFor(
             this.query({ op: 'signatures', args: { id, kind: 0 } }),
@@ -2118,7 +2118,7 @@ export class TypeServiceClient {
     });
   }
   private symbol(id: number, knownName?: string): SymbolView | undefined {
-    const view = this.intern(this.symbols, 'symbol', id, (brand) => {
+    const view = this.intern(this.symbols, 'symbol', id, (client, brand) => {
       const ensure = () => {
         this.ensure();
       };
@@ -2164,7 +2164,6 @@ export class TypeServiceClient {
       let tags: ts.JSDocTagInfo[] | undefined;
       let links: SymbolView['links'];
       let members: Map<string, SymbolView> | undefined;
-      const client = this;
       return {
         id,
         get name() {

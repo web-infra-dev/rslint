@@ -924,6 +924,8 @@ test('generation clients reuse facts and lazy dependency identities across files
         projection,
         file.replaceAll('\\', '/'),
       );
+      if (services.program === null)
+        throw new Error('expected project-backed parser services');
       return { file, frame, projection, handle, services };
     };
     try {
@@ -1167,6 +1169,7 @@ await Promise.resolve(1);
       ...encoded,
       tree: Buffer.from(encoded.tree, 'base64'),
     };
+    const sourceFileName: string = projection.binding.sourceFileName;
     const frame = decodeFrame(Buffer.from(encoded.frame, 'base64'));
     const cache = new SharedTypeCacheOwner(
       descriptor.generation,
@@ -1209,12 +1212,14 @@ await Promise.resolve(1);
         },
       );
     const client = makeClient();
-    const beforeSource = client.program.getSourceFile(file);
+    const program = client.program as unknown as ts.Program;
+    const beforeSource = program.getSourceFile(file);
+    if (!beforeSource) throw new Error(`missing project source: ${file}`);
     const beforeNodes = client.syntaxStats.nodes;
     const services = client.parserServices(
       frame,
       projection,
-      file.replaceAll('\\', '/'),
+      sourceFileName,
     ) as any;
     expect(client.program.getSourceFile(file)).toBe(beforeSource);
     expect(client.syntaxStats.nodes).toBe(beforeNodes);
@@ -1222,7 +1227,7 @@ await Promise.resolve(1);
     expect(services.esTreeNodeToTSNodeMap.has(frame.ast)).toBe(true);
     expect(client.syntaxStats.nodes).toBe(beforeNodes);
     expect(() =>
-      client.parserServices(frame, projection, file.replaceAll('\\', '/')),
+      client.parserServices(frame, projection, sourceFileName),
     ).toThrow('already attached');
 
     const other = host.request({
@@ -1235,7 +1240,7 @@ await Promise.resolve(1);
         mismatch.parserServices(
           frame,
           { ...other, tree: Buffer.from(other.tree, 'base64') },
-          file.replaceAll('\\', '/'),
+          sourceFileName,
         ),
       ).toThrow('different source');
     } finally {
@@ -1337,7 +1342,7 @@ await Promise.resolve(1);
       const uncached = syntaxOnly.parserServices(
         frame,
         projection,
-        file,
+        sourceFileName,
       ) as any;
       const awaitView = uncached.esTreeNodeToTSNodeMap.get(
         expression('AwaitExpression'),
@@ -2004,11 +2009,12 @@ test('public checker, Program and source reads match TypeScript', async () => {
     { maxFactsBytes: 1 << 18 },
   );
   try {
-    const reference = ts.createProgram([file], {
-      strict: true,
-      target: ts.ScriptTarget.ESNext,
-      module: ts.ModuleKind.ESNext,
-    });
+    const parsed = ts.getParsedCommandLineOfConfigFile(
+      config,
+      {},
+      { ...ts.sys, onUnRecoverableConfigFileDiagnostic() {} },
+    )!;
+    const reference = ts.createProgram(parsed.fileNames, parsed.options);
     const publicAPI = ts.createSourceFile(
       'typescript.d.ts',
       readFileSync(
@@ -2316,13 +2322,18 @@ test('declared members and source metadata follow TypeScript query order', async
     const checker = program.getTypeChecker();
     const source = program.getSourceFile(file)!;
     const declared = (index: number) => {
-      const declaration = source.statements[index] as ts.NamedDeclaration;
+      const declaration = source.statements[index];
+      if (!ts.isDeclarationStatement(declaration) || !declaration.name)
+        throw new Error('expected a named declaration');
       return checker.getDeclaredTypeOfSymbol(
-        checker.getSymbolAtLocation(declaration.name!)!,
-      ) as ts.InterfaceTypeWithDeclaredMembers;
+        checker.getSymbolAtLocation(declaration.name)!,
+      );
     };
     const inspect = (
-      type: ts.InterfaceTypeWithDeclaredMembers,
+      type: ts.Type &
+        Partial<
+          Pick<ts.InterfaceTypeWithDeclaredMembers, (typeof fields)[number]>
+        >,
       includeAll = false,
     ) => {
       const presence = () =>
@@ -2371,10 +2382,7 @@ test('declared members and source metadata follow TypeScript query order', async
       empty: inspect(declared(2)),
       generic: inspect(declared(3)),
       instantiated: inspect(declared(4)),
-      tuple: inspect(
-        (declared(5) as unknown as ts.TypeReference)
-          .target as ts.InterfaceTypeWithDeclaredMembers,
-      ),
+      tuple: inspect((declared(5) as ts.TypeReference).target),
       sources: names.map((name) => {
         const src = program.getSourceFile(resolve(dir, name))!;
         return [
