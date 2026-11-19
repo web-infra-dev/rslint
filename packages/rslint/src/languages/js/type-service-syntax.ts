@@ -74,6 +74,9 @@ const sourceProperties = [
   'languageVersion',
   'hasNoDefaultLib',
   'impliedNodeFormat',
+  'referencedFiles',
+  'typeReferenceDirectives',
+  'libReferenceDirectives',
 ];
 function sourceProperty(key: PropertyKey): boolean {
   return typeof key === 'string' && sourceProperties.includes(key);
@@ -390,8 +393,15 @@ export class GenerationSyntaxViews {
           this.ensure();
           const own = Reflect.getOwnPropertyDescriptor(target, key);
           if (own) return own;
+          if (source && sourceProperty(key))
+            return {
+              value: this.get(identity, key, proxy),
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            };
           const raw = this.rawSyntax(identity);
-          return (source && sourceProperty(key)) || Object.hasOwn(raw, key)
+          return Object.hasOwn(raw, key)
             ? {
                 configurable: true,
                 enumerable: true,
@@ -467,6 +477,28 @@ export class GenerationSyntaxViews {
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];
       if (key === 'impliedNodeFormat') return source.impliedNodeFormat;
+      if (
+        key === 'referencedFiles' ||
+        key === 'typeReferenceDirectives' ||
+        key === 'libReferenceDirectives'
+      ) {
+        const references = this.source(file)![key].map(
+          ({ pos, end, fileName, resolutionMode, preserve }) => ({
+            pos,
+            end,
+            fileName,
+            ...(resolutionMode ? { resolutionMode } : {}),
+            ...(preserve ? { preserve } : {}),
+          }),
+        );
+        Object.defineProperty(proxy, key, {
+          value: references,
+          writable: true,
+          configurable: true,
+          enumerable: true,
+        });
+        return references;
+      }
       // TypeScript 6 keeps this legacy property false, including for no-default-lib directives.
       if (key === 'hasNoDefaultLib') return false;
       if (key === 'languageVersion') {

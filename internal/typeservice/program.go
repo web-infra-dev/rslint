@@ -130,17 +130,19 @@ func projectReferences(c *tsoptions.ParsedCommandLine) []projectReference {
 }
 
 type referenceConfig struct {
-	Name              string                `json:"name"`
-	Path              tspath.Path           `json:"path"`
-	Options           map[string]any        `json:"options"`
-	FileNames         []string              `json:"fileNames"`
-	ProjectReferences []projectReference    `json:"projectReferences,omitempty"`
-	References        []int                 `json:"references,omitempty"`
-	Raw               any                   `json:"raw,omitempty"`
-	CompileOnSave     *bool                 `json:"compileOnSave,omitempty"`
-	WatchOptions      *core.WatchOptions    `json:"watchOptions,omitempty"`
-	TypeAcquisition   *core.TypeAcquisition `json:"typeAcquisition,omitempty"`
-	Diagnostics       []byte                `json:"diagnostics,omitempty"`
+	Name                string                `json:"name"`
+	Path                tspath.Path           `json:"path"`
+	Options             map[string]any        `json:"options"`
+	FileNames           []string              `json:"fileNames"`
+	ProjectReferences   []projectReference    `json:"projectReferences,omitempty"`
+	References          []int                 `json:"references,omitempty"`
+	ExtendedSourceFiles []string              `json:"extendedSourceFiles,omitempty"`
+	WildcardDirectories map[string]uint8      `json:"wildcardDirectories"`
+	Raw                 any                   `json:"raw,omitempty"`
+	CompileOnSave       *bool                 `json:"compileOnSave,omitempty"`
+	WatchOptions        *core.WatchOptions    `json:"watchOptions,omitempty"`
+	TypeAcquisition     *core.TypeAcquisition `json:"typeAcquisition,omitempty"`
+	Diagnostics         []byte                `json:"diagnostics,omitempty"`
 }
 
 // A flat graph preserves repeated references, cycles, and unresolved slots.
@@ -169,6 +171,17 @@ func resolvedReferences(p *program.Program) (Result, error) {
 			return 0, err
 		}
 		fact := &referenceConfig{Name: source.FileName(), Path: source.Path(), Options: options, FileNames: slices.Concat([]string{}, c.FileNames()), ProjectReferences: projectReferences(c), Raw: c.Raw, CompileOnSave: c.CompileOnSave, WatchOptions: c.ParsedConfig.WatchOptions, TypeAcquisition: c.TypeAcquisition()}
+		fact.ExtendedSourceFiles = c.ExtendedSourceFiles()
+		dirs := c.WildcardDirectories()
+		fact.WildcardDirectories = make(map[string]uint8, len(dirs))
+		for path, recursive := range dirs {
+			// TypeScript WatchDirectoryFlags.None and Recursive are 0 and 1.
+			var flags uint8
+			if recursive {
+				flags = 1
+			}
+			fact.WildcardDirectories[path] = flags
+		}
 		graph.Configs = append(graph.Configs, fact)
 		id := len(graph.Configs)
 		seen[c] = id

@@ -421,6 +421,8 @@ type ReferenceConfig = {
   options: Record<string, unknown>;
   fileNames: string[];
   projectReferences?: ts.ProjectReference[];
+  wildcardDirectories: ts.MapLike<ts.WatchDirectoryFlags>;
+  extendedSourceFiles?: string[];
   references?: number[];
   raw?: unknown;
   compileOnSave?: boolean;
@@ -489,9 +491,18 @@ export function guarded<T extends object>(
       surface === 'type' && has
         ? (target, key) => {
             ensure();
-            return declaredMemberKeys.has(key) && !has(target, key)
-              ? undefined
-              : Reflect.getOwnPropertyDescriptor(target, key);
+            if (declaredMemberKeys.has(key)) {
+              const value: unknown = Reflect.get(target, key);
+              return value === undefined
+                ? undefined
+                : {
+                    value,
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                  };
+            }
+            return Reflect.getOwnPropertyDescriptor(target, key);
           }
         : undefined,
     has: has
@@ -1384,6 +1395,7 @@ export class TypeServiceClient {
         options,
         diagnostics,
         references: _references,
+        extendedSourceFiles,
         ...commandLine
       } = config;
       const errors = diagnostics
@@ -1391,8 +1403,14 @@ export class TypeServiceClient {
             .scalar('configFileParsingDiagnostics')
             .map((d) => this.diagnostic(d))
         : [];
+      const sourceFile = this.syntax.configSource(name, path);
+      if (
+        extendedSourceFiles &&
+        !Object.hasOwn(sourceFile, 'extendedSourceFiles')
+      )
+        Object.assign(sourceFile, { extendedSourceFiles });
       return {
-        sourceFile: this.syntax.configSource(name, path),
+        sourceFile,
         commandLine: {
           ...commandLine,
           fileNames: commandLine.fileNames ?? [],
