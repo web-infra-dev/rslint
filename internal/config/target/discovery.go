@@ -22,6 +22,7 @@ func discoverLintTargetsWithPreparedFiles(
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	gitPolicy *rslintconfig.GitPolicy,
+	directoryInputRoots InputRoots,
 ) []File {
 	configDir = tspath.NormalizePath(configDir)
 	scanRoot = tspath.NormalizePath(scanRoot)
@@ -30,14 +31,14 @@ func discoverLintTargetsWithPreparedFiles(
 	}
 	if allowDirs == nil {
 		return discoverLintTargetsWithinRoot(
-			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy,
+			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy, directoryInputRoots,
 		)
 	}
 
 	targets := []File{}
 	if explicitFiles != nil {
 		targets = discoverLintTargetsWithinRoot(
-			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy,
+			config, configDir, scanRoot, fsys, explicitFiles, nil, stopDirs, singleThreaded, pathSpaces, gitPolicy, directoryInputRoots,
 		)
 	}
 	if len(allowDirs) == 0 {
@@ -62,6 +63,7 @@ func discoverLintTargetsWithPreparedFiles(
 			singleThreaded,
 			pathSpaces,
 			gitPolicy,
+			directoryInputRoots,
 		)...)
 	}
 
@@ -92,6 +94,7 @@ func discoverLintTargetsWithinRoot(
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	gitPolicy *rslintconfig.GitPolicy,
+	directoryInputRoots InputRoots,
 ) []File {
 	useCaseSensitive := true
 	if fsys != nil {
@@ -247,6 +250,7 @@ func discoverLintTargetsWithinRoot(
 	processFile := func(walkPath, physicalPath string, needsRealpath, gitEntryBlocked bool) {
 		fullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedScanRoot, walkPath))
 		projections := pathProjectionsForWalk(fullPath, physicalPath)
+		fromDirectory := len(projections) != 0
 		if len(projections) == 0 {
 			if allowFileSet == nil {
 				return
@@ -287,6 +291,9 @@ func discoverLintTargetsWithinRoot(
 			*target.match = match
 
 			targetMu.Lock()
+			if fromDirectory {
+				directoryInputRoots.Add(configDir, target.Path, gitWalkRoot.LexicalPath)
+			}
 			addTarget(target)
 			targetMu.Unlock()
 		}

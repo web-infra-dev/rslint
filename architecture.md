@@ -1491,17 +1491,22 @@ the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 
 The file CLI reads its optional bulk suppressions file in the calling working
 directory. After the final lint or fix observation, the CLI passes diagnostics
-and checked files to `internal/suppressions`, excluding files with syntax errors.
+and selected files to `internal/suppressions`. It marks files with syntax errors
+as unchecked.
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
 completed rule counts and owns baseline persistence. When a shell working
 directory has a different spelling from the OS working directory, the CLI also
-retains the spelling of the operand that selected each file. The baseline uses
-it to look up existing ESLint entries while target selection and config
-ownership keep their caller-visible paths. The CLI blocks baseline
-writes after configuration or plugin failures and supplies visible diagnostics
-and any baseline failure to report assembly.
+retains the spellings of the operands that selected each linted path. The
+baseline compares its rule counts against every requested key. A rule's
+findings are suppressed only when every key covers the count. Target selection
+and config ownership keep their caller-visible paths. If several selected
+filenames share a portable key, the baseline uses their distinct spellings
+because rules can inspect the filename. An alias removed by target
+deduplication reserves its name without contributing a rule count. The CLI
+blocks baseline writes after configuration or plugin failures and supplies
+visible diagnostics and any baseline failure to report assembly.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

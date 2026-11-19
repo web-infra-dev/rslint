@@ -153,9 +153,7 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 		data = make(entries)
 	}
 	// A different writer may have recorded the observed spelling since Open.
-	for path, file := range files {
-		file.key = f.entryKey(data, path, file.inputPath)
-	}
+	selectExistingKeys(data, files)
 	switch f.options.Mode {
 	case Record:
 		f.record(data, files)

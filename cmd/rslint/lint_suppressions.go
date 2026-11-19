@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/web-infra-dev/rslint/internal/config/target"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
@@ -16,6 +17,8 @@ func applyLintSuppressions(
 	diagnostics []rule.RuleDiagnostic,
 	records []linter.PluginDispatchRecord,
 	args lintArgs,
+	inputPaths map[string][]string,
+	skippedAliases []target.File,
 ) ([]rule.RuleDiagnostic, string) {
 	failedRules := make(map[string][]string)
 	var dispatchFailed, missingFile bool
@@ -43,17 +46,21 @@ func applyLintSuppressions(
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
 	files := observation.Native.Files
-	inputPaths := args.inputOrigins.paths()
-	checked := make([]suppressions.FileResult, 0, len(files))
+	checked := make([]suppressions.FileResult, 0, len(files)+len(skippedAliases))
+	for _, alias := range skippedAliases {
+		checked = append(checked, suppressions.FileResult{Path: alias.Path, InputPaths: inputPaths[alias.Path], Unchecked: true})
+	}
 	for _, file := range files {
-		if file.SyntaxError {
-			continue
-		}
 		skipped := file.SkippedErrorRules
 		if failed := failedRules[file.Path]; len(failed) > 0 {
 			skipped = append(failed, skipped...)
 		}
-		checked = append(checked, suppressions.FileResult{Path: file.Path, InputPath: inputPaths.forFile(file.Path), SkippedRules: skipped})
+		checked = append(checked, suppressions.FileResult{
+			Path:         file.Path,
+			InputPaths:   inputPaths[file.Path],
+			SkippedRules: skipped,
+			Unchecked:    file.SyntaxError,
+		})
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {

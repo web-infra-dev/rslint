@@ -164,11 +164,47 @@ describe('CLI Configuration Tests', () => {
       expect(unused.stdout.trim()).toBe('');
       expect(unused.stderr).toContain('Unused suppressions');
 
+      const two = { 'no-debugger': { count: 2 } };
+      if (!windows) {
+        // A logical PWD lets both operands select the same caller-visible filename.
+        await fs.writeFile(
+          baseline,
+          JSON.stringify({ [relative]: one, [otherKey]: two }),
+        );
+        for (const args of [
+          [relative, alternate],
+          [alternate, relative],
+        ]) {
+          const result = await check(...args);
+          expect(result.exitCode).toBe(1);
+          expect(
+            result.stdout
+              .trim()
+              .split('\n')
+              .map((line) => JSON.parse(line).ruleName),
+          ).toEqual(['no-debugger', 'no-debugger']);
+        }
+      }
       await fs.writeFile(alternate, '');
       expect((await check('--prune-suppressions', alternate)).exitCode).toBe(0);
       expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
         [relative]: one,
       });
+      if (!windows) {
+        await fs.writeFile(alternate, 'debugger; debugger;');
+        expect(
+          (await check('--suppress-all', alternate, relative)).exitCode,
+        ).toBe(0);
+        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+          [relative]: two,
+          [otherKey]: two,
+        });
+        await fs.writeFile(alternate, '');
+        expect(
+          (await check('--prune-suppressions', relative, alternate)).exitCode,
+        ).toBe(0);
+        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
+      }
     } finally {
       await cleanupTempDir(temp);
     }

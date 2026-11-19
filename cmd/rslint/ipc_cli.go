@@ -447,6 +447,7 @@ func discoverCLIConfigCatalog(
 		Directories:    rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, args.FS),
 		ImplicitCWD:    len(args.AllowFiles) == 0 && len(args.AllowDirs) == 0,
 		SingleThreaded: args.SingleThreaded,
+		InputRoots:     args.inputOrigins.configRoots,
 	}
 	if len(args.GlobRoots) > 0 {
 		request.RecursiveDirectories = request.Directories
@@ -479,6 +480,7 @@ func discoverCLIConfigCatalog(
 				RecursiveDirectories:      request.RecursiveDirectories,
 				LimitDirectoryWalkToFiles: request.LimitDirectoryWalkToFiles,
 				SingleThreaded:            args.SingleThreaded,
+				InputRoots:                request.InputRoots,
 			},
 		)
 	} else {

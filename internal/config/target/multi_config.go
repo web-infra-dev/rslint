@@ -18,6 +18,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	explicitSet *explicitLintTargetSet,
 	gitPolicy *rslintconfig.GitPolicy,
+	directoryInputRoots InputRoots,
 ) []File {
 	if len(configMap) == 0 {
 		return nil
@@ -131,6 +132,7 @@ func discoverLintTargetsMultiConfigWithPreparedFiles(
 			singleThreaded,
 			pathSpaces,
 			gitPolicy,
+			directoryInputRoots,
 		)
 		for _, target := range targets {
 			pathID := tspath.ToPath(tspath.NormalizePath(target.Path), "", true)
@@ -157,6 +159,7 @@ func discoverLintTargetsForConfigInMap(
 	singleThreaded bool,
 	pathSpaces *rslintconfig.PathSpaceSnapshot,
 	gitPolicy *rslintconfig.GitPolicy,
+	directoryInputRoots InputRoots,
 ) []File {
 	cfg, ok := configMap[configDir]
 	if !ok {
@@ -168,7 +171,7 @@ func discoverLintTargetsForConfigInMap(
 	visit := func(directories []rslintconfig.DirectoryIdentity) {
 		targets = append(targets, discoverLintTargetsWithinRoot(
 			cfg, configDir, configDir, fsys, explicitFiles, directories,
-			stopDirs, singleThreaded, pathSpaces, gitPolicy,
+			stopDirs, singleThreaded, pathSpaces, gitPolicy, directoryInputRoots,
 		)...)
 	}
 	// Keep each input's Git entry independent while retaining the owner's

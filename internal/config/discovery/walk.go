@@ -12,6 +12,7 @@ import (
 
 type discoveryWalkNode struct {
 	directory          string
+	inputRoot          string
 	canonicalDirectory string
 	ownerDir           string
 	ownerPath          string
@@ -66,17 +67,22 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 			}
 			coordinator.walkStats.directoriesVisited += result.directoriesVisited
 			coordinator.walkStats.directoriesPruned += result.directoriesPruned
-			for _, file := range result.files {
-				coordinator.reachableFiles[file] = true
-			}
+			node := queue[index]
+			owner := node.ownerDir
 			if result.candidateToAdopt != nil {
 				if err := coordinator.adoptCandidate(result.candidateToAdopt, false); err != nil {
 					return err
 				}
 				candidate := result.candidateToAdopt.candidate
+				owner = candidate.directory
+				coordinator.request.InputRoots.Add(candidate.directory, candidate.directory, node.inputRoot)
 				coordinator.draft.addDirectory(candidate.directory, rslintconfig.DirectoryIdentity{
 					LexicalPath: candidate.directory, CanonicalPath: candidate.physicalDirectory,
-				}, queue[index].recursive)
+				}, node.recursive)
+			}
+			for _, file := range result.files {
+				coordinator.reachableFiles[file] = true
+				coordinator.request.InputRoots.Add(owner, file, node.inputRoot)
 			}
 			next = append(next, result.children...)
 			if result.pending != nil {
@@ -94,6 +100,7 @@ func (coordinator *discoveryCoordinator) walkDirectories(roots []discoveryWalkNo
 					if err := coordinator.adoptCandidate(state, false); err != nil {
 						return err
 					}
+					coordinator.request.InputRoots.Add(state.candidate.directory, state.candidate.directory, item.node.inputRoot)
 					coordinator.draft.addDirectory(state.candidate.directory, rslintconfig.DirectoryIdentity{
 						LexicalPath: state.candidate.directory, CanonicalPath: state.candidate.physicalDirectory,
 					}, item.node.recursive)
@@ -241,6 +248,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 		}
 		children = append(children, discoveryWalkNode{
 			directory:          child,
+			inputRoot:          node.inputRoot,
 			canonicalDirectory: canonicalChild,
 			ownerDir:           node.ownerDir,
 			ownerPath:          node.ownerPath,

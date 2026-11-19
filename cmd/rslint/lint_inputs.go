@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"slices"
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -39,6 +40,11 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs) error {
 	if err != nil {
 		return err
 	}
+	if len(args.inputOrigins.matches) > 1 && slices.ContainsFunc(args.inputOrigins.matches, func(match target.InputMatch) bool {
+		return match.Directory || match.Files != nil
+	}) {
+		args.inputOrigins.configRoots = make(target.InputRoots)
+	}
 	args.AllowFiles = append(selection.Files, selection.Unmatched...)
 	args.AllowDirs = selection.Directories
 	args.GlobRoots = rslintconfig.ResolveDirectoryIdentities(selection.GlobRoots, args.FS)
@@ -47,57 +53,67 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs) error {
 }
 
 type cliInputOrigins struct {
-	cwd     string
-	matches []target.InputMatch
+	cwd         string
+	matches     []target.InputMatch
+	configRoots target.InputRoots
 }
 
-type cliInputPaths struct {
-	files       map[string]string
-	directories map[string]string
-}
-
-// Only a baseline consumer needs to project the selected targets onto the
-// spelling of the operands in the OS working directory.
-func (origins cliInputOrigins) paths() cliInputPaths {
+// Project only the inputs that reached each executed caller-visible path.
+// Literal files may bypass selection that excludes the same path from a scan.
+func (origins cliInputOrigins) paths(plan target.Plan, directoryRoots target.InputRoots) map[string][]string {
 	if len(origins.matches) == 0 {
-		return cliInputPaths{}
+		return nil
 	}
-	paths := cliInputPaths{files: make(map[string]string), directories: make(map[string]string)}
-	// SelectInputs retains the first operand when several select the same spelling.
-	for i := len(origins.matches) - 1; i >= 0; i-- {
-		match := origins.matches[i]
+	files := append(slices.Clip(plan.Files), plan.SkippedAliases...)
+	paths := make(map[string][]string)
+	if len(origins.matches) == 1 {
+		match := origins.matches[0]
+		operand := tspath.ResolvePath(origins.cwd, match.Operand)
+		// The sole operand is the source of every selected path.
+		for _, file := range files {
+			paths[file.Path] = []string{rebaseInputPath(file.Path, match.Path, operand)}
+		}
+		return paths
+	}
+	add := func(path, operand string) {
+		if !slices.Contains(paths[path], operand) {
+			paths[path] = append(paths[path], operand)
+		}
+	}
+	selected := make(map[string]target.File, len(files))
+	for _, file := range files {
+		selected[file.Path] = file
+	}
+	directories := make(map[string][]string)
+	for _, match := range origins.matches {
 		operand := tspath.ResolvePath(origins.cwd, match.Operand)
 		switch {
 		case match.Directory:
-			paths.directories[match.Path] = operand
+			directories[match.Path] = append(directories[match.Path], operand)
 		case match.Files == nil:
-			paths.files[match.Path] = operand
+			add(match.Path, operand)
 		default:
 			for _, path := range match.Files {
-				paths.files[path] = rebaseInputPath(path, match.Path, operand)
+				file, ok := selected[path]
+				if ok && file.Match() != nil && file.Match().Selected() &&
+					slices.Contains(origins.configRoots.For(file.ConfigDirectory, path), match.Path) {
+					add(path, rebaseInputPath(path, match.Path, operand))
+				}
+			}
+		}
+	}
+	for _, file := range files {
+		for _, scopeRoot := range directoryRoots.For(file.ConfigDirectory, file.Path) {
+			// A child config starts a new target walk. Config discovery retained
+			// the original operands whose traversal reached that boundary.
+			for _, root := range origins.configRoots.For(file.ConfigDirectory, scopeRoot) {
+				for _, operand := range directories[root] {
+					add(file.Path, rebaseInputPath(file.Path, root, operand))
+				}
 			}
 		}
 	}
 	return paths
-}
-
-func (paths cliInputPaths) forFile(path string) string {
-	if paths.files == nil {
-		return path
-	}
-	if operand, ok := paths.files[path]; ok {
-		return operand
-	}
-	for dir := tspath.GetDirectoryPath(path); ; {
-		if operand, ok := paths.directories[dir]; ok {
-			return rebaseInputPath(path, dir, operand)
-		}
-		parent := tspath.GetDirectoryPath(dir)
-		if parent == dir {
-			return path
-		}
-		dir = parent
-	}
 }
 
 func rebaseInputPath(path, root, operand string) string {

@@ -15,8 +15,10 @@ func (coordinator *discoveryCoordinator) collectExplicitGitSources(ownerDirector
 			coordinator.walkStats.directoriesPruned++
 			continue
 		}
+		coordinator.request.InputRoots.Add(ownerDirectory, directory.LexicalPath, directory.LexicalPath)
 		roots = append(roots, discoveryWalkNode{
 			directory:          directory.LexicalPath,
+			inputRoot:          directory.LexicalPath,
 			canonicalDirectory: directory.CanonicalPath,
 			ownerDir:           ownerDirectory,
 			ownerPath:          ownerPath,

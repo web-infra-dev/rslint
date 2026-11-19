@@ -65,6 +65,7 @@ func discoverLintTargetsFromRoot(
 		singleThreaded,
 		pathSpaces,
 		policy,
+		nil,
 	)
 }
 
@@ -97,6 +98,7 @@ func discoverLintTargetsMultiConfig(
 		pathSpaces,
 		explicitSet,
 		policy,
+		nil,
 	)
 }
 

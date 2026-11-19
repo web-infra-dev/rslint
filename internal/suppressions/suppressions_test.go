@@ -145,6 +145,45 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 			t.Errorf("file key under %s = %q, want a.ts", dir, key)
 		}
 	}
+	t.Run("rules can report different counts for each filename", func(t *testing.T) {
+		first := filepath.ToSlash(filepath.Join(repo, "name.js"))
+		second := filepath.ToSlash(filepath.Join(alias, "name.js"))
+		if err := os.WriteFile(first, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if f.operandKey(second) == f.fileKey(second) {
+			first, second = second, first
+		}
+		firstKey, secondKey := f.operandKey(first), f.operandKey(second)
+		selected := []FileResult{{Path: first}, {Path: second, InputPaths: []string{first}}}
+		a := rule.RuleDiagnostic{FilePath: first, RuleName: "x", Severity: rule.SeverityError}
+		b := rule.RuleDiagnostic{FilePath: second, RuleName: "x", Severity: rule.SeverityError}
+		path := filepath.Join(parent, "counts.json")
+		run := func(mode Mode, diagnostics ...rule.RuleDiagnostic) entries {
+			t.Helper()
+			store, err := Open(alias, Options{Mode: mode, Location: path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			visible, unused, err := store.Apply(t.Context(), selected, diagnostics)
+			if len(visible) != 0 || unused || err != nil {
+				t.Fatalf("mode %d: visible %v, unused %v, error %v", mode, visible, unused, err)
+			}
+			return store.entries
+		}
+		saved := run(Record, a, b, b)
+		if saved[firstKey]["x"].Count != 1 || saved[secondKey]["x"].Count != 2 {
+			t.Fatalf("separate filenames: %v", saved)
+		}
+		selected[1].Unchecked = true
+		saved = run(Prune)
+		if len(saved) != 1 || saved[secondKey]["x"].Count != 2 {
+			t.Fatalf("unchecked filename: %v", saved)
+		}
+		selected[0].Unchecked, selected[1].Unchecked = true, false
+		selected[1].InputPaths = []string{first, second}
+		run(Check, b, b)
+	})
 	sibling := filepath.Join(filepath.Dir(repo), "sibling.ts")
 	if err := os.WriteFile(sibling, nil, 0o644); err != nil {
 		t.Fatal(err)

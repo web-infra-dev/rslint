@@ -38,7 +38,11 @@ If a third `no-debugger` error appears in that file, Rslint reports all three. M
 
 File paths in the baseline use `/` and are relative to the working directory, including when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path. To reuse an existing ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. The rule IDs must match exactly.
 
-ESLint can record separate counts for the same file when you pass a relative path on one run and an absolute path through a symlink on another. Use the same path you passed to ESLint to check or prune that entry in Rslint.
+ESLint can record separate counts for a relative path and an absolute path through a symlink. When you pass one path, Rslint looks for that exact entry first, then for the path it normally records from the working directory.
+
+If both inputs select the same linted filename in one run, each must cover the error count. A missing entry allows zero errors. For example, if the entries allow one and two errors for a rule, Rslint reports the two errors once. Recording or pruning updates both entries.
+
+When two different filenames resolve to the same file, a plugin can report different errors for each name. Rslint updates counts only for filenames it linted. An existing entry for a skipped alias keeps its counts.
 
 Pass `--suppressions-location` on every run that uses a custom location. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. The hash comes from the absolute working directory.
 
