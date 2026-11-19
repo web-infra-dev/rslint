@@ -309,6 +309,11 @@ func TestNoDuplicateTypeConstituentsReservationIdentity(t *testing.T) {
 // their effect on another rule are observed on every rebuilt source snapshot.
 func lintDirectiveFixture(t *testing.T, code string) []rule.RuleDiagnostic {
 	t.Helper()
+	return lintDirectiveFixtureRules(t, code, []*rule.Rule{&NoDuplicateTypeConstituentsRule, &no_debugger.NoDebuggerRule})
+}
+
+func lintDirectiveFixtureRules(t testing.TB, code string, rules []*rule.Rule) []rule.RuleDiagnostic {
+	t.Helper()
 	helper := rule_tester.NewProgramHelper(fixtures.GetRootDir())
 	program, source, err := helper.CreateTestProgram(code, "directives.ts", "tsconfig.json")
 	if err != nil {
@@ -323,7 +328,7 @@ func lintDirectiveFixture(t *testing.T, code string) []rule.RuleDiagnostic {
 		SingleThreaded:   true,
 		GetRulesForFile: func(*ast.SourceFile) []rule.ConfiguredRule {
 			var configured []rule.ConfiguredRule
-			for _, r := range []*rule.Rule{&NoDuplicateTypeConstituentsRule, &no_debugger.NoDebuggerRule} {
+			for _, r := range rules {
 				configured = append(configured, rule.ConfiguredRule{Name: r.Name, Environment: &rule.RuleEnvironment{}, Severity: rule.SeverityError, Run: func(ctx rule.RuleContext) rule.RuleListeners { return r.Run(ctx, nil) }})
 			}
 			return configured

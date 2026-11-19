@@ -3,7 +3,6 @@ package no_duplicate_type_constituents
 import (
 	_ "embed"
 	"fmt"
-	"sort"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
@@ -11,7 +10,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 //go:embed no_duplicate_type_constituents.schema.json
@@ -82,6 +80,7 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 		if comments == nil {
 			comments = rule.NewCommentStore(ctx.SourceFile)
 		}
+		directiveGuard := fixDirectiveGuard{source: ctx.SourceFile, comments: comments.All}
 
 		unwindedParentType := func(node *ast.Node, kind ast.Kind) *ast.Node {
 			for {
@@ -161,29 +160,7 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 					}
 				}
 				bodyRange := utils.TrimNodeTextRange(ctx.SourceFile, body)
-				// Directives inside the type body itself cannot be discarded
-				// safely. Keep the diagnostic without a fix in that case.
-				allComments := comments.All()
-				first := sort.Search(len(allComments), func(i int) bool { return allComments[i].Pos() >= bodyRange.Pos() })
-				for _, comment := range allComments[first:] {
-					if comment.Pos() >= bodyRange.End() {
-						break
-					}
-					if utils.IsDirectiveComment(comment.Kind, ecmascript.StringTrim(utils.CommentValue(ctx.SourceFile.Text(), comment))) {
-						return nil
-					}
-				}
-				if _, alreadyReserved := reserved[outer]; !alreadyReserved {
-					count, seen := remaining[parent]
-					if !seen {
-						count = len(types)
-					}
-					if count <= 1 {
-						return nil
-					}
-					remaining[parent] = count - 1
-					reserved[outer] = struct{}{}
-				}
+
 				index := 0
 				for types[index] != outer {
 					index++
@@ -207,6 +184,26 @@ var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 					if len(fixes) == beforeCount {
 						scanTokens(outer.End(), utils.TrimNodeTextRange(ctx.SourceFile, types[1]).Pos())
 					}
+				}
+				triviaStart := outer.Pos()
+				if index > 0 {
+					triviaStart = min(triviaStart, types[index-1].End())
+				} else {
+					triviaStart = min(triviaStart, parent.Pos())
+				}
+				if !directiveGuard.safe(bodyRange, triviaStart, fixes) {
+					return nil
+				}
+				if _, alreadyReserved := reserved[outer]; !alreadyReserved {
+					count, seen := remaining[parent]
+					if !seen {
+						count = len(types)
+					}
+					if count <= 1 {
+						return nil
+					}
+					remaining[parent] = count - 1
+					reserved[outer] = struct{}{}
 				}
 				return fixes
 			})
