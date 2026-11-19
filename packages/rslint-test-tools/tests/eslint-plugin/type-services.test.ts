@@ -1106,6 +1106,8 @@ const truth = true as const;
 const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
 const spreadKeys = {...surrogateKeys};
 const multiline = { nested: { label: "中文" as const }, count: 1 };
+function inferredScalar() { return '中文' as const; }
+function inferredObject() { return { label: '中文' as const }; }
 ${longTypeNames.map((name) => `interface ${name} { value: number }`).join('\n')}
 declare function multilineCall(
   { '\\é': escaped }: { '\\é': string },
@@ -1630,7 +1632,20 @@ await Promise.resolve(1);
         ...longTypes.map((node) =>
           typeChecker.typeToString(typeChecker.getTypeAtLocation(node.name)),
         ),
+        typeChecker.typeToString(
+          typeChecker.getTypeAtLocation(declaration.name!),
+          declaration,
+        ),
         typeChecker.signatureToString(signature, declaration),
+        ...sourceFile.statements
+          .filter(ts.isFunctionDeclaration)
+          .filter((node) => node.name?.text.startsWith('inferred'))
+          .map((node) =>
+            typeChecker.signatureToString(
+              typeChecker.getSignatureFromDeclaration(node)!,
+              node,
+            ),
+          ),
         typeChecker.typeToString(type, declaration, flags),
         ...[ts.SignatureKind.Call, ts.SignatureKind.Construct].map((kind) =>
           typeChecker.signatureToString(

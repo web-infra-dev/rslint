@@ -5,7 +5,6 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/nodebuilder"
 	"github.com/microsoft/TypeScript/tsc/shim/printer"
-	"github.com/microsoft/TypeScript/tsc/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
@@ -27,9 +26,8 @@ func typeToString(c *checker.Checker, typ *checker.Type, enclosing *ast.Node, fl
 	defer func() { *level-- }()
 	node := builder.TypeToTypeNode(typ, enclosing, builderFlags, nodebuilder.InternalFlagsNone, nil)
 	writer := printer.NewTextWriter("", 0)
-	p := printer.NewPrinter(printer.PrinterOptions{RemoveComments: typ != checker.Checker_unresolvedType(c)}, printer.PrintHandlers{}, builder.EmitContext())
-	p.Write(node, ast.GetSourceFileOfNode(enclosing), writer, nil)
-	text := writer.String()
+	options := printer.PrinterOptions{RemoveComments: typ != checker.Checker_unresolvedType(c)}
+	text := printDisplay(node, enclosing, flags, options, builder.EmitContext(), writer)
 	if len(text) >= limit {
 		if units := ecmascript.StringCodeUnits(text); len(units) >= limit {
 			return ecmascript.StringFromCodeUnits(units[:limit-3]) + "..."
@@ -54,49 +52,71 @@ func signatureToString(c *checker.Checker, signature *checker.Signature, enclosi
 	node := builder.SignatureToSignatureDeclaration(signature, nodeKind, enclosing, builderFlags, nodebuilder.InternalFlagsNone, nil)
 	writer, releaseWriter := printer.GetSingleLineStringWriter()
 	defer releaseWriter()
-	textWriter := &signatureTextWriter{
-		EmitTextWriter: writer,
-		useSingleQuote: flags&checker.TypeFormatFlagsUseSingleQuotesForStringLiteralType != 0,
-	}
+	options := printer.PrinterOptions{RemoveComments: true, OmitTrailingSemicolon: true}
+	return printDisplay(node, enclosing, flags, options, builder.EmitContext(), writer)
+}
+
+// The native printer may reuse the source spelling of a quoted literal.
+// JavaScript's display API quotes the decoded value on the emitted syntax node.
+type displayWriter struct {
+	printer.EmitTextWriter
+	context      *printer.EmitContext
+	literal      *ast.Node
+	singleQuotes bool
+	bindingDepth int
+}
+
+func printDisplay(node, enclosing *ast.Node, flags checker.TypeFormatFlags, options printer.PrinterOptions, context *printer.EmitContext, writer printer.EmitTextWriter) string {
+	w := &displayWriter{EmitTextWriter: writer, context: context, singleQuotes: flags&checker.TypeFormatFlagsUseSingleQuotesForStringLiteralType != 0}
 	handlers := printer.PrintHandlers{
 		OnBeforeEmitNode: func(n *ast.Node) {
-			if n != nil && ast.IsBindingPattern(n) {
-				textWriter.bindingDepth++
+			if n != nil && n.Kind == ast.KindStringLiteral {
+				w.literal = n
+			} else if n != nil && ast.IsBindingPattern(n) {
+				w.bindingDepth++
 			}
 		},
 		OnAfterEmitNode: func(n *ast.Node) {
-			if n != nil && ast.IsBindingPattern(n) {
-				textWriter.bindingDepth--
+			if n != nil && n.Kind == ast.KindStringLiteral {
+				w.literal = nil
+			} else if n != nil && ast.IsBindingPattern(n) {
+				w.bindingDepth--
 			}
 		},
 	}
-	p := printer.NewPrinter(printer.PrinterOptions{RemoveComments: true, OmitTrailingSemicolon: true}, handlers, builder.EmitContext())
-	p.Write(node, ast.GetSourceFileOfNode(enclosing), textWriter, nil)
+	p := printer.NewPrinter(options, handlers, context)
+	p.Write(node, ast.GetSourceFileOfNode(enclosing), w, nil)
 	return writer.String()
 }
 
-// The printer can reuse the source spelling of a literal. Escape its decoded
-// value so a source escape cannot change meaning in the formatted signature.
-type signatureTextWriter struct {
-	printer.EmitTextWriter
-	useSingleQuote bool
-	bindingDepth   int
-}
-
-func (w *signatureTextWriter) WriteStringLiteral(text string) {
-	if len(text) >= 2 && (text[0] == '"' || text[0] == '\'') {
-		s := scanner.NewScanner()
-		s.SetText(text)
-		if s.Scan() == ast.KindStringLiteral && s.TokenEnd() == len(text) && s.TokenFlags()&ast.TokenFlagsUnterminated == 0 {
-			quote, escape := printer.QuoteCharDoubleQuote, printer.EscapeNonAsciiString
-			if w.bindingDepth != 0 {
-				// The JS printer keeps native characters in parameter names.
-				escape = printer.EscapeString
-			} else if w.useSingleQuote {
-				quote = printer.QuoteChar(text[0])
-			}
-			text = string(quote) + escape(s.TokenValue(), quote) + string(quote)
+func (w *displayWriter) WriteStringLiteral(text string) {
+	if n := w.literal; n != nil {
+		quote := printer.QuoteCharDoubleQuote
+		if w.bindingDepth == 0 && w.singleQuotes && n.AsStringLiteral().TokenFlags&ast.TokenFlagsSingleQuote != 0 {
+			quote = printer.QuoteCharSingleQuote
 		}
+		escape := printer.EscapeNonAsciiString
+		if w.bindingDepth != 0 || (w.context.EmitFlags(n)&printer.EFNoAsciiEscaping != 0 && !reusedDisplayLiteral(w.context.ParseNode(n))) {
+			escape = printer.EscapeString
+		}
+		text = string(quote) + escape(n.Text(), quote) + string(quote)
 	}
 	w.EmitTextWriter.WriteStringLiteral(text)
+}
+
+// TypeScript reuses the spelling policy of annotations and expressions that
+// directly supply a return type. Literals inferred inside a composite type
+// are synthesized with NoAsciiEscaping.
+func reusedDisplayLiteral(source *ast.Node) bool {
+	if source == nil || source.Parent == nil {
+		return false
+	}
+	parent := source.Parent
+	if ast.IsLiteralTypeNode(parent) || ast.IsTypeElement(parent) {
+		return true
+	}
+	for parent != nil && ast.IsOuterExpression(parent, ast.OEKParentheses|ast.OEKAssertions) && parent.Expression() == source {
+		source, parent = parent, parent.Parent
+	}
+	return parent != nil && (ast.IsReturnStatement(parent) || ast.IsArrowFunction(parent) && parent.Body() == source)
 }
