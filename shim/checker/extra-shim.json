@@ -41,6 +41,7 @@
       "getNameTypeFromMappedType",
       "getTemplateTypeFromMappedType",
       "sortSymbols",
+      "getNamedMembers",
       "getNodeBuilder",
       "getAugmentedPropertiesOfType",
       "getStringLiteralType",
@@ -105,7 +106,14 @@
       "globalRegExpType",
       "couldContainTypeVariables"
     ],
-    "InterfaceType": ["thisType"],
+    "InterfaceType": [
+      "thisType",
+      "declaredMembersResolved",
+      "declaredMembers",
+      "declaredCallSignatures",
+      "declaredConstructSignatures",
+      "declaredIndexInfos"
+    ],
     "MappedType": ["modifiersType"],
     "ValueSymbolLinks": ["resolvedType"]
   }

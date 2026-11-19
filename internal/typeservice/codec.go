@@ -31,6 +31,7 @@ const (
 	packetOptionalHandles
 	packetStrings
 	packetTypeDetails
+	packetDeclaredMembers
 )
 
 // EncodePacket has a finite record layout: header/kind, fixed fields, then
@@ -43,6 +44,8 @@ func EncodePacket(result Result) ([]byte, error) {
 	switch result.(type) {
 	case Literal:
 		kind, words = packetLiteral, 3
+	case *DeclaredMembers:
+		kind, words = packetDeclaredMembers, 5
 	case *TypeDetails:
 		kind, words = packetTypeDetails, 21
 	case Strings:
@@ -66,7 +69,7 @@ func EncodePacket(result Result) ([]byte, error) {
 	case NodeFacts:
 		kind, words = packetNodes, 1
 	case IndexInfos:
-		kind, words = packetIndexInfos, 1
+		kind, words = packetIndexInfos, 2
 	case *TypePredicateFact:
 		kind, words = packetTypePredicate, 4
 	case NamedSymbols:
@@ -93,6 +96,13 @@ func EncodePacket(result Result) ([]byte, error) {
 			w.put(12, w.text(fact.Text))
 		case 2:
 			binary.LittleEndian.PutUint64(w.data[12:], math.Float64bits(fact.Number))
+		}
+	case *DeclaredMembers:
+		if fact != nil {
+			w.put(8, w.ids(fact.properties))
+			w.put(12, w.ids(fact.calls))
+			w.put(16, w.ids(fact.constructs))
+			w.indexInfos(20, fact.indices)
 		}
 	case *TypeDetails:
 		w.put(8, w.node(fact.patternRef))
@@ -255,20 +265,7 @@ func EncodePacket(result Result) ([]byte, error) {
 		w.put(20, fact.ThisParameter)
 		w.put(24, uint32(fact.MinArgumentCount))
 	case IndexInfos:
-		offset := uint32(len(w.data))
-		w.data = append(w.data, make([]byte, 4+len(fact)*20)...)
-		w.put(offset, uint32(len(fact)))
-		for i, info := range fact {
-			at := offset + 4 + uint32(i)*20
-			w.put(at, info.KeyType)
-			w.put(at+4, info.Type)
-			if info.IsReadonly {
-				w.put(at+8, 1)
-			}
-			w.put(at+12, w.node(info.Declaration))
-			w.put(at+16, w.nodeList(info.Components))
-		}
-		w.put(8, offset)
+		w.indexInfos(8, fact)
 	case *TypePredicateFact:
 		if fact != nil {
 			w.put(8, fact.Kind+1)
@@ -310,6 +307,26 @@ func EncodePacket(result Result) ([]byte, error) {
 type packetWriter struct {
 	data    []byte
 	strings map[string]uint32
+}
+
+func (w *packetWriter) indexInfos(field uint32, fact IndexInfos) {
+	offset := uint32(len(w.data))
+	w.data = append(w.data, make([]byte, 4+len(fact)*20)...)
+	w.put(offset, uint32(len(fact)))
+	ids := make([]uint32, len(fact))
+	for i, info := range fact {
+		ids[i] = info.ID
+		at := offset + 4 + uint32(i)*20
+		w.put(at, info.KeyType)
+		w.put(at+4, info.Type)
+		if info.IsReadonly {
+			w.put(at+8, 1)
+		}
+		w.put(at+12, w.node(info.Declaration))
+		w.put(at+16, w.nodeList(info.Components))
+	}
+	w.put(field, offset)
+	w.put(field+4, w.ids(ids))
 }
 
 func (w *packetWriter) diagnostics(facts SuggestionDiagnostics) uint32 {

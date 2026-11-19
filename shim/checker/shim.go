@@ -135,6 +135,8 @@ func Checker_getTargetSymbol(recv *checker.Checker, s *ast.Symbol) *ast.Symbol
 func Checker_getApparentType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getTypeArguments github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeArguments
 func Checker_getTypeArguments(recv *checker.Checker, t *checker.Type) []*checker.Type
+//go:linkname Checker_getNamedMembers github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNamedMembers
+func Checker_getNamedMembers(recv *checker.Checker, members ast.SymbolTable, container *ast.Symbol) []*ast.Symbol
 //go:linkname Checker_getTypeParameterFromMappedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeParameterFromMappedType
 func Checker_getTypeParameterFromMappedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getConstraintTypeFromMappedType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getConstraintTypeFromMappedType
@@ -826,6 +828,21 @@ type extra_InterfaceType struct {
 }
 func InterfaceType_thisType(v *checker.InterfaceType) *checker.Type {
   return ((*extra_InterfaceType)(unsafe.Pointer(v))).thisType
+}
+func InterfaceType_declaredMembersResolved(v *checker.InterfaceType) bool {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).declaredMembersResolved
+}
+func InterfaceType_declaredMembers(v *checker.InterfaceType) ast.SymbolTable {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).declaredMembers
+}
+func InterfaceType_declaredCallSignatures(v *checker.InterfaceType) []*checker.Signature {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).declaredCallSignatures
+}
+func InterfaceType_declaredConstructSignatures(v *checker.InterfaceType) []*checker.Signature {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).declaredConstructSignatures
+}
+func InterfaceType_declaredIndexInfos(v *checker.InterfaceType) []*checker.IndexInfo {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).declaredIndexInfos
 }
 type IntersectionFlags = checker.IntersectionFlags
 const IntersectionFlagsNoConstraintReduction = checker.IntersectionFlagsNoConstraintReduction

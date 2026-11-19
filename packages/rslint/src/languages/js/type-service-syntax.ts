@@ -70,6 +70,15 @@ function translateNodeFlags(
   return result;
 }
 
+const sourceProperties = [
+  'languageVersion',
+  'hasNoDefaultLib',
+  'impliedNodeFormat',
+];
+function sourceProperty(key: PropertyKey): boolean {
+  return typeof key === 'string' && sourceProperties.includes(key);
+}
+
 function wrapList(
   value: unknown[],
   wrap: (item: unknown) => unknown,
@@ -109,7 +118,10 @@ export class GenerationSyntaxViews {
     summaryBytes: 0,
   };
   constructor(
-    private readonly typescript: Pick<typeof ts, 'SyntaxKind' | 'NodeFlags'>,
+    private readonly typescript: Pick<
+      typeof ts,
+      'SyntaxKind' | 'NodeFlags' | 'ScriptTarget'
+    >,
     private readonly descriptor: TypeServiceDescriptor,
     private lookup: SyntaxSource | undefined,
     private readonly readNodes: (node: NodeRef) => readonly NodeFact[],
@@ -345,6 +357,7 @@ export class GenerationSyntaxViews {
   private wrapRef(identity: SyntaxRef, cacheKey: string): object {
     const old = this.wrapped.get(cacheKey);
     if (old) return old;
+    const source = !('owner' in identity) && identity.index === 1;
     const proxy: object = new Proxy(
       {},
       {
@@ -357,13 +370,18 @@ export class GenerationSyntaxViews {
         },
         has: (target, key) => {
           this.ensure();
-          return Object.hasOwn(target, key) || key in this.rawSyntax(identity);
+          return (
+            Object.hasOwn(target, key) ||
+            (source && sourceProperty(key)) ||
+            key in this.rawSyntax(identity)
+          );
         },
         ownKeys: (target) => {
           this.ensure();
           return [
             ...new Set([
               ...Reflect.ownKeys(this.rawSyntax(identity)),
+              ...(source ? sourceProperties : []),
               ...Reflect.ownKeys(target),
             ]),
           ];
@@ -373,7 +391,7 @@ export class GenerationSyntaxViews {
           const own = Reflect.getOwnPropertyDescriptor(target, key);
           if (own) return own;
           const raw = this.rawSyntax(identity);
-          return Object.hasOwn(raw, key)
+          return (source && sourceProperty(key)) || Object.hasOwn(raw, key)
             ? {
                 configurable: true,
                 enumerable: true,
@@ -448,6 +466,19 @@ export class GenerationSyntaxViews {
       const source = this.metadataByName.get(file)!;
       if (key === 'fileName' || key === 'path' || key === 'isDeclarationFile')
         return source[key];
+      if (key === 'impliedNodeFormat') return source.impliedNodeFormat;
+      // TypeScript 6 keeps this legacy property false, including for no-default-lib directives.
+      if (key === 'hasNoDefaultLib') return false;
+      if (key === 'languageVersion') {
+        const targets = this.typescript.ScriptTarget;
+        if (this.configs.has(file) || file.toLowerCase().endsWith('.json'))
+          return targets.ES2015;
+        if (this.descriptor.syntaxOnly) return targets.Latest;
+        const target = this.descriptor.compilerOptions.target;
+        return typeof target === 'number' && target !== targets.ES3
+          ? target
+          : targets.LatestStandard;
+      }
       if (key === 'update') return () => unsupported('SourceFile.update');
       if (key === 'getLineEndOfPosition')
         return (position: number) => {

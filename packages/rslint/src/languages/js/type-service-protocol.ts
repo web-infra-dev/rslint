@@ -20,6 +20,7 @@ export interface TypeServiceDescriptor extends Scope {
     fileName: string;
     path: string;
     packages?: string[];
+    impliedNodeFormat?: number;
     external: boolean;
     defaultLibrary: boolean;
     isDeclarationFile: boolean;
@@ -78,6 +79,12 @@ export interface TypeFact {
   readonly typeParameters: readonly number[] | undefined;
   readonly tuple: { combinedFlags: number; readonly: boolean } | undefined;
 }
+export interface DeclaredMembersFact {
+  properties: readonly number[];
+  calls: readonly number[];
+  constructs: readonly number[];
+  indices: readonly IndexInfoFact[];
+}
 export interface TypeDetailFact {
   pattern?: NodeRef;
   node?: NodeRef;
@@ -133,6 +140,7 @@ export interface SignatureFact {
   readonly minArgumentCount: number;
 }
 export interface IndexInfoFact {
+  readonly id?: number;
   readonly components?: readonly NodeRef[];
   readonly keyType: number;
   readonly type: number;
@@ -164,6 +172,7 @@ export interface QueryArguments {
   simplifiedForWriting: IDArgs;
   typeParameterConstraint: IDArgs;
   typeDetails: IDArgs;
+  declaredMembers: IDArgs;
   resolvedTrueType: IDArgs;
   resolvedFalseType: IDArgs;
   symbolExports: IDArgs;
@@ -328,6 +337,7 @@ export interface QueryResults {
   simplifiedForWriting: number;
   typeParameterConstraint: number;
   typeDetails: TypeDetailFact;
+  declaredMembers: DeclaredMembersFact | undefined;
   resolvedTrueType: number;
   resolvedFalseType: number;
   symbolExports: readonly NamedSymbolFact[];
@@ -484,6 +494,7 @@ export function isCacheableTypeQuery(
     operation === 'typeCount' ||
     operation === 'instantiationCount' ||
     operation === 'relationCacheSizes' ||
+    operation === 'declaredMembers' ||
     operation === 'conditionalInstantiations' ||
     operation === 'freshLiteral' ||
     operation === 'typeParameterConstraint' ||
@@ -651,6 +662,7 @@ const operations = [
   'simplifiedForReading',
   'simplifiedForWriting',
   'typeParameterConstraint',
+  'declaredMembers',
 ] as const;
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
@@ -783,6 +795,7 @@ export const SCALAR_KINDS: Record<ScalarOperation, number> = {
   simplifiedForWriting: 1,
   typeParameterConstraint: 1,
   typeDetails: 19,
+  declaredMembers: 20,
   resolvedTrueType: 1,
   resolvedFalseType: 1,
   symbolExports: 11,
