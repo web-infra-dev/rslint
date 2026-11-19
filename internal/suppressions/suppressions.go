@@ -30,7 +30,7 @@ type entry struct {
 type entries map[string]map[string]entry
 
 type File struct {
-	cwd         string
+	baseDir     string // Native process cwd, the origin of all serialized paths.
 	physicalCwd string
 	cwdAliases  []utils.DirectoryIdentity
 	path        string
@@ -42,11 +42,13 @@ type File struct {
 // be determined. For every other rule, no diagnostics means a count of zero.
 type FileResult struct {
 	Path         string
+	InputPath    string // Optional CLI operand spelling resolved from the native process cwd.
 	SkippedRules []string
 }
 
 type checkedFile struct {
 	key          string
+	inputPath    string
 	counts       map[string]int
 	skippedRules []string
 }
@@ -61,10 +63,14 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 	files := make(map[string]*checkedFile, size)
 	for _, result := range checked {
 		path := result.Path
-		key := f.fileKey(path)
-		if f.options.Mode != Check || len(f.entries[key]) > 0 {
-			files[path] = &checkedFile{key: key, skippedRules: result.SkippedRules}
+		var key string
+		if f.options.Mode == Check {
+			key = f.entryKey(f.entries, path, result.InputPath)
+			if len(f.entries[key]) == 0 {
+				continue
+			}
 		}
+		files[path] = &checkedFile{key: key, inputPath: result.InputPath, skippedRules: result.SkippedRules}
 	}
 	for _, diagnostic := range diagnostics {
 		file := files[diagnostic.FilePath]

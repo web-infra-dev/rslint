@@ -8,49 +8,42 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
-	"slices"
 	"strings"
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open returns nil for the common case of a plain check without a baseline.
+// Open uses the file CLI's current working directory, including its logical
+// spelling. A plain check without a baseline returns nil.
 func Open(cwd string, options Options) (*File, error) {
 	cwd = filepath.FromSlash(cwd)
-	f := &File{cwd: cwd, options: options}
+	f := &File{options: options}
 	path := filepath.Join(cwd, DefaultFilename)
 	if location := options.Location; location != "" {
+		baseDir, err := syscall.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		f.baseDir = baseDir
 		path = location
 		if filepath.VolumeName(path) != "" || os.IsPathSeparator(path[0]) {
 			// Let Windows resolve drive-relative and current-drive-rooted paths.
-			var err error
 			path, err = filepath.Abs(path)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			path = filepath.Join(cwd, path)
+			path = filepath.Join(baseDir, path)
 		}
 		info, err := os.Stat(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
-			hashDirectory := cwd
-			if runtime.GOOS != "windows" {
-				// Node's process.cwd() uses the physical path on Unix. os.Getwd
-				// can instead preserve a shell's symlink spelling from PWD.
-				if err := f.resolveWorkingDirectory(); err != nil {
-					return nil, err
-				}
-				hashDirectory = f.physicalCwd
-			}
-			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(hashDirectory))
+			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(baseDir))
 		}
 	}
 	f.path = path
@@ -61,93 +54,11 @@ func Open(cwd string, options Options) (*File, error) {
 	if len(data) == 0 && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
-	if err := f.resolveWorkingDirectory(); err != nil {
+	if err := f.resolveWorkingDirectory(cwd); err != nil {
 		return nil, err
 	}
 	f.entries = data
 	return f, nil
-}
-
-func (f *File) resolveWorkingDirectory() error {
-	if f.physicalCwd != "" {
-		return nil
-	}
-	physical, err := filepath.EvalSymlinks(f.cwd)
-	if err != nil {
-		return err
-	}
-	f.physicalCwd = physical
-	for dir := f.cwd; dir != physical; {
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		physicalParent, err := filepath.EvalSymlinks(parent)
-		if err != nil {
-			return err
-		}
-		// An ordinary component already has the same spelling under its
-		// physical parent. Only a link needs its own prefix substitution.
-		link := filepath.Join(physicalParent, filepath.Base(dir))
-		if link != physical {
-			f.cwdAliases = append(f.cwdAliases, utils.DirectoryIdentity{LexicalPath: link, CanonicalPath: physical})
-		}
-		dir, physical = parent, physicalParent
-	}
-	slices.Reverse(f.cwdAliases)
-	return nil
-}
-
-func (f *File) fileKey(path string) string {
-	path = filepath.FromSlash(path)
-	// Apply shared links from outermost to innermost. An absolute target
-	// may already have expanded any of them. Independent links stay lexical.
-	for _, dir := range f.cwdAliases {
-		if suffix, err := relativeFilePath(dir.LexicalPath, path); err == nil && filepath.IsLocal(suffix) {
-			path = filepath.Join(dir.CanonicalPath, suffix)
-		}
-	}
-	key, err := relativeFilePath(f.physicalCwd, path)
-	if err != nil {
-		// A target on another Windows volume has no relative path.
-		key = path
-	}
-	return filepath.ToSlash(key)
-}
-
-func relativeFilePath(dir, path string) (string, error) {
-	rel, err := filepath.Rel(dir, path)
-	if runtime.GOOS == "windows" && err == nil {
-		rel = verifyRelativePathCase(dir, filepath.Clean(path), rel)
-	}
-	return rel, err
-}
-
-// Windows Rel folds every component, even inside case-sensitive directories.
-// Verify only spellings that Rel collapsed, including the identity of a link
-// itself when two differently named links lead to the same directory.
-func verifyRelativePathCase(dir, path, rel string) string {
-	if strings.HasPrefix(path, dir) {
-		return rel
-	}
-	for left, right := filepath.Join(dir, rel), path; left != right; {
-		leftParent, rightParent := filepath.Dir(left), filepath.Dir(right)
-		if leftParent == left || rightParent == right {
-			break // filepath.Rel already compared the volume names.
-		}
-		if filepath.Base(left) != filepath.Base(right) {
-			leftInfo, _ := os.Lstat(left)
-			rightInfo, _ := os.Lstat(right)
-			if !os.SameFile(leftInfo, rightInfo) {
-				// Use the outermost distinct entry to preserve its entire subtree.
-				up, _ := filepath.Rel(dir, leftParent)
-				down, _ := filepath.Rel(rightParent, path)
-				rel = filepath.Join(up, down)
-			}
-		}
-		left, right = leftParent, rightParent
-	}
-	return rel
 }
 
 func (f *File) fileMissing(key string) (bool, error) {
@@ -160,7 +71,7 @@ func (f *File) fileMissing(key string) (bool, error) {
 		return false, nil // A Unix host cannot check a Windows drive.
 	}
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(f.physicalCwd, path)
+		path = filepath.Join(f.baseDir, path)
 	}
 	_, err := os.Stat(path)
 	if err != nil && volume != "" {
@@ -240,6 +151,10 @@ func (f *File) update(ctx context.Context, files map[string]*checkedFile) error 
 	}
 	if data == nil {
 		data = make(entries)
+	}
+	// A different writer may have recorded the observed spelling since Open.
+	for path, file := range files {
+		file.key = f.entryKey(data, path, file.inputPath)
 	}
 	switch f.options.Mode {
 	case Record:

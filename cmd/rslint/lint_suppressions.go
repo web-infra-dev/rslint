@@ -43,6 +43,7 @@ func applyLintSuppressions(
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
 	files := observation.Native.Files
+	inputPaths := args.inputOrigins.paths()
 	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
 		if file.SyntaxError {
@@ -52,7 +53,7 @@ func applyLintSuppressions(
 		if failed := failedRules[file.Path]; len(failed) > 0 {
 			skipped = append(failed, skipped...)
 		}
-		checked = append(checked, suppressions.FileResult{Path: file.Path, SkippedRules: skipped})
+		checked = append(checked, suppressions.FileResult{Path: file.Path, InputPath: inputPaths.forFile(file.Path), SkippedRules: skipped})
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {
