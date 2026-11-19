@@ -91,6 +91,8 @@ function wrapList(
       Object.defineProperty(list, key, {
         value: Reflect.get(value, key),
         enumerable: true,
+        writable: true,
+        configurable: true,
       });
   return list;
 }
@@ -181,7 +183,6 @@ export class GenerationSyntaxViews {
       this.metadataByName.set(file, source);
       this.metadataByName.set(path, source);
     }
-    this.source(file);
     return this.nodeRef({ file, index: 1 })!;
   }
   sourceView(file: string): object | undefined {
@@ -442,7 +443,21 @@ export class GenerationSyntaxViews {
     return this.wrapRef(ref, key);
   }
   wrap(value: unknown): unknown {
-    if (Array.isArray(value)) return wrapList(value, (item) => this.wrap(item));
+    if (Array.isArray(value)) {
+      // The pinned reader gives each NodeArray its own encoded node index.
+      if ('parent' in value && value.parent instanceof RemoteNode) {
+        const key = this.key({
+          file: value.parent.getSourceFile().fileName,
+          index: (value as unknown as { index: number }).index,
+        });
+        const found = this.wrapped.get(key);
+        if (found) return found;
+        const list = wrapList(value, (item) => this.wrapNode(item as Node));
+        this.wrapped.set(key, list);
+        return list;
+      }
+      return wrapList(value, (item) => this.wrap(item));
+    }
     if (
       value instanceof RemoteNode ||
       (typeof value === 'object' &&
@@ -526,6 +541,7 @@ export class GenerationSyntaxViews {
     if (
       real &&
       !this.sources.has(file) &&
+      !this.configs.has(file) &&
       ['kind', 'flags', 'parent', 'name', 'text', 'escapedText'].includes(
         String(key),
       )
@@ -600,6 +616,7 @@ export class GenerationSyntaxViews {
     if (
       key === 'flags' &&
       real &&
+      !this.configs.has(file) &&
       (raw.kind === SyntaxKind.ModuleDeclaration ||
         raw.flags & NodeFlags.PossiblyContainsDeprecatedTag)
     ) {
@@ -646,13 +663,15 @@ export class GenerationSyntaxViews {
           ),
         );
       };
-    if (
-      member === undefined &&
-      typeof key === 'string' &&
-      /^(get|is|forEach)/.test(key)
-    )
-      unsupported(`node.${key}`);
-    return this.wrap(member);
+    const value = this.wrap(member);
+    if (Array.isArray(value))
+      Object.defineProperty(proxy, key, {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
+    return value;
   }
   private syntaxMember(raw: Node, key: string | symbol): unknown {
     if (

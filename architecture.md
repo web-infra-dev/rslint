@@ -1882,8 +1882,8 @@ Symbol member tables materialize on demand. Reads of transient symbol links
 and mapped modifiers observe the checker's current cached type, including
 values populated by intervening queries. Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
-can change the checker's cached answers. After the first explicit query,
-node-dependent semantic reads go directly to the checker. Type and signature
+can change the checker's cached answers for every client. Node-dependent
+semantic reads therefore go directly to the checker. Type and signature
 formatting use the checker printer with the writer layout used by each
 TypeScript method. Syntax navigation uses the reader's synthesized tokens and
 lists. Their identities survive decoded source eviction, and semantic queries
@@ -1892,11 +1892,11 @@ Workers and brokers retain each supplemental fact under its canonical key,
 rather than duplicating it under every node query. Fields decode on demand;
 wrappers retain requested immutable values and translated flags, never packet
 readers. A byte-bounded packet LRU is checked before shared storage and the
-bridge. Query keys use descriptor file ordinals while retaining every semantic
+bridge. Query keys use canonical source filenames while retaining every semantic
 argument. `QueryBatch` resolves node identities before one short checker lease
 and encodes its answers afterward.
 
-A caller can explicitly request known checker facts in batches of at most 256
+A caller can explicitly request immutable facts in batches of at most 256
 queries. Rule execution loads semantic facts as the rule requests them so
 overload resolution follows the rule's call order.
 
