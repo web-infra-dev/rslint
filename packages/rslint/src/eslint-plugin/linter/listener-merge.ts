@@ -347,13 +347,11 @@ export function mergeListeners(
           // Record it against the owning rule(s) and skip this selector —
           // ESLint isolates a broken rule the same way, leaving sibling
           // rules running.
-          for (const tl of tagged) {
-            merged.selectorErrors.push({
-              ruleName: tl.ruleName,
-              selector: cleanSelector,
-              message: compilation.message,
-            });
-          }
+          merged.selectorErrors.push({
+            ruleName,
+            selector: cleanSelector,
+            message: compilation.message,
+          });
           continue;
         }
         entry = {
@@ -729,13 +727,14 @@ export function visit(
       try {
         matched = esquery().matches(node, entry.selector!, reversedAncestry());
       } catch (err) {
-        // Attribute a bad selector to its first listener and keep dispatching.
-        errH?.({
-          ruleName: entry.listeners[0]?.ruleName,
-          selector: entry.raw,
-          node,
-          err,
-        });
+        if (errH) {
+          const ruleNames = new Set(
+            entry.listeners.map((listener) => listener.ruleName),
+          );
+          for (const ruleName of ruleNames) {
+            errH({ ruleName, selector: entry.raw, node, err });
+          }
+        }
         return;
       }
       if (!matched) return;

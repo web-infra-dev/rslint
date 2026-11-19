@@ -1492,11 +1492,12 @@ the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 The file CLI reads its optional bulk suppressions file in the calling working
 directory. After the final lint or fix observation, the CLI passes diagnostics
 and checked files to `internal/suppressions`, excluding files with syntax errors.
-For each file it identifies rules skipped for lack of type information and rules
-whose plugin execution failed. The package compares completed rule counts and
-owns baseline persistence. The CLI blocks baseline writes after configuration or
-plugin failures and supplies visible diagnostics and any baseline failure to
-report assembly.
+The lint plan identifies rules skipped for lack of type information. The plugin
+dispatcher identifies the files and error-level rules affected by incomplete
+worker results. The CLI passes these exclusions to the package, which compares
+completed rule counts and owns baseline persistence. The CLI blocks baseline
+writes after configuration or plugin failures and supplies visible diagnostics
+and any baseline failure to report assembly.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

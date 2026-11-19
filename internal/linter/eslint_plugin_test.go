@@ -501,17 +501,16 @@ func TestDispatchEslintPlugin_Cancelled(t *testing.T) {
 func TestDispatchEslintPlugin_MissingResultNoPanic(t *testing.T) {
 	text := "x"
 	files := []EslintPluginFileInput{{Path: "/a.ts", ConfigKey: "/cfg", Text: &text, Rules: []rule.ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)}}}
-	dispatch := EslintPluginDispatchFunc(func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
-		return &EslintPluginLintResult{Results: nil}, nil // no result for /a.ts
+	dispatch := EslintPluginDispatchFunc(func(context.Context, EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		return nil, nil //nolint:nilnil // Simulate a worker returning no response and no transport error.
 	})
-	var diags []rule.RuleDiagnostic
-	if err := testDispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", nil, func(d rule.RuleDiagnostic) {
-		diags = append(diags, d)
-	}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	outcome := testDispatchEslintPluginRulesWithOutcome(context.Background(), dispatch, files, false, "off", nil)
+	want := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginMissingFileResult, FilePath: "/a.ts"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/a.ts", RuleName: "uc/x"},
 	}
-	if len(diags) != 0 {
-		t.Errorf("missing result should contribute 0 diagnostics, got %d", len(diags))
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 0 || !slices.Equal(outcome.Notices, want) {
+		t.Errorf("missing result outcome = %+v", outcome)
 	}
 }
 
@@ -1099,20 +1098,25 @@ func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {
 			Path:      "/repo/good.ts",
 			ConfigKey: "/repo",
 			Text:      &goodText,
-			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", []any{"good"}, rule.SeverityWarning)},
+			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", []any{"good"}, rule.SeverityError)},
 		},
-		{
-			Path:      "/repo/bad.ts",
-			ConfigKey: "/repo",
-			Text:      &badText,
-			Rules:     []rule.ConfiguredRule{pluginRule("external/rule", []any{"bad"}, rule.SeverityError)},
-		},
+	}
+	// Three windows share one batch. Only the middle request fails.
+	frame := make([]byte, pluginWindowBytes)
+	for _, path := range []string{"/repo/completed.ts", "/repo/bad.ts", "/repo/pending.ts"} {
+		files = append(files, EslintPluginFileInput{
+			Path: path, ConfigKey: "/repo", Text: &badText, Frame: frame,
+			Rules: []rule.ConfiguredRule{pluginRule("external/rule", []any{"bad"}, rule.SeverityError)},
+		})
 	}
 	dispatchError := errors.New("WorkerPool: closed")
 	dispatch := EslintPluginDispatchFunc(func(_ context.Context, request EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 		file := request.Files[0]
 		if file.Path == "/repo/bad.ts" {
 			return nil, dispatchError
+		}
+		if file.Path == "/repo/completed.ts" {
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: file.Path}}}, nil
 		}
 		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
 			FilePath: file.Path,
@@ -1135,6 +1139,13 @@ func TestDispatchEslintPluginRulesWithOutcomeSurfacesFailure(t *testing.T) {
 	)
 	if !errors.Is(outcome.DispatchError, dispatchError) {
 		t.Fatalf("dispatch error = %v, want %v", outcome.DispatchError, dispatchError)
+	}
+	wantNotices := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/bad.ts", RuleName: "external/rule"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/pending.ts", RuleName: "external/rule"},
+	}
+	if !slices.Equal(outcome.Notices, wantNotices) {
+		t.Errorf("unfinished windows = %+v, want %+v", outcome.Notices, wantNotices)
 	}
 	if len(outcome.Diagnostics) != 2 {
 		t.Fatalf("diagnostics = %d, want partial result plus failure: %+v", len(outcome.Diagnostics), outcome.Diagnostics)
@@ -1206,27 +1217,29 @@ func TestDispatchEslintPluginRulesWithOutcomePreservesCancellation(t *testing.T)
 
 func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T) {
 	text := "const value = 1;"
+	rules := []rule.ConfiguredRule{
+		pluginRule("external/throws", nil, rule.SeverityError),
+		pluginRule("external/warns", nil, rule.SeverityWarning),
+		pluginRule("external/healthy", nil, rule.SeverityError),
+	}
 	files := []EslintPluginFileInput{
-		{
-			Path:  "/repo/present.ts",
-			Text:  &text,
-			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
-		},
-		{
-			Path:  "/repo/missing.ts",
-			Text:  &text,
-			Rules: []rule.ConfiguredRule{pluginRule("external/configured", nil, rule.SeverityWarning)},
-		},
+		{Path: "/repo/present.ts", Text: &text, Rules: rules},
+		{Path: "/repo/missing.ts", Text: &text, Rules: rules},
 	}
 	outcome := testDispatchEslintPluginRulesWithOutcome(
 		context.Background(),
 		EslintPluginDispatchFunc(func(_ context.Context, _ EslintPluginLintRequest) (*EslintPluginLintResult, error) {
 			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
 				FilePath: "/repo/present.ts",
-				Diagnostics: []EslintPluginDiagnostic{{
-					RuleName: "external/unconfigured",
-					Message:  "unexpected diagnostic",
-				}},
+				RuleErrors: []EslintPluginRuleError{
+					{Rule: "external/throws", Message: "first exception"},
+					{Rule: "external/warns"},
+					{Rule: "external/throws", Message: "second exception"},
+				},
+				Diagnostics: []EslintPluginDiagnostic{
+					{RuleName: "external/throws", Message: "finding before failure"},
+					{RuleName: "external/unconfigured", Message: "unexpected diagnostic"},
+				},
 			}}}, nil
 		}),
 		files,
@@ -1234,12 +1247,15 @@ func TestDispatchEslintPluginRulesWithOutcomeReturnsProtocolNotices(t *testing.T
 		SuggestionsModeOff,
 		nil,
 	)
-	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 1 {
-		t.Fatalf("outcome = %+v, want one usable diagnostic and no dispatch error", outcome)
+	if outcome.DispatchError != nil || len(outcome.Diagnostics) != 5 {
+		t.Fatalf("outcome = %+v, want three rule failures and both findings", outcome)
 	}
 	want := []EslintPluginProtocolNotice{
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/present.ts", RuleName: "external/throws"},
 		{Kind: EslintPluginUnconfiguredDiagnostic, FilePath: "/repo/present.ts", RuleName: "external/unconfigured"},
 		{Kind: EslintPluginMissingFileResult, FilePath: "/repo/missing.ts"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/throws"},
+		{Kind: EslintPluginUnverifiedRule, FilePath: "/repo/missing.ts", RuleName: "external/healthy"},
 	}
 	if !reflect.DeepEqual(outcome.Notices, want) {
 		t.Fatalf("notices = %+v, want %+v", outcome.Notices, want)
@@ -1449,6 +1465,10 @@ func TestDispatchEslintPluginProjectionFailureCannotFallBack(t *testing.T) {
 	diagnostics = outcome.Diagnostics
 	if called || len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message.Description, "does not match Program syntax") {
 		t.Fatalf("projection failure became a successful lint: %v/%+v", called, outcome)
+	}
+	wantNotice := EslintPluginProtocolNotice{Kind: EslintPluginUnverifiedRule, FilePath: input.Path, RuleName: "plugin/check"}
+	if !slices.Equal(outcome.Notices, []EslintPluginProtocolNotice{wantNotice}) {
+		t.Fatalf("projection failure notices = %+v, want %+v", outcome.Notices, wantNotice)
 	}
 	input.Text = nil
 	var builder estree.Builder

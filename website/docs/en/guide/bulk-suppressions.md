@@ -52,6 +52,6 @@ Pruning lowers counts, removes entries that reach zero, and removes entries for 
 
 Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
 
-If a plugin rule throws, Rslint reports the failure and any findings that rule emitted. Completed rules in the same file still use their baseline. Fix plugin or configuration failures before recording or pruning.
+If a plugin rule throws, Rslint reports the failure and any findings that rule emitted. Completed rules in the same run still use their baseline. By default, Rslint also reports any unused suppressions for those rules and exits with code `2` when it finds one. Fix plugin or configuration failures before recording or pruning.
 
 To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.

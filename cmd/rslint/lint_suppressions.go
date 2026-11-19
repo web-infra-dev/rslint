@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -27,17 +28,17 @@ func applyLintSuppressions(
 			switch notice.Kind {
 			case linter.EslintPluginMissingFileResult:
 				missingFile = true
-			case linter.EslintPluginUnconfiguredDiagnostic:
-				failedRules[notice.FilePath] = append(failedRules[notice.FilePath], notice.RuleName)
+			case linter.EslintPluginUnconfiguredDiagnostic, linter.EslintPluginUnverifiedRule:
+				ids := failedRules[notice.FilePath]
+				if !slices.Contains(ids, notice.RuleName) {
+					failedRules[notice.FilePath] = append(ids, notice.RuleName)
+				}
 			}
 		}
 	}
-	for _, d := range diagnostics {
-		if d.Origin == rule.DiagnosticOriginPluginFailure {
-			failedRules[d.FilePath] = append(failedRules[d.FilePath], d.RuleName)
-		}
-	}
-	incomplete := dispatchFailed || missingFile || len(failedRules) > 0
+	incomplete := dispatchFailed || missingFile || len(failedRules) > 0 || slices.ContainsFunc(diagnostics, func(d rule.RuleDiagnostic) bool {
+		return d.Origin == rule.DiagnosticOriginPluginFailure
+	})
 	if incomplete && args.Suppressions.Mode != suppressions.Check {
 		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
@@ -57,16 +58,17 @@ func applyLintSuppressions(
 	if err != nil {
 		return diagnostics, err.Error()
 	}
-	if missingFile {
-		return visible, "Cannot verify suppressions because a plugin file result is missing."
-	}
-	// Failed plugin runs already report their errors, and pruning has to wait
-	// until all plugin results are available.
-	if unused && !incomplete && !args.PassOnUnpruned {
+	if unused && !args.PassOnUnpruned {
 		if len(args.ConfigCatalog.Failures) > 0 {
 			return visible, "A lint configuration failed to load. Fix the configuration and rerun rslint to check for unused suppressions."
 		}
+		if incomplete {
+			return visible, "Unused suppressions remain. Fix the plugin failure before running --prune-suppressions."
+		}
 		return visible, "Unused suppressions remain. Run with --prune-suppressions to remove them, or --pass-on-unpruned-suppressions to allow them."
+	}
+	if missingFile {
+		return visible, "Cannot verify suppressions because a plugin file result is missing."
 	}
 	return visible, ""
 }
