@@ -271,7 +271,6 @@ const extraValid: ValidTestCase[] = [
 
 const comparisonCases = operators.map(
   ([operator, preferred, negated], run) => ({
-    operator,
     valid: [
       { code: 'expect()' },
       { code: 'expect({}).toStrictEqual({})' },
@@ -293,53 +292,40 @@ const comparisonCases = operators.map(
   }),
 );
 
-// The upstream repeats this matrix with an explicit ES2015 configuration.
-// Keep its retained cases and original indices; skip only duplicates already
-// covered by an identical source and configuration earlier in this matrix.
-const upstreamValid = comparisonCases.flatMap(({ operator, valid }, run) =>
-  valid.flatMap((item, index) => {
-    const firstRetained = [0, 2, 6, 6][run];
-    return index < firstRetained
-      ? []
-      : [
-          {
-            ...item,
-            name: `upstream prefer-comparison-matcher: ${operator} / valid ${index}`,
-            languageOptions: { ecmaVersion: 2015 },
-          },
-        ];
-  }),
-);
-const upstreamInvalid = comparisonCases.flatMap(({ operator, invalid }) =>
-  invalid.flatMap((item, index) =>
-    item.languageOptions
-      ? []
-      : [
-          {
-            ...item,
-            name: `upstream prefer-comparison-matcher: ${operator} / invalid ${index}`,
-            languageOptions: { ecmaVersion: 2015 },
-          },
-        ],
-  ),
-);
-
-new RuleTester(fixtureConfig()).run('prefer-comparison-matcher', {
+// Run the complete matrix once with upstream's ES2015 default. The trailing
+// argument-comma cases retain their explicit ES2017 override.
+const config = fixtureConfig();
+new RuleTester({
+  ...config,
+  languageOptions: { ...config.languageOptions, ecmaVersion: 2015 },
+}).run('prefer-comparison-matcher', {
   valid: [
     ...comparisonCases.flatMap((cases) => cases.valid),
     ...extraValid.map((item, index) => ({
-      name: `run 4 valid ${index}`,
+      name: `extra valid ${index}`,
       ...item,
     })),
-    ...upstreamValid,
-    ...[0, 1, 2, 3, 13, 6, 7, 8, 9, 10, 11, 12].map((originalIndex, index) => ({
-      ...extraValid[originalIndex],
-      name: `upstream prefer-comparison-matcher / valid ${[0, 1, 2, 3, 5, 7, 8, 9, 10, 11, 12, 13][index]}`,
-      languageOptions: { ecmaVersion: 2015 },
-    })),
+  ],
+  invalid: comparisonCases.flatMap((cases) => cases.invalid),
+});
+
+// Default configuration needs a smoke check, not a second complete matrix.
+new RuleTester(fixtureConfig()).run('prefer-comparison-matcher', {
+  valid: [
+    {
+      name: 'default configuration valid control',
+      code: 'expect(value).toBeGreaterThan(1);',
+    },
   ],
   invalid: [
-    ...comparisonCases.flatMap((cases) => cases.invalid),
-    ...upstreamInvalid,
+    {
+      ...generateInvalidCases(
+        '>',
+        'toBe',
+        'toBeGreaterThan',
+        'toBeLessThanOrEqual',
+      )[0],
+      name: 'default configuration autofix control',
+    },
   ],
 });

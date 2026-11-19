@@ -6,8 +6,9 @@
     "strict": true,
     "esModuleInterop": true,
     "lib": ["es2015", "es2017", "esnext"],
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "moduleDetection": "force"
   },
-  "files": ["jest-matchers.d.ts"],
+  "files": ["jest-matchers.d.ts", "console.d.ts"],
   "include": ["file.ts", "react.tsx"]
 }

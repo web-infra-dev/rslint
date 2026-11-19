@@ -39,6 +39,15 @@ const console = new Console();
 
 new RuleTester(fixtureConfig()).run('unbound-method', {
   valid: [
+    // Paired controls require real method types; missing console types must fail.
+    {
+      name: 'typed console.log is safe to pass unbound',
+      code: 'const f = console.log;',
+      filename: 'fixtures/upstream/file.ts',
+      languageOptions: {
+        parserOptions: { project: ['fixtures/upstream/tsconfig.json'] },
+      },
+    },
     ...(
       [
         `export {};
@@ -765,6 +774,26 @@ oc.superLogThis();
     })),
   ],
   invalid: [
+    // Paired controls require real method types; missing console types must fail.
+    {
+      name: 'typed console custom method requires its receiver',
+      code: 'const f = console.customMethod;',
+      filename: 'fixtures/upstream/file.ts',
+      languageOptions: {
+        parserOptions: { project: ['fixtures/upstream/tsconfig.json'] },
+      },
+      errors: [
+        {
+          messageId: 'unboundWithoutThisAnnotation',
+          message:
+            'Avoid referencing unbound methods which may cause unintentional scoping of `this`.\nIf your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 31,
+        },
+      ],
+    },
     ...(
       [
         ...[
