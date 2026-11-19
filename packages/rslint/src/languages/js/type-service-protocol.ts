@@ -482,8 +482,15 @@ export type QueryTransport = (
 ) => Uint8Array;
 
 /** Any client of the checker can re-resolve a call or populate a lazy slot. */
-export function isCacheableTypeQuery(operation: Operation): boolean {
-  switch (operation) {
+export function isCacheableTypeQuery(query: TypeServiceQuery): boolean {
+  switch (query.op) {
+    case 'nodeRecord':
+    case 'modeForResolutionAtIndex':
+    case 'modeForUsageLocation':
+    case 'syntacticDiagnostics':
+      return true;
+    case 'semanticDiagnostics':
+    case 'declarationDiagnostics':
     case 'resolvedSignatureWithOptions':
     case 'symbolLinkType':
     case 'symbolCount':
@@ -500,17 +507,13 @@ export function isCacheableTypeQuery(operation: Operation): boolean {
     case 'resolvedTrueType':
     case 'resolvedFalseType':
     case 'mappedModifiersType':
-    case 'type':
-    case 'fromTypeNode':
-    case 'context':
-    case 'contextualArgument':
-    case 'symbol':
-    case 'signature':
-    case 'resolvedSignature':
-    case 'symbolType':
+    case 'mappedTypeParameter':
+    case 'mappedConstraintType':
+    case 'mappedTemplateType':
       return false;
     default:
-      return true;
+      // A node can depend on a re-resolved call elsewhere in the expression.
+      return !('node' in query.args && query.args.node !== undefined);
   }
 }
 const operations = [

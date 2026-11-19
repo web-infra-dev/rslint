@@ -106,7 +106,12 @@
       "declaredConstructSignatures",
       "declaredIndexInfos"
     ],
-    "MappedType": ["modifiersType"],
+    "MappedType": [
+      "typeParameter",
+      "constraintType",
+      "templateType",
+      "modifiersType"
+    ],
     "ValueSymbolLinks": ["resolvedType"]
   },
   "ExtraFieldPointers": {

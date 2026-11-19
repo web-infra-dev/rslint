@@ -883,16 +883,17 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
 				return Handle(0), nil
 			}
+			mapped := t.AsMappedType()
 			var operand *checker.Type
 			switch r.Op {
 			case "mappedTypeParameter":
-				operand = checker.Checker_getTypeParameterFromMappedType(c, t)
+				operand = checker.MappedType_typeParameter(mapped)
 			case "mappedConstraintType":
-				operand = checker.Checker_getConstraintTypeFromMappedType(c, t)
+				operand = checker.MappedType_constraintType(mapped)
 			case "mappedTemplateType":
-				operand = checker.Checker_getTemplateTypeFromMappedType(c, t)
+				operand = checker.MappedType_templateType(mapped)
 			case "mappedModifiersType":
-				operand = checker.MappedType_modifiersType(t.AsMappedType())
+				operand = checker.MappedType_modifiersType(mapped)
 			}
 			return Handle(s.typeID(operand)), nil
 		case "properties":
@@ -929,11 +930,16 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			if flags&checker.TypeFlagsIntrinsic != 0 {
 				fact.IntrinsicName = t.AsIntrinsicType().IntrinsicName()
+			} else if flags&checker.TypeFlagsBoolean != 0 {
+				fact.IntrinsicName = "boolean"
 			}
 			if flags&checker.TypeFlagsUniqueESSymbol != 0 {
 				fact.EscapedName = ast.EscapeSymbolName(checker.GetPropertyNameFromType(t))
 			}
-			if flags&checker.TypeFlagsObject != 0 {
+			if flags&(checker.TypeFlagsObject|checker.TypeFlagsTypeParameter) != 0 {
+				fact.Target = s.typeID(t.Target())
+			}
+			if flags&(checker.TypeFlagsObject|checker.TypeFlagsUnionOrIntersection|checker.TypeFlagsIntrinsic|checker.TypeFlagsBooleanLiteral) != 0 {
 				objectFlags := t.ObjectFlags()
 				fact.ObjectFlags = []string{}
 				for _, flag := range publicObjectFlags {
@@ -941,16 +947,15 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 						fact.ObjectFlags = append(fact.ObjectFlags, flag.name)
 					}
 				}
-				if objectFlags&checker.ObjectFlagsReference != 0 {
-					fact.Target = s.typeID(t.Target())
-				}
+			}
+			if flags&checker.TypeFlagsObject != 0 {
 				// Fresh array literals can copy the target's Tuple flag onto a
 				// reference. Only the definition owns type parameters and tuple data.
 				if definition := t.AsInterfaceType(); definition != nil {
 					if parameters := definition.TypeParameters(); len(parameters) > 0 {
 						fact.TypeParameters = s.typeIDs(parameters)
 					}
-					if objectFlags&checker.ObjectFlagsTuple != 0 {
+					if t.ObjectFlags()&checker.ObjectFlagsTuple != 0 {
 						tuple := t.AsTupleType()
 						fact.Tuple = &TupleFact{
 							Readonly:      tuple.IsReadonly(),

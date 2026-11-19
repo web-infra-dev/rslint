@@ -957,6 +957,15 @@ type extra_MappedType struct {
   resolvedApparentType *checker.Type
   containsError bool
 }
+func MappedType_typeParameter(v *checker.MappedType) *checker.Type {
+  return ((*extra_MappedType)(unsafe.Pointer(v))).typeParameter
+}
+func MappedType_constraintType(v *checker.MappedType) *checker.Type {
+  return ((*extra_MappedType)(unsafe.Pointer(v))).constraintType
+}
+func MappedType_templateType(v *checker.MappedType) *checker.Type {
+  return ((*extra_MappedType)(unsafe.Pointer(v))).templateType
+}
 func MappedType_modifiersType(v *checker.MappedType) *checker.Type {
   return ((*extra_MappedType)(unsafe.Pointer(v))).modifiersType
 }

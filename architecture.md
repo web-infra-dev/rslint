@@ -1907,11 +1907,14 @@ ranges, message chains and related locations. The worker reads generated type
 nodes from the compiler's detached binary syntax tree and translates their
 kinds for JS rules. Generated nodes have no source-node handle.
 Symbol member tables materialize on demand. Reads of transient symbol links
-and mapped modifiers observe the checker's current cached type, including
-values populated by intervening queries. Explicit signature queries pass the apparent
+and mapped-type fields observe the checker's current values without triggering
+resolution. Type methods and the `typeArguments` accessor are inherited.
+Field presence follows the TypeScript type kind and its current state. Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
 can change the checker's cached answers for every client. Node-dependent
-semantic reads therefore go directly to the checker. Type and signature
+semantic reads therefore go directly to the checker, except for
+`getTypeAtLocation` on a variable declaration's own identifier. Its symbol has
+a fixed type, and the worker can reuse it when it already has the syntax tree. Type and signature
 formatting use the checker printer with the writer layout used by each
 TypeScript method. Syntax navigation uses the reader's synthesized tokens and
 lists. Their identities survive decoded source eviction, and semantic queries
