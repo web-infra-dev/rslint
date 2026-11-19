@@ -1869,7 +1869,10 @@ module resolution, and compiler statistics. Program-wide queries acquire their
 own checker leases. The JS checker also exposes intrinsic and literal types,
 symbol lookup and formatting, type predicates, and inspection of generated
 declaration nodes. Statistics and the checker's mutable result slots are read
-on demand. Compiler output through `Program.emit()` and source replacement
+on demand. Declared interface members remain absent until the checker resolves
+them. The worker then retains the declared properties, signatures and index
+information separately from inherited members. Source views expose the project
+script target and applicable module format. Compiler output through `Program.emit()` and source replacement
 through `SourceFile.update()` are unsupported and throw. Conditional-type
 instantiation keys are opaque to rules and scoped to the native checker.
 

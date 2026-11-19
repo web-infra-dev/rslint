@@ -39,6 +39,7 @@ const enums = {
   NodeFlags: ts.NodeFlags,
   JsxEmit: ts.JsxEmit,
   ModuleDetectionKind: ts.ModuleDetectionKind,
+  ScriptTarget: ts.ScriptTarget,
 };
 let temp: string, binary: string, readerModule: string;
 beforeAll(() => {
@@ -2276,6 +2277,144 @@ test('public checker, Program and source reads match TypeScript', async () => {
     await host.close();
   }
 });
+test('declared members and source metadata follow TypeScript query order', async () => {
+  const dir = mkdtempSync(resolve(temp, 'declared-'));
+  const file = resolve(dir, 'input.ts'),
+    config = resolve(dir, 'tsconfig.json');
+  const names = ['input.ts', 'esm.mts', 'cjs.cts', 'empty.json'];
+  writeFileSync(
+    file,
+    [
+      '/// <reference no-default-lib="true" />',
+      'export interface Parent { inherited: string; }',
+      'export interface Child extends Parent { own: number; (): string; new(): Child; [index: number]: boolean; }',
+      'export interface Empty {}',
+      'export class Box<T> { constructor(public value: T) {} }',
+      'export type Instance = Box<string>;',
+      `export type Pair = [${Array.from({ length: 12 }, (_, i) => 'slot' + i + ': number').join(',')}];`,
+    ].join('\n'),
+  );
+  writeFileSync(resolve(dir, 'esm.mts'), 'export {};');
+  writeFileSync(resolve(dir, 'cjs.cts'), 'export {};');
+  writeFileSync(resolve(dir, 'empty.json'), '{}');
+  writeFileSync(resolve(dir, 'package.json'), '{"type":"module"}');
+  const fields = [
+    'declaredProperties',
+    'declaredCallSignatures',
+    'declaredConstructSignatures',
+    'declaredIndexInfos',
+  ] as const;
+  const read = (program: ts.Program) => {
+    const checker = program.getTypeChecker();
+    const source = program.getSourceFile(file)!;
+    const declared = (index: number) => {
+      const declaration = source.statements[index] as ts.NamedDeclaration;
+      return checker.getDeclaredTypeOfSymbol(
+        checker.getSymbolAtLocation(declaration.name!)!,
+      ) as ts.InterfaceTypeWithDeclaredMembers;
+    };
+    const inspect = (
+      type: ts.InterfaceTypeWithDeclaredMembers,
+      includeAll = false,
+    ) => {
+      const presence = () =>
+        fields.map((key) => [
+          key in type,
+          Object.hasOwn(type, key),
+          Reflect.ownKeys(type).includes(key),
+          type[key] !== undefined,
+        ]);
+      const before = presence();
+      const props = checker.getPropertiesOfType(type);
+      const calls = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
+      const constructs = checker.getSignaturesOfType(
+        type,
+        ts.SignatureKind.Construct,
+      );
+      const indices = checker.getIndexInfosOfType(type);
+      return {
+        before,
+        after: presence(),
+        all: includeAll ? props.map((s) => s.name) : undefined,
+        own: type.declaredProperties?.map((s) => s.name),
+        calls: type.declaredCallSignatures?.map((s) => [
+          calls.includes(s),
+          checker.signatureToString(s),
+        ]),
+        constructs: type.declaredConstructSignatures?.map((s) => [
+          constructs.includes(s),
+          checker.signatureToString(s),
+        ]),
+        indices: type.declaredIndexInfos?.map((info) => [
+          indices.includes(info),
+          checker.typeToString(info.keyType),
+          checker.typeToString(info.type),
+          info.declaration?.getSourceFile() === source,
+        ]),
+        identity: fields.map((key) => type[key] === type[key]),
+        memberIdentity: type.declaredProperties?.every((prop) =>
+          props.includes(prop),
+        ),
+      };
+    };
+    return {
+      child: inspect(declared(1), true),
+      empty: inspect(declared(2)),
+      generic: inspect(declared(3)),
+      instantiated: inspect(declared(4)),
+      tuple: inspect(
+        (declared(5) as unknown as ts.TypeReference)
+          .target as ts.InterfaceTypeWithDeclaredMembers,
+      ),
+      sources: names.map((name) => {
+        const src = program.getSourceFile(resolve(dir, name))!;
+        return [
+          src.languageVersion,
+          src.hasNoDefaultLib,
+          src.impliedNodeFormat,
+          ...['languageVersion', 'hasNoDefaultLib', 'impliedNodeFormat'].map(
+            (k) => [k in src, Object.hasOwn(src, k)],
+          ),
+        ];
+      }),
+    };
+  };
+  for (const compilerOptions of [
+    { target: 'es2020', module: 'esnext', moduleResolution: 'bundler' },
+    { module: 'nodenext' },
+  ]) {
+    const raw = {
+      compilerOptions: { ...compilerOptions, resolveJsonModule: true },
+      files: names,
+    };
+    writeFileSync(config, JSON.stringify(raw));
+    const parsed = ts.parseJsonConfigFileContent(raw, ts.sys, dir);
+    const expected = read(ts.createProgram(parsed.fileNames, parsed.options));
+    expect(expected.tuple.own).toEqual([
+      ...Array.from({ length: 12 }, (_, i) => String(i)),
+      'length',
+    ]);
+    expect(expected.child.own).toEqual(['own']);
+    expect(expected.child.all).toEqual(['own', 'inherited']);
+    const host = new Host();
+    const descriptor = host.request({ method: 'init', config });
+    const client = new TypeServiceClient(
+      enums,
+      descriptor,
+      (query) =>
+        Buffer.from(host.request({ method: 'query', query }), 'base64'),
+      host.source,
+      { maxFactsBytes: 1 << 18 },
+    );
+    try {
+      expect(read(client.program as unknown as ts.Program)).toEqual(expected);
+    } finally {
+      client.close();
+      await host.close();
+    }
+  }
+});
+
 test('resolved project references retain config syntax, nesting and missing entries', async () => {
   const dir = mkdtempSync(resolve(temp, 'references-')),
     file = resolve(dir, 'input.ts'),

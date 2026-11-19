@@ -1,6 +1,8 @@
 package typeservice
 
 import (
+	"strconv"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/program"
@@ -67,6 +69,55 @@ func (s *Session) typeDetails(c *checker.Checker, t *checker.Type) *TypeDetails 
 	}
 	return d
 }
+
+// The public fields appear only after the checker has resolved the type's own
+// members. Inspecting them must not resolve the type or include inherited members.
+type DeclaredMembers struct {
+	properties, calls, constructs Handles
+	indices                       IndexInfos
+}
+
+func (*DeclaredMembers) result() {}
+
+func (s *Session) declaredMembers(c *checker.Checker, t *checker.Type) *DeclaredMembers {
+	def := t.AsInterfaceType()
+	if def == nil || !checker.InterfaceType_declaredMembersResolved(def) {
+		return nil
+	}
+	members := checker.InterfaceType_declaredMembers(def)
+	var props []*ast.Symbol
+	if t.ObjectFlags()&checker.ObjectFlagsTuple != 0 {
+		// Tuple slots are declared in numeric order before length, including slots past 9.
+		count := t.AsTupleType().FixedLength()
+		props = make([]*ast.Symbol, count+1)
+		for i := range count {
+			props[i] = members[strconv.Itoa(i)]
+		}
+		props[count] = members["length"]
+	} else {
+		props = checker.Checker_getNamedMembers(c, members, t.Symbol())
+	}
+	infos := checker.InterfaceType_declaredIndexInfos(def)
+	result := &DeclaredMembers{
+		properties: s.symbolIDs(props),
+		calls:      s.signatureIDs(checker.InterfaceType_declaredCallSignatures(def)),
+		constructs: s.signatureIDs(checker.InterfaceType_declaredConstructSignatures(def)),
+		indices:    make(IndexInfos, len(infos)),
+	}
+	for i, info := range infos {
+		result.indices[i] = s.indexInfo(info)
+	}
+	return result
+}
+
+func (s *Session) signatureIDs(signatures []*checker.Signature) Handles {
+	ids := make(Handles, len(signatures))
+	for i, signature := range signatures {
+		ids[i] = s.signatureID(signature)
+	}
+	return ids
+}
+
 func nodeRefs(p *program.Program, nodes []*ast.Node) []*NodeRef {
 	if nodes == nil {
 		return nil

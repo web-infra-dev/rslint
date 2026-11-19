@@ -18,6 +18,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
@@ -58,16 +59,17 @@ var publicObjectFlags = [...]struct {
 // Exclusive access is acquired and released for each query, never for the
 // lifetime of the session. Callers must close every client before Close.
 type Session struct {
-	mu         sync.Mutex
-	program    *program.Program
-	syntaxOnly bool
-	anchor     *ast.SourceFile
-	eligible   map[*ast.SourceFile]bool
-	checker    *checker.Checker
-	generation uint32
-	types      map[uint32]*checker.Type
-	symbols    map[uint32]*ast.Symbol
-	signatures map[uint32]*checker.Signature
+	mu           sync.Mutex
+	program      *program.Program
+	syntaxOnly   bool
+	anchor       *ast.SourceFile
+	eligible     map[*ast.SourceFile]bool
+	checker      *checker.Checker
+	generation   uint32
+	types        map[uint32]*checker.Type
+	symbols      map[uint32]*ast.Symbol
+	signatures   map[uint32]*checker.Signature
+	indexInfoIDs map[*checker.IndexInfo]uint32
 }
 
 type Descriptor struct {
@@ -79,12 +81,13 @@ type Descriptor struct {
 	Sources          []Source       `json:"sources"`
 }
 type Source struct {
-	FileName          string   `json:"fileName"`
-	Path              string   `json:"path"`
-	Packages          []string `json:"packages"`
-	External          bool     `json:"external"`
-	DefaultLibrary    bool     `json:"defaultLibrary"`
-	IsDeclarationFile bool     `json:"isDeclarationFile"`
+	ImpliedNodeFormat core.ResolutionMode `json:"impliedNodeFormat,omitempty"`
+	FileName          string              `json:"fileName"`
+	Path              string              `json:"path"`
+	Packages          []string            `json:"packages"`
+	External          bool                `json:"external"`
+	DefaultLibrary    bool                `json:"defaultLibrary"`
+	IsDeclarationFile bool                `json:"isDeclarationFile"`
 }
 
 // Binding authorizes one eligible lint target. Dependency nodes remain valid
@@ -166,6 +169,7 @@ func (s *Session) Close() {
 	s.types = nil
 	s.symbols = nil
 	s.signatures = nil
+	s.indexInfoIDs = nil
 }
 
 // SyntaxDescriptor opens only the requested target for a file-scoped reader.
@@ -235,8 +239,20 @@ func compilerOptions(opts *core.CompilerOptions) (map[string]any, error) {
 	}
 	return options, nil
 }
+
+var formatExtensions = []string{tspath.ExtensionMts, tspath.ExtensionMjs, tspath.ExtensionCts, tspath.ExtensionCjs}
+
 func (s *Session) source(f *ast.SourceFile) Source {
-	return Source{FileName: f.FileName(), Path: string(f.Path()), Packages: s.program.PackageNamesForSourceFile(f), External: s.program.IsSourceFileFromExternalLibrary(f), DefaultLibrary: s.program.IsSourceFileDefaultLibrary(f), IsDeclarationFile: f.IsDeclarationFile}
+	source := syntaxSource(f)
+	source.Packages = s.program.PackageNamesForSourceFile(f)
+	source.External = s.program.IsSourceFileFromExternalLibrary(f)
+	source.DefaultLibrary = s.program.IsSourceFileDefaultLibrary(f)
+	resolution := s.program.Options().GetModuleResolutionKind()
+	if resolution == core.ModuleResolutionKindNode16 || resolution == core.ModuleResolutionKindNodeNext ||
+		strings.Contains(source.FileName, "/node_modules/") || tspath.FileExtensionIsOneOf(source.FileName, formatExtensions) {
+		source.ImpliedNodeFormat = s.program.SourceFileMetadata(f).ImpliedNodeFormat
+	}
+	return source
 }
 
 // Query returns one authoritative answer, with shallow facts for its direct
@@ -353,6 +369,10 @@ func (s *Session) QueryBatch(ctx context.Context, queries []Query) (packets [][]
 }
 func materializeReferences(p *program.Program, result Result) {
 	switch fact := result.(type) {
+	case *DeclaredMembers:
+		if fact != nil {
+			materializeReferences(p, fact.indices)
+		}
 	case *TypeDetails:
 		fact.patternRef, fact.nodeRef, fact.rootRef = nodeReference(p, fact.pattern), nodeReference(p, fact.node), nodeReference(p, fact.rootNode)
 		fact.labelRefs = nodeRefs(p, fact.labels)
@@ -632,7 +652,16 @@ func (s *Session) namedSymbols(symbols []*ast.Symbol) NamedSymbols {
 	return result
 }
 func (s *Session) indexInfo(info *checker.IndexInfo) IndexInfo {
+	if s.indexInfoIDs == nil {
+		s.indexInfoIDs = make(map[*checker.IndexInfo]uint32)
+	}
+	id := s.indexInfoIDs[info]
+	if id == 0 {
+		id = uint32(len(s.indexInfoIDs)) + 1
+		s.indexInfoIDs[info] = id
+	}
 	return IndexInfo{
+		ID:             id,
 		KeyType:        s.typeID(info.KeyType()),
 		Type:           s.typeID(info.ValueType()),
 		IsReadonly:     info.IsReadonly(),
@@ -818,6 +847,8 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				}
 			}
 			return Handle(s.typeID(value)), nil
+		case "declaredMembers":
+			return s.declaredMembers(c, s.typeByID(r.ID)), nil
 		case "typeDetails":
 			return s.typeDetails(c, s.typeByID(r.ID)), nil
 		case "resolvedTrueType", "resolvedFalseType":

@@ -32,7 +32,7 @@ export class TypePacketReader {
     if (bytes.length < 12 || this.word(0) !== 0x35535452) invalid();
     this.kind = this.word(4);
     const words = [
-      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1, 3, 1, 1, 21,
+      0, 1, 1, 1, 1, 13, 7, 5, 1, 1, 4, 1, 1, 1, 1, 1, 3, 1, 1, 21, 5,
     ][this.kind];
     if (!words || bytes.length < 8 + words * 4) invalid();
   }
@@ -247,13 +247,15 @@ export class TypePacketReader {
     }
     return value as SignatureFact[K];
   }
-  private indexInfos(): readonly IndexInfoFact[] {
-    const at = this.word(8),
-      count = this.word(at);
+  private indexInfos(at: number, idOffset: number): readonly IndexInfoFact[] {
+    const count = this.word(at);
+    const ids = idOffset ? this.ids(idOffset) : undefined;
+    if (ids && ids.length !== count) return invalid();
     if (at + 4 + count * 20 > this.view!.byteLength) return invalid();
     return Array.from({ length: count }, (_, i) => {
       const pos = at + 4 + i * 20;
       return {
+        id: ids?.[i],
         keyType: this.word(pos),
         type: this.word(pos + 4),
         isReadonly: this.word(pos + 8) !== 0,
@@ -364,7 +366,11 @@ export class TypePacketReader {
         value = this.ids(this.word(8));
         break;
       case 9:
-        value = this.indexInfos();
+        // Earlier packets point straight past the single offset at byte 8.
+        value = this.indexInfos(
+          this.word(8),
+          this.word(8) === 12 ? 0 : this.word(12),
+        );
         break;
       case 10:
         value = this.typePredicate();
@@ -398,6 +404,16 @@ export class TypePacketReader {
           default:
             return invalid();
         }
+        break;
+      case 20:
+        value = this.word(8)
+          ? {
+              properties: this.ids(this.word(8)),
+              calls: this.ids(this.word(12)),
+              constructs: this.ids(this.word(16)),
+              indices: this.indexInfos(this.word(20), this.word(24)),
+            }
+          : undefined;
         break;
       case 19: {
         const list = (offset: number) =>

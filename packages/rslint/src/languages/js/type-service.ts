@@ -48,7 +48,13 @@ export interface ConditionalRootView {
   aliasSymbol?: SymbolView;
   aliasTypeArguments?: readonly TypeView[];
 }
-export interface TypeView {
+interface DeclaredMemberViews {
+  declaredProperties: readonly SymbolView[];
+  declaredCallSignatures: readonly SignatureView[];
+  declaredConstructSignatures: readonly SignatureView[];
+  declaredIndexInfos: readonly IndexInfoView[];
+}
+export interface TypeView extends Partial<Readonly<DeclaredMemberViews>> {
   readonly simplifiedForReading: TypeView | undefined;
   readonly simplifiedForWriting: TypeView | undefined;
   readonly elementType: TypeView | undefined;
@@ -438,6 +444,13 @@ function diagnosticMessage(fact: DiagnosticFact): ts.DiagnosticMessageChain {
 function unsupported(surface: string): never {
   throw new Error(`unsupported TypeScript operation: ${surface}`);
 }
+const declaredMemberKeys = new Set<PropertyKey>([
+  'declaredProperties',
+  'declaredCallSignatures',
+  'declaredConstructSignatures',
+  'declaredIndexInfos',
+]);
+
 export function guarded<T extends object>(
   object: T,
   ensure: () => void,
@@ -462,6 +475,25 @@ export function guarded<T extends object>(
           }
         : value;
     },
+    ownKeys:
+      surface === 'type' && has
+        ? (target) => {
+            ensure();
+            const keys = Reflect.ownKeys(target);
+            return has(target, 'declaredProperties')
+              ? keys
+              : keys.filter((key) => !declaredMemberKeys.has(key));
+          }
+        : undefined,
+    getOwnPropertyDescriptor:
+      surface === 'type' && has
+        ? (target, key) => {
+            ensure();
+            return declaredMemberKeys.has(key) && !has(target, key)
+              ? undefined
+              : Reflect.getOwnPropertyDescriptor(target, key);
+          }
+        : undefined,
     has: has
       ? (target, key) => {
           ensure();
@@ -493,6 +525,7 @@ type TypeScriptEnums = Pick<
   | 'NodeFlags'
   | 'JsxEmit'
   | 'ModuleDetectionKind'
+  | 'ScriptTarget'
 >;
 
 function readCompilerOptions(
@@ -565,6 +598,7 @@ export class TypeServiceClient {
   private readonly types = new WeakObjectCache<number, TypeView>();
   private readonly symbols = new WeakObjectCache<number, SymbolView>();
   private readonly signatures = new WeakObjectCache<number, SignatureView>();
+  private readonly indexInfos = new WeakObjectCache<number, IndexInfoView>();
   private readonly brands = new WeakMap<object, ObjectBrand>();
   private readonly conditionalRoots = new WeakMap<
     object,
@@ -1420,6 +1454,7 @@ export class TypeServiceClient {
     this.types.clear();
     this.symbols.clear();
     this.signatures.clear();
+    this.indexInfos.clear();
     for (const file of this.files) file.close();
     this.files.clear();
     this.syntax.close();
@@ -1629,6 +1664,10 @@ export class TypeServiceClient {
               case 'finalArrayType':
               case 'simplifiedForReading':
               case 'simplifiedForWriting':
+              case 'declaredProperties':
+              case 'declaredCallSignatures':
+              case 'declaredConstructSignatures':
+              case 'declaredIndexInfos':
               case 'resolvedTrueType':
               case 'resolvedFalseType':
                 return Reflect.get(view, key) !== undefined;
@@ -1671,13 +1710,17 @@ export class TypeServiceClient {
     return ids.map((id) => this.signature(id)!);
   }
   private indexInfo(fact: IndexInfoFact): IndexInfoView {
-    return {
+    const old = fact.id && this.indexInfos.get(fact.id);
+    if (old) return old;
+    const info = {
       components: fact.components?.map((ref) => this.syntax.nodeRef(ref)!),
       keyType: this.type(fact.keyType)!,
       type: this.type(fact.type)!,
       isReadonly: fact.isReadonly,
       declaration: this.syntax.nodeRef(fact.declaration),
     };
+    if (fact.id) this.indexInfos.set(fact.id, info);
+    return info;
   }
   private type(id: number): TypeView | undefined {
     return this.intern(this.types, 'type', id, () => {
@@ -1778,6 +1821,23 @@ export class TypeServiceClient {
         constraintType = mapped('mappedConstraintType'),
         templateType = mapped('mappedTemplateType');
       const isClassOrInterface = () => objectFlag(of.ClassOrInterface);
+      let resolvedMembers: DeclaredMemberViews | undefined;
+      const declaredMembers = () => {
+        if (!resolvedMembers && objectFlag(of.ClassOrInterface | of.Tuple)) {
+          const fact = this.query({ op: 'declaredMembers', args: { id } });
+          if (fact) {
+            resolvedMembers = {
+              declaredProperties: this.symbolsFor(fact.properties),
+              declaredCallSignatures: this.signaturesFor(fact.calls),
+              declaredConstructSignatures: this.signaturesFor(fact.constructs),
+              declaredIndexInfos: fact.indices.map((info) =>
+                this.indexInfo(info),
+              ),
+            };
+          }
+        }
+        return resolvedMembers;
+      };
       const client = this;
       const calls = memo(ensure, () =>
           this.signaturesFor(
@@ -1835,6 +1895,18 @@ export class TypeServiceClient {
         },
         get escapedName() {
           return escapedName();
+        },
+        get declaredProperties() {
+          return declaredMembers()?.declaredProperties;
+        },
+        get declaredCallSignatures() {
+          return declaredMembers()?.declaredCallSignatures;
+        },
+        get declaredConstructSignatures() {
+          return declaredMembers()?.declaredConstructSignatures;
+        },
+        get declaredIndexInfos() {
+          return declaredMembers()?.declaredIndexInfos;
         },
         get objectFlags() {
           return objectFlags();

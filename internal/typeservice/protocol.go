@@ -255,7 +255,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	switch wire.Op {
 	case "conditionalInstantiations", "freshLiteral", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
 		request = &TypeRequest{Op: wire.Op}
-	case "typeDetails", "resolvedTrueType", "resolvedFalseType":
+	case "typeDetails", "resolvedTrueType", "resolvedFalseType", "declaredMembers":
 		request = &TypeRequest{Op: wire.Op}
 	case "symbolExports", "symbolGlobalExports":
 		request = &SymbolRequest{Op: wire.Op}
@@ -466,6 +466,7 @@ type NamedSymbol struct {
 }
 type IndexInfos []IndexInfo
 type IndexInfo struct {
+	ID             uint32
 	KeyType, Type  uint32
 	IsReadonly     bool
 	Declaration    *NodeRef
