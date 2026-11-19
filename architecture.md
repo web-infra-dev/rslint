@@ -1876,10 +1876,10 @@ script target and applicable module format. Compiler output through `Program.emi
 through `SourceFile.update()` are unsupported and throw. Conditional-type
 instantiation keys are opaque to rules and scoped to the native checker.
 
-The reusable ESTree `Builder.Project` owns syntax encoding and exact numeric
-forward origins and preferred reverse aliases from the original compiler AST.
-`ProjectOrigins` provides the same mappings for an existing compact frame,
-without token scanning or another frame encoding. Flattened comma prefixes and
+The ESTree builder's `ProjectOrigins` maps an existing compact frame to its
+original compiler nodes and records their preferred reverse aliases. It reuses
+the frame's node numbering without scanning tokens or encoding another frame.
+Flattened comma prefixes and
 detached optional chain prefixes retain compact aliases referencing original
 frame node IDs. The file client creates ordinary writable aliases only on
 reverse lookup. Their original membership survives earlier listener mutations.
@@ -1891,8 +1891,7 @@ binary syntax reader.
 maps while preserving generation-scoped native, type, symbol and signature
 identities while a plugin can observe them. Weak interning releases unreachable
 wrappers and their keys. Closing the owner invalidates all those objects and
-releases its transports and caches. `FileTypeServiceClient` is a convenience
-owner for a standalone invocation.
+releases its transports and caches.
 
 An injected synchronous transport uses a finite request/fact protocol and
 offset-addressed binary records. Property/name arguments and packet strings

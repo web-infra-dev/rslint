@@ -16,7 +16,7 @@ import (
 )
 
 func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
-	if !p.recordOrigins {
+	if p.mapping == nil {
 		return p.convertNode(node, pattern)
 	}
 	previous := p.origin
@@ -28,10 +28,10 @@ func (p *estreeProjector) convert(node *ast.Node, pattern bool) uint32 {
 }
 
 func (p *estreeProjector) registerReverse(node *ast.Node, id uint32) {
-	if p.recordOrigins && node != nil && id != 0 && p.reverse[node] == 0 {
-		p.reverse[node] = id
-		if id == p.chainRecord {
-			p.chainReverse = append(p.chainReverse, node)
+	if p.mapping != nil && node != nil && id != 0 && p.mapping.reverse[node] == 0 {
+		p.mapping.reverse[node] = id
+		if id == p.mapping.chainRecord {
+			p.mapping.chainReverse = append(p.mapping.chainReverse, node)
 		}
 	}
 }
@@ -278,9 +278,9 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 		keyword := scanner.TokenToString(n.KeywordToken)
 		meta := p.add("Identifier", start, start+uint32(len(keyword)),
 			p.listValue(nil), p.stringValue(keyword), boolValue(false), undefinedValue())
-		if p.recordOrigins {
+		if p.mapping != nil {
 			// The compiler stores this keyword as an enum, not an AST node.
-			p.origins[meta-1] = nil
+			p.mapping.nodes[meta-1] = nil
 		}
 		return p.addNode("MetaProperty", node,
 			nodeValue(meta), nodeValue(p.convert(n.Name(), false)))
@@ -410,8 +410,8 @@ func (p *estreeProjector) convertNode(node *ast.Node, pattern bool) uint32 {
 	case ast.KindImportClause:
 		name := node.AsImportClause().Name()
 		id := p.addNode("ImportDefaultSpecifier", name, nodeValue(p.convert(name, false)))
-		if p.recordOrigins {
-			p.origins[id-1] = node
+		if p.mapping != nil {
+			p.mapping.nodes[id-1] = node
 		}
 		return id
 	case ast.KindImportAttribute:
@@ -798,12 +798,11 @@ func (p *estreeProjector) wrapOptionalChain(node *ast.Node, id uint32, chain boo
 		return id
 	}
 	wrapper := p.addNode("ChainExpression", node, nodeValue(id))
-	if p.originsOnly {
+	if p.mapping != nil {
 		// A chain operand can reclaim only the last record it emitted.
 		// Track every reverse key for that wrapper, including transparent nodes.
-		p.chainRecord = wrapper
-		clear(p.chainReverse)
-		p.chainReverse = p.chainReverse[:0]
+		p.mapping.chainRecord = wrapper
+		p.mapping.chainReverse = p.mapping.chainReverse[:0]
 	}
 	return wrapper
 }
@@ -864,7 +863,7 @@ func (p *estreeProjector) convertParameters(parameters []*ast.Node) uint32 {
 
 func (p *estreeProjector) convertParameter(node *ast.Node) uint32 {
 	previous := p.origin
-	if p.recordOrigins {
+	if p.mapping != nil {
 		p.origin = node
 	}
 	id := p.convertParameterNode(node)
@@ -976,14 +975,11 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 		// callers avoid detached prefixes; semantic maps preserve their aliases.
 		rights := []*ast.Node{n.Right}
 		var prefixes []*ast.Node
-		if p.recordOrigins {
-			prefixes = append(prefixes, node)
-		}
 		left := n.Left
 		for left.Kind == ast.KindBinaryExpression && left.AsBinaryExpression().OperatorToken.Kind == ast.KindCommaToken {
 			p.check()
 			nested := left.AsBinaryExpression()
-			if p.recordOrigins {
+			if p.mapping != nil {
 				prefixes = append(prefixes, left)
 			}
 			rights = append(rights, nested.Right)
@@ -998,11 +994,16 @@ func (p *estreeProjector) convertBinary(node *ast.Node, pattern bool) uint32 {
 			items[count] = p.convert(rights[index], false)
 		}
 		id := p.addNode("SequenceExpression", node, p.listValue(items))
-		if len(prefixes) > 1 && p.sequenceMembers != nil {
-			p.sequenceMembers(id, items)
-		}
-		for index := 1; index < len(prefixes); index++ {
-			p.sequenceAliases = append(p.sequenceAliases, sequenceAlias{prefixes[index], id, uint32(len(items) - index)})
+		if len(prefixes) != 0 {
+			m := p.mapping
+			if m.SequenceMembers == nil {
+				m.SequenceMembers = make(map[uint32][]uint32)
+			}
+			m.SequenceMembers[id] = items
+			for i, prefix := range prefixes {
+				start, end := p.rangeOf(prefix)
+				m.Aliases = append(m.Aliases, SequenceAlias{m.table.GetIndex(prefix), id, uint32(len(items) - i - 1), start, end})
+			}
 		}
 		return id
 	}
@@ -1153,7 +1154,7 @@ func (p *estreeProjector) convertClass(node *ast.Node, declaration bool) uint32 
 			}
 			for index, heritageNode := range clause.Types.Nodes {
 				previous := p.origin
-				if p.recordOrigins {
+				if p.mapping != nil {
 					p.origin = heritageNode
 				}
 				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
@@ -1397,7 +1398,7 @@ func (p *estreeProjector) convertInterface(node *ast.Node) uint32 {
 			}
 			for _, heritageNode := range clause.Types.Nodes {
 				previous := p.origin
-				if p.recordOrigins {
+				if p.mapping != nil {
 					p.origin = heritageNode
 				}
 				heritageExpression, heritageTypeArguments := heritageParts(heritageNode)
@@ -1615,8 +1616,8 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 		nested := body.AsModuleDeclaration()
 		right := p.convertNode(nested.Name(), false)
 		name = p.add("TSQualifiedName", p.nodes[name-1].start, p.nodes[right-1].end, nodeValue(name), nodeValue(right))
-		if p.recordOrigins {
-			p.origins[name-1] = nested.Name()
+		if p.mapping != nil {
+			p.mapping.nodes[name-1] = nested.Name()
 		}
 		declare = declare || p.hasModifier(body, ast.ModifierFlagsAmbient)
 		body = nested.Body
@@ -1626,7 +1627,7 @@ func (p *estreeProjector) convertModuleDeclaration(node *ast.Node) uint32 {
 
 func (p *estreeProjector) convertJsxName(node *ast.Node) uint32 {
 	previous := p.origin
-	if p.recordOrigins {
+	if p.mapping != nil {
 		p.origin = node
 	}
 	id := p.convertJsxNameNode(node)
@@ -1692,22 +1693,17 @@ func (p *estreeProjector) convertChainOperand(node *ast.Node) (uint32, bool) {
 		return id, false
 	}
 	expression := p.values[record.valueStart] & payloadMask
-	// Standalone typed projection owns its own frame and can keep the
-	// detached wrapper. On-demand origins must reproduce the smaller frame.
-	if p.recordOrigins && !p.originsOnly {
-		return expression, true
-	}
-	if p.originsOnly {
-		origin := p.origins[id-1]
-		for _, node := range p.chainReverse {
-			p.reverse[node] = detachedChainReverse
-			p.recordChainAlias(node, origin, expression, record.start, record.end)
+	if m := p.mapping; m != nil {
+		origin := m.nodes[id-1]
+		for _, node := range m.chainReverse {
+			m.reverse[node] = detachedChainReverse
+			if index := m.table.GetIndex(node); index != 0 {
+				m.ChainAliases = append(m.ChainAliases, ChainAlias{index, m.table.GetIndex(origin), expression, record.start, record.end})
+			}
 		}
-		p.chainRecord = 0
-		clear(p.chainReverse)
-		p.chainReverse = p.chainReverse[:0]
-		p.origins[id-1] = nil
-		p.origins = p.origins[:id-1]
+		m.chainRecord = 0
+		m.chainReverse = m.chainReverse[:0]
+		m.nodes = m.nodes[:id-1]
 	}
 	// The wrapper is the last record emitted by convert and has no users yet.
 	// Its parent consumes the inner expression, so reclaim it before proceeding.

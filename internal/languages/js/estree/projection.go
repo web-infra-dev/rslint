@@ -65,38 +65,13 @@ type estreeProjector struct {
 	frameBytes       uint64
 	scan             scanner.Scanner
 	origin           *ast.Node
-	origins          []*ast.Node
-	reverse          map[*ast.Node]uint32
-	sequenceAliases  []sequenceAlias
-	chainRecord      uint32
-	chainReverse     []*ast.Node
-	recordOrigins    bool
-	originsOnly      bool
-	sequenceMembers  func(sequenceID uint32, members []uint32)
-	recordChainAlias func(node, origin *ast.Node, expression, start, end uint32)
+	mapping          *originProjection
 }
 
 // Options are syntax metadata already resolved by the linter.
 type Options struct {
 	SourceType string
 	HasBOM     bool
-	// RecordOrigin receives exact compiler nodes for projected records. IDs are
-	// one-based frame IDs. Synthetic records may have a nil origin. The callback runs
-	// before Build returns, and callers own any retained references.
-	RecordOrigin func(id uint32, node *ast.Node)
-	// RecordReverse receives preferred reverse mappings, including compiler
-	// aliases that share a projected node (such as parenthesized expressions).
-	RecordReverse func(node *ast.Node, id uint32)
-	// RecordSequenceAlias describes a flattened comma prefix without encoding
-	// another growing expression list. It is materialized only on reverse lookup.
-	RecordSequenceAlias func(node *ast.Node, sequenceID, count, start, end uint32)
-	sequenceMembers     func(sequenceID uint32, members []uint32)
-	recordChainAlias    func(node, origin *ast.Node, expression, start, end uint32)
-}
-
-type sequenceAlias struct {
-	node              *ast.Node
-	sequenceID, count uint32
 }
 
 // Keep the first reverse mapping reserved after its frame ID is reclaimed.
@@ -167,10 +142,10 @@ func (b *Builder) Build(ctx context.Context, file *ast.SourceFile, options Optio
 // storage must remain immutable until every consumer has finished; it never
 // aliases the Builder's scratch. allocate is called synchronously at most once.
 func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte) (data []byte, err error) {
-	return b.build(ctx, file, options, allocate, false)
+	return b.build(ctx, file, options, allocate, nil)
 }
 
-func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, originsOnly bool) (data []byte, err error) {
+func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, mapping *originProjection) (data []byte, err error) {
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
 	}
@@ -191,14 +166,7 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 	p.file = file
 	p.text = file.Text()
 	p.sourceType = options.SourceType
-	p.recordOrigins = options.RecordOrigin != nil || options.RecordReverse != nil || options.RecordSequenceAlias != nil
-	p.originsOnly = originsOnly
-	p.sequenceMembers = options.sequenceMembers
-	p.recordChainAlias = options.recordChainAlias
-	p.origins = p.origins[:0]
-	if p.recordOrigins {
-		p.reverse = make(map[*ast.Node]uint32)
-	}
+	p.mapping = mapping
 	if options.SourceType == "commonjs" {
 		p.sourceType = "script"
 	}
@@ -222,33 +190,14 @@ func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Optio
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
-	if !originsOnly {
-		initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
-		b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
-		b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
-	}
-	if options.RecordOrigin != nil {
-		for index, node := range p.origins {
-			options.RecordOrigin(uint32(index+1), node)
-		}
-	}
-	if options.RecordReverse != nil {
-		for node, id := range p.reverse {
-			if id != detachedChainReverse {
-				options.RecordReverse(node, id)
-			}
-		}
-	}
-	if options.RecordSequenceAlias != nil {
-		for _, alias := range p.sequenceAliases {
-			start, end := p.rangeOf(alias.node)
-			options.RecordSequenceAlias(alias.node, alias.sequenceID, alias.count, start, end)
-		}
-	}
-	if originsOnly {
+	if mapping != nil {
+		mapping.finish()
 		p.check()
 		return nil, nil
 	}
+	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
+	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
+	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
 	return b.encode(root, options.HasBOM, allocate)
 }
 
@@ -260,18 +209,7 @@ func (p *estreeProjector) check() {
 
 func (p *estreeProjector) clearSource() {
 	p.origin = nil
-	clear(p.origins)
-	p.origins = nil
-	p.reverse = nil
-	clear(p.sequenceAliases)
-	p.sequenceAliases = nil
-	p.chainRecord = 0
-	clear(p.chainReverse)
-	p.chainReverse = nil
-	p.recordOrigins = false
-	p.originsOnly = false
-	p.sequenceMembers = nil
-	p.recordChainAlias = nil
+	p.mapping = nil
 	p.file = nil
 	p.text = ""
 	p.sourceType = ""
@@ -461,12 +399,12 @@ func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint
 		end:        end,
 		valueStart: uint32(len(p.values)),
 	})
-	if p.recordOrigins {
+	if p.mapping != nil {
 		origin := p.origin
 		if typeName == "TSTypeAnnotation" || typeName == "TSTypeParameterDeclaration" {
 			origin = nil
 		}
-		p.origins = append(p.origins, origin)
+		p.mapping.nodes = append(p.mapping.nodes, origin)
 	}
 	p.values = append(p.values, values...)
 	return id
@@ -511,8 +449,8 @@ func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 func (p *estreeProjector) addNode(typeName string, node *ast.Node, values ...uint32) uint32 {
 	start, end := p.rangeOf(node)
 	id := p.add(typeName, start, end, values...)
-	if p.recordOrigins {
-		p.origins[id-1] = node
+	if p.mapping != nil {
+		p.mapping.nodes[id-1] = node
 	}
 	return id
 }

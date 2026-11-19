@@ -622,7 +622,7 @@ export class TypeServiceClient {
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
   private signatureOptionsUsed = false;
-  readonly stats = { queries: 0, localHits: 0, sharedHits: 0, factBytes: 0 };
+  private factBytes = 0;
   readonly program: ProgramView;
   readonly checker: CheckerView;
   constructor(
@@ -1381,9 +1381,6 @@ export class TypeServiceClient {
       'program',
     );
   }
-  get syntaxStats() {
-    return this.syntax.stats;
-  }
   private resolvedReferences():
     readonly (ResolvedReferenceView | undefined)[] | undefined {
     const graph: { roots: number[]; configs: ReferenceConfig[] } | null =
@@ -1469,7 +1466,7 @@ export class TypeServiceClient {
     this.closed = true;
     for (const reader of this.facts.values()) reader.close();
     this.facts.clear();
-    this.stats.factBytes = 0;
+    this.factBytes = 0;
     this.types.clear();
     this.symbols.clear();
     this.signatures.clear();
@@ -1494,7 +1491,6 @@ export class TypeServiceClient {
     };
     const key = this.key(query);
     if (!this.cacheable(query)) {
-      this.stats.queries++;
       const reader = this.ingest(
         query,
         this.transport!(query, key, false),
@@ -1508,13 +1504,10 @@ export class TypeServiceClient {
     }
     let reader = this.facts.get(key);
     if (reader) {
-      this.stats.localHits++;
       this.facts.delete(key);
       this.facts.set(key, reader);
     } else {
       const shared = this.shared?.get(key);
-      if (shared) this.stats.sharedHits++;
-      else this.stats.queries++;
       reader = this.ingest(query, shared ?? this.transport!(query, key, true));
     }
     try {
@@ -1523,7 +1516,7 @@ export class TypeServiceClient {
       if (this.facts.get(key) !== reader) reader.close();
     }
   }
-  key(query: TypeServiceQuery): string {
+  private key(query: TypeServiceQuery): string {
     return typeQueryKey(query, this.fileOrdinals);
   }
   private store(key: string, bytes: Uint8Array): TypePacketReader {
@@ -1531,15 +1524,15 @@ export class TypeServiceClient {
     if (existing) return existing;
     const reader = new TypePacketReader(Uint8Array.from(bytes));
     if (reader.retainedBytes <= this.maxFactsBytes) {
-      while (this.stats.factBytes + reader.retainedBytes > this.maxFactsBytes) {
+      while (this.factBytes + reader.retainedBytes > this.maxFactsBytes) {
         const oldest = this.facts.keys().next().value!,
           evicted = this.facts.get(oldest)!;
-        this.stats.factBytes -= evicted.retainedBytes;
+        this.factBytes -= evicted.retainedBytes;
         evicted.close();
         this.facts.delete(oldest);
       }
       this.facts.set(key, reader);
-      this.stats.factBytes += reader.retainedBytes;
+      this.factBytes += reader.retainedBytes;
     }
     return reader;
   }
@@ -1585,7 +1578,6 @@ export class TypeServiceClient {
       if (this.facts.has(key) || missing.has(key)) continue;
       const shared = this.shared?.get(key);
       if (shared) {
-        this.stats.sharedHits++;
         const reader = this.ingest(query, shared);
         if (this.facts.get(key) !== reader) reader.close();
       } else missing.set(key, query);
@@ -1598,7 +1590,6 @@ export class TypeServiceClient {
       const packets = this.batchTransport(queries, keys);
       if (packets.length !== batch.length)
         throw new Error('incomplete type service batch');
-      this.stats.queries += batch.length;
       packets.forEach((packet, index) => {
         const reader = this.ingest(queries[index], packet);
         if (this.facts.get(keys[index]) !== reader) reader.close();
@@ -2382,29 +2373,5 @@ export class TypeServiceFile {
       experimentalDecorators: options.experimentalDecorators === true,
       isolatedDeclarations: options.isolatedDeclarations === true,
     };
-  }
-}
-
-/** Compatibility convenience for a standalone invocation. Worker pools should
- * retain TypeServiceClient and create/close file handles for each lint task. */
-export class FileTypeServiceClient extends TypeServiceClient {
-  private readonly handle: TypeServiceFile;
-  constructor(
-    typescript: TypeScriptEnums,
-    descriptor: TypeServiceDescriptor,
-    binding: FileBinding,
-    transport: QueryTransport,
-    syntax: SyntaxSource,
-    options: TypeServiceClientOptions,
-  ) {
-    super(typescript, descriptor, transport, syntax, options);
-    this.handle = this.file(binding);
-  }
-  parserServices(
-    frame: DecodedFrame,
-    projection: TypeServiceProjection,
-    sourceFileName: string,
-  ) {
-    return this.handle.parserServices(frame, projection, sourceFileName);
   }
 }

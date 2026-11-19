@@ -71,15 +71,6 @@ func canBeExported(t types.Signature) bool {
 }
 
 func main() {
-	generateShims(func(name string, source []byte) error {
-		if err := os.MkdirAll(path.Dir(name), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(name, source, 0o644)
-	})
-}
-
-func generateShims(writeFile func(string, []byte) error) {
 	packagesToShim := []string{
 		"ast",
 		"binder",
@@ -507,7 +498,7 @@ func generateShims(writeFile func(string, []byte) error) {
 		shimHeaderBuilder.WriteString("\n")
 
 		shimGoPath := path.Join(shimDirPath, "shim.go")
-		if err := writeFile(shimGoPath, []byte(shimHeaderBuilder.String()+shimBuilder.String())); err != nil {
+		if err := os.WriteFile(shimGoPath, []byte(shimHeaderBuilder.String()+shimBuilder.String()), 0o644); err != nil {
 			log.Fatalf("error writing %s: %v", shimGoPath, err)
 		}
 
