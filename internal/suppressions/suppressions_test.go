@@ -14,6 +14,7 @@ import (
 
 func TestScopedUpdate(t *testing.T) {
 	cwd := t.TempDir()
+	t.Chdir(cwd)
 	checked := filepath.ToSlash(filepath.Join(cwd, "a.ts"))
 	for _, name := range []string{"a.ts", "untouched.ts", "former-dir"} {
 		if err := os.WriteFile(filepath.Join(cwd, name), nil, 0o644); err != nil {
@@ -77,14 +78,50 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("directory location follows the Unix working directory", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Windows retains the process working directory spelling")
+		}
+		for _, pair := range [][2]string{{"Project", "PROJECT"}, {"Caf\u00e9", "Cafe\u0301"}} {
+			names := []string{filepath.Join(parent, pair[0]), filepath.Join(parent, pair[1])}
+			if err := os.Mkdir(names[0], 0o755); err != nil {
+				t.Fatal(err)
+			}
+			err := os.Mkdir(names[1], 0o755)
+			same := os.IsExist(err)
+			if err != nil && !same {
+				t.Fatal(err)
+			}
+			var filenames []string
+			for _, name := range names {
+				t.Chdir(name)
+				file, err := Open(name, Options{Mode: Record, Location: parent})
+				if err != nil {
+					t.Fatal(err)
+				}
+				filenames = append(filenames, file.path)
+				if key := file.fileKey(filepath.Join(name, "file.ts")); key != "file.ts" {
+					t.Errorf("file key from %q = %q", name, key)
+				}
+			}
+			if (filenames[0] == filenames[1]) != same {
+				t.Errorf("directory baselines %q, same directory: %v", filenames, same)
+			}
+		}
+	})
 	repo := filepath.Join(parent, "projects", "repo")
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	alias := filepath.Join(parent, "link")
-	if err := os.Symlink(repo, alias); err != nil {
+	stable := filepath.Join(parent, "stable")
+	if err := os.Symlink(repo, stable); err != nil {
 		t.Skipf("directory symlink unavailable: %v", err)
 	}
+	alias := filepath.Join(parent, "link")
+	if err := os.Symlink("stable", alias); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(alias)
 	f, err := Open(alias, Options{Mode: Record, Location: alias})
 	if err != nil {
 		t.Fatal(err)
@@ -96,6 +133,13 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	if got, want := filepath.Base(f.path), "rslint-suppressions_"+cwdHash(hashDirectory); got != want {
 		t.Fatalf("directory baseline name = %q, want %q", got, want)
 	}
+	shared, err := Open(alias, Options{Mode: Record, Location: "../shared.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(filepath.Dir(hashDirectory), "shared.json"); shared.path != want {
+		t.Fatalf("relative location = %q, want %q", shared.path, want)
+	}
 	for _, dir := range []string{repo, alias} {
 		if key := f.fileKey(filepath.ToSlash(filepath.Join(dir, "a.ts"))); key != "a.ts" {
 			t.Errorf("file key under %s = %q, want a.ts", dir, key)
@@ -105,10 +149,12 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	if err := os.WriteFile(sibling, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if key := f.fileKey(filepath.ToSlash(sibling)); key != "../sibling.ts" {
-		t.Fatalf("sibling key = %q, want ../sibling.ts", key)
+	key := f.fileKey(filepath.ToSlash(sibling))
+	want, err := filepath.Rel(hashDirectory, sibling)
+	if err != nil || key != filepath.ToSlash(want) {
+		t.Fatalf("sibling key = %q, want %q (error %v)", key, want, err)
 	}
-	data := entries{"../sibling.ts": {"x": {Count: 1}}}
+	data := entries{key: {"x": {Count: 1}}}
 	if err := f.prune(data, nil); err != nil || len(data) != 1 {
 		t.Fatalf("pruning an existing sibling: entries %v, error %v", data, err)
 	}
@@ -133,12 +179,20 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 		t.Fatal(err)
 	}
 	lexical := filepath.Join(alias, "packages", "view")
+	t.Chdir(filepath.Join(lexical, "a"))
 	f, err = Open(filepath.Join(lexical, "a"), Options{Mode: Record})
 	if err != nil {
 		t.Fatal(err)
 	}
 	data = make(entries)
-	for _, base := range []string{lexical, filepath.Join(packages, "view"), inner} {
+	bases := []string{lexical, filepath.Join(stable, "packages", "view"), filepath.Join(packages, "view"), inner}
+	upper := filepath.Join(parent, "INNER")
+	if _, err := os.Stat(upper); err == nil {
+		bases = append(bases, upper)
+	} else if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	for _, base := range bases {
 		for _, name := range []string{"b", "linked"} {
 			key := f.fileKey(filepath.Join(base, name, "file.ts"))
 			if want := "../" + name + "/file.ts"; key != want {
@@ -150,21 +204,27 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	t.Run("case-only spelling of an ancestor link", func(t *testing.T) {
 		alternate := filepath.Join(parent, "LINK")
 		path := filepath.Join(alternate, "packages", "view", "b", "file.ts")
-		// Windows filepath.Rel folds link and LINK even when they can name
-		// two independent links to the same directory. Supply that result on
-		// every host so the fixture exercises the volume's actual behavior.
-		folded := filepath.Join("b", "file.ts")
-		want := folded
+		want := "../b/file.ts"
 		if err := os.Symlink(repo, alternate); err == nil {
-			want = filepath.Join("..", "..", "..", "LINK", "packages", "view", "b", "file.ts")
+			// A case-sensitive volume permits a second link with the same target.
+			up, err := filepath.Rel(f.baseDir, parent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want = filepath.ToSlash(filepath.Join(up, "LINK", "packages", "view", "b", "file.ts"))
 		} else if !os.IsExist(err) {
 			t.Fatal(err)
 		}
-		if got := verifyRelativePathCase(lexical, path, folded); got != want {
-			t.Errorf("case-aware relative path = %q, want %q", got, want)
+		if got := f.fileKey(path); got != want {
+			t.Errorf("case-aware sibling key = %q, want %q", got, want)
 		}
 	})
+	t.Chdir(filepath.Join(inner, "a"))
 	if err := os.Remove(alias); err != nil {
+		t.Fatal(err)
+	}
+	f, err = Open(filepath.Join(inner, "a"), Options{Mode: Prune})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if err := f.prune(data, nil); err != nil || len(data) != 2 {
@@ -174,6 +234,7 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 
 func TestUpdatePreservesOtherWriter(t *testing.T) {
 	cwd := t.TempDir()
+	t.Chdir(cwd)
 	options := Options{Mode: Record}
 	first, err := Open(cwd, options)
 	if err != nil {

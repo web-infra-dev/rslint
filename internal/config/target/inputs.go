@@ -22,11 +22,26 @@ type InputSelection struct {
 	ScanDirectories map[string][]string
 }
 
+// InputMatch connects an operand's filesystem spelling to the paths selected
+// from it. For a glob, Operand and Path name the static root, and Files is the
+// existing expansion. A literal directory is expanded later by target planning.
+type InputMatch struct {
+	Operand   string
+	Path      string
+	Directory bool
+	Files     []string
+}
+
 // SelectInputs interprets raw file, directory, and glob inputs against fsys.
 // Exact-file APIs bypass this operation. Unmatched inputs remain separate so
 // each entrypoint keeps its existing reporting policy without admitting overlay
 // dependencies as fallback targets.
 func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string) (*InputSelection, error) {
+	return SelectInputsWithMatches(ctx, fsys, cwd, inputs, nil)
+}
+
+// SelectInputsWithMatches also reports how each successful operand matched.
+func SelectInputsWithMatches(ctx context.Context, fsys vfs.FS, cwd string, inputs []string, onMatch func(InputMatch)) (*InputSelection, error) {
 	selection := &InputSelection{Files: []string{}, ScanDirectories: make(map[string][]string)}
 	type input struct {
 		path      string
@@ -89,6 +104,9 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 			continue
 		}
 		if input.directory {
+			if onMatch != nil {
+				onMatch(InputMatch{Operand: inputs[index], Path: input.path, Directory: true})
+			}
 			if !directories[input.path] {
 				directories[input.path] = true
 				selection.Directories = append(selection.Directories, input.path)
@@ -97,6 +115,9 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 		}
 		if !input.glob {
 			if input.file {
+				if onMatch != nil {
+					onMatch(InputMatch{Operand: inputs[index], Path: input.path})
+				}
 				addFile(input.path)
 				literals[input.path] = true
 			} else if !unmatched[input.path] {
@@ -113,6 +134,10 @@ func SelectInputs(ctx context.Context, fsys vfs.FS, cwd string, inputs []string)
 				selection.Unmatched = append(selection.Unmatched, input.path)
 			}
 			continue
+		}
+		if onMatch != nil {
+			operand, _, _ := globDirectory(patterns[globIndex-1])
+			onMatch(InputMatch{Operand: operand, Path: expansion.Root, Files: expansion.Files})
 		}
 		if !roots[expansion.Root] {
 			roots[expansion.Root] = true

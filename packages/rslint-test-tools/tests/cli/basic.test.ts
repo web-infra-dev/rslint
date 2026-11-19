@@ -111,6 +111,69 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
+  test('reads and prunes the selected ESLint path when two spellings have different counts', async () => {
+    const temp = await createTempDir({
+      'repo/rslint.config.mjs':
+        "export default [{files:['**/*.js'],rules:{'no-debugger':'error'}}];",
+      'repo/a/clean.js': '',
+      'repo/b/file.js': 'debugger; debugger;',
+    });
+    try {
+      const parent = await fs.realpath(temp);
+      const repo = path.join(parent, 'repo');
+      const link = path.join(parent, 'link');
+      await fs.symlink(repo, link, 'junction');
+      const cwd = path.join(link, 'a');
+      const windows = process.platform === 'win32';
+      const alternate = path.join(windows ? repo : link, 'b', 'file.js');
+      const relative = '../b/file.js';
+      const otherKey = path
+        .relative(windows ? cwd : path.join(repo, 'a'), alternate)
+        .split(path.sep)
+        .join('/');
+      const baseline = path.join(cwd, 'eslint-suppressions.json');
+      const one = { 'no-debugger': { count: 1 } };
+      await fs.writeFile(
+        baseline,
+        JSON.stringify({
+          [relative]: one,
+          [otherKey]: { 'no-debugger': { count: 3 } },
+        }),
+      );
+      const check = (...args: string[]) =>
+        runCliProcess(
+          process.execPath,
+          [
+            RSLINT_BIN,
+            '--suppressions-location',
+            baseline,
+            '--format',
+            'jsonline',
+            ...args,
+          ],
+          { cwd, env: { ...process.env, PWD: cwd } },
+        );
+
+      const exceeded = await check(relative);
+      expect(exceeded.exitCode).toBe(1);
+      expect(exceeded.stdout.trim().split('\n')).toHaveLength(2);
+      expect((await check('../b/*.js')).exitCode).toBe(1);
+      expect((await check(path.dirname(alternate))).exitCode).toBe(2);
+      const unused = await check(alternate);
+      expect(unused.exitCode).toBe(2);
+      expect(unused.stdout.trim()).toBe('');
+      expect(unused.stderr).toContain('Unused suppressions');
+
+      await fs.writeFile(alternate, '');
+      expect((await check('--prune-suppressions', alternate)).exitCode).toBe(0);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+        [relative]: one,
+      });
+    } finally {
+      await cleanupTempDir(temp);
+    }
+  });
+
   test('prunes after fixes and preserves files skipped by lint', async () => {
     const cwd = await createTempDir({
       'rslint.config.mjs':

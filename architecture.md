@@ -1495,7 +1495,11 @@ and checked files to `internal/suppressions`, excluding files with syntax errors
 The lint plan identifies rules skipped for lack of type information. The plugin
 dispatcher identifies the files and error-level rules affected by incomplete
 worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. The CLI blocks baseline
+completed rule counts and owns baseline persistence. When a shell working
+directory has a different spelling from the OS working directory, the CLI also
+retains the spelling of the operand that selected each file. The baseline uses
+it to look up existing ESLint entries while target selection and config
+ownership keep their caller-visible paths. The CLI blocks baseline
 writes after configuration or plugin failures and supplies visible diagnostics
 and any baseline failure to report assembly.
 
