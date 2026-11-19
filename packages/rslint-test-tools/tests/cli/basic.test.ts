@@ -43,8 +43,8 @@ describe('CLI Configuration Tests', () => {
   test('records and checks per-file error counts through the package CLI', async () => {
     const cwd = await createTempDir({
       'rslint.config.mjs':
-        "export default [{rules: {'no-var':'error','no-debugger':'error'}}];",
-      'a.js': 'var a = 1; debugger;',
+        "export default [{rules: {'no-var':'error','no-debugger':'error','no-console':'error'}}];",
+      'a.js': 'var a = 1; debugger; console.log(a);',
       'eslint-suppressions.json': '{}',
     });
     const check = (...flags: string[]) =>
@@ -55,19 +55,25 @@ describe('CLI Configuration Tests', () => {
       await expect(
         fs.access(path.join(cwd, 'rslint-suppressions.json')),
       ).rejects.toThrow();
+      const baseline = path.join(cwd, 'rslint-suppressions.json');
+      expect((await check('--suppress-rule', '[]')).exitCode).toBe(1);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
       expect(
         (
           await check(
             '--suppress-rule',
             'no-var',
             '--suppress-rule',
-            'no-debugger',
+            '[no-debugger, no-console]',
           )
         ).exitCode,
       ).toBe(0);
-      const baseline = path.join(cwd, 'rslint-suppressions.json');
       expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-        'a.js': { 'no-var': { count: 1 }, 'no-debugger': { count: 1 } },
+        'a.js': {
+          'no-var': { count: 1 },
+          'no-debugger': { count: 1 },
+          'no-console': { count: 1 },
+        },
       });
       expect(
         await fs.readFile(path.join(cwd, 'eslint-suppressions.json'), 'utf8'),

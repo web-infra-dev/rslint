@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +15,7 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
 	"github.com/web-infra-dev/rslint/internal/suppressions"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -79,6 +82,62 @@ type repeatedFlag []string
 func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
+// ESLint accepts bare IDs and single- or double-quoted strings in a flat list.
+// A comma or closing bracket inside a quoted rule ID belongs to the ID.
+var bracketedRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\[\]({,'"][^,\]]*)`)
+var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
+
+func decodeRuleEscape(escape string) string {
+	// ESLint's string-list parser accepts JSON escapes and drops the
+	// backslash before other characters, including a single quote.
+	switch escape[1] {
+	case 'b', 'f', 'n', 'r', 't', 'u', '\\':
+		var decoded string
+		_ = json.Unmarshal([]byte(`"`+escape+`"`), &decoded)
+		return decoded
+	default:
+		return escape[1:]
+	}
+}
+
+func appendSuppressRules(rules []string, value string) ([]string, error) {
+	list, bracketed := strings.CutPrefix(ecmascript.StringTrim(value), "[")
+	if !bracketed {
+		for id := range strings.SplitSeq(value, ",") {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				return nil, errors.New("expected a rule ID")
+			}
+			rules = append(rules, id)
+		}
+		return rules, nil
+	}
+
+	list, ok := strings.CutSuffix(list, "]")
+	if !ok {
+		return nil, errors.New("expected ']' after rule IDs")
+	}
+	if rules == nil {
+		rules = []string{} // An explicit empty selection records no rules.
+	}
+	for list = ecmascript.StringTrim(list); list != ""; list = ecmascript.StringTrim(list) {
+		id := bracketedRuleID.FindString(list)
+		list = ecmascript.StringTrim(list[len(id):])
+		if list != "" {
+			list, ok = strings.CutPrefix(list, ",")
+			if !ok {
+				return nil, errors.New("expected a comma between rule IDs")
+			}
+		}
+		id = ecmascript.StringTrim(id)
+		if id != "" && (id[0] == '\'' || id[0] == '"') {
+			id = quotedRuleEscape.ReplaceAllStringFunc(id[1:len(id)-1], decodeRuleEscape)
+		}
+		rules = append(rules, id)
+	}
+	return rules, nil
+}
+
 const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
@@ -98,7 +157,7 @@ Options:
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   --suppress-all        Record all current lint errors
-  --suppress-rule RULE  Record errors for a rule (repeatable or comma-separated)
+  --suppress-rule RULE  Record errors for selected rules (repeatable, a,b or "[a,b]")
   --suppressions-location PATH  Use a different suppressions file or directory
   --prune-suppressions  Remove unused suppressions
   --pass-on-unpruned-suppressions  Allow unused suppressions
@@ -167,14 +226,9 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		return nil
 	})
 	fs.Func("suppress-rule", "rule IDs to record", func(value string) error {
-		for id := range strings.SplitSeq(value, ",") {
-			id = strings.TrimSpace(id)
-			if id == "" {
-				return errors.New("expected a rule ID")
-			}
-			args.Suppressions.Rules = append(args.Suppressions.Rules, id)
-		}
-		return nil
+		var err error
+		args.Suppressions.Rules, err = appendSuppressRules(args.Suppressions.Rules, value)
+		return err
 	})
 
 	if err := fs.Parse(argv); err != nil {
@@ -182,12 +236,12 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
-	hasRules := len(args.Suppressions.Rules) > 0
+	suppressRuleSet := args.Suppressions.Rules != nil
 	switch {
-	case suppressAll && hasRules || prune && (suppressAll || hasRules):
+	case suppressAll && suppressRuleSet || prune && (suppressAll || suppressRuleSet):
 		fmt.Fprintln(os.Stderr, "error: choose only one of --suppress-all, --suppress-rule and --prune-suppressions")
 		return args, help, 2
-	case suppressAll || hasRules:
+	case suppressAll || suppressRuleSet:
 		args.Suppressions.Mode = suppressions.Record
 	case prune:
 		args.Suppressions.Mode = suppressions.Prune
