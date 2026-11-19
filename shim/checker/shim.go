@@ -48,11 +48,11 @@ type extra_CachedTypeKey struct {
   kind checker.CachedTypeKind
   typeId checker.TypeId
 }
-func CachedTypeKey_kind(v *checker.CachedTypeKey) checker.CachedTypeKind {
-  return ((*extra_CachedTypeKey)(unsafe.Pointer(v))).kind
+func CachedTypeKey_kindPtr(v *checker.CachedTypeKey) *checker.CachedTypeKind {
+  return &((*extra_CachedTypeKey)(unsafe.Pointer(v))).kind
 }
-func CachedTypeKey_typeId(v *checker.CachedTypeKey) checker.TypeId {
-  return ((*extra_CachedTypeKey)(unsafe.Pointer(v))).typeId
+func CachedTypeKey_typeIdPtr(v *checker.CachedTypeKey) *checker.TypeId {
+  return &((*extra_CachedTypeKey)(unsafe.Pointer(v))).typeId
 }
 type CachedTypeKind = checker.CachedTypeKind
 const CachedTypeKindApparentType = checker.CachedTypeKindApparentType
@@ -131,8 +131,6 @@ func Checker_getIndexInfosOfIndexSymbol(recv *checker.Checker, indexSymbol *ast.
 func Checker_getSignaturesOfSymbol(recv *checker.Checker, symbol *ast.Symbol) []*checker.Signature
 //go:linkname Checker_getReturnTypeOfSignature github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getReturnTypeOfSignature
 func Checker_getReturnTypeOfSignature(recv *checker.Checker, sig *checker.Signature) *checker.Type
-//go:linkname Checker_getTargetSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTargetSymbol
-func Checker_getTargetSymbol(recv *checker.Checker, s *ast.Symbol) *ast.Symbol
 //go:linkname Checker_getApparentType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getApparentType
 func Checker_getApparentType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getTypeArguments github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeArguments
@@ -157,8 +155,6 @@ func Checker_isArrayType(recv *checker.Checker, t *checker.Type) bool
 func Checker_isArrayOrTupleType(recv *checker.Checker, t *checker.Type) bool
 //go:linkname Checker_getDeclaredTypeOfSymbol github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getDeclaredTypeOfSymbol
 func Checker_getDeclaredTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
-//go:linkname Checker_getLocalTypeParametersOfClassOrInterfaceOrTypeAlias github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getLocalTypeParametersOfClassOrInterfaceOrTypeAlias
-func Checker_getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(recv *checker.Checker, symbol *ast.Symbol) []*checker.Type
 //go:linkname Checker_getStringLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getStringLiteralType
 func Checker_getStringLiteralType(recv *checker.Checker, value string) *checker.Type
 //go:linkname Checker_getNumberLiteralType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNumberLiteralType
@@ -185,8 +181,6 @@ func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (s
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
 //go:linkname Checker_getNodeBuilder github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getNodeBuilder
 func Checker_getNodeBuilder(recv *checker.Checker) (*checker.NodeBuilder, func())
-//go:linkname Checker_symbolToStringEx github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).symbolToStringEx
-func Checker_symbolToStringEx(recv *checker.Checker, symbol *ast.Symbol, enclosingDeclaration *ast.Node, meaning ast.SymbolFlags, flags checker.SymbolFormatFlags) string
 //go:linkname Checker_typePredicateToStringEx github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).typePredicateToStringEx
 func Checker_typePredicateToStringEx(recv *checker.Checker, typePredicate *checker.TypePredicate, enclosingDeclaration *ast.Node, flags checker.TypeFormatFlags) string
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).isTypeIdenticalTo
@@ -197,6 +191,8 @@ func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, tar
 func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_getMinArgumentCount github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getMinArgumentCount
 func Checker_getMinArgumentCount(recv *checker.Checker, signature *checker.Signature) int
+//go:linkname Checker_newTypePredicate github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).newTypePredicate
+func Checker_newTypePredicate(recv *checker.Checker, kind checker.TypePredicateKind, parameterName string, parameterIndex int32, t *checker.Type) *checker.TypePredicate
 //go:linkname Checker_getAugmentedPropertiesOfType github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getAugmentedPropertiesOfType
 func Checker_getAugmentedPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
 //go:linkname Checker_getTypeOfAssignmentPattern github.com/microsoft/TypeScript/tsc/internal/checker.(*Checker).getTypeOfAssignmentPattern
@@ -546,6 +542,9 @@ func Checker_patternForType(v *checker.Checker) map[*checker.Type]*ast.Node {
 func Checker_cachedTypes(v *checker.Checker) map[checker.CachedTypeKey]*checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).cachedTypes
 }
+func Checker_unresolvedType(v *checker.Checker) *checker.Type {
+  return ((*extra_Checker)(unsafe.Pointer(v))).unresolvedType
+}
 func Checker_regularTrueType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).regularTrueType
 }
@@ -563,6 +562,15 @@ func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
 }
 func Checker_couldContainTypeVariables(v *checker.Checker) func(*checker.Type) bool {
   return ((*extra_Checker)(unsafe.Pointer(v))).couldContainTypeVariables
+}
+func Checker_apparentArgumentCountPtr(v *checker.Checker) **int {
+  return &((*extra_Checker)(unsafe.Pointer(v))).apparentArgumentCount
+}
+func Checker_serializationLevelPtr(v *checker.Checker) *int {
+  return &((*extra_Checker)(unsafe.Pointer(v))).serializationLevel
+}
+func Checker_valueSymbolLinks_storePtr(v *checker.Checker) *core.PagedLinkStore[*checker.ValueSymbolLinks] {
+  return &((*extra_Checker)(unsafe.Pointer(v))).valueSymbolLinks.store
 }
 //go:linkname CompareTypes github.com/microsoft/TypeScript/tsc/internal/checker.CompareTypes
 func CompareTypes(t1 *checker.Type, t2 *checker.Type) int
@@ -769,17 +777,17 @@ type extra_IndexInfo struct {
 func IndexInfo_components(v *checker.IndexInfo) []*ast.Node {
   return ((*extra_IndexInfo)(unsafe.Pointer(v))).components
 }
-func IndexInfo_keyType(v *checker.IndexInfo) *checker.Type {
-  return ((*extra_IndexInfo)(unsafe.Pointer(v))).keyType
+func IndexInfo_keyTypePtr(v *checker.IndexInfo) **checker.Type {
+  return &((*extra_IndexInfo)(unsafe.Pointer(v))).keyType
 }
-func IndexInfo_valueType(v *checker.IndexInfo) *checker.Type {
-  return ((*extra_IndexInfo)(unsafe.Pointer(v))).valueType
+func IndexInfo_valueTypePtr(v *checker.IndexInfo) **checker.Type {
+  return &((*extra_IndexInfo)(unsafe.Pointer(v))).valueType
 }
-func IndexInfo_isReadonly(v *checker.IndexInfo) bool {
-  return ((*extra_IndexInfo)(unsafe.Pointer(v))).isReadonly
+func IndexInfo_isReadonlyPtr(v *checker.IndexInfo) *bool {
+  return &((*extra_IndexInfo)(unsafe.Pointer(v))).isReadonly
 }
-func IndexInfo_declaration(v *checker.IndexInfo) *ast.Node {
-  return ((*extra_IndexInfo)(unsafe.Pointer(v))).declaration
+func IndexInfo_declarationPtr(v *checker.IndexInfo) **ast.Node {
+  return &((*extra_IndexInfo)(unsafe.Pointer(v))).declaration
 }
 type IndexType = checker.IndexType
 type IndexedAccessType = checker.IndexedAccessType
@@ -1450,24 +1458,6 @@ func TypeParameter_constraint(v *checker.TypeParameter) *checker.Type {
   return ((*extra_TypeParameter)(unsafe.Pointer(v))).constraint
 }
 type TypePredicate = checker.TypePredicate
-type extra_TypePredicate struct {
-  kind checker.TypePredicateKind
-  parameterIndex int32
-  parameterName string
-  t *checker.Type
-}
-func TypePredicate_kind(v *checker.TypePredicate) checker.TypePredicateKind {
-  return ((*extra_TypePredicate)(unsafe.Pointer(v))).kind
-}
-func TypePredicate_parameterName(v *checker.TypePredicate) string {
-  return ((*extra_TypePredicate)(unsafe.Pointer(v))).parameterName
-}
-func TypePredicate_parameterIndex(v *checker.TypePredicate) int32 {
-  return ((*extra_TypePredicate)(unsafe.Pointer(v))).parameterIndex
-}
-func TypePredicate_t(v *checker.TypePredicate) *checker.Type {
-  return ((*extra_TypePredicate)(unsafe.Pointer(v))).t
-}
 type TypePredicateKind = checker.TypePredicateKind
 const TypePredicateKindAssertsIdentifier = checker.TypePredicateKindAssertsIdentifier
 const TypePredicateKindAssertsThis = checker.TypePredicateKindAssertsThis

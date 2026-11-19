@@ -18,9 +18,9 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/jsnum"
 	"github.com/microsoft/TypeScript/tsc/shim/locale"
+	"github.com/microsoft/TypeScript/tsc/shim/nodebuilder"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/program"
-	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 var nextGeneration atomic.Uint32
@@ -763,12 +763,19 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		if r.Type != 0 {
 			typ = s.typeByID(r.Type)
 		}
-		return Text(checker.PluginPredicateString(c, checker.TypePredicateKind(r.Kind), string(r.Name), r.Position, typ, native, checker.TypeFormatFlags(r.Flags))), nil
+		predicate := checker.Checker_newTypePredicate(c, checker.TypePredicateKind(r.Kind), string(r.Name), r.Position, typ)
+		return Text(checker.Checker_typePredicateToStringEx(c, predicate, native, checker.TypeFormatFlags(r.Flags))), nil
 	case *IndexDeclarationRequest:
-		info := checker.NewPluginIndexInfo(s.typeByID(r.Key), s.typeByID(r.Value), r.Readonly, nodes.declaration)
+		// The JS caller can supply a structural IndexInfo. This temporary value
+		// belongs to the print request, outside the checker's long-lived arena.
+		var info checker.IndexInfo
+		*checker.IndexInfo_keyTypePtr(&info) = s.typeByID(r.Key)
+		*checker.IndexInfo_valueTypePtr(&info) = s.typeByID(r.Value)
+		*checker.IndexInfo_isReadonlyPtr(&info) = r.Readonly
+		*checker.IndexInfo_declarationPtr(&info) = nodes.declaration
 		builder, release := checker.Checker_getNodeBuilder(c)
 		defer release()
-		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(info, native, checker.PluginNodeBuilderFlags(r.Flags), 0, nil))
+		return encodeGeneratedNode(builder.IndexInfoToIndexSignatureDeclaration(&info, native, nodebuilder.Flags(r.Flags), nodebuilder.InternalFlagsNone, nil))
 	case *ContextualArgumentRequest:
 		return Handle(s.typeID(c.GetContextualTypeForArgumentAtIndex(native, r.Index))), nil
 	case *ResolvedSignatureRequest:
@@ -781,7 +788,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		if r.WithCandidates {
 			output = &candidates
 		}
-		sig := checker.ResolveSignatureWithOptions(c, native, output, r.ArgumentCount)
+		count := checker.Checker_apparentArgumentCountPtr(c)
+		saved := *count
+		*count = r.ArgumentCount
+		defer func() { *count = saved }()
+		sig := checker.Checker_getResolvedSignature(c, native, output, checker.CheckModeNormal)
 		ids[0] = s.signatureID(sig)
 		for _, candidate := range candidates {
 			ids = append(ids, s.signatureID(candidate))
@@ -839,7 +850,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				}
 			case "simplifiedForReading", "simplifiedForWriting":
 				if t.Flags()&checker.TypeFlagsIndexedAccess != 0 {
-					value = checker.CachedIndexedAccess(c, t, r.Op == "simplifiedForWriting")
+					value = cachedIndexedAccess(c, t, r.Op == "simplifiedForWriting")
 				}
 			case "typeParameterConstraint":
 				if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
@@ -1004,7 +1015,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		case "fullyQualifiedName":
 			return Text(c.GetFullyQualifiedName(s.symbolByID(r.ID))), nil
 		case "symbolLinkType":
-			return Handle(s.typeID(checker.CachedSymbolType(c, s.symbolByID(r.ID)))), nil
+			return Handle(s.typeID(cachedSymbolType(c, s.symbolByID(r.ID)))), nil
 		case "symbolMembers", "symbolExports", "symbolGlobalExports":
 			symbol := s.symbolByID(r.ID)
 			table := symbol.Members
@@ -1044,7 +1055,7 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *SignatureRequest:
 		switch r.Op {
 		case "typeArgumentsForResolvedSignature":
-			return OptionalHandles(s.typeIDs(checker.ResolvedSignatureTypeArguments(c, s.signatureByID(r.ID)))), nil
+			return OptionalHandles(s.typeIDs(resolvedSignatureTypeArguments(c, s.signatureByID(r.ID)))), nil
 		case "returnType":
 			return Handle(s.typeID(c.GetReturnTypeOfSignature(s.signatureByID(r.ID)))), nil
 		case "signatureDocumentation":
@@ -1136,43 +1147,42 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 	case *ParameterTypeRequest:
 		return Handle(s.typeID(c.GetTypeParameterAtPosition(s.signatureByID(r.ID), r.Position))), nil
 	case *PrintRequest:
-		var builderFlags checker.PluginNodeBuilderFlags
+		var builderFlags nodebuilder.Flags
 		if r.Flags != nil {
-			builderFlags = checker.PluginNodeBuilderFlags(*r.Flags)
+			builderFlags = nodebuilder.Flags(*r.Flags)
 		}
 		switch r.Op {
 		case "typeNode":
-			return encodeGeneratedNode(checker.TypeNodeForPlugin(c, s.typeByID(r.ID), native, uint32(builderFlags)))
+			return encodeGeneratedNode(c.TypeToTypeNode(s.typeByID(r.ID), native, builderFlags, nil))
 		case "symbolString":
 			flags := checker.SymbolFormatFlagsAllowAnyNodeKind
 			if r.Flags != nil {
 				flags = checker.SymbolFormatFlags(*r.Flags)
 			}
-			return Text(checker.Checker_symbolToStringEx(c, s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
+			return Text(c.SymbolToStringEx(s.symbolByID(r.ID), native, ast.SymbolFlags(r.Kind), flags)), nil
 		case "signatureDeclaration", "parameterDeclaration", "typeParameterDeclarations", "typeParameterDeclaration", "entityName", "symbolExpression":
 			builder, release := checker.Checker_getNodeBuilder(c)
 			defer release()
-			const internal = 0
 			var node *ast.Node
 			switch r.Op {
 			case "signatureDeclaration":
-				node = builder.SignatureToSignatureDeclaration(s.signatureByID(r.ID), ast.Kind(r.Kind), native, builderFlags, internal, nil)
+				node = builder.SignatureToSignatureDeclaration(s.signatureByID(r.ID), ast.Kind(r.Kind), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "parameterDeclaration":
-				node = builder.SymbolToParameterDeclaration(s.symbolByID(r.ID), native, builderFlags, internal, nil)
+				node = builder.SymbolToParameterDeclaration(s.symbolByID(r.ID), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "typeParameterDeclaration":
-				node = builder.TypeParameterToDeclaration(s.typeByID(r.ID), native, builderFlags, internal, nil)
+				node = builder.TypeParameterToDeclaration(s.typeByID(r.ID), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "entityName":
-				node = builder.SymbolToEntityName(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, internal, nil)
+				node = builder.SymbolToEntityName(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "symbolExpression":
-				node = builder.SymbolToExpression(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, internal, nil)
+				node = builder.SymbolToExpression(s.symbolByID(r.ID), ast.SymbolFlags(r.Kind), native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 			case "typeParameterDeclarations":
 				symbol := s.symbolByID(r.ID)
-				target := checker.Checker_getTargetSymbol(c, symbol)
+				target := c.GetTargetSymbol(symbol)
 				if target.Flags&(ast.SymbolFlagsClass|ast.SymbolFlagsInterface|ast.SymbolFlagsTypeAlias) != 0 {
-					params := checker.Checker_getLocalTypeParametersOfClassOrInterfaceOrTypeAlias(c, symbol)
+					params := c.GetLocalTypeParametersOfClassOrInterfaceOrTypeAlias(symbol)
 					decls := make([]*ast.Node, len(params))
 					for i, param := range params {
-						decls[i] = builder.TypeParameterToDeclaration(param, native, builderFlags, internal, nil)
+						decls[i] = builder.TypeParameterToDeclaration(param, native, builderFlags, nodebuilder.InternalFlagsNone, nil)
 					}
 					factory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 					node = factory.NewFunctionTypeNode(factory.NewNodeList(decls), factory.NewNodeList(nil), nil)
@@ -1188,35 +1198,9 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 		}
 		switch r.Op {
 		case "typeString":
-			if flags&checker.TypeFormatFlagsMultilineObjectLiterals != 0 {
-				text := checker.TypeToStringWithJavaScriptLayout(c, s.typeByID(r.ID), native, flags)
-				// TypeScript applies a second, hard limit after printing.
-				limit := 320
-				if s.program.Options().NoErrorTruncation == core.TSTrue || flags&checker.TypeFormatFlagsNoTruncation != 0 {
-					limit = 2_000_000
-				}
-				if len(text) >= limit {
-					if units := ecmascript.StringCodeUnits(text); len(units) >= limit {
-						text = ecmascript.StringFromCodeUnits(units[:limit-3]) + "..."
-					}
-				}
-				return Text(text), nil
-			}
-			return Text(c.TypeToStringEx(s.typeByID(r.ID), native, flags, nil)), nil
+			return Text(typeToString(c, s.typeByID(r.ID), native, flags, s.program.Options().NoErrorTruncation == core.TSTrue)), nil
 		case "signatureString":
-			sig := s.signatureByID(r.ID)
-			if flags&checker.TypeFormatFlagsMultilineObjectLiterals != 0 {
-				return Text(checker.SignatureToStringWithJavaScriptLayout(c, sig, native, flags, checker.SignatureKind(r.Kind))), nil
-			}
-			if r.Kind != uint32(checker.SignatureKindConstruct) {
-				flags |= checker.TypeFormatFlagsWriteCallStyleSignature
-			}
-			text := c.SignatureToStringEx(sig, native, flags, nil)
-			if r.Kind == uint32(checker.SignatureKindConstruct) && sig.Flags()&checker.SignatureFlagsConstruct == 0 {
-				// TypeScript also accepts Construct when rendering a call signature.
-				text = "new " + text
-			}
-			return Text(text), nil
+			return Text(signatureToString(c, s.signatureByID(r.ID), native, flags, checker.SignatureKind(r.Kind))), nil
 		}
 	case *SignaturesRequest:
 		if r.Kind > 1 {

@@ -53,8 +53,11 @@ func (b *compilerBackend) SymbolCount() int        { return b.raw.SymbolCount() 
 func (b *compilerBackend) RelationCacheSizes() [4]uint32 {
 	var sizes [4]atomic.Uint32
 	b.raw.ForEachCheckerParallel(func(_ int, c *checker.Checker) {
-		for i, v := range checker.PluginRelationCacheSizes(c) {
-			sizes[i].Add(v)
+		for i, relation := range [...]*checker.Relation{
+			checker.Checker_assignableRelation(c), checker.Checker_identityRelation(c),
+			checker.Checker_subtypeRelation(c), checker.Checker_strictSubtypeRelation(c),
+		} {
+			sizes[i].Add(uint32(len(checker.Relation_results(relation))))
 		}
 	})
 	return [4]uint32{sizes[0].Load(), sizes[1].Load(), sizes[2].Load(), sizes[3].Load()}

@@ -66,10 +66,10 @@ runs:
         echo "Go tests: $mode"
         cat "$targets"
 
-    - name: Verify compiler shim layout
+    - name: Verify compiler shim generation and layout
       if: steps.selection.outputs.mode == 'full'
       shell: bash
-      run: go test github.com/microsoft/TypeScript/tsc/shim/checker
+      run: go test ./tools/gen_shims github.com/microsoft/TypeScript/tsc/shim/checker
 
     - name: Unit Test (Linux / Darwin)
       if: runner.os != 'Windows' && steps.selection.outputs.mode != 'skip'
