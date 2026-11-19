@@ -21,7 +21,7 @@ const (
 type Options struct {
 	Location string
 	Mode     Mode
-	Rules    []string // Empty records all rules in Record mode.
+	Rules    []string // In Record mode nil selects all rules and an empty list selects none.
 }
 
 type entry struct {
@@ -101,7 +101,7 @@ func eligible(d rule.RuleDiagnostic) bool {
 func (f *File) record(data entries, files map[string]*checkedFile) {
 	for _, file := range files {
 		for id, count := range file.counts {
-			if len(f.options.Rules) > 0 && !slices.Contains(f.options.Rules, id) {
+			if f.options.Rules != nil && !slices.Contains(f.options.Rules, id) {
 				continue
 			}
 			if data[file.key] == nil {

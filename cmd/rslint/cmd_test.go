@@ -2737,6 +2737,21 @@ func TestReadPhysicalFileTextPreservesEncodingAndSourceBOM(t *testing.T) {
 	}
 }
 
+func TestParseLintFlagsSuppressRuleList(t *testing.T) {
+	args, _, code := parseLintFlags([]string{
+		"--suppress-rule", `[ @scope/plugin/first(legacy), 'plugin/with,comma', "no-\u0076ar", ]`,
+		"--suppress-rule", "no-alert,no-debugger",
+		"--suppress-rule", "[]",
+	})
+	want := []string{"@scope/plugin/first(legacy)", "plugin/with,comma", "no-var", "no-alert", "no-debugger"}
+	if code != 0 || !slices.Equal(args.Suppressions.Rules, want) {
+		t.Fatalf("got rules %q and exit code %d, want %q and exit code 0", args.Suppressions.Rules, code, want)
+	}
+	if _, _, code := parseLintFlags([]string{"--suppress-rule", "[no-var,no-debugger"}); code != 2 {
+		t.Errorf("unterminated list returned %d, want exit code 2", code)
+	}
+}
+
 func TestParseLintFlagsTiming(t *testing.T) {
 	cases := []struct {
 		name         string

@@ -28,7 +28,7 @@ rslint [options] [files/directories...]
 | `--force-color`                   | Force colored output ([details](/guide/environment-variables))                                 |
 | `--help`, `-h`                    | Show help information                                                                          |
 | `--suppress-all`                  | Record current error counts for all lint rules                                                 |
-| `--suppress-rule <id>`            | Record errors for selected rules (repeatable or comma-separated)                               |
+| `--suppress-rule <id>`            | Record errors for selected rules (repeatable, `a,b`, or `"[a,b]"`)                             |
 | `--suppressions-location <path>`  | Select the suppressions file or its directory                                                  |
 | `--prune-suppressions`            | Reduce or remove unused counts and remove entries for deleted files                            |
 | `--pass-on-unpruned-suppressions` | Allow unused counts when checking the exit status                                              |
@@ -94,10 +94,10 @@ rslint -c custom.config.ts src/
 
 ## Bulk suppressions
 
-To enable a rule on an existing project, run it at error severity and record the current violations. Commit the resulting `rslint-suppressions.json` to share the baseline with CI.
+To enable rules on an existing project, run them at error severity and record the current violations. Commit the resulting `rslint-suppressions.json` to share the baseline with CI.
 
 ```bash
-rslint --suppress-rule no-var
+rslint --suppress-rule "[no-var,no-debugger]"
 rslint
 rslint --prune-suppressions
 ```
