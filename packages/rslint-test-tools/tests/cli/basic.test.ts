@@ -155,13 +155,14 @@ describe('CLI Configuration Tests', () => {
     const saved = JSON.stringify({
       'a.js': {
         'no-debugger': { count: 1 },
-        'no-var': { count: 1 },
         'local/healthy': { count: 1 },
-        'local/throws': { count: 1 },
+        'local/throws': { count: 2 },
       },
+      'fixed.js': { 'no-var': { count: 1 } },
     });
     const cwd = await createTempDir({
       'a.js': 'debugger;',
+      'fixed.js': 'const value = 1;',
       'local.mjs': `export default { rules: {
         healthy: { create(ctx) { return { Program(node) { ctx.report({ node, message: 'healthy finding' }); } }; } },
         throws: { create(ctx) { return { Program(node) {
@@ -170,7 +171,7 @@ describe('CLI Configuration Tests', () => {
         } }; } },
       } };`,
       'rslint.config.mjs':
-        "import local from './local.mjs'; export default [{files:['a.js'],plugins:{local},rules:{'no-debugger':'error','local/healthy':'error','local/throws':'error'}}];",
+        "import local from './local.mjs'; export default [{files:['a.js'],plugins:{local},rules:{'no-debugger':'error','local/healthy':'error','local/throws':'error'}},{files:['fixed.js'],rules:{'no-var':'error'}}];",
       'rslint-suppressions.json': saved,
     });
     try {
@@ -181,7 +182,14 @@ describe('CLI Configuration Tests', () => {
       expect(read.stdout).toContain('finding before failure');
       expect(read.stdout).not.toContain('no-debugger');
       expect(read.stdout).not.toContain('healthy finding');
-      const write = await runRslint(['--prune-suppressions', ...args], cwd);
+      const together = await runRslint([...args, 'fixed.js'], cwd);
+      expect(together.exitCode).toBe(2);
+      expect(together.stdout).toContain('fixture failure');
+      expect(together.stderr).toContain('Unused suppressions');
+      const write = await runRslint(
+        ['--prune-suppressions', ...args, 'fixed.js'],
+        cwd,
+      );
       expect(write.exitCode).toBe(2);
       expect(write.stderr).toContain('incomplete');
       expect(

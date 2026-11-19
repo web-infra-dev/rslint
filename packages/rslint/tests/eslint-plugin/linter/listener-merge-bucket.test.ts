@@ -45,12 +45,8 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
   // wraps `esq.matches` and reports the throw via the
   // `onListenerError` callback, leaving the remaining listeners free
   // to fire.
-  test('selector that throws on matches is reported via onListenerError; siblings still fire', () => {
-    const errors: Array<{
-      ruleName: string | undefined;
-      selector: string;
-      message: string;
-    }> = [];
+  test('attributes a shared selector match failure to each rule and isolates listener throws', () => {
+    const errors: Array<[string | undefined, string]> = [];
     const goodSelectorHits: ESTreeNode[] = [];
 
     // Hand-built tiny AST. visit() doesn't need a parsed program — it
@@ -66,15 +62,16 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
       ],
     } as unknown as ESTreeNode;
 
+    // The unknown pseudo-class parses successfully and throws during matching.
+    const badListeners = { 'Identifier:enter': [() => {}, () => {}] };
     const merged = mergeListeners([
+      { ruleName: 'first-bad-selector', listeners: badListeners },
+      { ruleName: 'second-bad-selector', listeners: badListeners },
       {
-        ruleName: 'bad-rule',
+        ruleName: 'bad-listener',
         listeners: {
-          // `Identifier:enter` parses as a class-pseudo esquery
-          // doesn't recognise → `esq.matches` throws "Unknown class
-          // name: enter" at runtime.
-          'Identifier:enter'() {
-            /* never reached — esq.matches throws first */
+          Identifier() {
+            throw new Error('listener failure');
           },
         },
       },
@@ -89,13 +86,8 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
     ]);
 
     const result = visit(ast, merged, {
-      onListenerError: (rec) => {
-        errors.push({
-          ruleName: rec.ruleName,
-          selector: rec.selector,
-          message: rec.err instanceof Error ? rec.err.message : String(rec.err),
-        });
-      },
+      onListenerError: ({ ruleName, selector }) =>
+        errors.push([ruleName, selector]),
     });
 
     // Pre-fix: throw propagated, visit returned early, goodSelectorHits
@@ -105,10 +97,11 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
     expect(goodSelectorHits.length).toBeGreaterThan(0);
     expect(goodSelectorHits[0].type).toBe('Identifier');
 
-    // Bad selector reported with rule attribution.
-    const badErr = errors.find((e) => e.selector === 'Identifier:enter');
-    expect(badErr).toBeDefined();
-    expect(badErr?.ruleName).toBe('bad-rule');
+    expect(errors.sort()).toEqual([
+      ['bad-listener', 'Identifier'],
+      ['first-bad-selector', 'Identifier:enter'],
+      ['second-bad-selector', 'Identifier:enter'],
+    ]);
   });
 });
 
