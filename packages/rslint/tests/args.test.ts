@@ -221,6 +221,18 @@ describe('parseArgs positionals', () => {
 });
 
 describe('parseArgs rest ordering', () => {
+  test('distinguishes an empty --suppress-rule list from a missing value', () => {
+    expect(parseArgs(['--suppress-rule', '']).rest).toEqual([
+      '--suppress-rule=[]',
+    ]);
+    for (const flag of ['--suppress-rule', '--suppress-rule=']) {
+      expect(parseArgs(['a.js', flag]).rest).toEqual([
+        '--suppress-rule=',
+        'a.js',
+      ]);
+    }
+  });
+
   test('flags are placed before positionals in rest', () => {
     const result = parseArgs(['src/a.ts', '--format', 'jsonline']);
     expect(result.rest).toEqual(['--format', 'jsonline', 'src/a.ts']);

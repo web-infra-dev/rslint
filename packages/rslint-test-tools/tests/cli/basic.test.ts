@@ -153,30 +153,74 @@ describe('CLI Configuration Tests', () => {
 
   test('keeps plugin failures visible and preserves the baseline on an incomplete update', async () => {
     const saved = JSON.stringify({
-      'good.js': { 'no-debugger': { count: 1 } },
-      'bad.js': { 'local/throws': { count: 1 } },
+      'a.js': {
+        'no-debugger': { count: 1 },
+        'no-var': { count: 1 },
+        'local/healthy': { count: 1 },
+        'local/throws': { count: 1 },
+      },
     });
     const cwd = await createTempDir({
-      'good.js': 'debugger;',
-      'bad.js': 'debugger;',
-      'local.mjs':
-        "export default {rules:{throws:{meta:{schema:[]},create(){return {Program(){throw Error('fixture failure')}}}}}};",
+      'a.js': 'debugger;',
+      'local.mjs': `export default { rules: {
+        healthy: { create(ctx) { return { Program(node) { ctx.report({ node, message: 'healthy finding' }); } }; } },
+        throws: { create(ctx) { return { Program(node) {
+          ctx.report({ node, message: 'finding before failure' });
+          throw Error('fixture failure');
+        } }; } },
+      } };`,
       'rslint.config.mjs':
-        "import local from './local.mjs'; export default [{files:['good.js'],rules:{'no-debugger':'error'}},{files:['bad.js'],plugins:{local},rules:{'local/throws':'warn'}}];",
+        "import local from './local.mjs'; export default [{files:['a.js'],plugins:{local},rules:{'no-debugger':'error','local/healthy':'error','local/throws':'error'}}];",
       'rslint-suppressions.json': saved,
     });
     try {
-      const args = ['--format', 'jsonline', 'good.js', 'bad.js'];
+      const args = ['--format', 'jsonline', 'a.js'];
       const read = await runRslint(args, cwd);
       expect(read.exitCode).toBe(1);
       expect(read.stdout).toContain('fixture failure');
+      expect(read.stdout).toContain('finding before failure');
       expect(read.stdout).not.toContain('no-debugger');
+      expect(read.stdout).not.toContain('healthy finding');
       const write = await runRslint(['--prune-suppressions', ...args], cwd);
       expect(write.exitCode).toBe(2);
       expect(write.stderr).toContain('incomplete');
       expect(
         await fs.readFile(path.join(cwd, 'rslint-suppressions.json'), 'utf8'),
       ).toBe(saved);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
+  test('preserves a type-aware count when the file is outside its TypeScript project', async () => {
+    const rule = '@typescript-eslint/await-thenable';
+    const cwd = await createTempDir({
+      'rslint.config.mjs': `export default [{
+        files: ['**/*.ts'], plugins: ['@typescript-eslint'],
+        languageOptions: { parserOptions: { projectService: false, project: ['./tsconfig.json'] } },
+        rules: { '${rule}': 'error', 'no-var': 'error' },
+      }];`,
+      'tsconfig.json': JSON.stringify({ files: ['other.ts'] }),
+      'other.ts': 'export {};',
+      'a.ts': 'async function f() { var value = 1; await value; }',
+      'rslint-suppressions.json': JSON.stringify({
+        'a.ts': { [rule]: { count: 1 }, 'no-var': { count: 1 } },
+      }),
+    });
+    try {
+      const update = await runRslint(
+        ['--fix', '--prune-suppressions', 'a.ts'],
+        cwd,
+      );
+      expect(update.exitCode).toBe(0);
+      expect(
+        JSON.parse(
+          await fs.readFile(path.join(cwd, 'rslint-suppressions.json'), 'utf8'),
+        ),
+      ).toEqual({
+        'a.ts': { [rule]: { count: 1 } },
+      });
+      expect((await runRslint(['a.ts'], cwd)).exitCode).toBe(0);
     } finally {
       await cleanupTempDir(cwd);
     }

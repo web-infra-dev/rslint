@@ -718,7 +718,9 @@ the original frames until source identity checks and fix text freezing finish.
 Producer finalization waits for actual generation borrowers; detached plugin
 work continues with frozen inputs. Frames are shared by source object identity,
 not by file path, and compute ECMAScript line maps lazily. `LintedFiles` requests
-selected target paths; `SourceFiles` additionally retains their original ASTs.
+selected target paths. `SkippedErrorRules` also returns the error-level rule IDs
+excluded from each target because it lacks a type checker. `SourceFiles`
+retains the original ASTs for selected targets.
 The API requests ASTs only for its encoded-source response. Diagnostic
 projection does not invalidate those explicitly retained artifacts.
 
@@ -1488,12 +1490,13 @@ the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
 The file CLI reads its optional bulk suppressions file in the calling working
-directory. After the final lint or fix observation, it gives
-`internal/suppressions` the completed rule diagnostics and paths whose rules
-could run. That package owns baseline counts and persistence. The CLI supplies
-visible diagnostics and any baseline failure to report assembly. The pipeline
-exposes target syntax failures and plugin failure origins independently of this
-CLI policy.
+directory. After the final lint or fix observation, the CLI passes diagnostics
+and checked files to `internal/suppressions`, excluding files with syntax errors.
+For each file it identifies rules skipped for lack of type information and rules
+whose plugin execution failed. The package compares completed rule counts and
+owns baseline persistence. The CLI blocks baseline writes after configuration or
+plugin failures and supplies visible diagnostics and any baseline failure to
+report assembly.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

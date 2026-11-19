@@ -545,7 +545,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 
-	demand := linter.ArtifactDemand{LintedFiles: baseline != nil}
+	demand := linter.ArtifactDemand{SkippedErrorRules: baseline != nil}
 	if fix {
 		demand.Native = rule.EditDemandAutofix
 		demand.Plugin = rule.EditDemandAll
@@ -564,9 +564,9 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			linter.AutofixPolicy{
 				VerifyAfterLastRound: true,
 				VerificationDemand: linter.ArtifactDemand{
-					LintedFiles: baseline != nil,
-					Native:      rule.EditDemandNone,
-					Plugin:      rule.EditDemandAll,
+					SkippedErrorRules: baseline != nil,
+					Native:            rule.EditDemandNone,
+					Plugin:            rule.EditDemandAll,
 				},
 			},
 			dispatch,
