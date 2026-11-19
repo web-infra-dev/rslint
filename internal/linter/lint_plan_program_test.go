@@ -297,10 +297,10 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 					IsEslintPluginRule: true,
 				})
 			case paths["gap.ts"]:
-				typeAwareRule := noopRule()[0]
-				typeAwareRule.Name = "type-aware-rule"
-				typeAwareRule.RequiresTypeInfo = true
-				return []rule.ConfiguredRule{typeAwareRule}
+				return []rule.ConfiguredRule{
+					{Name: "type-aware-rule", RequiresTypeInfo: true, Severity: rule.SeverityError},
+					{Name: "type-aware-warning", RequiresTypeInfo: true, Severity: rule.SeverityWarning},
+				}
 			default:
 				return nil
 			}
@@ -309,11 +309,25 @@ func TestPreparedLintPlanPreservesNativeSemanticsAndIsReused(t *testing.T) {
 
 	preparedCalls := make(map[string]int)
 	plan := mustPrepareLintPlan(t, PrepareLintPlanOptions{
-		Programs:         programs,
-		SingleThreaded:   true,
-		TargetsByProgram: targets,
-		GetRulesForFile:  newRuleHandler(preparedCalls),
+		Programs:                 programs,
+		SingleThreaded:           true,
+		TargetsByProgram:         targets,
+		GetRulesForFile:          newRuleHandler(preparedCalls),
+		collectSkippedErrorRules: true,
 	})
+	files, err := projectGenerationTargets(t.Context(), Generation{}, plan, SourceSnapshot{}, ArtifactDemand{SkippedErrorRules: true})
+	if err != nil || len(files) != 3 {
+		t.Fatalf("projecting skipped rules: files=%v, err=%v", files, err)
+	}
+	for _, file := range files {
+		var want []string
+		if file.Path == paths["gap.ts"] {
+			want = []string{"type-aware-rule"}
+		}
+		if !slices.Equal(file.SkippedErrorRules, want) {
+			t.Fatalf("%s: skipped error rules = %v, want %v", file.Path, file.SkippedErrorRules, want)
+		}
+	}
 	pluginTargets := plan.Targets()
 	if len(pluginTargets) != 1 || pluginTargets[0].File.FileName() != paths["a.ts"] {
 		t.Fatalf("prepared plugin projection = %+v, want only a.ts", pluginTargets)

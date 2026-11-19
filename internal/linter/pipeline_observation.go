@@ -72,10 +72,11 @@ func prepareObservation(
 	var plan *LintPlan
 	if generation.Native.RulesForFile != nil {
 		plan, err = PrepareLintPlanContext(ctx, PrepareLintPlanOptions{
-			Programs:         generation.Native.Programs,
-			TargetsByProgram: generation.Native.TargetsByProgram,
-			SingleThreaded:   generation.Native.SingleThreaded,
-			GetRulesForFile:  generation.Native.RulesForFile,
+			Programs:                 generation.Native.Programs,
+			TargetsByProgram:         generation.Native.TargetsByProgram,
+			SingleThreaded:           generation.Native.SingleThreaded,
+			GetRulesForFile:          generation.Native.RulesForFile,
+			collectSkippedErrorRules: policy.Demand.SkippedErrorRules,
 		})
 		if err != nil {
 			return preparedObservation{}, fmt.Errorf("linter pipeline: prepare lint plan: %w", err)

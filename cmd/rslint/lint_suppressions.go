@@ -16,49 +16,56 @@ func applyLintSuppressions(
 	records []linter.PluginDispatchRecord,
 	args lintArgs,
 ) ([]rule.RuleDiagnostic, string) {
-	const incomplete = "Cannot update suppressions because plugin lint results are incomplete."
-	failedFiles := make(map[string]bool)
-	missing := false
+	failedRules := make(map[string][]string)
+	var dispatchFailed, missingFile bool
 	for _, record := range records {
 		if record.Observation != observation.Index {
 			continue
 		}
-		if record.DispatchError != nil {
-			if args.Suppressions.Mode != suppressions.Check {
-				return diagnostics, incomplete
-			}
-			// A transport error can span more than the synthetic diagnostic's
-			// anchor file. Report the original failure and available findings.
-			return diagnostics, ""
-		}
+		dispatchFailed = dispatchFailed || record.DispatchError != nil
 		for _, notice := range record.Notices {
-			failedFiles[notice.FilePath] = true
-			missing = missing || notice.Kind == linter.EslintPluginMissingFileResult
+			switch notice.Kind {
+			case linter.EslintPluginMissingFileResult:
+				missingFile = true
+			case linter.EslintPluginUnconfiguredDiagnostic:
+				failedRules[notice.FilePath] = append(failedRules[notice.FilePath], notice.RuleName)
+			}
 		}
 	}
 	for _, d := range diagnostics {
 		if d.Origin == rule.DiagnosticOriginPluginFailure {
-			failedFiles[d.FilePath] = true
+			failedRules[d.FilePath] = append(failedRules[d.FilePath], d.RuleName)
 		}
 	}
-	if len(failedFiles) > 0 && args.Suppressions.Mode != suppressions.Check {
-		return diagnostics, incomplete
+	incomplete := dispatchFailed || missingFile || len(failedRules) > 0
+	if incomplete && args.Suppressions.Mode != suppressions.Check {
+		return diagnostics, "Cannot update suppressions because plugin lint results are incomplete."
 	}
 	files := observation.Native.Files
-	checked := make([]string, 0, len(files))
+	checked := make([]suppressions.FileResult, 0, len(files))
 	for _, file := range files {
-		if !file.SyntaxError && !failedFiles[file.Path] {
-			checked = append(checked, file.Path)
+		if file.SyntaxError {
+			continue
 		}
+		skipped := file.SkippedErrorRules
+		if failed := failedRules[file.Path]; len(failed) > 0 {
+			skipped = append(failed, skipped...)
+		}
+		checked = append(checked, suppressions.FileResult{Path: file.Path, SkippedRules: skipped})
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {
 		return diagnostics, err.Error()
 	}
-	if missing {
+	if missingFile {
 		return visible, "Cannot verify suppressions because a plugin file result is missing."
 	}
-	if unused && !args.PassOnUnpruned {
+	// Failed plugin runs already report their errors, and pruning has to wait
+	// until all plugin results are available.
+	if unused && !incomplete && !args.PassOnUnpruned {
+		if len(args.ConfigCatalog.Failures) > 0 {
+			return visible, "A lint configuration failed to load. Fix the configuration and rerun rslint to check for unused suppressions."
+		}
 		return visible, "Unused suppressions remain. Run with --prune-suppressions to remove them, or --pass-on-unpruned-suppressions to allow them."
 	}
 	return visible, ""

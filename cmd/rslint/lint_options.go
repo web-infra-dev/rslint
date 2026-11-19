@@ -84,7 +84,7 @@ func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
 // ESLint accepts bare IDs and single- or double-quoted strings in a flat list.
 // A comma or closing bracket inside a quoted rule ID belongs to the ID.
-var bracketedRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\[\]({,'"][^,\]]*)`)
+var suppressRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\[\]({,'"][^,\]]*)`)
 var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
 
 func decodeRuleEscape(escape string) string {
@@ -101,33 +101,28 @@ func decodeRuleEscape(escape string) string {
 }
 
 func appendSuppressRules(rules []string, value string) ([]string, error) {
-	list, bracketed := strings.CutPrefix(ecmascript.StringTrim(value), "[")
-	if !bracketed {
-		for id := range strings.SplitSeq(value, ",") {
-			id = strings.TrimSpace(id)
-			if id == "" {
-				return nil, errors.New("expected a rule ID")
-			}
-			rules = append(rules, id)
-		}
-		return rules, nil
+	if value == "" {
+		return nil, errors.New("expected a rule ID")
 	}
-
-	list, ok := strings.CutSuffix(list, "]")
-	if !ok {
-		return nil, errors.New("expected ']' after rule IDs")
+	list, bracketed := strings.CutPrefix(ecmascript.StringTrim(value), "[")
+	if bracketed {
+		var closed bool
+		list, closed = strings.CutSuffix(list, "]")
+		if !closed {
+			return nil, errors.New("expected ']' after rule IDs")
+		}
 	}
 	if rules == nil {
 		rules = []string{} // An explicit empty selection records no rules.
 	}
 	for list = ecmascript.StringTrim(list); list != ""; list = ecmascript.StringTrim(list) {
-		id := bracketedRuleID.FindString(list)
+		id := suppressRuleID.FindString(list)
 		list = ecmascript.StringTrim(list[len(id):])
 		if list != "" {
-			list, ok = strings.CutPrefix(list, ",")
-			if !ok {
+			if list[0] != ',' {
 				return nil, errors.New("expected a comma between rule IDs")
 			}
+			list = list[1:]
 		}
 		id = ecmascript.StringTrim(id)
 		if id != "" && (id[0] == '\'' || id[0] == '"') {

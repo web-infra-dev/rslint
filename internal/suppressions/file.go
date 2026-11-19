@@ -9,6 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
+
+	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
@@ -16,6 +20,7 @@ const DefaultFilename = "rslint-suppressions.json"
 // Open returns nil for the common case of a plain check without a baseline.
 func Open(cwd string, options Options) (*File, error) {
 	cwd = filepath.FromSlash(cwd)
+	f := &File{cwd: cwd, options: options}
 	path := filepath.Join(cwd, DefaultFilename)
 	if location := options.Location; location != "" {
 		path = location
@@ -38,15 +43,15 @@ func Open(cwd string, options Options) (*File, error) {
 			if runtime.GOOS != "windows" {
 				// Node's process.cwd() uses the physical path on Unix. os.Getwd
 				// can instead preserve a shell's symlink spelling from PWD.
-				hashDirectory, err = filepath.EvalSymlinks(cwd)
-				if err != nil {
+				if err := f.resolveWorkingDirectory(); err != nil {
 					return nil, err
 				}
+				hashDirectory = f.physicalCwd
 			}
 			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(hashDirectory))
 		}
 	}
-	f := &File{cwd: cwd, path: path, options: options}
+	f.path = path
 	data, err := f.read(path)
 	if err != nil {
 		return nil, err
@@ -54,8 +59,60 @@ func Open(cwd string, options Options) (*File, error) {
 	if len(data) == 0 && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
+	if err := f.resolveWorkingDirectory(); err != nil {
+		return nil, err
+	}
 	f.entries = data
 	return f, nil
+}
+
+func (f *File) resolveWorkingDirectory() error {
+	if f.physicalCwd != "" {
+		return nil
+	}
+	var err error
+	f.physicalCwd, err = filepath.EvalSymlinks(f.cwd)
+	return err
+}
+
+func (f *File) fileKey(path string) string {
+	path = filepath.FromSlash(path)
+	key, err := filepath.Rel(f.cwd, path)
+	if f.cwd != f.physicalCwd && (err != nil || !filepath.IsLocal(key)) {
+		// Go may project relative targets under a symlinked PWD while an
+		// absolute target uses the physical directory.
+		key, err = filepath.Rel(f.physicalCwd, path)
+	}
+	if err != nil {
+		// A target on another Windows volume has no relative path.
+		key = path
+	}
+	return filepath.ToSlash(key)
+}
+
+func (f *File) fileMissing(key string) (bool, error) {
+	if strings.HasPrefix(key, "//") {
+		return false, nil // Do not contact a network share to prune an unchecked file.
+	}
+	path := filepath.FromSlash(key)
+	volume := filepath.VolumeName(path)
+	if volume == "" && len(key) >= 3 && key[1:3] == ":/" && tspath.IsVolumeCharacter(key[0]) {
+		return false, nil // A Unix host cannot check a Windows drive.
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(f.physicalCwd, path)
+	}
+	_, err := os.Stat(path)
+	if err != nil && volume != "" {
+		// A detached drive can report all of its files as missing.
+		if root, _ := os.Stat(volume + string(filepath.Separator)); root == nil {
+			return false, nil
+		}
+	}
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return true, nil
+	}
+	return false, err
 }
 
 func (f *File) read(path string) (entries, error) {

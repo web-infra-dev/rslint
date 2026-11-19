@@ -12,6 +12,9 @@ type LintedFile struct {
 	Path string
 	// SyntaxError means syntax diagnostics prevented rule execution for this target.
 	SyntaxError bool
+	// SkippedErrorRules lists enabled error-level rules excluded because type
+	// information was unavailable. The requested projection is shared and read-only.
+	SkippedErrorRules []string
 	// SourceFile is populated only when ArtifactDemand.SourceFiles is requested.
 	SourceFile *ast.SourceFile
 }

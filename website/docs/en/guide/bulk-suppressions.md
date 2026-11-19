@@ -36,7 +36,7 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-File paths in the baseline use `/` and are relative to the working directory, including when you pass `--config`. To reuse an existing ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. The rule IDs must match exactly.
+File paths in the baseline use `/` and are relative to the working directory, including when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path. To reuse an existing ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. The rule IDs must match exactly.
 
 Pass `--suppressions-location` on every run that uses a custom location. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory. Create the directory first. The hash comes from the absolute working directory.
 
@@ -48,6 +48,10 @@ If the count in `src/app.js` falls from two to one, Rslint suppresses the remain
 rslint --prune-suppressions
 ```
 
-Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run preserves entries for existing files outside its scope. Ignored files and files with syntax errors keep their entries. A plugin execution failure prevents updates.
+Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run preserves entries for existing files outside its scope. A Windows drive must be accessible to verify a deletion. Entries on network shares are updated only when Rslint checks those files.
+
+Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
+
+If a plugin rule throws, Rslint reports the failure and any findings that rule emitted. Completed rules in the same file still use their baseline. Fix plugin or configuration failures before recording or pruning.
 
 To defer cleanup, run `rslint --pass-on-unpruned-suppressions`. Lint errors and the configured warning limit still determine the exit status.

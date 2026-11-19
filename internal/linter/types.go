@@ -26,10 +26,11 @@ type LintResult struct {
 // GetRulesForFile is called once for every selected file without syntax errors.
 // It may be called concurrently unless SingleThreaded is set.
 type PrepareLintPlanOptions struct {
-	Programs         []*program.Program
-	TargetsByProgram [][]string
-	SingleThreaded   bool
-	GetRulesForFile  RuleHandler
+	Programs                 []*program.Program
+	TargetsByProgram         [][]string
+	SingleThreaded           bool
+	GetRulesForFile          RuleHandler
+	collectSkippedErrorRules bool
 }
 
 // RunLinterOptions configures execution of a prepared lint plan and an optional

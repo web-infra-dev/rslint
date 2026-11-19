@@ -86,7 +86,13 @@ export function parseArgs(argv: string[]) {
       ) {
         // Bind the value before reordering. An omitted argument must reach
         // Go as empty instead of consuming a positional lint target.
-        const value = token.value ?? '';
+        // ESLint treats a separate empty string as an empty rule list.
+        const value =
+          token.name === 'suppress-rule' &&
+          token.value === '' &&
+          !token.inlineValue
+            ? '[]'
+            : (token.value ?? '');
         const looksLikeOption =
           !token.inlineValue && value.length > 1 && value.startsWith('-');
         flags.push(`${token.rawName}=${looksLikeOption ? '' : value}`);
