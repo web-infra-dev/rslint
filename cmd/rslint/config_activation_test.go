@@ -27,6 +27,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 		disabled      bool
 		typeCheckOnly bool
 		badOptions    bool
+		badBaseline   bool
 		badProject    bool
 		fix           bool
 		succeed       bool
@@ -37,6 +38,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 		{name: "disabled plugin", disabled: true},
 		{name: "type check only", typeCheckOnly: true},
 		{name: "preflight failure", badOptions: true},
+		{name: "invalid baseline", badBaseline: true},
 		{name: "Program failure", badProject: true},
 		{name: "fix failure", fix: true},
 		{name: "successful activation", succeed: true},
@@ -52,6 +54,9 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 			}
 			if err := os.WriteFile(filepath.Join(dir, "tsconfig.json"), []byte(`{"files":["index.ts"]}`), 0o644); err != nil {
 				t.Fatal(err)
+			}
+			if test.badBaseline {
+				writeLintTargetContractFiles(t, dir, map[string]string{"rslint-suppressions.json": "invalid"})
 			}
 			project := "./tsconfig.json"
 			if test.badProject {
@@ -97,7 +102,7 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 				Fix:            test.fix,
 				CompleteConfigActivation: func() error {
 					calls++
-					if !test.ignore && !test.badOptions && !test.badProject && fsys.readCount(targetPath) == 0 {
+					if !test.ignore && !test.badOptions && !test.badBaseline && !test.badProject && fsys.readCount(targetPath) == 0 {
 						t.Error("activation joined before Program read the target")
 					}
 					if dispatches != 0 {
@@ -121,6 +126,9 @@ func TestCLIConfigActivationBeforeExecution(t *testing.T) {
 			}))
 			if calls != 1 {
 				t.Fatalf("activation joins = %d, want 1", calls)
+			}
+			if test.badBaseline && !strings.Contains(stderr, "invalid suppressions file") {
+				t.Fatalf("baseline error missing from stderr: %q", stderr)
 			}
 			if test.succeed {
 				if dispatches != 1 || !strings.Contains(stdout, "no-debugger") || stderr != "" {
@@ -251,7 +259,7 @@ func TestDiscoverCLISingleThreadedConfigPreparesPlugins(t *testing.T) {
 	peer.Start()
 	args := lintArgs{FS: osvfs.FS(), SingleThreaded: true}
 	payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
-	if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
+	if err := discoverCLIConfigCatalog(context.Background(), tspath.NormalizePath(dir), &args, &payload, cli); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(kinds, []ipc.MessageKind{kindLoadConfigs, kindPrepareConfigs}) {

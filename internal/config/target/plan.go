@@ -18,10 +18,17 @@ type Plan struct {
 	Files                []File
 	ExplicitFileOutcomes []ExplicitFileOutcome
 	// SkippedAliases are other selected paths removed by canonical deduplication.
-	SkippedAliases []File
+	SkippedAliases []SkippedAlias
 
 	pathSpaces *rslintconfig.PathSpaceSnapshot
 	gitPolicy  *rslintconfig.GitPolicy
+}
+
+// SkippedAlias keeps the connection between an admitted spelling and the
+// filename retained for execution when their canonical targets coincide.
+type SkippedAlias struct {
+	File
+	KeptPath string
 }
 
 // Request keeps the two directory roles explicit. ConfigDirectory
@@ -147,7 +154,7 @@ func Resolve(request Request) (Plan, error) {
 				)
 			}
 			if request.CollectSkippedAliases && existing.Path != target.Path {
-				plan.SkippedAliases = append(plan.SkippedAliases, target)
+				plan.SkippedAliases = append(plan.SkippedAliases, SkippedAlias{File: target, KeptPath: existing.Path})
 			}
 			continue
 		}

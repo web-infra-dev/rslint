@@ -2,37 +2,35 @@ package main
 
 import (
 	"context"
-	"os"
 	"slices"
-	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 )
 
 // Prepare raw CLI patterns only. IPC-provided files are exact paths and never
 // enter this function. Missing patterns retain the existing literal skip policy.
-func prepareCLIInputs(ctx context.Context, args *lintArgs) error {
+func prepareCLIInputs(ctx context.Context, args *lintArgs, preflight lintPreflight) error {
 	if len(args.Positional) == 0 && (len(args.AllowFiles) > 0 || len(args.AllowDirs) > 0) {
 		return nil
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
+	cwd := preflight.cwd
 	// Go honors a valid shell PWD on Unix. Keep it for target selection and
 	// config ownership, but retain the operands if the OS names cwd differently.
 	var onMatch func(target.InputMatch)
-	if native, err := syscall.Getwd(); err == nil && native != cwd {
-		args.inputOrigins.cwd = tspath.NormalizePath(native)
-		onMatch = func(match target.InputMatch) {
-			args.inputOrigins.matches = append(args.inputOrigins.matches, match)
+	if preflight.baseline != nil {
+		if native := tspath.NormalizePath(preflight.baseline.NativeCWD()); native != cwd {
+			args.inputOrigins.cwd = native
+			onMatch = func(match target.InputMatch) {
+				args.inputOrigins.matches = append(args.inputOrigins.matches, match)
+			}
 		}
 	}
 	if len(args.Positional) == 0 {
 		if onMatch != nil {
-			onMatch(target.InputMatch{Operand: ".", Path: tspath.NormalizePath(cwd), Directory: true})
+			onMatch(target.InputMatch{Operand: ".", Path: cwd, Directory: true})
 		}
 		return nil
 	}
@@ -58,57 +56,103 @@ type cliInputOrigins struct {
 	configRoots target.InputRoots
 }
 
-// Project only the inputs that reached each executed caller-visible path.
-// Literal files may bypass selection that excludes the same path from a scan.
-func (origins cliInputOrigins) paths(plan target.Plan, directoryRoots target.InputRoots) map[string][]string {
-	if len(origins.matches) == 0 {
+// Keep the requesting operand separate from the filename used to select and
+// execute a target. Entries for selected but unexecuted names reserve their
+// own baselines. A literal may bypass selection that excludes it from a scan.
+func (origins cliInputOrigins) paths(plan target.Plan, directoryRoots target.InputRoots, explicitConfig, caseSensitive bool) map[string]suppressions.FileResult {
+	if len(origins.matches) == 0 && len(plan.SkippedAliases) == 0 {
 		return nil
 	}
-	files := append(slices.Clip(plan.Files), plan.SkippedAliases...)
-	paths := make(map[string][]string)
+	paths := make(map[string]suppressions.FileResult)
+	for _, alias := range plan.SkippedAliases {
+		paths[alias.Path] = suppressions.FileResult{Path: alias.Path, CoalescedInto: alias.KeptPath}
+	}
+	if len(origins.matches) == 0 {
+		return paths
+	}
+	selected := make(map[string]target.File, len(plan.Files)+len(plan.SkippedAliases))
+	for _, file := range plan.Files {
+		selected[file.Path] = file
+	}
+	for _, alias := range plan.SkippedAliases {
+		selected[alias.Path] = alias.File
+	}
+	appendOperand := func(path, operand, coalescedInto string) {
+		result := paths[path]
+		result.Path = path
+		result.CoalescedInto = coalescedInto
+		if !slices.Contains(result.InputPaths, operand) {
+			result.InputPaths = append(result.InputPaths, operand)
+		}
+		paths[path] = result
+	}
+	add := func(matched, caller, operand string) {
+		if _, ok := selected[caller]; ok {
+			matched = caller
+		}
+		if winner := paths[matched].CoalescedInto; winner != "" {
+			matched = winner
+		}
+		// Case or Unicode spellings of the same entry can share a traversal.
+		// Retain the operand on both names so the baseline knows whether the
+		// skipped name was independently requested.
+		if caller == matched {
+			appendOperand(caller, operand, "")
+			return
+		}
+		appendOperand(caller, operand, matched)
+		if suppressions.SamePathSpelling(caller, matched) {
+			appendOperand(matched, operand, "")
+		}
+	}
 	if len(origins.matches) == 1 {
 		match := origins.matches[0]
 		operand := tspath.ResolvePath(origins.cwd, match.Operand)
-		// The sole operand is the source of every selected path.
-		for _, file := range files {
-			paths[file.Path] = []string{rebaseInputPath(file.Path, match.Path, operand)}
+		for path := range selected {
+			add(path, path, rebaseInputPath(path, match.Path, operand))
 		}
 		return paths
 	}
-	add := func(path, operand string) {
-		if !slices.Contains(paths[path], operand) {
-			paths[path] = append(paths[path], operand)
-		}
-	}
-	selected := make(map[string]target.File, len(files))
-	for _, file := range files {
-		selected[file.Path] = file
-	}
-	directories := make(map[string][]string)
+	type directory struct{ caller, operand string }
+	rootID := func(path string) tspath.Path { return tspath.ToPath(path, "", caseSensitive) }
+	directories := make(map[tspath.Path][]directory)
 	for _, match := range origins.matches {
 		operand := tspath.ResolvePath(origins.cwd, match.Operand)
 		switch {
 		case match.Directory:
-			directories[match.Path] = append(directories[match.Path], operand)
+			id := rootID(match.Path)
+			directories[id] = append(directories[id], directory{match.Path, operand})
 		case match.Files == nil:
-			add(match.Path, operand)
+			if _, ok := selected[match.Path]; ok {
+				add(match.Path, match.Path, operand)
+			}
 		default:
 			for _, path := range match.Files {
 				file, ok := selected[path]
 				if ok && file.Match() != nil && file.Match().Selected() &&
-					slices.Contains(origins.configRoots.For(file.ConfigDirectory, path), match.Path) {
-					add(path, rebaseInputPath(path, match.Path, operand))
+					slices.ContainsFunc(origins.configRoots.For(file.ConfigDirectory, path), func(root string) bool {
+						return suppressions.SamePathSpelling(root, match.Path)
+					}) {
+					add(path, path, rebaseInputPath(path, match.Path, operand))
 				}
 			}
 		}
 	}
-	for _, file := range files {
+	for _, file := range selected {
 		for _, scopeRoot := range directoryRoots.For(file.ConfigDirectory, file.Path) {
 			// A child config starts a new target walk. Config discovery retained
 			// the original operands whose traversal reached that boundary.
-			for _, root := range origins.configRoots.For(file.ConfigDirectory, scopeRoot) {
-				for _, operand := range directories[root] {
-					add(file.Path, rebaseInputPath(file.Path, root, operand))
+			roots := origins.configRoots.For(file.ConfigDirectory, scopeRoot)
+			if explicitConfig {
+				// An explicit config walks the requested directory directly.
+				roots = []string{scopeRoot}
+			}
+			for _, root := range roots {
+				for _, dir := range directories[rootID(root)] {
+					if suppressions.SamePathSpelling(root, dir.caller) {
+						caller := rebaseInputPath(file.Path, root, dir.caller)
+						add(file.Path, caller, rebaseInputPath(file.Path, root, dir.operand))
+					}
 				}
 			}
 		}

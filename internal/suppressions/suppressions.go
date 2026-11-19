@@ -41,10 +41,11 @@ type File struct {
 // FileResult identifies a selected path. A completed rule with no diagnostics
 // has a count of zero. An unchecked path only reserves its baseline keys.
 type FileResult struct {
-	Path         string
-	InputPaths   []string // Spellings of CLI operands that selected this lint result.
-	SkippedRules []string
-	Unchecked    bool
+	Path          string
+	InputPaths    []string // Spellings of CLI operands that selected this lint result.
+	CoalescedInto string   // Filename that target selection retained instead of this path.
+	SkippedRules  []string
+	Unchecked     bool
 }
 
 type checkedFile struct {
@@ -53,6 +54,7 @@ type checkedFile struct {
 	portable     string
 	counts       map[string]int
 	skippedRules []string
+	unchecked    bool
 }
 
 // Apply compares diagnostics with the baseline for the given files, including

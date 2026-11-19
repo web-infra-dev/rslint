@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -240,6 +242,33 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 			data[key] = map[string]entry{"x": {Count: 1}}
 		}
 	}
+	t.Run("repeated key keeps the single-input fallback", func(t *testing.T) {
+		caller := filepath.Join(lexical, "b", "file.ts")
+		operand := filepath.Join(stable, "packages", "view", "b", "file.ts")
+		selected := FileResult{Path: caller, InputPaths: []string{operand}}
+		duplicate := FileResult{Path: operand, InputPaths: []string{operand}, CoalescedInto: caller, Unchecked: true}
+		file := f.matchFiles([]FileResult{selected, duplicate})[caller]
+		if !slices.Equal(file.keys, []string{f.operandKey(operand)}) || file.portable != "../b/file.ts" {
+			t.Fatalf("repeated operand: exact keys %v, fallback %q", file.keys, file.portable)
+		}
+	})
+	t.Run("operand keeps the spelling of a link outside cwd", func(t *testing.T) {
+		relative := filepath.Join(inner, "b", "file.ts")
+		lower := filepath.Join(lexical, "b", "file.ts")
+		upper := filepath.Join(lexical, "b", "FILE.ts")
+		if !SamePathSpelling(lower, upper) {
+			t.Skip("volume distinguishes these filenames")
+		}
+		files := f.matchFiles([]FileResult{
+			{Path: upper, InputPaths: []string{relative, upper}},
+			{Path: lower, InputPaths: []string{relative}, CoalescedInto: upper, Unchecked: true},
+		})
+		want := []string{f.operandKey(relative), f.operandKey(upper)}
+		slices.Sort(want)
+		if got := files[upper].keys; !slices.Equal(got, want) {
+			t.Fatalf("selected link keys = %v, want %v", got, want)
+		}
+	})
 	t.Run("case-only spelling of an ancestor link", func(t *testing.T) {
 		alternate := filepath.Join(parent, "LINK")
 		path := filepath.Join(alternate, "packages", "view", "b", "file.ts")
@@ -271,15 +300,39 @@ func TestWorkingDirectoryAlias(t *testing.T) {
 	}
 }
 
+func TestDistinctLintResultsCannotWriteTheSameExactKey(t *testing.T) {
+	const exact = "../../foo/file.js"
+	direct := &checkedFile{literal: exact, portable: exact, keys: []string{exact}}
+	alias := &checkedFile{literal: "../../deep/foo/file.js", portable: "../../FOO/file.js", keys: []string{exact}}
+	separateFilenames(map[string][]*checkedFile{direct.portable: {direct}, alias.portable: {alias}})
+	selectExistingKeys(nil, map[string]*checkedFile{direct.literal: direct, alias.literal: alias})
+	if !slices.Equal(direct.keys, []string{exact}) || !slices.Equal(alias.keys, []string{"../../FOO/file.js"}) {
+		t.Fatalf("keys for two measured filenames: %v and %v", direct.keys, alias.keys)
+	}
+}
+
 func TestUpdatePreservesOtherWriter(t *testing.T) {
-	cwd := t.TempDir()
-	t.Chdir(cwd)
+	parent := t.TempDir()
+	cwd := filepath.Join(parent, "repo")
+	if err := os.Mkdir(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(parent, "link")
+	if runtime.GOOS == "windows" {
+		// cspell:ignore mklink
+		if output, err := exec.Command("cmd.exe", "/d", "/c", "mklink", "/J", link, cwd).CombinedOutput(); err != nil {
+			t.Fatalf("create directory junction: %v\n%s", err, output)
+		}
+	} else if err := os.Symlink(cwd, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(link)
 	options := Options{Mode: Record}
-	first, err := Open(cwd, options)
+	first, err := Open(link, options)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := Open(cwd, options)
+	second, err := Open(link, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,6 +362,32 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	if !reflect.DeepEqual(reopened.entries, want) {
 		t.Fatalf("got %v, want %v", reopened.entries, want)
 	}
+	t.Run("preserve the baseline file symlink", func(t *testing.T) {
+		location := filepath.Join(link, "linked.json")
+		if err := os.Symlink(DefaultFilename, location); err != nil {
+			t.Skipf("file symlink unavailable: %v", err)
+		}
+		linked, err := Open(link, Options{Mode: Record, Location: location})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := update(t.Context(), linked, "linked"); err != nil {
+			t.Fatal(err)
+		}
+		reopened, err := Open(cwd, Options{})
+		if err != nil || reopened == nil || reopened.entries["test.js"]["linked"].Count != 1 {
+			t.Fatalf("update through file symlink: %v, error %v", reopened, err)
+		}
+		if err := os.Remove(filepath.Join(cwd, DefaultFilename)); err != nil {
+			t.Fatal(err)
+		}
+		if err := update(t.Context(), linked, "dangling"); err == nil {
+			t.Fatal("updated through dangling baseline symlink")
+		}
+		if target, err := os.Readlink(location); err != nil || target != DefaultFilename {
+			t.Fatalf("baseline symlink target = %q, error %v", target, err)
+		}
+	})
 }
 
 func TestDirectoryHash(t *testing.T) {

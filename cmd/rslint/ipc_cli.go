@@ -269,10 +269,6 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 			return 2
 		}
 	}
-	if len(payload.Files) > 0 {
-		baseArgs.AllowFiles, baseArgs.AllowDirs = classifyPaths(payload.Files)
-		baseArgs.Positional = nil
-	}
 	if payload.Format != "" {
 		baseArgs.Format = payload.Format
 	}
@@ -283,14 +279,28 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
-	baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
-	// Preserve help/init priority, then reject an invalid payload-authoritative
-	// format before config discovery can execute user JavaScript.
-	if !help && !baseArgs.Init {
-		if _, err := output.ParseFormat(baseArgs.Format); err != nil {
+	var preflight lintPreflight
+	if !help {
+		if !baseArgs.Init && payload.ConfigDiscovery == nil {
+			// Format errors take priority even for an incomplete handshake.
+			// End this request before command preflight opens the baseline.
+			_, err := output.ParseFormat(baseArgs.Format)
+			if err == nil {
+				err = errors.New("CLI host did not provide config discovery intent")
+			}
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
+		}
+		var code int
+		if preflight, code = prepareLintCommand(baseArgs); code != 0 {
+			if code == 1 { // Working-directory failures complete the host handshake.
+				if ctx.Err() != nil {
+					return 2
+				}
+				shutdownPeer(ctx, ch)
+			}
+			return code
 		}
 	}
 
@@ -299,13 +309,14 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 	// catalog into the shared lint pipeline input. Every lint invocation uses
 	// this path; --init is the only configuration operation that bypasses it.
 	if !help && !baseArgs.Init {
-		if payload.ConfigDiscovery == nil {
-			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
-			return 2
+		baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		if len(payload.Files) > 0 {
+			baseArgs.AllowFiles, baseArgs.AllowDirs = classifyPaths(payload.Files)
+			baseArgs.Positional = nil
 		}
-		prepareErr := prepareCLIInputs(ctx, &baseArgs)
+		prepareErr := prepareCLIInputs(ctx, &baseArgs, preflight)
 		if prepareErr == nil {
-			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
+			prepareErr = discoverCLIConfigCatalog(ctx, preflight.cwd, &baseArgs, payload, ch)
 		}
 		if err := prepareErr; err != nil {
 			if ctx.Err() != nil {
@@ -364,7 +375,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 	baseArgs.DeferTimingTable = func(table string) { timingTable = table }
 	baseArgs.StartWriter = acknowledgedOutputWriter{ctx: ctx, channel: ch}
 
-	exitCode := handleLintCommand(baseArgs, ctx, dispatch)
+	exitCode := handleLintCommand(baseArgs, preflight, ctx, dispatch)
 
 	finalizeStdout()
 	stdoutFlushed := shutdownPeer(ctx, ch)
@@ -430,6 +441,7 @@ func classifyPaths(paths []string) (files []string, dirs []string) {
 
 func discoverCLIConfigCatalog(
 	ctx context.Context,
+	cwd string,
 	args *lintArgs,
 	payload *initPayload,
 	channel *ipc.Channel,
@@ -437,11 +449,6 @@ func discoverCLIConfigCatalog(
 	if args == nil || payload == nil || payload.ConfigDiscovery == nil {
 		return nil
 	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get working directory for config discovery: %w", err)
-	}
-	cwd = tspath.NormalizePath(cwd)
 	request := discovery.ConfigDiscoveryRequest{
 		CWD:            cwd,
 		Directories:    rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, args.FS),
@@ -464,6 +471,7 @@ func discoverCLIConfigCatalog(
 	}
 	loader := &ipcConfigModuleLoader{channel: channel}
 	var catalog *discovery.ConfigCatalog
+	var err error
 	if payload.ConfigDiscovery.ExplicitConfigPath != "" {
 		targetFiles := append([]discovery.DiscoveryFile(nil), request.Files...)
 		targetDirectories := append([]rslintconfig.DirectoryIdentity(nil), request.Directories...)
