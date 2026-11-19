@@ -48,7 +48,7 @@ If the count in `src/app.js` falls from two to one, Rslint suppresses the remain
 rslint --prune-suppressions
 ```
 
-Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run preserves entries for existing files outside its scope. A Windows drive must be accessible to verify a deletion. Entries on network shares are updated only when Rslint checks those files.
+Pruning lowers counts, removes entries that reach zero, and removes entries for deleted files. A partial run preserves entries for existing files outside its scope. A Windows drive must be accessible to verify a deletion. Entries with UNC paths such as `//server/share/file.ts` are updated only when Rslint checks those files.
 
 Ignored files and files with syntax errors keep their entries. If a file moves outside its TypeScript project, Rslint keeps the counts for enabled rules that require type information. Other rules in that file can still be checked and pruned. If you turn a rule off or lower its severity to `"warn"`, pruning removes its old count the next time Rslint checks the file.
 
