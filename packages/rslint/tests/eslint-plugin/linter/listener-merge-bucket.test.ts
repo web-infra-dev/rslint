@@ -45,25 +45,22 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
   // wraps `esq.matches` and reports the throw via the
   // `onListenerError` callback, leaving the remaining listeners free
   // to fire.
-  test('attributes a shared selector match failure to each rule and isolates listener throws', () => {
-    const errors: Array<[string | undefined, string]> = [];
+  test('reports each matching error once per file and rule, and keeps visiting', () => {
     const goodSelectorHits: ESTreeNode[] = [];
-
-    // Hand-built tiny AST. visit() doesn't need a parsed program — it
-    // walks via visitorKeys / Object.keys, and an Identifier inside an
-    // ExpressionStatement triggers both bucketed dispatch + wildcard.
     const ast = {
       type: 'Program',
-      body: [
-        {
-          type: 'ExpressionStatement',
-          expression: { type: 'Identifier', name: 'foo' },
-        },
-      ],
+      body: ['foo', 'bar', 'other', 'ok'].map((name) => ({
+        type: 'ExpressionStatement',
+        expression: { type: 'Identifier', name },
+      })),
     } as unknown as ESTreeNode;
 
-    // The unknown pseudo-class parses successfully and throws during matching.
-    const badListeners = { 'Identifier:enter': [() => {}, () => {}] };
+    // The first two identifiers reach :enter, the third reaches :other,
+    // and the last matches successfully without evaluating either class.
+    const selector =
+      'Identifier[name="ok"], Identifier[name="other"]:other, Identifier:enter';
+    let matches = 0;
+    const badListeners = { [selector]: [() => matches++, () => {}] };
     const merged = mergeListeners([
       { ruleName: 'first-bad-selector', listeners: badListeners },
       { ruleName: 'second-bad-selector', listeners: badListeners },
@@ -85,23 +82,28 @@ describe('visit: esquery match throw is isolated, does not kill file', () => {
       },
     ]);
 
-    const result = visit(ast, merged, {
-      onListenerError: ({ ruleName, selector }) =>
-        errors.push([ruleName, selector]),
-    });
+    const visitFile = () => {
+      const errors: Array<[string | undefined, string, string]> = [];
+      visit(ast, merged, {
+        onListenerError: ({ ruleName, selector, err }) =>
+          errors.push([ruleName, selector, (err as Error).message]),
+      });
+      return errors;
+    };
 
-    // Pre-fix: throw propagated, visit returned early, goodSelectorHits
-    // was empty. Post-fix: bad selector goes to onListenerError, good
-    // selector still fires.
-    expect(result.visitedNodes).toBeGreaterThan(0);
-    expect(goodSelectorHits.length).toBeGreaterThan(0);
-    expect(goodSelectorHits[0].type).toBe('Identifier');
-
-    expect(errors.sort()).toEqual([
-      ['bad-listener', 'Identifier'],
-      ['first-bad-selector', 'Identifier:enter'],
-      ['second-bad-selector', 'Identifier:enter'],
-    ]);
+    for (const errors of [visitFile(), visitFile()]) {
+      expect(errors.filter(([rule]) => rule === 'bad-listener')).toHaveLength(
+        4,
+      );
+      expect(errors.filter(([rule]) => rule !== 'bad-listener')).toEqual([
+        ['first-bad-selector', selector, 'Unknown class name: enter'],
+        ['second-bad-selector', selector, 'Unknown class name: enter'],
+        ['first-bad-selector', selector, 'Unknown class name: other'],
+        ['second-bad-selector', selector, 'Unknown class name: other'],
+      ]);
+    }
+    expect(matches).toBe(4);
+    expect(goodSelectorHits).toHaveLength(8);
   });
 });
 

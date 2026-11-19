@@ -445,16 +445,9 @@ export function lintFile(
   const visitResult = visit(ast, mergedListeners, {
     cancelFlag: req.cancelFlag,
     onListenerError: ({ ruleName, selector, node, err }) => {
-      // Structured rule-level attribution: write one ruleErrors entry
-      // per (rule, listener-throw). This is what surfaces in the
-      // per-file result back to Go and ultimately to the user's
-      // diagnostic stream — without it the user only sees stderr,
-      // which the LSP path doesn't even render.
-      //
-      // Stderr is still emitted as a dedup'd one-liner so a flood
-      // of identical (selector, errMsg) pairs doesn't drown the
-      // terminal during interactive runs. But ruleErrors is the
-      // authoritative channel: every throw lands there.
+      // Go renders ruleErrors as diagnostics in both the CLI and LSP. visit()
+      // reports every callback throw and each distinct selector match error per
+      // file and rule. Stderr filters repeated messages across files.
       const message = (err as Error)?.message ?? String(err);
       if (ruleName) {
         ruleErrors.push({
