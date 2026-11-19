@@ -33,6 +33,8 @@ rslint [options] [files/directories...]
 | `--prune-suppressions`            | Reduce or remove unused counts and remove entries for deleted files                            |
 | `--pass-on-unpruned-suppressions` | Allow unused counts when checking the exit status                                              |
 
+To record existing errors and use the baseline in CI, see [Bulk suppressions](/guide/bulk-suppressions).
+
 ## File and Directory Arguments
 
 You can pass file paths, directory paths, quoted glob patterns, or a mix of them. Rslint discovers the config file by walking upward from the target location.
@@ -91,22 +93,6 @@ Use `--config` or `-c` to override automatic config discovery:
 rslint --config custom.config.ts src/
 rslint -c custom.config.ts src/
 ```
-
-## Bulk suppressions
-
-To enable rules on an existing project, run them at error severity and record the current violations. Commit the resulting `rslint-suppressions.json` to share the baseline with CI.
-
-```bash
-rslint --suppress-rule "[no-var,no-debugger]"
-rslint
-rslint --prune-suppressions
-```
-
-Rslint counts errors per file and rule. If a file has two recorded errors for a rule, a third violation makes all three visible. Fixing one leaves an unused count and exits with code 2. Run `--prune-suppressions` to lower the count, or `--pass-on-unpruned-suppressions` to report other problems and apply the usual warning limit. Recording updates positive counts for the selected rules. Pruning only lowers counts. Choose one recording or pruning action per invocation.
-
-File keys use paths relative to the working directory with forward slashes. Run checks and baseline updates from the same directory, including when using an external config. A partial run keeps entries for existing files outside its scope. Pruning also removes deleted files. Ignored files and files with syntax errors keep their recorded counts. Plugin execution failures prevent updates. Warnings and TypeScript compiler errors remain visible under the normal reporting options. Autofix runs before counts are compared.
-
-Use `--suppressions-location` on every invocation to select a custom file, including an existing ESLint suppressions file. Rule IDs must match exactly. An existing directory or a path ending in a directory separator selects `rslint-suppressions_<hash>` inside that directory, using the absolute working directory to compute the hash. Create the directory first. With `--type-check-only`, baseline checks are skipped and recording or pruning is a usage error.
 
 ## Rule Overrides
 
