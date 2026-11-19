@@ -20,7 +20,6 @@ import type {
 import type { DecodedFrame } from './frame.js';
 import type { ESTreeNode } from './types.js';
 import { offsetToLineColumn } from './positions.js';
-type Bag = Record<string, unknown>;
 interface SyntheticRef {
   readonly owner: NodeRef;
   readonly child: number;
@@ -42,7 +41,7 @@ const commonNodeFlags = Object.entries(NodeFlags).filter(
     const value = entry[1];
     return (
       typeof value === 'number' &&
-      value > 0 &&
+      value > NodeFlags.None &&
       (value & (value - 1)) === 0 &&
       !(value & specialNodeFlags)
     );
@@ -51,7 +50,7 @@ const commonNodeFlags = Object.entries(NodeFlags).filter(
 function translateNodeFlags(
   flags: number,
   table: object,
-  moduleKeyword = 0,
+  moduleKeyword: SyntaxKind = SyntaxKind.Unknown,
 ): number {
   const to = table as Record<string, number>;
   let result = 0;
@@ -506,10 +505,12 @@ export class GenerationSyntaxViews {
         if (this.configs.has(file) || file.toLowerCase().endsWith('.json'))
           return targets.ES2015;
         if (this.descriptor.syntaxOnly) return targets.Latest;
-        const target = this.descriptor.compilerOptions.target;
-        return typeof target === 'number' && target !== targets.ES3
-          ? target
-          : targets.LatestStandard;
+        const value = this.descriptor.compilerOptions.target;
+        const target: ts.ScriptTarget | undefined =
+          typeof value === 'number' ? value : undefined;
+        return target === undefined || target === targets.ES3
+          ? targets.LatestStandard
+          : target;
       }
       if (key === 'update') return () => unsupported('SourceFile.update');
       if (key === 'getLineEndOfPosition')
