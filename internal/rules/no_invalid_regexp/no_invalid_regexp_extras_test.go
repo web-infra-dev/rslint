@@ -1,14 +1,18 @@
-// cspell:ignore dgimsuy dgimsvy dgimuvy giig Cpmn Ougr Tnsa Vith
+// cspell:ignore udfff dgimsuy dgimsvy dgimuvy giig Cpmn Ougr Tnsa Vith
 package no_invalid_regexp
 
 import (
+	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/microsoft/TypeScript/tsc/shim/core"
+	"github.com/microsoft/TypeScript/tsc/shim/parser"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoInvalidRegexpRule(t *testing.T) {
+func TestNoInvalidRegexpExtras(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
@@ -36,29 +40,29 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// closes stands for itself.
 			{Code: `RegExp('(?=a)*')`},
 			{Code: `RegExp('^{')`},
-			{Code: `new RegExp('.', 'v')`},     // v flag alone is valid
-			{Code: `new RegExp('.', 'u')`},     // u flag alone is valid
+			{Code: `new RegExp('.', 'v')`}, // v flag alone is valid
+			{Code: `new RegExp('.', 'u')`}, // u flag alone is valid
 			// No arguments
 			{Code: `RegExp()`},
 			{Code: `new RegExp`},
 			// Non-string pattern types — skip pattern validation
-			{Code: "RegExp(`pattern`)"},             // template literal
-			{Code: `RegExp(pattern)`},               // variable
-			{Code: `RegExp('[' + '')`},              // binary expression
-			{Code: `RegExp(cond ? '[' : '.')`},      // conditional
-			{Code: `RegExp(123)`},                   // number
-			{Code: `RegExp(null)`},                  // null
-			{Code: `RegExp(undefined)`},             // undefined
-			{Code: `RegExp(/abc/)`},                 // regex literal
+			{Code: "RegExp(`pattern`)"},        // template literal
+			{Code: `RegExp(pattern)`},          // variable
+			{Code: `RegExp('[' + '')`},         // binary expression
+			{Code: `RegExp(cond ? '[' : '.')`}, // conditional
+			{Code: `RegExp(123)`},              // number
+			{Code: `RegExp(null)`},             // null
+			{Code: `RegExp(undefined)`},        // undefined
+			{Code: `RegExp(/abc/)`},            // regex literal
 			// Non-RegExp callee — should not match
-			{Code: `global.RegExp('.', 'z')`},       // member expression
-			{Code: `window.RegExp('.', 'z')`},       // member expression
-			{Code: `this.RegExp('.', 'z')`},         // member expression
-			{Code: `foo.RegExp('.', 'z')`},          // member expression
-			{Code: `regexp('.', 'z')`},              // case sensitivity
+			{Code: `global.RegExp('.', 'z')`}, // member expression
+			{Code: `window.RegExp('.', 'z')`}, // member expression
+			{Code: `this.RegExp('.', 'z')`},   // member expression
+			{Code: `foo.RegExp('.', 'z')`},    // member expression
+			{Code: `regexp('.', 'z')`},        // case sensitivity
 			// Non-literal flags — skip flag validation
-			{Code: "new RegExp('.', `g`)"},           // template literal flags
-			{Code: `new RegExp('.', 'g' + 'i')`},    // binary expression flags
+			{Code: "new RegExp('.', `g`)"},       // template literal flags
+			{Code: `new RegExp('.', 'g' + 'i')`}, // binary expression flags
 			// Non-literal pattern + non-literal flags — skip both
 			{Code: `new RegExp(pattern, flags)`},
 			// Non-literal pattern + valid flags
@@ -105,28 +109,28 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 				Code:    `new RegExp('.', 'g')`,
 				Options: []any{map[string]interface{}{"allowConstructorFlags": []interface{}{}}},
 			},
-			// === Skipped: regexp2 engine limitations (FP — valid in ESLint but regexp2 rejects) ===
+			// Previously skipped valid syntax; all cases now run.
 			// Unicode property long names
-			{Code: `new RegExp('\\p{Letter}', 'u')`, Skip: true},
+			{Code: `new RegExp('\\p{Letter}', 'u')`},
 			// Unicode Script= syntax
-			{Code: `new RegExp('\\p{Script=Nandinagari}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Cpmn}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Cypro_Minoan}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Old_Uyghur}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Ougr}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Tangsa}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Tnsa}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Toto}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Vith}', 'u')`, Skip: true},
-			{Code: `new RegExp('\\p{Script=Vithkuqi}', 'u')`, Skip: true},
+			{Code: `new RegExp('\\p{Script=Nandinagari}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Cpmn}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Cypro_Minoan}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Old_Uyghur}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Ougr}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Tangsa}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Tnsa}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Toto}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Vith}', 'u')`},
+			{Code: `new RegExp('\\p{Script=Vithkuqi}', 'u')`},
 			// v-flag set notation
-			{Code: `new RegExp('[A--B]', 'v')`, Skip: true},
-			{Code: `new RegExp('[A--[0-9]]', 'v')`, Skip: true},
-			{Code: `new RegExp('[\\p{Basic_Emoji}--\\q{a|bc|def}]', 'v')`, Skip: true},
-			{Code: `new RegExp('[A--B]', flags)`, Skip: true},
+			{Code: `new RegExp('[A--B]', 'v')`},
+			{Code: `new RegExp('[A--[0-9]]', 'v')`},
+			{Code: `new RegExp('[\\p{Basic_Emoji}--\\q{a|bc|def}]', 'v')`},
+			{Code: `new RegExp('[A--B]', flags)`},
 			// Surrogate pair named capture groups
-			{Code: `new RegExp('(?<\\ud835\\udc9c>.)', 'g')`, Skip: true},
-			{Code: `new RegExp('(?<\\u{1d49c}>.)', 'g')`, Skip: true},
+			{Code: `new RegExp('(?<\\ud835\\udc9c>.)', 'g')`},
+			{Code: `new RegExp('(?<\\u{1d49c}>.)', 'g')`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -496,18 +500,16 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
-			// === Skipped: regexp2 engine limitations (FN — invalid in ESLint but regexp2 misses) ===
+			// Previously skipped invalid syntax; all cases now run.
 			// v-flag specific parsing
 			{
 				Code: `new RegExp('[[]', 'v');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `new RegExp('[[]\\u{0}*', 'v');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
@@ -515,7 +517,6 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Duplicate named capture groups outside alternatives
 			{
 				Code: `new RegExp('(?<k>a)(?<k>b)');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
@@ -554,11 +555,117 @@ func TestNoInvalidRegexpRule(t *testing.T) {
 			// Trailing backslash
 			{
 				Code: `new RegExp('\\');`,
-				Skip: true,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "regexMessage", Line: 1, Column: 1},
 				},
 			},
 		},
 	)
+}
+
+// Cases retained from the previous JS suite.
+func TestNoInvalidRegexpLegacyIntegrationExtras(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInvalidRegexpRule, []rule_tester.ValidTestCase{
+		{Code: "new RegExp('\\\\p{Letter}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Nandinagari}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Cpmn}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Cypro_Minoan}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Old_Uyghur}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Ougr}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Tangsa}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Tnsa}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Toto}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Vith}', 'u');"},
+		{Code: "new RegExp('\\\\p{Script=Vithkuqi}', 'u');"},
+		{Code: "new RegExp('[A--B]', 'v');"},
+		{Code: "new RegExp('[A--[0-9]]', 'v');"},
+		{Code: "new RegExp('[\\\\p{Basic_Emoji}--\\\\q{a|bc|def}]', 'v');"},
+		{Code: "new RegExp('[A--B]', flags);"},
+		{Code: "new RegExp('(?<\\\\ud835\\\\udc9c>.)', 'g');"},
+		{Code: "new RegExp('(?<\\\\u{1d49c}>.)', 'g');"},
+	}, []rule_tester.InvalidTestCase{})
+}
+
+func TestNoInvalidRegexpRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInvalidRegexpRule, []rule_tester.ValidTestCase{
+		{Code: "new RegExp('.', 'é💩')", Options: []any{map[string]any{"allowConstructorFlags": []any{"é", "💩"}}}},
+		{Code: "new (RegExp)(('a'), ('g'))"},
+		{Code: "function f(RegExp) { return (RegExp)('[', 'z'); }"},
+		{Code: "const RegExp = () => {}; new RegExp('[', 'z');"},
+		{Code: "RegExp('[');", Globals: map[string]any{"RegExp": "off"}},
+		{Code: "new RegExp('[a--b]', flags)"},
+	}, []rule_tester.InvalidTestCase{
+		{Code: "new RegExp('.', '💩💩')", Options: []any{map[string]any{"allowConstructorFlags": []any{"💩"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Duplicate flags ('💩') supplied to RegExp constructor.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
+		{Code: "new RegExp('.', '💀')", Options: []any{map[string]any{"allowConstructorFlags": []any{"💩"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid flags supplied to RegExp constructor '💀'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22}}},
+		{Code: "new RegExp('.', 'ê')", Options: []any{map[string]any{"allowConstructorFlags": []any{"é"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid flags supplied to RegExp constructor 'ê'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 21}}},
+		{Code: "(RegExp)(('['), ('g'))", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[/: Unterminated character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 23}}},
+		{Code: "RegExp?.('[')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[/: Unterminated character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 14}}},
+		{Code: "RegExp(...patterns, 'z')", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid flags supplied to RegExp constructor 'z'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}}},
+		{Code: "RegExp('[', ...flags)", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[/: Unterminated character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 22}}},
+		{Code: "const text = '💩';\n  new RegExp(\n   '[',\n   'u'\n  );", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[/u: Unterminated character class.", Line: 2, Column: 3, EndLine: 5, EndColumn: 4}}},
+	})
+}
+
+// The compiler-backed Go RuleTester rejects legacy octal string escapes before
+// running rules, even in a script. Exercise the unchanged input through the
+// parser and rule directly, including edit demand and the full report range.
+func TestNoInvalidRegexpSloppyOctal(t *testing.T) {
+	const code = `new RegExp('\133')`
+	sf := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/octal.js", Path: "/octal.js"}, code, core.ScriptKindJS)
+	comments := rule.NewCommentStore(sf)
+	var diags []rule.RuleDiagnostic
+	ctx := rule.RuleContext{SourceFile: sf, Comments: comments, DisableManager: rule.NewDisableManager(sf, comments), LanguageOptions: rule.LanguageOptions{SourceType: "script"}}.WithDiagnosticConsumer(NoInvalidRegexpRule.Name, rule.SeverityError, rule.DiagnosticConsumer{Demand: rule.EditDemandAll, Report: func(d rule.RuleDiagnostic) { diags = append(diags, d) }})
+	call := sf.Statements.Nodes[0].AsExpressionStatement().Expression
+	NoInvalidRegexpRule.Run(ctx, nil)[call.Kind](call)
+	if len(diags) != 1 {
+		t.Fatalf("diagnostics=%#v", diags)
+	}
+	d := diags[0]
+	if d.Message.Id != "regexMessage" || d.Message.Description != "Invalid regular expression: /[/: Unterminated character class." || d.Range.Pos() != 0 || d.Range.End() != len(code) {
+		t.Fatalf("diagnostic=%#v", d)
+	}
+	if d.FixesPtr != nil || d.Suggestions != nil {
+		t.Fatalf("unexpected edits: %#v", d)
+	}
+}
+
+// Reviewer reproductions and inverse cases checked against ESLint 10.14.0.
+func TestNoInvalidRegexpRepresentationRegressions(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoInvalidRegexpRule, []rule_tester.ValidTestCase{
+		{Code: "new RegExp(\"[\\ud800-\\udfff]\", \"u\");"},
+		{Code: "new RegExp(\"[\\ud800-\\udfff]\", \"v\");"},
+		{Code: "new RegExp(\"[a-�]\", \"u\");"},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c!-a]\", \"\");"},
+		{Code: "new RegExp(\"[!-\\\\c\\u0000]\", \"\");"},
+		{Code: "new RegExp(\"[\\\\c]\", \"\");"},
+		{Code: "new RegExp(\"\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\\\\\\\\\k<\\\\1>\", \"\");"},
+		{Code: "new RegExp(\"\\\\(?<\\\\1>\", \"\");"},
+		{Code: "RegExp(\"[\\\\c1-!]\", flags)"},
+		{Code: "RegExp(\"[\\\\c_-!]\", flags)"},
+		{Code: "RegExp(\"\\\\k<\\\\1>\", flags)"},
+	}, []rule_tester.InvalidTestCase{
+		{Code: "new RegExp(\"[�-a]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[�-a]/u: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}}},
+		{Code: "new RegExp(\"[!-\\\\c1]\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[!-\\c1]/: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[!-\\\\c_]\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[!-\\c_]/: Range out of order in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"(?<a>x)\\\\k<\\\\1>\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?<a>x)\\k<\\1>/: Invalid capture group name.", Line: 1, Column: 1, EndLine: 1, EndColumn: 34}}},
+		{Code: "new RegExp(\"(?<a>x)\\\\k<\\\\1>)\", \"\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?<a>x)\\k<\\1>)/: Unmatched ')'.", Line: 1, Column: 1, EndLine: 1, EndColumn: 35}}},
+		{Code: "new RegExp(\"\\\\\\\"\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\\"/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
+		{Code: "new RegExp(\"\\\\\\\"\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\\"/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 24}}},
+		{Code: "new RegExp(\"[a-\\\\a]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[a-\\a]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[a-\\\\a]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[a-\\a]/v: Invalid character in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 27}}},
+		{Code: "new RegExp(\"[\\\\q{\\\\a}]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\q{\\a}]/v: Unterminated class string disjunction.", Line: 1, Column: 1, EndLine: 1, EndColumn: 30}}},
+		{Code: "new RegExp(\"[)]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[)]/v: Invalid character in character class.", Line: 1, Column: 1, EndLine: 1, EndColumn: 23}}},
+		{Code: "new RegExp(\"\\\\u{1,0}\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /\\u{1,0}/u: Invalid unicode escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"(?=a){\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /(?=a){/u: Lone quantifier brackets.", Line: 1, Column: 1, EndLine: 1, EndColumn: 26}}},
+		{Code: "new RegExp(\"a{1}{\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /a{1}{/v: Lone quantifier brackets.", Line: 1, Column: 1, EndLine: 1, EndColumn: 25}}},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c1-!]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c_-!]/u: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "new RegExp(\"[\\\\c_-!]\", \"v\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c_-!]/v: Invalid escape.", Line: 1, Column: 1, EndLine: 1, EndColumn: 28}}},
+		{Code: "/* 😀 */\r\n  new RegExp(\"[\\\\c1-!]\", \"u\");", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regexMessage", Message: "Invalid regular expression: /[\\c1-!]/u: Invalid escape.", Line: 2, Column: 3, EndLine: 2, EndColumn: 30}}},
+	})
 }
