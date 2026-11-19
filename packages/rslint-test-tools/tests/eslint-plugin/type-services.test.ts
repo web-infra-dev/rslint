@@ -28,6 +28,7 @@ const enums = {
   SyntaxKind: ts.SyntaxKind,
   TypeFlags: ts.TypeFlags,
   ObjectFlags: ts.ObjectFlags,
+  SymbolFlags: ts.SymbolFlags,
   NodeFlags: ts.NodeFlags,
   JsxEmit: ts.JsxEmit,
   ModuleDetectionKind: ts.ModuleDetectionKind,
@@ -1475,10 +1476,12 @@ test('signature options preserve TypeScript query order across clients', async (
     file,
     `
     type Picked<T> = { [K in keyof T]: T[K] };
-    declare function choose<T extends string>(value: T): 1;
-    declare function choose<T extends string>(value: T, extra: T): 2;
-    const warmed = choose(false,);
+    declare function choose<T extends string>(value: T): { x: 1 };
+    declare function choose<T extends string>(value: T, extra: T): { x: 2 };
+    ({ x } = choose(false,));
     const fresh = choose(false,);
+    declare let x: number;
+    type Used = Picked<{ p: string }>;
   `,
   );
   const compilerOptions = { strict: true, noLib: true };
@@ -1487,22 +1490,35 @@ test('signature options preserve TypeScript query order across clients', async (
     JSON.stringify({ compilerOptions, files: ['input.ts'] }),
   );
   const host = new Host();
-  const nativeCall = (source: ts.SourceFile, index: number) =>
-    (source.statements[index] as ts.VariableStatement).declarationList
-      .declarations[0].initializer as ts.CallExpression;
+  const assignment = (source: ts.SourceFile) =>
+    (
+      (source.statements[3] as ts.ExpressionStatement)
+        .expression as ts.ParenthesizedExpression
+    ).expression as ts.BinaryExpression;
   const exercise = (program: ts.Program, peer = program) => {
     const checker = program.getTypeChecker(),
       peerChecker = peer.getTypeChecker();
     const source = program.getSourceFile(file)!,
       peerSource = peer.getSourceFile(file)!;
-    const call = nativeCall(source, 3),
-      peerCall = nativeCall(peerSource, 3);
-    const firstCall = nativeCall(source, 4);
+    const call = assignment(source).right as ts.CallExpression,
+      peerCall = assignment(peerSource).right as ts.CallExpression;
+    const pattern = assignment(peerSource).left as ts.ObjectLiteralExpression;
+    const propertyName = (
+      pattern.properties[0] as ts.ShorthandPropertyAssignment
+    ).name;
+    const firstCall = (source.statements[4] as ts.VariableStatement)
+      .declarationList.declarations[0].initializer as ts.CallExpression;
     const returned = (signature: ts.Signature | undefined, owner = checker) =>
       owner.typeToString(signature!.getReturnType());
     const read = () => [
       returned(peerChecker.getResolvedSignature(peerCall), peerChecker),
       peerChecker.typeToString(peerChecker.getTypeAtLocation(peerCall)),
+      peerChecker.typeToString(peerChecker.getTypeOfAssignmentPattern(pattern)),
+      peerChecker.typeToString(
+        peerChecker.getTypeOfSymbol(
+          peerChecker.getPropertySymbolOfDestructuringAssignment(propertyName)!,
+        ),
+      ),
     ];
     const withCandidates = (count: number) => {
       const candidates: ts.Signature[] = [];
@@ -1552,7 +1568,7 @@ test('signature options preserve TypeScript query order across clients', async (
       ).toEqual(expected);
       const source = owner.program.getSourceFile(file) as ts.SourceFile;
       const checker = owner.checker;
-      const call = nativeCall(source, 3),
+      const call = assignment(source).right,
         signature = checker.getResolvedSignature(call)!;
       expect(() => checker.getResolvedSignature(call, [signature])).toThrow(
         'must be empty',
@@ -1565,7 +1581,11 @@ test('signature options preserve TypeScript query order across clients', async (
       expect('typeParameter' in checker.getTypeAtLocation(call)!).toBe(false);
       expect(mapped.typeParameter?.symbol?.name).toBe('K');
       expect(checker.typeToString(mapped.constraintType!)).toBe('keyof T');
-      expect(checker.typeToString(mapped.templateType!)).toBe('T[K]');
+      expect(mapped.templateType).toBeUndefined();
+      const used = checker.getTypeFromTypeNode(
+        (source.statements[6] as ts.TypeAliasDeclaration).type,
+      )!;
+      checker.getTypeOfPropertyOfType(used, 'p');
       expect(mapped.templateType?.indexType).toBe(mapped.typeParameter);
     } finally {
       owner.close();
@@ -1743,6 +1763,13 @@ test('public checker, Program and source reads match TypeScript', async () => {
         })(),
         shape: [
           'types' in literal,
+          'target' in c.getStringType(),
+          'target' in literal,
+          Object.hasOwn(literal, 'getFlags'),
+          Object.hasOwn(t, 'typeArguments'),
+          Object.hasOwn(tuple, 'thisType'),
+          'thisType' in t,
+          tuple.thisType && format(tuple.thisType),
           'types' in c.getBooleanType(),
           Reflect.get(c, 'getOptionalExtension'),
           Reflect.get(src, 'getOptionalExtension'),

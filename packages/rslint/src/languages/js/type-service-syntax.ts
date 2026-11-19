@@ -140,6 +140,14 @@ export class GenerationSyntaxViews {
   locationOrUndefined(node: object): NodeRef | undefined {
     return this.identities.get(node);
   }
+  isVariableDeclarationName(ref: NodeRef): boolean {
+    const node = this.sources.get(ref.file)?.getOrCreateNodeAtIndex(ref.index);
+    return (
+      node?.kind === SyntaxKind.Identifier &&
+      node.parent?.kind === SyntaxKind.VariableDeclaration &&
+      Reflect.get(node.parent, 'name') === node
+    );
+  }
   location(node: object): NodeRef {
     this.ensure();
     const ref = this.identities.get(node);

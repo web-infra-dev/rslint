@@ -55,6 +55,7 @@ interface DeclaredMemberViews {
   declaredIndexInfos: readonly IndexInfoView[];
 }
 export interface TypeView extends Partial<Readonly<DeclaredMemberViews>> {
+  readonly checker: CheckerView;
   readonly simplifiedForReading: TypeView | undefined;
   readonly simplifiedForWriting: TypeView | undefined;
   readonly elementType: TypeView | undefined;
@@ -453,12 +454,18 @@ const declaredMemberKeys = new Set<PropertyKey>([
   'declaredIndexInfos',
 ]);
 
+type ViewReflection<T extends object> = Pick<
+  ProxyHandler<T>,
+  'has' | 'ownKeys' | 'getOwnPropertyDescriptor'
+>;
+
 export function guarded<T extends object>(
   object: T,
   ensure: () => void,
-  has?: (target: T, key: string | symbol) => boolean,
+  reflection?: ViewReflection<T>,
 ): T {
   return new Proxy(object, {
+    ...reflection,
     get(target, key, receiver) {
       ensure();
       const value: unknown = Reflect.get(target, key, receiver);
@@ -469,39 +476,6 @@ export function guarded<T extends object>(
           }
         : value;
     },
-    ownKeys: has
-      ? (target) => {
-          ensure();
-          const declared = has(target, 'declaredProperties');
-          return Reflect.ownKeys(target).filter((key) =>
-            declaredMemberKeys.has(key) ? declared : has(target, key),
-          );
-        }
-      : undefined,
-    getOwnPropertyDescriptor: has
-      ? (target, key) => {
-          ensure();
-          if (declaredMemberKeys.has(key)) {
-            const value: unknown = Reflect.get(target, key);
-            if (value === undefined) return undefined;
-            return {
-              value,
-              writable: true,
-              enumerable: true,
-              configurable: true,
-            };
-          }
-          return has(target, key)
-            ? Reflect.getOwnPropertyDescriptor(target, key)
-            : undefined;
-        }
-      : undefined,
-    has: has
-      ? (target, key) => {
-          ensure();
-          return has(target, key);
-        }
-      : undefined,
   });
 }
 // The wrapper caches decoded values only. This closure never captures a packet
@@ -528,7 +502,99 @@ type TypeScriptEnums = Pick<
   | 'JsxEmit'
   | 'ModuleDetectionKind'
   | 'ScriptTarget'
->;
+> & { SymbolFlags: Pick<typeof ts.SymbolFlags, 'TypeLiteral'> };
+
+type TypePrototype = ReturnType<typeof makeTypePrototype>;
+
+function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
+  const { TypeFlags: tf, ObjectFlags: of } = typescript;
+  function cached<T>(read: (type: TypeView) => T) {
+    const values = new WeakMap<TypeView, T>();
+    return function (this: TypeView) {
+      if (!values.has(this)) values.set(this, read(this));
+      return values.get(this)!;
+    };
+  }
+  const typeArguments = cached((t) =>
+    (t.objectFlags ?? 0) & of.Reference
+      ? checker.getTypeArguments(t)
+      : undefined,
+  );
+  const prototype = {
+    get typeArguments() {
+      return typeArguments.call(this);
+    },
+    getFlags() {
+      return this.flags;
+    },
+    getSymbol() {
+      return this.symbol;
+    },
+    isUnion() {
+      return !!(this.flags & tf.Union);
+    },
+    isIntersection() {
+      return !!(this.flags & tf.Intersection);
+    },
+    isUnionOrIntersection() {
+      return !!(this.flags & tf.UnionOrIntersection);
+    },
+    isLiteral() {
+      return !!(
+        this.flags &
+        (tf.StringLiteral | tf.NumberLiteral | tf.BigIntLiteral)
+      );
+    },
+    isStringLiteral() {
+      return !!(this.flags & tf.StringLiteral);
+    },
+    isNumberLiteral() {
+      return !!(this.flags & tf.NumberLiteral);
+    },
+    isTypeParameter() {
+      return !!(this.flags & tf.TypeParameter);
+    },
+    isClassOrInterface() {
+      return !!((this.objectFlags ?? 0) & of.ClassOrInterface);
+    },
+    isClass() {
+      return !!((this.objectFlags ?? 0) & of.Class);
+    },
+    isIndexType() {
+      return !!(this.flags & tf.Index);
+    },
+    getCallSignatures: cached((t) => checker.getSignaturesOfType(t, 0)),
+    getConstructSignatures: cached((t) => checker.getSignaturesOfType(t, 1)),
+    getProperties: cached((t) => checker.getPropertiesOfType(t)),
+    getApparentProperties: cached((t) =>
+      checker.getAugmentedPropertiesOfType(t),
+    ),
+    getProperty(name) {
+      return checker.getPropertyOfType(this, name);
+    },
+    getNonNullableType: cached((t) => checker.getNonNullableType(t)),
+    getConstraint: cached((t) => checker.getBaseConstraintOfType(t)),
+    getDefault: cached((t) =>
+      t.isTypeParameter() ? checker.getDefaultFromTypeParameter(t) : undefined,
+    ),
+    getBaseTypes: cached((t) =>
+      t.isClassOrInterface() ? checker.getBaseTypes(t) : undefined,
+    ),
+    getStringIndexType: cached((t) => checker.getIndexTypeOfType(t, 0)),
+    getNumberIndexType: cached((t) => checker.getIndexTypeOfType(t, 1)),
+  } satisfies Partial<TypeView> & ThisType<TypeView>;
+  for (const key of Object.keys(prototype)) {
+    Object.defineProperty(prototype, key, { enumerable: false });
+  }
+  return prototype;
+}
+
+function inheritTypePrototype<T extends object>(
+  fields: T,
+  prototype: TypePrototype,
+): asserts fields is T & TypePrototype {
+  Object.setPrototypeOf(fields, prototype);
+}
 
 function readCompilerOptions(
   typescript: TypeScriptEnums,
@@ -609,6 +675,7 @@ export class TypeServiceClient {
   private shared: SharedTypeCacheReader | undefined;
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
+  private readonly typePrototype: TypePrototype;
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
   private factBytes = 0;
@@ -1262,6 +1329,7 @@ export class TypeServiceClient {
       typescript,
       descriptor.compilerOptions,
     );
+    this.typePrototype = makeTypePrototype(this.checker, typescript);
     this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
@@ -1471,7 +1539,15 @@ export class TypeServiceClient {
       ...request,
     };
     const key = typeQueryKey(query);
-    if (!isCacheableTypeQuery(query.op)) {
+    // At a simple variable declaration's name the checker returns the symbol's
+    // fixed type. A use of the same identifier can have a different flow type.
+    if (
+      !isCacheableTypeQuery(query) &&
+      !(
+        query.op === 'type' &&
+        this.syntax.isVariableDeclarationName(query.args.node)
+      )
+    ) {
       const reader = this.ingest(
         query,
         this.transport!(query, key, false),
@@ -1545,7 +1621,7 @@ export class TypeServiceClient {
         checker: this.descriptor.checker,
         ...request,
       };
-      if (!isCacheableTypeQuery(query.op)) continue;
+      if (!isCacheableTypeQuery(query)) continue;
       const key = typeQueryKey(query);
       if (this.facts.has(key) || missing.has(key)) continue;
       const shared = this.shared?.get(key);
@@ -1606,6 +1682,7 @@ export class TypeServiceClient {
     kind: ObjectKind,
     id: number,
     create: (client: this, brand: ObjectBrand) => T,
+    reflection?: ViewReflection<T>,
   ): T | undefined {
     this.ensure();
     if (!id) return undefined;
@@ -1617,78 +1694,7 @@ export class TypeServiceClient {
       () => {
         this.ensure();
       },
-      kind === 'type'
-        ? (view, key) => {
-            const type = view as unknown as TypeView;
-            const tf = this.typescript.TypeFlags,
-              of = this.typescript.ObjectFlags;
-            switch (key) {
-              case 'types':
-                return !!(
-                  type.flags &
-                  (tf.UnionOrIntersection | tf.TemplateLiteral)
-                );
-              case 'type':
-                return !!(type.flags & (tf.Index | tf.StringMapping));
-              case 'indexType':
-              case 'objectType':
-                return !!(type.flags & tf.IndexedAccess);
-              case 'checkType':
-              case 'extendsType':
-              case 'root':
-                return !!(type.flags & tf.Conditional);
-              case 'texts':
-                return !!(type.flags & tf.TemplateLiteral);
-              case 'value':
-              case 'escapedName':
-                return type[key] !== undefined;
-              case 'elementFlags':
-              case 'minLength':
-              case 'fixedLength':
-              case 'hasRestElement':
-              case 'labeledElementDeclarations':
-                return type.combinedFlags !== undefined;
-              case 'baseType':
-                return !!(type.flags & tf.Substitution);
-              case 'elementType':
-              case 'finalArrayType':
-                return (
-                  !!((type.objectFlags ?? 0) & of.EvolvingArray) &&
-                  type[key] !== undefined
-                );
-              case 'simplifiedForReading':
-              case 'simplifiedForWriting':
-                return (
-                  !!(type.flags & tf.IndexedAccess) && type[key] !== undefined
-                );
-              case 'resolvedTrueType':
-              case 'resolvedFalseType':
-                return (
-                  !!(type.flags & tf.Conditional) && type[key] !== undefined
-                );
-              case 'node':
-                return (
-                  !!((type.objectFlags ?? 0) & of.Reference) &&
-                  type.node !== undefined
-                );
-              case 'pattern':
-              case 'declaredProperties':
-              case 'declaredCallSignatures':
-              case 'declaredConstructSignatures':
-              case 'declaredIndexInfos':
-                return type[key] !== undefined;
-              case 'thisType':
-                return !!((type.objectFlags ?? 0) & of.ClassOrInterface);
-              case 'typeParameter':
-              case 'constraintType':
-              case 'templateType':
-              case 'modifiersType':
-                return !!((type.objectFlags ?? 0) & of.Mapped);
-              default:
-                return Reflect.has(view, key);
-            }
-          }
-        : undefined,
+      reflection,
     );
     this.brands.set(object, brand);
     map.set(id, object);
@@ -1719,8 +1725,132 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
+  // TypeScript assigns some fields even when their initial value is undefined.
+  // All other optional getters represent a member only when it has a value.
+  private hasTypeField(view: TypeView, key: PropertyKey): boolean {
+    const tf = this.typescript.TypeFlags;
+    const of = this.typescript.ObjectFlags;
+    switch (key) {
+      case 'types':
+        return !!(view.flags & (tf.UnionOrIntersection | tf.TemplateLiteral));
+      case 'type':
+        return !!(view.flags & (tf.Index | tf.StringMapping));
+      case 'objectType':
+      case 'indexType':
+        return !!(view.flags & tf.IndexedAccess);
+      case 'root':
+      case 'checkType':
+      case 'extendsType':
+        return !!(view.flags & tf.Conditional);
+      case 'target':
+        return view.target !== undefined;
+      case 'typeParameters':
+      case 'localTypeParameters':
+      case 'outerTypeParameters':
+      case 'thisType':
+        return (
+          !!((view.objectFlags ?? 0) & (of.ClassOrInterface | of.Tuple)) &&
+          view.target?.id === view.id
+        );
+      case 'symbol':
+        return (
+          !!(
+            view.flags &
+            (tf.Object |
+              tf.TypeParameter |
+              tf.StringLiteral |
+              tf.NumberLiteral |
+              tf.BigIntLiteral |
+              tf.StringMapping)
+          ) || view.symbol !== undefined
+        );
+      case 'aliasSymbol':
+      case 'aliasTypeArguments':
+        return (
+          view.aliasSymbol !== undefined ||
+          !!(
+            view.flags &
+            (tf.UnionOrIntersection | tf.Conditional | tf.IndexedAccess)
+          ) ||
+          !!((view.objectFlags ?? 0) & (of.Mapped | of.Instantiated)) ||
+          (!!((view.objectFlags ?? 0) & of.Anonymous) &&
+            view.symbol?.flags === this.typescript.SymbolFlags.TypeLiteral) ||
+          (!!((view.objectFlags ?? 0) & of.Reference) &&
+            view.node !== undefined)
+        );
+      case 'elementFlags':
+      case 'combinedFlags':
+      case 'readonly':
+      case 'minLength':
+      case 'fixedLength':
+      case 'hasRestElement':
+      case 'labeledElementDeclarations':
+        return view.combinedFlags !== undefined;
+      case 'objectFlags':
+        return view.objectFlags !== undefined;
+      case 'freshType':
+        return (
+          !!(view.flags & (tf.Literal | tf.Enum)) &&
+          view.freshType !== undefined
+        );
+      case 'regularType':
+        return (
+          !!(view.flags & (tf.Literal | tf.Enum | tf.Union | tf.Object)) &&
+          view.regularType !== undefined
+        );
+      case 'simplifiedForReading':
+      case 'simplifiedForWriting':
+        return !!(view.flags & tf.IndexedAccess) && view[key] !== undefined;
+      case 'resolvedTrueType':
+      case 'resolvedFalseType':
+        return !!(view.flags & tf.Conditional) && view[key] !== undefined;
+      case 'elementType':
+      case 'finalArrayType':
+        return (
+          !!((view.objectFlags ?? 0) & of.EvolvingArray) &&
+          view[key] !== undefined
+        );
+      case 'constraint':
+        return (
+          !!(view.flags & (tf.TypeParameter | tf.Substitution)) &&
+          view.constraint !== undefined
+        );
+      default: {
+        const descriptor = Reflect.getOwnPropertyDescriptor(view, key);
+        return descriptor?.get
+          ? Reflect.get(view, key) !== undefined
+          : Reflect.has(view, key);
+      }
+    }
+  }
+  private readonly typeReflection: ViewReflection<TypeView> = {
+    has: (view, key) => {
+      this.ensure();
+      return this.hasTypeField(view, key);
+    },
+    ownKeys: (view) => {
+      this.ensure();
+      const declared = view.declaredProperties !== undefined;
+      return Reflect.ownKeys(view).filter((key) =>
+        declaredMemberKeys.has(key) ? declared : this.hasTypeField(view, key),
+      );
+    },
+    getOwnPropertyDescriptor: (view, key) => {
+      this.ensure();
+      if (declaredMemberKeys.has(key)) {
+        const value: unknown = Reflect.get(view, key);
+        return value === undefined
+          ? undefined
+          : { value, writable: true, configurable: true, enumerable: true };
+      }
+      const descriptor = Reflect.getOwnPropertyDescriptor(view, key);
+      return descriptor && this.hasTypeField(view, key)
+        ? descriptor
+        : undefined;
+    },
+  };
   private type(id: number): TypeView | undefined {
-    return this.intern(this.types, 'type', id, (client) => {
+    const create = (client: this): TypeView => {
       const ensure = () => {
         this.ensure();
       };
@@ -1800,24 +1930,13 @@ export class TypeServiceClient {
         objectFlag = (mask: number) => Boolean((objectFlags() ?? 0) & mask),
         tf = this.typescript.TypeFlags,
         of = this.typescript.ObjectFlags;
-      const typeArguments = memo(ensure, () =>
-        objectFlag(of.Reference)
-          ? this.typesFor(this.query({ op: 'typeArguments', args: { id } }))
-          : undefined,
-      );
       const mapped = (
         op:
           'mappedTypeParameter' | 'mappedConstraintType' | 'mappedTemplateType',
       ) =>
-        memo(ensure, () =>
-          objectFlag(of.Mapped)
-            ? this.type(this.query({ op, args: { id } }))
-            : undefined,
-        );
-      const typeParameter = mapped('mappedTypeParameter'),
-        constraintType = mapped('mappedConstraintType'),
-        templateType = mapped('mappedTemplateType');
-      const isClassOrInterface = () => objectFlag(of.ClassOrInterface);
+        objectFlag(of.Mapped)
+          ? this.type(this.query({ op, args: { id } }))
+          : undefined;
       let resolvedMembers: DeclaredMemberViews | undefined;
       const declaredMembers = () => {
         if (!resolvedMembers && objectFlag(of.ClassOrInterface | of.Tuple)) {
@@ -1835,48 +1954,9 @@ export class TypeServiceClient {
         }
         return resolvedMembers;
       };
-      const calls = memo(ensure, () =>
-          this.signaturesFor(
-            this.query({ op: 'signatures', args: { id, kind: 0 } }),
-          ),
-        ),
-        constructs = memo(ensure, () =>
-          this.signaturesFor(
-            this.query({ op: 'signatures', args: { id, kind: 1 } }),
-          ),
-        );
-      const properties = memo(ensure, () =>
-          this.symbolsFor(this.query({ op: 'properties', args: { id } })),
-        ),
-        apparentProperties = memo(ensure, () =>
-          this.symbolsFor(
-            this.query({ op: 'apparentProperties', args: { id } }),
-          ),
-        ),
-        bases = memo(ensure, () =>
-          isClassOrInterface()
-            ? this.typesFor(this.query({ op: 'baseTypes', args: { id } }))
-            : undefined,
-        ),
-        defaultType = memo(ensure, () =>
-          flag(tf.TypeParameter)
-            ? this.type(this.query({ op: 'defaultType', args: { id } }))
-            : undefined,
-        ),
-        nonNullable = memo(ensure, () =>
-          this.type(this.query({ op: 'nonNullable', args: { id } })),
-        ),
-        constraint = memo(ensure, () =>
-          this.type(this.query({ op: 'constraint', args: { id } })),
-        ),
-        numberIndexType = memo(ensure, () =>
-          this.type(this.query({ op: 'numberIndexType', args: { id } })),
-        ),
-        stringIndexType = memo(ensure, () =>
-          this.type(this.query({ op: 'stringIndexType', args: { id } })),
-        );
-      return {
+      const fields = {
         id,
+        checker: client.checker,
         get flags() {
           return flags();
         },
@@ -2026,9 +2106,6 @@ export class TypeServiceClient {
         get target() {
           return target();
         },
-        get typeArguments() {
-          return typeArguments();
-        },
         get aliasTypeArguments() {
           return aliasTypeArguments();
         },
@@ -2036,13 +2113,13 @@ export class TypeServiceClient {
           return typeParameters();
         },
         get typeParameter() {
-          return typeParameter();
+          return mapped('mappedTypeParameter');
         },
         get constraintType() {
-          return constraintType();
+          return mapped('mappedConstraintType');
         },
         get templateType() {
-          return templateType();
+          return mapped('mappedTemplateType');
         },
         get modifiersType() {
           return objectFlag(of.Mapped)
@@ -2052,7 +2129,8 @@ export class TypeServiceClient {
             : undefined;
         },
         get thisType() {
-          return isClassOrInterface()
+          return objectFlag(of.ClassOrInterface | of.Tuple) &&
+            target()?.id === id
             ? client.type(client.query({ op: 'classThisType', args: { id } }))
             : undefined;
         },
@@ -2062,38 +2140,11 @@ export class TypeServiceClient {
         get readonly() {
           return tuple()?.readonly;
         },
-        getFlags: flags,
-        getSymbol: symbol,
-        isUnion: () => flag(tf.Union),
-        isIntersection: () => flag(tf.Intersection),
-        isUnionOrIntersection: () => flag(tf.UnionOrIntersection),
-        isLiteral: () =>
-          flag(tf.StringLiteral | tf.NumberLiteral | tf.BigIntLiteral),
-        isStringLiteral: () => flag(tf.StringLiteral),
-        isNumberLiteral: () => flag(tf.NumberLiteral),
-        isTypeParameter: () => flag(tf.TypeParameter),
-        isClassOrInterface,
-        isClass: () => objectFlag(of.Class),
-        isIndexType: () => flag(tf.Index),
-        getCallSignatures: calls,
-        getConstructSignatures: constructs,
-        getProperties: properties,
-        getApparentProperties: apparentProperties,
-        getProperty: (name) =>
-          this.symbol(
-            this.query({
-              op: 'property',
-              args: { id, name: nameToUnits(name) },
-            }),
-          ),
-        getNonNullableType: nonNullable,
-        getConstraint: constraint,
-        getDefault: defaultType,
-        getBaseTypes: bases,
-        getStringIndexType: stringIndexType,
-        getNumberIndexType: numberIndexType,
       };
-    });
+      inheritTypePrototype(fields, client.typePrototype);
+      return fields;
+    };
+    return this.intern(this.types, 'type', id, create, this.typeReflection);
   }
   private symbol(id: number, knownName?: string): SymbolView | undefined {
     const view = this.intern(this.symbols, 'symbol', id, (client, brand) => {
