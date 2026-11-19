@@ -355,6 +355,10 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// target discovery. Per-file service/root options require selected targets
 	// before their effective values can contribute project candidates.
 	var targetPlan target.Plan
+	var directoryInputRoots target.InputRoots
+	if baseline != nil && args.inputOrigins.configRoots != nil {
+		directoryInputRoots = make(target.InputRoots)
+	}
 	var configResolver *configLint.Resolver
 	var projectPolicies map[target.File]rslintconfig.ProjectPolicy
 	if !typeCheckOnly || hasProjectOptions {
@@ -365,18 +369,20 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
 		}
 		targetPlan, err = target.Resolve(target.Request{
-			ConfigMap:       targetConfigMap,
-			Config:          targetRslintConfig,
-			ConfigDirectory: currentDirectory,
-			ScanRoot:        workingDirectory,
-			OwnerScopes:     configTargetScopes,
-			FS:              fs,
-			Files:           configCatalog.TargetFiles,
-			ScanDirectories: args.ScanDirectories,
-			Directories:     targetDirectories,
-			GitPolicy:       configCatalog.GitPolicy,
-			PathSpaces:      pathSpaces,
-			SingleThreaded:  singleThreaded,
+			ConfigMap:             targetConfigMap,
+			Config:                targetRslintConfig,
+			ConfigDirectory:       currentDirectory,
+			ScanRoot:              workingDirectory,
+			OwnerScopes:           configTargetScopes,
+			FS:                    fs,
+			Files:                 configCatalog.TargetFiles,
+			ScanDirectories:       args.ScanDirectories,
+			Directories:           targetDirectories,
+			GitPolicy:             configCatalog.GitPolicy,
+			PathSpaces:            pathSpaces,
+			SingleThreaded:        singleThreaded,
+			DirectoryInputRoots:   directoryInputRoots,
+			CollectSkippedAliases: baseline != nil,
 		})
 		if err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
@@ -631,7 +637,8 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err := ctx.Err(); err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args)
+		inputPaths := args.inputOrigins.paths(targetPlan, directoryInputRoots)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, inputPaths, targetPlan.SkippedAliases)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

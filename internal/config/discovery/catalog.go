@@ -71,6 +71,9 @@ type ConfigDiscoveryRequest struct {
 	AdditionalGitFiles []rslintconfig.PathIdentity
 	Fresh              bool
 	SingleThreaded     bool
+	// InputRoots receives the original scan roots reaching a config boundary or
+	// an expanded file candidate, before overlapping routes are deduplicated.
+	InputRoots target.InputRoots
 }
 
 // ExplicitConfigRequest supplies one invocation-wide config array, either
@@ -98,6 +101,7 @@ type ExplicitConfigRequest struct {
 	AdditionalGitFiles        []rslintconfig.PathIdentity
 	Fresh                     bool
 	SingleThreaded            bool
+	InputRoots                target.InputRoots
 }
 
 type ConfigFailure struct {
@@ -227,6 +231,7 @@ func LoadExplicitConfig(ctx context.Context, fsys vfs.FS, loader ConfigModuleLoa
 		ImplicitCWD:               request.TargetFiles == nil && request.TargetDirectories == nil,
 		Fresh:                     request.Fresh,
 		SingleThreaded:            request.SingleThreaded,
+		InputRoots:                request.InputRoots,
 	}
 	return buildConfigCatalog(ctx, fsys, loader, automatic, &request)
 }

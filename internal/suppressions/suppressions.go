@@ -38,17 +38,19 @@ type File struct {
 	entries     entries
 }
 
-// FileResult identifies a linted file and rules whose error counts could not
-// be determined. For every other rule, no diagnostics means a count of zero.
+// FileResult identifies a selected path. A completed rule with no diagnostics
+// has a count of zero. An unchecked path only reserves its baseline keys.
 type FileResult struct {
 	Path         string
-	InputPath    string // Optional CLI operand spelling resolved from the native process cwd.
+	InputPaths   []string // Spellings of CLI operands that selected this lint result.
 	SkippedRules []string
+	Unchecked    bool
 }
 
 type checkedFile struct {
-	key          string
-	inputPath    string
+	keys         []string
+	literal      string
+	portable     string
 	counts       map[string]int
 	skippedRules []string
 }
@@ -56,21 +58,9 @@ type checkedFile struct {
 // Apply compares diagnostics with the baseline for the given files, including
 // those that were checked and produced no diagnostics.
 func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []rule.RuleDiagnostic) ([]rule.RuleDiagnostic, bool, error) {
-	size := len(checked)
+	files := f.matchFiles(checked)
 	if f.options.Mode == Check {
-		size = min(size, len(f.entries))
-	}
-	files := make(map[string]*checkedFile, size)
-	for _, result := range checked {
-		path := result.Path
-		var key string
-		if f.options.Mode == Check {
-			key = f.entryKey(f.entries, path, result.InputPath)
-			if len(f.entries[key]) == 0 {
-				continue
-			}
-		}
-		files[path] = &checkedFile{key: key, inputPath: result.InputPath, skippedRules: result.SkippedRules}
+		selectExistingKeys(f.entries, files)
 	}
 	for _, diagnostic := range diagnostics {
 		file := files[diagnostic.FilePath]
@@ -90,9 +80,11 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 
 	unused := false
 	for _, file := range files {
-		for id, recorded := range f.entries[file.key] {
-			if file.counts[id] < recorded.Count && !slices.Contains(file.skippedRules, id) {
-				unused = true
+		for _, key := range file.keys {
+			for id, recorded := range f.entries[key] {
+				if file.counts[id] < recorded.Count && !slices.Contains(file.skippedRules, id) {
+					unused = true
+				}
 			}
 		}
 	}
@@ -102,7 +94,15 @@ func (f *File) Apply(ctx context.Context, checked []FileResult, diagnostics []ru
 			return false
 		}
 		count := file.counts[diagnostic.RuleName]
-		return count > 0 && count <= f.entries[file.key][diagnostic.RuleName].Count
+		if count == 0 {
+			return false
+		}
+		for _, key := range file.keys {
+			if count > f.entries[key][diagnostic.RuleName].Count {
+				return false
+			}
+		}
+		return true
 	})
 	return visible, unused, nil
 }
@@ -117,30 +117,34 @@ func (f *File) record(data entries, files map[string]*checkedFile) {
 			if f.options.Rules != nil && !slices.Contains(f.options.Rules, id) {
 				continue
 			}
-			if data[file.key] == nil {
-				data[file.key] = make(map[string]entry)
+			for _, key := range file.keys {
+				if data[key] == nil {
+					data[key] = make(map[string]entry)
+				}
+				data[key][id] = entry{Count: count}
 			}
-			data[file.key][id] = entry{Count: count}
 		}
 	}
 }
 
 func (f *File) prune(data entries, files map[string]*checkedFile) error {
 	for _, file := range files {
-		rules := data[file.key]
-		for id, recorded := range rules {
-			if slices.Contains(file.skippedRules, id) {
-				continue
+		for _, key := range file.keys {
+			rules := data[key]
+			for id, recorded := range rules {
+				if slices.Contains(file.skippedRules, id) {
+					continue
+				}
+				switch count := file.counts[id]; {
+				case count == 0:
+					delete(rules, id)
+				case count < recorded.Count:
+					rules[id] = entry{Count: count}
+				}
 			}
-			switch count := file.counts[id]; {
-			case count == 0:
-				delete(rules, id)
-			case count < recorded.Count:
-				rules[id] = entry{Count: count}
+			if len(rules) == 0 {
+				delete(data, key)
 			}
-		}
-		if len(rules) == 0 {
-			delete(data, file.key)
 		}
 	}
 	for key := range data {

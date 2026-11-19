@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -30,6 +31,26 @@ type InputMatch struct {
 	Path      string
 	Directory bool
 	Files     []string
+}
+
+type ownedInput struct{ owner, path string }
+
+// InputRoots optionally records which independent scans reached an exact path
+// under its config owner. Callers that only need the target set leave it nil.
+type InputRoots map[ownedInput][]string
+
+func (roots InputRoots) Add(owner, path, root string) {
+	if roots == nil {
+		return
+	}
+	key := ownedInput{owner, path}
+	if !slices.Contains(roots[key], root) {
+		roots[key] = append(roots[key], root)
+	}
+}
+
+func (roots InputRoots) For(owner, path string) []string {
+	return roots[ownedInput{owner, path}]
 }
 
 // SelectInputs interprets raw file, directory, and glob inputs against fsys.

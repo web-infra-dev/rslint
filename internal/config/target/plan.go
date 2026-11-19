@@ -17,6 +17,8 @@ import (
 type Plan struct {
 	Files                []File
 	ExplicitFileOutcomes []ExplicitFileOutcome
+	// SkippedAliases are other selected paths removed by canonical deduplication.
+	SkippedAliases []File
 
 	pathSpaces *rslintconfig.PathSpaceSnapshot
 	gitPolicy  *rslintconfig.GitPolicy
@@ -42,6 +44,9 @@ type Request struct {
 	GitPolicy       *rslintconfig.GitPolicy
 	PathSpaces      *rslintconfig.PathSpaceSnapshot
 	SingleThreaded  bool
+	// DirectoryInputRoots receives the directory walks that selected each file.
+	DirectoryInputRoots   InputRoots
+	CollectSkippedAliases bool
 }
 
 // Resolve discovers the exact lint target set and rejects
@@ -80,6 +85,7 @@ func Resolve(request Request) (Plan, error) {
 			spaces,
 			explicitFiles,
 			request.GitPolicy,
+			request.DirectoryInputRoots,
 		)
 	} else {
 		configMap := map[string]rslintconfig.RslintConfig{configDirectory: request.Config}
@@ -98,6 +104,7 @@ func Resolve(request Request) (Plan, error) {
 			request.SingleThreaded,
 			plan.pathSpaces,
 			request.GitPolicy,
+			request.DirectoryInputRoots,
 		)
 	}
 	useCaseSensitive := request.FS == nil || request.FS.UseCaseSensitiveFileNames()
@@ -138,6 +145,9 @@ func Resolve(request Request) (Plan, error) {
 					existing.ConfigDirectory,
 					target.ConfigDirectory,
 				)
+			}
+			if request.CollectSkippedAliases && existing.Path != target.Path {
+				plan.SkippedAliases = append(plan.SkippedAliases, target)
 			}
 			continue
 		}

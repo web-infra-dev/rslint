@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"unicode"
@@ -150,27 +151,110 @@ func relativeFilePath(dir, path string) (string, error) {
 	return rel, nil
 }
 
-// ESLint records the actual input spelling relative to process.cwd(). Keep an
-// existing entry under that exact name. Newly recorded files use a stable key
-// that can also be checked from the physical working directory.
-func (f *File) entryKey(data entries, path, inputPath string) string {
-	if len(data) > 0 {
-		observed := filepath.FromSlash(path)
-		if inputPath != "" && inputPath != path && f.fileKey(inputPath) == f.fileKey(path) {
-			observed = filepath.FromSlash(inputPath)
-		}
-		rel := filepath.Rel
-		if runtime.GOOS == "windows" {
-			// A case-sensitive Windows directory can contain both spellings.
-			rel = relativeFilePath
-		}
-		key, err := rel(f.baseDir, observed)
-		if err != nil {
-			key = observed
-		}
-		if key = filepath.ToSlash(key); data[key] != nil {
-			return key
+// ESLint keys are relative to the native process cwd and retain the spelling
+// of the linted input.
+func (f *File) operandKey(path string) string {
+	path = filepath.FromSlash(path)
+	rel := filepath.Rel
+	if runtime.GOOS == "windows" {
+		rel = relativeFilePath // A case-sensitive directory can contain both spellings.
+	}
+	key, err := rel(f.baseDir, path)
+	if err != nil {
+		key = path
+	}
+	return filepath.ToSlash(key)
+}
+
+func (f *File) matchFiles(selected []FileResult) map[string]*checkedFile {
+	files := make(map[string]*checkedFile)
+	byPortableKey := make(map[string][]*checkedFile)
+	exactMatches := make(map[string]bool)
+	if f.options.Mode == Check {
+		// An exact entry can belong to a group whose portable key is absent.
+		// Retain that group, including peers with no baseline entry of their own.
+		hasEntry := func(path string) bool { return f.entries[f.operandKey(path)] != nil }
+		for _, result := range selected {
+			if hasEntry(result.Path) || slices.ContainsFunc(result.InputPaths, hasEntry) {
+				if portable := f.fileKey(result.Path); f.entries[portable] == nil {
+					exactMatches[portable] = true
+				}
+			}
 		}
 	}
-	return f.fileKey(path)
+	for _, result := range selected {
+		portable := f.fileKey(result.Path)
+		if f.options.Mode == Check && f.entries[portable] == nil && !exactMatches[portable] {
+			continue
+		}
+		literal := f.operandKey(result.Path)
+		keys := make([]string, 0, max(1, len(result.InputPaths)))
+		for _, input := range result.InputPaths {
+			key := literal
+			// From a symlinked cwd, .. can name a different physical file.
+			if input != result.Path && f.fileKey(input) == portable {
+				key = f.operandKey(input)
+			}
+			keys = append(keys, key)
+		}
+		if len(keys) == 0 {
+			keys = append(keys, literal)
+		}
+		slices.Sort(keys)
+		file := &checkedFile{
+			keys:         slices.Compact(keys),
+			literal:      literal,
+			portable:     portable,
+			skippedRules: result.SkippedRules,
+		}
+		byPortableKey[portable] = append(byPortableKey[portable], file)
+		if !result.Unchecked {
+			files[result.Path] = file
+		}
+	}
+	for _, group := range byPortableKey {
+		if len(group) > 1 {
+			separateFilenames(group)
+		}
+	}
+	return files
+}
+
+// Rules can inspect the filename, so separately selected paths that share a
+// portable key cannot use each other's counts. Keep a disputed operand on the
+// name passed to the rule. Unchecked aliases reserve names by the same logic.
+func separateFilenames(group []*checkedFile) {
+	owners := make(map[string]string)
+	claim := func(key, literal string) {
+		if owner, ok := owners[key]; ok && owner != literal {
+			owners[key] = ""
+		} else {
+			owners[key] = literal
+		}
+	}
+	for _, file := range group {
+		claim(file.literal, file.literal)
+		for _, key := range file.keys {
+			claim(key, file.literal)
+		}
+	}
+	for _, file := range group {
+		file.portable = ""
+		for i, key := range file.keys {
+			if owners[key] != file.literal {
+				file.keys[i] = file.literal
+			}
+		}
+		slices.Sort(file.keys)
+		file.keys = slices.Compact(file.keys)
+	}
+}
+
+func selectExistingKeys(data entries, files map[string]*checkedFile) {
+	for _, file := range files {
+		// A missing key has no allowance when several spellings were requested.
+		if len(file.keys) == 1 && file.portable != "" && data[file.keys[0]] == nil {
+			file.keys[0] = file.portable
+		}
+	}
 }
