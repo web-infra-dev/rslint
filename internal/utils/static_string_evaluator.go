@@ -523,6 +523,56 @@ func (staticEvaluator *StaticStringEvaluator) ResolveIdentifierInitializer(node 
 	return initializer, ok
 }
 
+// ResolveUnmodifiedInitializerAtLocation reuses escape facts to reject object
+// initializers whose values may have changed before this use. The current call
+// occurs after evaluating its arguments. Loops and outer mutable objects stay
+// conservative, without executing or interpreting the initializer's functions.
+func (e *StaticStringEvaluator) ResolveUnmodifiedInitializerAtLocation(node *ast.Node) (*ast.Node, bool) {
+	initializer, symbol, ok := e.resolveIdentifierInitializer(node)
+	if !ok {
+		return nil, false
+	}
+	e.ensureReferenceFlags()
+	view := NewStaticStringEvaluatorWithCallEscapes(e.typeChecker, e.sourceFile, e.referenceResolver)
+	view.GlobalAccess = e.GlobalAccess
+	view.useReferenceFacts(e)
+	view.observationPoint = node
+	root := executionRoot(node)
+	if root == nil || root.Kind != ast.KindSourceFile && executionRoot(symbol.Declarations[0]) != root {
+		view.observationPoint = nil
+	}
+	for parent := node.Parent; parent != nil && parent != root; parent = parent.Parent {
+		if ast.IsIterationStatement(parent, false) {
+			view.observationPoint = nil
+			break
+		}
+	}
+	if view.hasPropertyMutation(symbol) {
+		return nil, false
+	}
+	return initializer, true
+}
+
+// IsUnmodifiedBuiltinMethod recognizes a direct, unshadowed namespace method.
+// It deliberately excludes aliases and changed namespace objects.
+func (e *StaticStringEvaluator) IsUnmodifiedBuiltinMethod(node *ast.Node, namespace, method string) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil || !ast.IsPropertyAccessExpression(node) || node.Name() == nil || node.Name().Text() != method {
+		return false
+	}
+	object := SkipAssertionsAndParens(node.Expression())
+	if !e.isBuiltinIdentifier(object, namespace) {
+		return false
+	}
+	symbol := e.referenceSymbol(object)
+	return symbol != nil && !e.hasWrites(symbol) && !e.hasPropertyMutation(symbol)
+}
+
+func (e *StaticStringEvaluator) HasUnmodifiedArrayPrototype() bool {
+	e.ensureReferenceFlags()
+	return !e.arrayPrototypeMutated
+}
+
 func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node *ast.Node) (*ast.Node, *ast.Symbol, bool) {
 	if staticEvaluator == nil || (staticEvaluator.typeChecker == nil && staticEvaluator.referenceResolver == nil) {
 		return nil, nil, false

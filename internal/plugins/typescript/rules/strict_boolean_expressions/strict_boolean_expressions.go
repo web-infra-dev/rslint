@@ -395,7 +395,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
 				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
-					predicate, predicateType := firstArrayPredicateArgument(ctx, callExpr.Arguments.Nodes)
+					predicate, predicateType := firstArrayPredicateArgument(ctx, staticEvaluator, callExpr.Arguments.Nodes)
 					if predicate != nil {
 						checkArrayMethodPredicate(ctx, sf, tc, predicate, predicateType, opts)
 					}
@@ -860,19 +860,20 @@ func getSuggestionsForConditionError(
 		// Assertions can hide nullish values from the final expression type.
 		// Default their result before accessing length,
 		// preserving short-circuiting and evaluating the original expression once.
-		lengthCode := func(code string) string {
-			if hasOptionalChain(node) || assertionCanBeNullish(tc, node) {
-				return "(" + code + ` ?? "").length`
+		guardNullish := hasOptionalChain(node) || assertionCanBeNullish(tc, node)
+		valueCode := func(code string) string {
+			if guardNullish {
+				return "(" + code + ` ?? "")`
 			}
-			return code + ".length"
+			return code
 		}
 		if neg != nil {
 			return []rule.RuleSuggestion{
 				wrappingFix(sf, sugCompareStringLength(), neg, node, func(code string) string {
-					return lengthCode(code) + " === 0"
+					return valueCode(code) + ".length === 0"
 				}),
 				wrappingFix(sf, sugCompareEmptyString(), neg, node, func(code string) string {
-					return code + ` === ""`
+					return valueCode(code) + ` === ""`
 				}),
 				wrappingFix(sf, sugCastBoolean(), neg, node, func(code string) string {
 					return "!Boolean(" + code + ")"
@@ -881,10 +882,10 @@ func getSuggestionsForConditionError(
 		}
 		return []rule.RuleSuggestion{
 			wrappingFix(sf, sugCompareStringLength(), node, node, func(code string) string {
-				return lengthCode(code) + " > 0"
+				return valueCode(code) + ".length > 0"
 			}),
 			wrappingFix(sf, sugCompareEmptyString(), node, node, func(code string) string {
-				return code + ` !== ""`
+				return valueCode(code) + ` !== ""`
 			}),
 			wrappingFix(sf, sugCastBoolean(), node, node, func(code string) string {
 				return "Boolean(" + code + ")"
@@ -907,7 +908,7 @@ func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
 	for node = ast.SkipParentheses(node); node != nil; node = ast.SkipParentheses(node.Expression()) {
 		awaited := false
 		switch node.Kind {
-		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
 		case ast.KindAwaitExpression:
 			awaited = true
 		default:
@@ -960,7 +961,7 @@ func hasOptionalChain(node *ast.Node) bool {
 // A possibly empty spread also admits the next argument. Keep the authored
 // spread as the diagnostic node: its element types do not identify a safe
 // inline function to edit.
-func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+func firstArrayPredicateArgument(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, arguments []*ast.Node) (*ast.Node, *checker.Type) {
 	tc := ctx.TypeChecker
 	var firstTypes []*checker.Type
 	var reportNode *ast.Node
@@ -971,6 +972,18 @@ func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*
 			}
 			firstTypes = append(firstTypes, utils.GetConstrainedTypeAtLocation(tc, argument))
 			break
+		}
+		if element, handled := assignedArrayIteratorElement(ctx, evaluator, argument.Expression()); handled {
+			if element == nil {
+				return nil, nil
+			}
+			if !utils.IsTypeFlagSet(element, checker.TypeFlagsNever) {
+				if reportNode == nil {
+					reportNode = argument
+				}
+				firstTypes = append(firstTypes, element)
+			}
+			continue
 		}
 		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
 		types, mayBeEmpty, known := firstSpreadElementTypes(ctx, spreadType, map[*checker.Type]bool{})
@@ -1003,6 +1016,90 @@ func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*
 	return reportNode, tc.GetUnionType(firstTypes)
 }
 
+// Object.assign's intersection type retains overwritten iterator signatures.
+// Resolve only the direct builtin, a fresh array target and plain literal
+// sources, selecting the last own iterator. Unknown sources/mutations stay
+// opaque rather than combining runtime-incompatible signatures.
+func assignedArrayIteratorElement(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, expression *ast.Node) (*checker.Type, bool) {
+	node := utils.SkipAssertionsAndParens(expression)
+	unmodified := true
+	seen := map[*ast.Node]bool{}
+	for ast.IsIdentifier(node) {
+		if seen[node] {
+			return nil, false
+		}
+		seen[node] = true
+		initializer, ok := evaluator.ResolveIdentifierInitializer(node)
+		if !ok {
+			return nil, false
+		}
+		if _, stable := evaluator.ResolveUnmodifiedInitializerAtLocation(node); !stable {
+			unmodified = false
+		}
+		node = utils.SkipAssertionsAndParens(initializer)
+	}
+	if !ast.IsCallExpression(node) || !ast.IsPropertyAccessExpression(node.Expression()) {
+		return nil, false
+	}
+	callee := node.Expression().AsPropertyAccessExpression()
+	if callee.Name().Text() != "assign" || !ast.IsIdentifier(callee.Expression) || callee.Expression.Text() != "Object" ||
+		!ctx.Refs.IsGlobalNameReference(callee.Expression, "Object", ast.SymbolFlagsValue) {
+		return nil, false
+	}
+	arguments := node.Arguments()
+	if len(arguments) < 2 || !ast.IsArrayLiteralExpression(utils.SkipAssertionsAndParens(arguments[0])) {
+		return nil, false
+	}
+	// Ordinary metadata assignments retain the existing type path. Activate
+	// source precedence only when a literal actually declares an own iterator.
+	hasIterator := false
+	for _, source := range arguments[1:] {
+		source = utils.SkipAssertionsAndParens(source)
+		if ast.IsObjectLiteralExpression(source) {
+			if iterator := utils.GetWellKnownSymbolPropertyOfType(ctx.TypeChecker.GetTypeAtLocation(source), "iterator", ctx.TypeChecker); iterator != nil {
+				for _, declaration := range iterator.Declarations {
+					if declaration.Parent == source {
+						hasIterator = true
+					}
+				}
+			}
+		}
+	}
+	if !hasIterator {
+		return nil, false
+	}
+	if !unmodified || !evaluator.IsUnmodifiedBuiltinMethod(node.Expression(), "Object", "assign") || !evaluator.HasUnmodifiedArrayPrototype() {
+		return nil, true
+	}
+	var last *checker.Type
+	for _, source := range arguments[1:] {
+		source = utils.SkipAssertionsAndParens(source)
+		if !ast.IsObjectLiteralExpression(source) {
+			return nil, true
+		}
+		for _, property := range source.AsObjectLiteralExpression().Properties.Nodes {
+			if property.Kind != ast.KindPropertyAssignment && property.Kind != ast.KindShorthandPropertyAssignment && property.Kind != ast.KindMethodDeclaration {
+				return nil, true
+			}
+		}
+		t := ctx.TypeChecker.GetTypeAtLocation(source)
+		if utils.GetWellKnownSymbolPropertyOfType(t, "iterator", ctx.TypeChecker) != nil {
+			last = t
+		}
+	}
+	if last == nil {
+		return nil, false
+	}
+	first, _, known := iterableElementTypes(ctx.TypeChecker, last)
+	if !known {
+		return nil, true
+	}
+	if len(first) == 0 {
+		return ctx.TypeChecker.GetNeverType(), true
+	}
+	return first[0], true
+}
+
 // Read tuple elements in order and stop at the first guaranteed argument. For
 // [...Callback[], Callback, object], the object can never be the callback, even
 // though it appears in the tuple's numeric index type. Variadic elements recurse
@@ -1031,16 +1128,7 @@ func firstSpreadElementTypes(ctx rule.RuleContext, t *checker.Type, visiting map
 		return types, mayBeEmpty, true
 	}
 	iterator := utils.GetWellKnownSymbolPropertyOfType(t, "iterator", tc)
-	standardIterator := true
-	if iterator != nil {
-		standardIterator = len(iterator.Declarations) != 0
-		for _, declaration := range iterator.Declarations {
-			if !ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
-				standardIterator = false
-				break
-			}
-		}
-	}
+	standardIterator := iterator == nil || hasStandardIteratorSignature(ctx, iterator)
 	// User iterator declarations define the spread values independently of
 	// numeric properties or tuple-like metadata. Their length is not inferred.
 	if !standardIterator {
@@ -1098,10 +1186,66 @@ func firstSpreadElementTypes(ctx rule.RuleContext, t *checker.Type, visiting map
 	return types, true, true
 }
 
+// A matching ambient method signature does not replace the runtime iterator.
+// Compare instantiated return types with the library signatures, and accept
+// only declarations with no implementation. Different signatures remain opaque.
+func hasStandardIteratorSignature(ctx rule.RuleContext, iterator *ast.Symbol) bool {
+	tc := ctx.TypeChecker
+	if len(iterator.Declarations) == 0 {
+		return false
+	}
+	allLibrary := true
+	for _, declaration := range iterator.Declarations {
+		if !ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			allLibrary = false
+			if declaration.Kind != ast.KindMethodSignature {
+				return false
+			}
+		}
+	}
+	if allLibrary {
+		return true
+	}
+	signatures := utils.GetCallSignatures(tc, tc.GetTypeOfSymbolAtLocation(iterator, ctx.SourceFile.AsNode()))
+	var library []*checker.Signature
+	for _, signature := range signatures {
+		if declaration := signature.Declaration(); declaration != nil && ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			library = append(library, signature)
+		}
+	}
+	if len(library) == 0 {
+		return false
+	}
+	for _, signature := range signatures {
+		declaration := signature.Declaration()
+		if declaration == nil {
+			return false
+		}
+		if ctx.Program().IsSourceFileDefaultLibrary(ast.GetSourceFileOfNode(declaration)) {
+			continue
+		}
+		matched := false
+		for _, standard := range library {
+			if len(signature.Parameters()) == len(standard.Parameters()) && len(signature.TypeParameters()) == 0 && len(standard.TypeParameters()) == 0 &&
+				checker.Checker_isTypeIdenticalTo(tc, tc.GetReturnTypeOfSignature(signature), tc.GetReturnTypeOfSignature(standard)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
+}
+
 func iterableElementTypes(tc *checker.Checker, t *checker.Type) ([]*checker.Type, bool, bool) {
 	first := checker.Checker_getIterationTypeOfIterable(tc, checker.IterationUseSpread, checker.IterationTypeKindYield, t, nil)
 	if first == nil || utils.IsTypeFlagSet(first, checker.TypeFlagsAny|checker.TypeFlagsUnknown) {
 		return nil, false, false
+	}
+	if utils.IsTypeFlagSet(first, checker.TypeFlagsNever) {
+		return nil, true, true
 	}
 	return []*checker.Type{first}, true, true
 }

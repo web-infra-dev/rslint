@@ -157,9 +157,9 @@ including comments containing parentheses. For `(x, /* ) */) => 1`, Rslint
 produces `(x, /* ) */): boolean => 1`. Upstream v8.67.0 misidentifies this
 as a parameter without parentheses and produces an invalid annotation.
 
-The string-length suggestion defaults an optional chain's short-circuit result
+The string-length and empty-string suggestions default an optional chain's short-circuit result
 or a potentially nullish value hidden by a type assertion to an empty string
-before accessing `.length`. For example, `user?.name!` becomes
+before accessing `.length` or comparing with `""`. For example, `user?.name!` becomes
 `((user?.name!) ?? "").length > 0`; the original expression is evaluated once.
 Upstream v8.67.0 can suggest `(user?.name!).length > 0`, which throws when
 `user` is nullish. Negated conditions use the corresponding `=== 0` check. This protection is
@@ -168,7 +168,8 @@ types are non-nullish. For `value: string | undefined`, the suggestion for
 `value!` is `(value! ?? "").length > 0`. The same protection applies when an
 assertion wraps a conditional expression, or occurs inside `await`. For an
 optional `Promise<string>`, the suggestion for `await value!` handles the awaited
-nullish result before reading its length.
+nullish result before reading its length or comparing with an empty string.
+Transparent `satisfies` wrappers receive the same protection.
 
 Suggestions that begin with a parenthesis insert a leading semicolon when needed
 inside `case` and `default` clauses, namespace bodies and ordinary blocks. This prevents a
@@ -183,17 +184,25 @@ callbacks. No inline callback edits are offered for a spread argument.
 Upstream v8.67.0 can report `conditionErrorOther` on a valid tuple containing a
 boolean callback and its `thisArg`. For array-like intersection types, an
 explicit required `0` property retains the first callback and nonempty status
-when the type uses the standard iterator. User-declared iterators use the
+when the type uses the standard iterator. Matching type-only iterator signatures
+do not replace that runtime iterator and retain tuple positions. Iterators with
+yield type `never` contribute no arguments, allowing inspection of the following
+callback. User-declared iterator implementations use the
 compiler's yield type independently of numeric metadata and do not imply a
 nonempty argument list. `Set` and `Iterable` spreads also use the yield type. Opaque
 collections and unresolved mixed collection unions remain conservative.
+For a direct, unchanged `Object.assign` with a fresh array target and plain
+literal sources, the last own iterator declaration determines the spread values.
+Unknown sources and potentially modified objects remain conservative.
 
 Computed array-method names are treated as unknown when their backing objects
 may have been modified by a function call. Primitive strings copied from those objects
 before a later-created callback remain stable; defining that callback does not
 execute its body. Function-local captures of outer mutable objects remain
 unknown when repeated calls could observe earlier mutations. Fresh local objects
-and primitive literals retain the single-invocation ordering. Calls before the
+and primitive literals retain the single-invocation ordering. Direct synchronous
+top-level arrow IIFEs also retain this ordering; loops, aliases and asynchronous
+IIFEs do not establish one invocation. Calls before the
 copy still invalidate the backing object. This avoids classifying a runtime `forEach` call
 as a predicate method based on an object's initial property value.
 

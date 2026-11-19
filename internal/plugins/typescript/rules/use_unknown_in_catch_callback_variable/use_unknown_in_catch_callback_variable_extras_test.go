@@ -1,6 +1,7 @@
 package use_unknown_in_catch_callback_variable
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -155,4 +156,13 @@ func TestUseUnknownInCatchCallbackVariableCapturedValues(t *testing.T) {
 		// derived primitive
 		{Code: "const methods = { current: 'catch' as const };\nconst key = methods.current;\nfunction change(value: { current: string }) {\n  value.current = 'then';\n}\nchange(methods);\nconst second = key + '';\nPromise.resolve(1)[second]((error: any) => {});\n", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useUnknown", Message: "Prefer the safe `: unknown` for a `catch` callback variable.", Line: 8, Column: 29, EndLine: 8, EndColumn: 39, Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "wrongTypeAnnotationSuggestion", Output: "const methods = { current: 'catch' as const };\nconst key = methods.current;\nfunction change(value: { current: string }) {\n  value.current = 'then';\n}\nchange(methods);\nconst second = key + '';\nPromise.resolve(1)[second]((error: unknown) => {});\n"}}}}},
 	})
+}
+
+func TestUseUnknownInCatchCallbackVariableTopLevelCapture(t *testing.T) {
+	const declarations = `const methods:{current:'catch'|'then'}={current:'catch'}; function change(o:{current:string}){o.current='then'} `
+	const body = `(()=>{const key=methods.current; Promise.resolve(1)[key]((error: any)=>change(methods));})();`
+	code := declarations + body
+	parameter := "error: any"
+	column := strings.Index(code, parameter) + 1
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{{Code: declarations + `change(methods); ` + body}}, []rule_tester.InvalidTestCase{{Code: code, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useUnknown", Message: "Prefer the safe `: unknown` for a `catch` callback variable.", Line: 1, Column: column, EndLine: 1, EndColumn: column + len(parameter), Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "wrongTypeAnnotationSuggestion", Output: strings.Replace(code, parameter, "error: unknown", 1)}}}}}})
 }

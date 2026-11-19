@@ -1969,7 +1969,7 @@ if ((<string | null>x) ?? "") {}`},
 		},
 
 		// ---- NonNullAssertion `x!`: preserve precedence and guard erased nullish values. ----
-		// The previous length suggestion threw when x was undefined; default it once.
+		// Length and empty-string suggestions share a default so undefined stays falsy.
 		// `declare const x: number | undefined; if (x!.toString())` — the `.toString()` makes the whole thing string.
 		// For this fixer test, use `x!` directly in a position where `!`-narrowed `string | undefined` ⇒ `string`.
 		{
@@ -1980,7 +1980,7 @@ if ((<string | null>x) ?? "") {}`},
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 					{MessageId: "conditionFixCompareStringLength", Output: "declare const x: string | undefined;\nif ((x! ?? \"\").length > 0) {}"},
 					{MessageId: "conditionFixCompareEmptyString", Output: `declare const x: string | undefined;
-if (x! !== "") {}`},
+if ((x! ?? "") !== "") {}`},
 					{MessageId: "conditionFixCastBoolean", Output: "declare const x: string | undefined;\nif (Boolean(x!)) {}"},
 				},
 			}},
@@ -2156,7 +2156,7 @@ func TestStrictBooleanExpressionsSyntaxEdges(t *testing.T) {
 					Line: 1, Column: 35, EndLine: 1, EndColumn: 39,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: {s: string}; if (((x?.s) ?? \"\").length > 0) {}"},
-						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: {s: string}; if ((x?.s) !== \"\") {}"},
+						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: {s: string}; if (((x?.s) ?? \"\") !== \"\") {}"},
 						{MessageId: "conditionFixCastBoolean", Output: "declare const x: {s: string}; if (Boolean((x?.s))) {}"},
 					},
 				},
@@ -2183,7 +2183,7 @@ func TestStrictBooleanExpressionsSyntaxEdges(t *testing.T) {
 					Line: 1, Column: 36, EndLine: 1, EndColumn: 41,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "conditionFixCompareStringLength", Output: "declare const x: () => string; if (((x?.()) ?? \"\").length > 0) {}"},
-						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: () => string; if ((x?.()) !== \"\") {}"},
+						{MessageId: "conditionFixCompareEmptyString", Output: "declare const x: () => string; if (((x?.()) ?? \"\") !== \"\") {}"},
 						{MessageId: "conditionFixCastBoolean", Output: "declare const x: () => string; if (Boolean((x?.()))) {}"},
 					},
 				},

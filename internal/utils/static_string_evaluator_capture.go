@@ -41,21 +41,48 @@ func executionRoot(node *ast.Node) *ast.Node {
 func (e *StaticStringEvaluator) callMayPrecedeCapture(site *ast.Node, symbol *ast.Symbol) bool {
 	root := executionRoot(site)
 	captureRoot := executionRoot(e.capturePoint)
+	once := topLevelIIFE(captureRoot)
 	// Captures of an outer mutable object may be repeated on later calls.
 	// Lexical ordering in the capturing function does not bound that object's
 	// lifetime. Alias evaluation also checks its outer backing symbol.
-	if captureRoot != nil && captureRoot.Kind != ast.KindSourceFile &&
+	if captureRoot != nil && captureRoot.Kind != ast.KindSourceFile && once == nil &&
 		(len(symbol.Declarations) != 1 || executionRoot(symbol.Declarations[0]) != captureRoot) {
 		return true
 	}
 	if root == captureRoot {
 		return site.End() <= e.capturePoint.Pos()
 	}
+	if once != nil && root == executionRoot(once) {
+		return site.End() <= once.Pos()
+	}
 	if root != nil && (ast.IsArrowFunction(root) || ast.IsFunctionExpression(root)) &&
 		root.Pos() >= e.capturePoint.End() && executionRoot(root.Parent) == captureRoot {
 		return false
 	}
 	return true
+}
+
+// Recognize only a direct synchronous arrow invocation in source initialization.
+// Loops, enclosing functions/classes, aliases and asynchronous continuations
+// do not establish one invocation. No function-body execution is performed.
+func topLevelIIFE(root *ast.Node) *ast.Node {
+	if root == nil || !ast.IsArrowFunction(root) || ast.GetFunctionFlags(root)&ast.FunctionFlagsAsync != 0 {
+		return nil
+	}
+	callee := root
+	for callee.Parent != nil && ast.IsParenthesizedExpression(callee.Parent) {
+		callee = callee.Parent
+	}
+	call := callee.Parent
+	if call == nil || !ast.IsCallExpression(call) || call.Expression() != callee || executionRoot(call) == nil || executionRoot(call).Kind != ast.KindSourceFile {
+		return nil
+	}
+	for parent := call.Parent; parent != nil && parent.Kind != ast.KindSourceFile; parent = parent.Parent {
+		if ast.IsIterationStatement(parent, false) || parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression {
+			return nil
+		}
+	}
+	return call
 }
 
 // Capture immutable values at initialization, including primitive elements
