@@ -776,15 +776,7 @@ func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *ch
 		// Preserve reads in stored callbacks even when they contain an IIFE.
 		// Upstream checks only the nearest function and incorrectly reports
 		// `value = register(() => (() => value)())` as unused.
-		for enclosing := function; enclosing != nil && ast.IsNodeDescendantOf(enclosing, bin.Right); {
-			if coreNoUnusedVars.IsStorableFunction(enclosing, bin.Right) {
-				return false
-			}
-			enclosing = ast.FindAncestor(enclosing.Parent, func(current *ast.Node) bool {
-				return ast.IsFunctionLike(current)
-			})
-		}
-		return true
+		return !coreNoUnusedVars.IsInsideStorableFunction(node, bin.Right)
 	}
 	return false
 }

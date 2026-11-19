@@ -560,7 +560,7 @@ func isSelfModifyingReference(
 			isInsideLoop(current) {
 			continue
 		}
-		return !isInsideOfStorableFunction(node, binary.Right)
+		return !IsInsideStorableFunction(node, binary.Right)
 	}
 
 	return false
@@ -681,29 +681,35 @@ func isInsideAnyOwnDeclaration(usage *ast.Node, definitions []*ast.Node) bool {
 	return false
 }
 
-// isInsideOfStorableFunction preserves a RHS reference if any enclosing
+// IsInsideStorableFunction preserves a RHS reference if any enclosing
 // function can escape or execute later. A synchronous nested IIFE does not
 // make a surrounding callback, async body, or generator synchronous.
-func isInsideOfStorableFunction(node *ast.Node, rhs *ast.Node) bool {
+func IsInsideStorableFunction(node *ast.Node, rhs *ast.Node) bool {
+	flow := functionValueFlow{rhs: rhs}
+	escaped := false
 	for current := node.Parent; current != nil && ast.IsNodeDescendantOf(current, rhs); current = current.Parent {
-		if ast.IsFunctionLike(current) && IsStorableFunction(current, rhs) {
-			return true
+		if ast.IsFunctionLike(current) {
+			use := flow.use(current)
+			if use.state == functionValueDiscarded {
+				return false
+			}
+			escaped = escaped || use.state == functionValueEscaped
 		}
 	}
-	return false
+	return escaped
 }
 
-// IsStorableFunction follows the function value through returns and binding.
-// Calling a wrapper executes the wrapper, not the function it returns; the
-// returned value's next consumer determines whether that function can escape.
-func IsStorableFunction(function *ast.Node, rhs *ast.Node) bool {
-	flow := functionValueFlow{rhs: rhs}
-	return flow.use(function).stored
-}
+type functionValueState uint8
+
+const (
+	functionValueDiscarded functionValueState = iota
+	functionValueInvoked
+	functionValueEscaped
+)
 
 type functionValueUse struct {
 	invocation *ast.Node
-	stored     bool
+	state      functionValueState
 }
 
 type functionValueFlow struct {
@@ -715,7 +721,7 @@ type functionValueFlow struct {
 
 func (flow *functionValueFlow) wrapperUse(function *ast.Node) functionValueUse {
 	if function == nil || !ast.IsNodeDescendantOf(function, flow.rhs) {
-		return functionValueUse{stored: true}
+		return functionValueUse{state: functionValueEscaped}
 	}
 	if use, ok := flow.wrappers[function]; ok {
 		return use
@@ -733,6 +739,7 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 	returned := false
 	direct := true
 	var containers []functionValueContainer
+	var spreadMember *ast.Node
 	method := ""
 	for node.Parent != nil && ast.IsNodeDescendantOf(node.Parent, flow.rhs) {
 		parent := node.Parent
@@ -747,7 +754,7 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 					return functionValueUse{}
 				}
 			} else if ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 		case ast.KindConditionalExpression:
 			if parent.AsConditionalExpression().Condition == node {
@@ -757,15 +764,15 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 			var wrapper *ast.Node
 			if parent.Kind == ast.KindArrowFunction {
 				if parent.Body() != node {
-					return functionValueUse{stored: true}
+					return functionValueUse{state: functionValueEscaped}
 				}
 				wrapper = parent
 			} else {
 				wrapper = ast.GetContainingFunction(parent)
 			}
 			use := flow.wrapperUse(wrapper)
-			if use.stored || use.invocation == nil {
-				return functionValueUse{stored: true}
+			if use.state != functionValueInvoked {
+				return use
 			}
 			// Continue from the wrapper's result, preserving whether it is the
 			// function itself or a container holding that function.
@@ -775,23 +782,23 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 			continue
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
 			if utils.AccessExpressionObject(parent) != node {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 			name, ok := utils.AccessExpressionStaticName(parent)
 			if !ok {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 			if len(containers) != 0 {
 				container := containers[len(containers)-1]
 				if !container.selectsMember(name) {
-					return functionValueUse{stored: true}
+					return functionValueUse{state: functionValueEscaped}
 				}
 				containers = containers[:len(containers)-1]
 				direct = len(containers) == 0
 				break
 			}
 			if !direct || method != "" {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 			// These own properties describe a fresh callable without executing
 			// or exposing its captured reads. Unknown members may expose it.
@@ -799,12 +806,12 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 				return functionValueUse{}
 			}
 			if name != "bind" && name != "call" && name != "apply" {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 			method = name
 		case ast.KindCallExpression:
 			if !direct || parent.AsCallExpression().Expression != node {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 			if method == "bind" {
 				// Binding creates another callable carrying the same captured
@@ -816,29 +823,48 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 			// Async bodies may resume after assignment; generators execute
 			// on iteration. Do not follow their call result as a synchronous
 			// return value either (it is a promise or iterator).
-			deferred := ast.GetFunctionFlags(function)&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) != 0
-			return functionValueUse{invocation: parent, stored: deferred}
+			return flow.invocationUse(function, parent)
 		case ast.KindNewExpression:
 			if direct && parent.AsNewExpression().Expression == node {
-				return functionValueUse{invocation: parent}
+				return flow.invocationUse(function, parent)
 			}
-			return functionValueUse{stored: true}
+			return functionValueUse{state: functionValueEscaped}
 		case ast.KindPropertyAssignment:
 			if parent.AsPropertyAssignment().Initializer != node {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 		case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
 			// Remember each literal along the path so nested extraction can
 			// recover the original callable, including through wrapper returns.
-			containers = append(containers, functionValueContainer{literal: parent, member: node})
+			member := node
+			if spreadMember != nil {
+				member = spreadMember
+				spreadMember = nil
+			}
+			containers = append(containers, functionValueContainer{literal: parent, member: member})
 			direct = false
-		case ast.KindShorthandPropertyAssignment, ast.KindSpreadAssignment, ast.KindSpreadElement:
-			return functionValueUse{stored: true}
+		case ast.KindSpreadElement:
+			if parent.Parent == nil || parent.Parent.Kind != ast.KindArrayLiteralExpression || len(containers) == 0 {
+				return functionValueUse{state: functionValueEscaped}
+			}
+			container := containers[len(containers)-1]
+			if container.literal.Kind != ast.KindArrayLiteralExpression {
+				return functionValueUse{state: functionValueEscaped}
+			}
+			spreadMember = container.member
+			containers = containers[:len(containers)-1]
+		case ast.KindClassExpression, ast.KindClassDeclaration:
+			if !classHasCreationEffects(parent) && flow.use(parent).state == functionValueDiscarded {
+				return functionValueUse{}
+			}
+			return functionValueUse{state: functionValueEscaped}
+		case ast.KindShorthandPropertyAssignment, ast.KindSpreadAssignment:
+			return functionValueUse{state: functionValueEscaped}
 		case ast.KindTaggedTemplateExpression, ast.KindYieldExpression:
-			return functionValueUse{stored: true}
+			return functionValueUse{state: functionValueEscaped}
 		default:
 			if parent.Kind == ast.KindBlock || ast.IsStatement(parent) {
-				return functionValueUse{stored: true}
+				return functionValueUse{state: functionValueEscaped}
 			}
 		}
 		node = parent
@@ -846,7 +872,157 @@ func (flow *functionValueFlow) use(function *ast.Node) functionValueUse {
 	// Preserve the existing conservative treatment of returned function values
 	// stored as the assignment's result. A further call or discard above has
 	// already been distinguished from storing that value.
-	return functionValueUse{stored: returned}
+	if returned {
+		return functionValueUse{state: functionValueEscaped}
+	}
+	return functionValueUse{}
+}
+
+func literalArrayMemberIndex(literal *ast.Node, member *ast.Node) (int, int, bool) {
+	offset := 0
+	selected := -1
+	for _, element := range literal.AsArrayLiteralExpression().Elements.Nodes {
+		if element.Kind == ast.KindSpreadElement {
+			inner := utils.SkipAssertionsAndParens(element.AsSpreadElement().Expression)
+			if inner == nil || inner.Kind != ast.KindArrayLiteralExpression {
+				return -1, 0, false
+			}
+			index, length, known := literalArrayMemberIndex(inner, member)
+			if !known {
+				return -1, 0, false
+			}
+			if index >= 0 {
+				selected = offset + index
+			}
+			offset += length
+		} else {
+			if element == member {
+				selected = offset
+			}
+			offset++
+		}
+	}
+	return selected, offset, true
+}
+
+func (flow *functionValueFlow) invocationUse(function *ast.Node, invocation *ast.Node) functionValueUse {
+	if functionReceiverEscapes(function) {
+		return functionValueUse{state: functionValueEscaped}
+	}
+	flags := ast.GetFunctionFlags(function)
+	if flags&(ast.FunctionFlagsAsync|ast.FunctionFlagsGenerator) == 0 {
+		return functionValueUse{invocation: invocation, state: functionValueInvoked}
+	}
+	result := flow.nextConsumer(invocation)
+	if flags&ast.FunctionFlagsGenerator == 0 && result != nil && result.Kind == ast.KindAwaitExpression {
+		return functionValueUse{invocation: result, state: functionValueInvoked}
+	}
+	if flags&ast.FunctionFlagsAsync != 0 || functionHasYield(function) || result == nil {
+		return functionValueUse{state: functionValueEscaped}
+	}
+	name, known := utils.AccessExpressionStaticName(result)
+	if !known || name != "next" || utils.AccessExpressionObject(result) != flow.transparentValue(invocation) {
+		return functionValueUse{state: functionValueEscaped}
+	}
+	call := flow.nextConsumer(result)
+	if call == nil || call.Kind != ast.KindCallExpression || call.AsCallExpression().Expression != flow.transparentValue(result) {
+		return functionValueUse{state: functionValueEscaped}
+	}
+	value := flow.nextConsumer(call)
+	if value != nil {
+		name, known = utils.AccessExpressionStaticName(value)
+		if known && name == "value" && utils.AccessExpressionObject(value) == flow.transparentValue(call) {
+			return functionValueUse{invocation: value, state: functionValueInvoked}
+		}
+	}
+	return functionValueUse{state: functionValueEscaped}
+}
+
+func (flow *functionValueFlow) transparentValue(node *ast.Node) *ast.Node {
+	for node.Parent != nil && ast.IsNodeDescendantOf(node.Parent, flow.rhs) {
+		switch node.Parent.Kind {
+		case ast.KindParenthesizedExpression, ast.KindAsExpression,
+			ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+			node = node.Parent
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func (flow *functionValueFlow) nextConsumer(node *ast.Node) *ast.Node {
+	parent := flow.transparentValue(node).Parent
+	if parent != nil && ast.IsNodeDescendantOf(parent, flow.rhs) {
+		return parent
+	}
+	return nil
+}
+
+func functionHasYield(function *ast.Node) bool {
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node != function && (ast.IsFunctionLike(node) || ast.IsClassLike(node)) {
+			return false
+		}
+		return node.Kind == ast.KindYieldExpression || node.ForEachChild(visit)
+	}
+	return visit(function)
+}
+
+func functionReceiverEscapes(function *ast.Node) bool {
+	if function.Kind != ast.KindMethodDeclaration && function.Kind != ast.KindFunctionExpression {
+		return false
+	}
+	containsThis := function.Body() != nil && function.Body().SubtreeFacts()&ast.SubtreeContainsLexicalThis != 0
+	for _, parameter := range function.Parameters() {
+		containsThis = containsThis || parameter.SubtreeFacts()&ast.SubtreeContainsLexicalThis != 0
+	}
+	if !containsThis {
+		return false
+	}
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node != function && ((ast.IsFunctionLike(node) && node.Kind != ast.KindArrowFunction) || ast.IsClassLike(node)) {
+			return false
+		}
+		if node.Kind != ast.KindThisKeyword {
+			return node.ForEachChild(visit)
+		}
+		for current := node; current.Parent != nil && current != function; current = current.Parent {
+			parent := current.Parent
+			switch parent.Kind {
+			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
+				ast.KindParenthesizedExpression, ast.KindAsExpression,
+				ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+				continue
+			case ast.KindCallExpression, ast.KindNewExpression, ast.KindReturnStatement,
+				ast.KindYieldExpression, ast.KindVariableDeclaration, ast.KindPropertyAssignment,
+				ast.KindArrayLiteralExpression:
+				return true
+			case ast.KindBinaryExpression:
+				return ast.IsAssignmentOperator(parent.AsBinaryExpression().OperatorToken.Kind)
+			default:
+				return false
+			}
+		}
+		return false
+	}
+	return visit(function)
+}
+
+func classHasCreationEffects(class *ast.Node) bool {
+	if ast.HasDecorators(class) {
+		return true
+	}
+	for _, member := range class.Members() {
+		if member.Kind == ast.KindClassStaticBlockDeclaration || ast.HasDecorators(member) ||
+			member.Kind == ast.KindPropertyDeclaration && member.AsPropertyDeclaration().Initializer != nil &&
+				ast.HasSyntacticModifier(member, ast.ModifierFlagsStatic) {
+			return true
+		}
+	}
+	return false
 }
 
 // functionValueContainer tracks a fresh literal containing a callable. Only
@@ -860,14 +1036,8 @@ type functionValueContainer struct {
 func (container functionValueContainer) selectsMember(name string) bool {
 	switch container.literal.Kind {
 	case ast.KindArrayLiteralExpression:
-		for index, element := range container.literal.AsArrayLiteralExpression().Elements.Nodes {
-			if element.Kind == ast.KindSpreadElement {
-				return false
-			}
-			if element == container.member {
-				return name == strconv.Itoa(index)
-			}
-		}
+		index, _, known := literalArrayMemberIndex(container.literal, container.member)
+		return known && index >= 0 && name == strconv.Itoa(index)
 	case ast.KindObjectLiteralExpression:
 		var selected *ast.Node
 		for _, property := range container.literal.AsObjectLiteralExpression().Properties.Nodes {

@@ -11,6 +11,63 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+func TestNoUnusedVarsCallbackLifetimeBoundaries(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: "let x = 0;\nx = (() => { return { next() { saved = this.next.bind(this); return x + 1; } }; })().next(); consume(saved());"},
+		{Code: "let x = 0;\nx = ({ next() { register(this.next); return x + 1; } }).next();"},
+		{Code: "let x = 0;\nx = ({ next(arg = (saved = this.next.bind(this))) { consume(arg); return x + 1; } }).next();"},
+		{Code: "let x = 0;\nx = ({ next() { saved = this; return x + 1; } }).next(); consume(saved.next());"},
+		{Code: "let x = 0;\nx = (() => { return class { static log() { consume(x); } static { queueMicrotask(this.log); } }; })().length;"},
+		{Code: "let x = 0;\nx = (class { static log() { consume(x); } static callback = register(this.log); }).name;"},
+		{Code: "let x = 0;\nx = await (async () => { await 0; queueMicrotask(() => consume(x)); return 1; })();"},
+		{Code: "let x = 0;\nx = await (async () => { await 0; return () => x; })();"},
+		{Code: "let x = 0;\nx = (function* () { yield 0; return x + 1; })().next().value;"},
+		{Code: "let x = 0;\nx = (async function* () { await 0; return x + 1; })().next();"},
+		{Code: "let x = 0;\nx = register([... [() => x]]);"},
+		{Code: "let x = 0;\nx = [...source(() => x)];"},
+		{Code: "let x = 0;\nx = ({...source, next() { register(this); return x + 1; }}).next();"},
+		{Code: "let x = 0;\nx = (() => { const fn = () => x; register(fn); return fn; })().length;"},
+	}
+	for index := range valid {
+		valid[index].Code += "\nexport {};"
+		valid[index].LanguageOptions = rule.LanguageOptions{SourceType: "module"}
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		"await (async () => { await 0; return x + 1; })()",
+		"await (async () => { await 0; (() => consume(x))(); return 1; })()",
+		"await (async () => x + 1).call(null)",
+		"await (async () => x + 1).bind(null)()",
+		"(function* () { return x + 1; })().next().value",
+		"(() => function* () { return x + 1; })()().next().value",
+		"(function* () { return x + 1; }).call(null).next().value",
+		"[...[() => x]]",
+		"[...[...[() => x]]]",
+		"(() => () => x).length",
+		"(() => { return () => x; }).name",
+		"(() => () => () => x)[\"length\"]",
+		"(() => () => x).bind(null).name",
+		"({next() { return x + 1; }}).next()",
+		"({offset: 1, next() { return this.offset + x; }}).next()",
+		"[...[() => x + 1]][0]()",
+		"[0, ...[() => x + 1]][1]()",
+		"[...[...[() => x + 1]]][0]()",
+		"(await (async () => () => x + 1)())()",
+		"register(() => (() => x).length)",
+		"(() => { register(() => x); return 1; }).length",
+		"(() => { return class { static log() { consume(x); } static { queueMicrotask(this.log); } }; }).length",
+		"(class { static read() { return x; } }).length",
+		"(() => class { read() { return x; } })().name",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:            "let x = 0;\nx = " + expression + ";\nexport {};",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}
+
 func TestNoUnusedVarsIgnorePatternMessages(t *testing.T) {
 	options := map[string]interface{}{
 		"args":                           "all",
