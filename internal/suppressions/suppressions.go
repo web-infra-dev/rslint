@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type Mode uint8
@@ -31,6 +32,7 @@ type entries map[string]map[string]entry
 type File struct {
 	cwd         string
 	physicalCwd string
+	cwdAliases  []utils.DirectoryIdentity
 	path        string
 	options     Options
 	entries     entries

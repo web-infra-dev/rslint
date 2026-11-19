@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const DefaultFilename = "rslint-suppressions.json"
@@ -70,24 +72,82 @@ func (f *File) resolveWorkingDirectory() error {
 	if f.physicalCwd != "" {
 		return nil
 	}
-	var err error
-	f.physicalCwd, err = filepath.EvalSymlinks(f.cwd)
-	return err
+	physical, err := filepath.EvalSymlinks(f.cwd)
+	if err != nil {
+		return err
+	}
+	f.physicalCwd = physical
+	for dir := f.cwd; dir != physical; {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		physicalParent, err := filepath.EvalSymlinks(parent)
+		if err != nil {
+			return err
+		}
+		// An ordinary component already has the same spelling under its
+		// physical parent. Only a link needs its own prefix substitution.
+		link := filepath.Join(physicalParent, filepath.Base(dir))
+		if link != physical {
+			f.cwdAliases = append(f.cwdAliases, utils.DirectoryIdentity{LexicalPath: link, CanonicalPath: physical})
+		}
+		dir, physical = parent, physicalParent
+	}
+	slices.Reverse(f.cwdAliases)
+	return nil
 }
 
 func (f *File) fileKey(path string) string {
 	path = filepath.FromSlash(path)
-	key, err := filepath.Rel(f.cwd, path)
-	if f.cwd != f.physicalCwd && (err != nil || !filepath.IsLocal(key)) {
-		// Go may project relative targets under a symlinked PWD while an
-		// absolute target uses the physical directory.
-		key, err = filepath.Rel(f.physicalCwd, path)
+	// Apply shared links from outermost to innermost. An absolute target
+	// may already have expanded any of them. Independent links stay lexical.
+	for _, dir := range f.cwdAliases {
+		if suffix, err := relativeFilePath(dir.LexicalPath, path); err == nil && filepath.IsLocal(suffix) {
+			path = filepath.Join(dir.CanonicalPath, suffix)
+		}
 	}
+	key, err := relativeFilePath(f.physicalCwd, path)
 	if err != nil {
 		// A target on another Windows volume has no relative path.
 		key = path
 	}
 	return filepath.ToSlash(key)
+}
+
+func relativeFilePath(dir, path string) (string, error) {
+	rel, err := filepath.Rel(dir, path)
+	if runtime.GOOS == "windows" && err == nil {
+		rel = verifyRelativePathCase(dir, filepath.Clean(path), rel)
+	}
+	return rel, err
+}
+
+// Windows Rel folds every component, even inside case-sensitive directories.
+// Verify only spellings that Rel collapsed, including the identity of a link
+// itself when two differently named links lead to the same directory.
+func verifyRelativePathCase(dir, path, rel string) string {
+	if strings.HasPrefix(path, dir) {
+		return rel
+	}
+	for left, right := filepath.Join(dir, rel), path; left != right; {
+		leftParent, rightParent := filepath.Dir(left), filepath.Dir(right)
+		if leftParent == left || rightParent == right {
+			break // filepath.Rel already compared the volume names.
+		}
+		if filepath.Base(left) != filepath.Base(right) {
+			leftInfo, _ := os.Lstat(left)
+			rightInfo, _ := os.Lstat(right)
+			if !os.SameFile(leftInfo, rightInfo) {
+				// Use the outermost distinct entry to preserve its entire subtree.
+				up, _ := filepath.Rel(dir, leftParent)
+				down, _ := filepath.Rel(rightParent, path)
+				rel = filepath.Join(up, down)
+			}
+		}
+		left, right = leftParent, rightParent
+	}
+	return rel
 }
 
 func (f *File) fileMissing(key string) (bool, error) {
