@@ -55,11 +55,9 @@
       "isOptionalParameter",
       "getSignaturesOfSymbol",
       "getSymbolOfDeclaration",
-      "getLocalTypeParametersOfClassOrInterfaceOrTypeAlias",
-      "getTargetSymbol",
       "getSymbolOfNode",
       "instantiateTypes",
-      "symbolToStringEx",
+      "newTypePredicate",
       "typePredicateToStringEx"
     ]
   },
@@ -79,18 +77,10 @@
     "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
     "Relation": ["results"],
-    "IndexInfo": [
-      "components",
-      "keyType",
-      "valueType",
-      "isReadonly",
-      "declaration"
-    ],
-    "TypePredicate": ["kind", "parameterName", "parameterIndex", "t"],
+    "IndexInfo": ["components"],
     "TypeReference": ["node"],
     "EvolvingArrayType": ["elementType", "finalArrayType"],
     "TypeParameter": ["constraint"],
-    "CachedTypeKey": ["kind", "typeId"],
     "Signature": ["parameters", "declaration", "mapper"],
     "Checker": [
       "assignableRelation",
@@ -99,6 +89,7 @@
       "strictSubtypeRelation",
       "patternForType",
       "cachedTypes",
+      "unresolvedType",
       "regularTrueType",
       "regularFalseType",
       "numberType",
@@ -116,5 +107,14 @@
     ],
     "MappedType": ["modifiersType"],
     "ValueSymbolLinks": ["resolvedType"]
+  },
+  "ExtraFieldPointers": {
+    "Checker": [
+      "apparentArgumentCount",
+      "serializationLevel",
+      "valueSymbolLinks.store"
+    ],
+    "CachedTypeKey": ["kind", "typeId"],
+    "IndexInfo": ["keyType", "valueType", "isReadonly", "declaration"]
   }
 }

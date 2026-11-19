@@ -20,7 +20,9 @@ replace (
 	github.com/microsoft/TypeScript/tsc/shim/ls => ./shim/ls
 	github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto => ./shim/lsp/lsproto
 	github.com/microsoft/TypeScript/tsc/shim/module => ./shim/module
+	github.com/microsoft/TypeScript/tsc/shim/nodebuilder => ./shim/nodebuilder
 	github.com/microsoft/TypeScript/tsc/shim/parser => ./shim/parser
+	github.com/microsoft/TypeScript/tsc/shim/printer => ./shim/printer
 	github.com/microsoft/TypeScript/tsc/shim/project => ./shim/project
 	github.com/microsoft/TypeScript/tsc/shim/scanner => ./shim/scanner
 	github.com/microsoft/TypeScript/tsc/shim/semver => ./shim/semver
@@ -54,7 +56,9 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/locale v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/lsp/lsproto v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/module v0.0.0
+	github.com/microsoft/TypeScript/tsc/shim/nodebuilder v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/parser v0.0.0-00010101000000-000000000000
+	github.com/microsoft/TypeScript/tsc/shim/printer v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/project v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/scanner v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/semver v0.0.0

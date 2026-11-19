@@ -136,3 +136,35 @@ func globalExports(symbol *ast.Symbol) ast.SymbolTable {
 	}
 	return nil
 }
+
+// Read the same lazy slots that JS exposes. A field read must not resolve a type.
+func cachedSymbolType(c *checker.Checker, symbol *ast.Symbol) *checker.Type {
+	links := checker.Checker_valueSymbolLinks_storePtr(c).TryGet(uint64(ast.GetSymbolId(symbol)))
+	if links == nil || *links == nil {
+		return nil
+	}
+	return checker.ValueSymbolLinks_resolvedType(*links)
+}
+
+func cachedIndexedAccess(c *checker.Checker, t *checker.Type, writing bool) *checker.Type {
+	kind := checker.CachedTypeKindIndexedAccessForReading
+	if writing {
+		kind = checker.CachedTypeKindIndexedAccessForWriting
+	}
+	var key checker.CachedTypeKey
+	*checker.CachedTypeKey_kindPtr(&key) = kind
+	*checker.CachedTypeKey_typeIdPtr(&key) = t.Id()
+	return checker.Checker_cachedTypes(c)[key]
+}
+
+func resolvedSignatureTypeArguments(c *checker.Checker, sig *checker.Signature) []*checker.Type {
+	mapper := checker.Signature_mapper(sig)
+	if mapper == nil {
+		return nil
+	}
+	target := sig.Target()
+	if target == nil {
+		target = sig
+	}
+	return checker.Checker_instantiateTypes(c, target.TypeParameters(), mapper)
+}

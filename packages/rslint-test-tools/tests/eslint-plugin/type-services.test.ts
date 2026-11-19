@@ -1083,6 +1083,9 @@ test('exact origins, aliases, metadata and disposal', async () => {
   );
   const file = resolve(directory, 'mapping.tsx'),
     config = resolve(directory, 'tsconfig.json');
+  // The first name fits the UTF-16 display limit. The second hits it exactly,
+  // with a surrogate pair straddling the cut before the ellipsis.
+  const longTypeNames = ['例'.repeat(110), 'A'.repeat(316) + '𐐀AB'];
   const code = `\uFEFF\uFEFF"use strict";
 import Default, { createStore as named } from "effector";
 export function f<T>(plain: string, value = 1, ...rest: number[]) {
@@ -1103,6 +1106,7 @@ const truth = true as const;
 const surrogateKeys = {"\\uD800":1 as const,"\\uD801":"two" as const,"\\uFFFD":true as const};
 const spreadKeys = {...surrogateKeys};
 const multiline = { nested: { label: "中文" as const }, count: 1 };
+${longTypeNames.map((name) => `interface ${name} { value: number }`).join('\n')}
 declare function multilineCall(
   { '\\é': escaped }: { '\\é': string },
   value: { label: "中文"; escaped: "\\é"; slash: "\\\\é" },
@@ -1616,9 +1620,17 @@ await Promise.resolve(1);
       )!;
       const type = typeChecker.getTypeAtLocation(object);
       const signature = typeChecker.getSignatureFromDeclaration(declaration)!;
+      const longTypes = sourceFile.statements
+        .filter(ts.isInterfaceDeclaration)
+        .filter((node) => longTypeNames.includes(node.name.text));
+      expect(longTypes).toHaveLength(longTypeNames.length);
       const multiline = ts.TypeFormatFlags.MultilineObjectLiterals;
       const flags = multiline | ts.TypeFormatFlags.NoTruncation;
       return [
+        ...longTypes.map((node) =>
+          typeChecker.typeToString(typeChecker.getTypeAtLocation(node.name)),
+        ),
+        typeChecker.signatureToString(signature, declaration),
         typeChecker.typeToString(type, declaration, flags),
         ...[ts.SignatureKind.Call, ts.SignatureKind.Construct].map((kind) =>
           typeChecker.signatureToString(
