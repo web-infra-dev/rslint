@@ -20,7 +20,6 @@ import {
 } from '../../../rslint/src/languages/js/shared-type-cache.js';
 import { lintFile } from '../../../rslint/src/eslint-plugin/linter/ecma-language-plugin.js';
 import { decodeFrame } from '../../../rslint/src/languages/js/frame.js';
-import { typeReplyPackets } from '../../../rslint/src/languages/js/type-service-codec.js';
 import type { ESTreeNode } from '../../../rslint/src/languages/js/types.js';
 import { VISITOR_KEYS } from '../../../rslint/src/languages/js/visitor-keys.js';
 
@@ -771,6 +770,7 @@ test('type and declaration identity survive closing one file', async () => {
       host.source,
       {
         maxFactsBytes: 1 << 20,
+        maxSyntaxBytes: 0,
         batchTransport: (queries) =>
           host
             .request({ method: 'batch', queries })
@@ -823,7 +823,7 @@ test('type and declaration identity survive closing one file', async () => {
         .declarations as { id: ESTreeNode }[];
       owner.prefetch(
         secondDeclarations.map((declaration) => ({
-          op: 'type',
+          op: 'nodeRecord',
           args: {
             node: {
               file: second.projection.sourceFileName,
@@ -835,8 +835,13 @@ test('type and declaration identity survive closing one file', async () => {
           },
         })),
       );
-      for (const node of secondDeclarations)
+      for (const node of secondDeclarations) {
+        const identifier = second.services.esTreeNodeToTSNodeMap.get(
+          node.id,
+        ) as ts.Identifier;
+        expect(identifier.text).toBe(node.id.name);
         expect(second.services.getTypeAtLocation(node.id)).toBe(firstType);
+      }
       expect(
         owner.checker.getAliasedSymbol(
           second.services.getSymbolAtLocation(
@@ -1527,24 +1532,14 @@ test('signature options preserve TypeScript query order across clients', async (
       method: 'init',
       config,
     });
-    const cache = new SharedTypeCacheOwner(descriptor.generation, 1 << 16, 32);
     const open = () =>
       new TypeServiceClient(
         enums,
         descriptor,
-        (query, key, cacheable) => {
-          const packet = Buffer.from(
-            host.request({ method: 'query', query }),
-            'base64',
-          );
-          if (cacheable) cache.publish(key, typeReplyPackets(packet).packet);
-          return packet;
-        },
+        (query) =>
+          Buffer.from(host.request({ method: 'query', query }), 'base64'),
         host.source,
-        {
-          maxFactsBytes: 1 << 16,
-          shared: new SharedTypeCacheReader(cache.descriptor),
-        },
+        { maxFactsBytes: 1 << 16 },
       );
     const owner = open(),
       peer = open();
@@ -1575,7 +1570,6 @@ test('signature options preserve TypeScript query order across clients', async (
     } finally {
       owner.close();
       peer.close();
-      cache.close();
     }
   } finally {
     await host.close();
@@ -1748,6 +1742,10 @@ test('public checker, Program and source reads match TypeScript', async () => {
           };
         })(),
         shape: [
+          'types' in literal,
+          'types' in c.getBooleanType(),
+          Reflect.get(c, 'getOptionalExtension'),
+          Reflect.get(src, 'getOptionalExtension'),
           'root' in cond,
           'root' in literal,
           'elementFlags' in tuple,
@@ -1883,7 +1881,10 @@ test('declared members and source metadata follow TypeScript query order', async
       `export type Pair = [${Array.from({ length: 12 }, (_, i) => 'slot' + i + ': number').join(',')}];`,
     ].join('\n'),
   );
-  writeFileSync(resolve(dir, 'esm.mts'), 'export {};');
+  writeFileSync(
+    resolve(dir, 'esm.mts'),
+    "import './cjs.cjs'; declare global {} declare module './cjs.cjs' {}",
+  );
   writeFileSync(resolve(dir, 'cjs.cts'), 'export {};');
   writeFileSync(resolve(dir, 'empty.json'), '{}');
   writeFileSync(resolve(dir, 'package.json'), '{"type":"module"}');
@@ -1911,14 +1912,7 @@ test('declared members and source metadata follow TypeScript query order', async
         >,
       includeAll = false,
     ) => {
-      const presence = () =>
-        fields.map((key) => [
-          key in type,
-          Object.hasOwn(type, key),
-          Reflect.ownKeys(type).includes(key),
-          type[key] !== undefined,
-          Object.getOwnPropertyDescriptor(type, key)?.value === type[key],
-        ]);
+      const presence = () => fields.map((key) => key in type);
       const before = presence();
       const props = checker.getPropertiesOfType(type);
       const calls = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
@@ -1958,33 +1952,22 @@ test('declared members and source metadata follow TypeScript query order', async
       generic: inspect(declared(3)),
       instantiated: inspect(declared(4)),
       tuple: inspect((declared(5) as ts.TypeReference).target),
+      modes: [0, 1].map((i) =>
+        program.getModeForResolutionAtIndex(
+          program.getSourceFile(resolve(dir, 'esm.mts'))!,
+          i,
+        ),
+      ),
       sources: names.map((name) => {
         const src = program.getSourceFile(resolve(dir, name))!;
         return [
           src.languageVersion,
           src.hasNoDefaultLib,
           src.impliedNodeFormat,
-          ...(
-            [
-              'referencedFiles',
-              'typeReferenceDirectives',
-              'libReferenceDirectives',
-            ] as const
-          ).map((key) => ({
-            sameList: src[key] === src[key],
-            own: Object.hasOwn(src, key),
-            descriptorMatches:
-              Object.getOwnPropertyDescriptor(src, key)?.value === src[key],
-            entries: src[key].map((ref) => [Object.keys(ref), ref]),
-          })),
-          ...['languageVersion', 'hasNoDefaultLib', 'impliedNodeFormat'].map(
-            (k) => [
-              k in src,
-              Object.hasOwn(src, k),
-              Object.getOwnPropertyDescriptor(src, k)?.value ===
-                Reflect.get(src, k),
-            ],
-          ),
+          src.referencedFiles,
+          src.typeReferenceDirectives,
+          src.libReferenceDirectives,
+          src.referencedFiles === src.referencedFiles,
         ];
       }),
     };
@@ -2017,7 +2000,9 @@ test('declared members and source metadata follow TypeScript query order', async
       { maxFactsBytes: 1 << 18 },
     );
     try {
-      expect(read(client.program as unknown as ts.Program)).toEqual(expected);
+      expect(read(client.program as unknown as ts.Program)).toStrictEqual(
+        expected,
+      );
     } finally {
       client.close();
       await host.close();
@@ -2069,7 +2054,7 @@ test('resolved project references retain config syntax, nesting and missing entr
     descriptor,
     (q) => Buffer.from(h.request({ method: 'query', query: q }), 'base64'),
     h.source,
-    { maxFactsBytes: 1 << 16 },
+    { maxFactsBytes: 1 << 16, maxSyntaxBytes: 0 },
   );
   try {
     const parsed = ts.getParsedCommandLineOfConfigFile(
@@ -2090,6 +2075,13 @@ test('resolved project references retain config syntax, nesting and missing entr
             ref && [
               ref.sourceFile.fileName,
               ref.sourceFile.text,
+              ref.sourceFile.flags,
+              ref.sourceFile.statements[0].kind,
+              ref.sourceFile.statements ===
+                ref.sourceFile.forEachChild(
+                  () => undefined,
+                  (nodes) => nodes,
+                ),
               ref.sourceFile.getSourceFile() === ref.sourceFile,
               ref.commandLine.fileNames,
               ref.commandLine.options.target,

@@ -68,10 +68,22 @@ func programQuery(ctx context.Context, p *program.Program, r *ProgramRequest, no
 		}
 		return Handle(p.GetModeForUsageLocation(source, node)), nil
 	case "modeForResolutionAtIndex":
-		if file == nil || r.Index < 0 || r.Index >= len(file.Imports()) {
-			return nil, errors.New("invalid module resolution index")
+		if file != nil && r.Index >= 0 {
+			imports := file.Imports()
+			if r.Index < len(imports) {
+				return Handle(p.GetModeForUsageLocation(file, imports[r.Index])), nil
+			}
+			index := len(imports)
+			for _, name := range file.ModuleAugmentations {
+				if name.Kind == ast.KindStringLiteral {
+					if index == r.Index {
+						return Handle(p.GetModeForUsageLocation(file, name)), nil
+					}
+					index++
+				}
+			}
 		}
-		return Handle(p.GetModeForUsageLocation(file, file.Imports()[r.Index])), nil
+		return nil, errors.New("invalid module resolution index")
 	case "projectReferences":
 		data, err := json.Marshal(projectReferences(q.CommandLine()))
 		return Text(data), err

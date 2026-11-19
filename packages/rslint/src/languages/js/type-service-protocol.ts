@@ -481,33 +481,25 @@ export type QueryTransport = (
   cacheable: boolean,
 ) => Uint8Array;
 
-/** Normal overload resolution can replace semantic results for syntax nodes. */
-export function isCacheableTypeQuery(
-  operation: Operation,
-  signatureOptionsUsed: boolean,
-): boolean {
-  // The checker populates these slots during later semantic queries.
-  if (
-    operation === 'resolvedSignatureWithOptions' ||
-    operation === 'symbolLinkType' ||
-    operation === 'symbolCount' ||
-    operation === 'typeCount' ||
-    operation === 'instantiationCount' ||
-    operation === 'relationCacheSizes' ||
-    operation === 'declaredMembers' ||
-    operation === 'conditionalInstantiations' ||
-    operation === 'freshLiteral' ||
-    operation === 'typeParameterConstraint' ||
-    operation === 'finalArray' ||
-    operation === 'simplifiedForReading' ||
-    operation === 'simplifiedForWriting' ||
-    operation === 'resolvedTrueType' ||
-    operation === 'resolvedFalseType' ||
-    operation === 'mappedModifiersType'
-  )
-    return false;
-  if (!signatureOptionsUsed) return true;
+/** Any client of the checker can re-resolve a call or populate a lazy slot. */
+export function isCacheableTypeQuery(operation: Operation): boolean {
   switch (operation) {
+    case 'resolvedSignatureWithOptions':
+    case 'symbolLinkType':
+    case 'symbolCount':
+    case 'typeCount':
+    case 'instantiationCount':
+    case 'relationCacheSizes':
+    case 'declaredMembers':
+    case 'conditionalInstantiations':
+    case 'freshLiteral':
+    case 'typeParameterConstraint':
+    case 'finalArray':
+    case 'simplifiedForReading':
+    case 'simplifiedForWriting':
+    case 'resolvedTrueType':
+    case 'resolvedFalseType':
+    case 'mappedModifiersType':
     case 'type':
     case 'fromTypeNode':
     case 'context':
@@ -667,14 +659,9 @@ const operations = [
 const operationIDs = new Map<Operation, number>(
   operations.map((op, index) => [op, index + 1]),
 );
-export function typeQueryKey(
-  q: TypeServiceQuery,
-  files?: ReadonlyMap<string, number>,
-): string {
+export function typeQueryKey(q: TypeServiceQuery): string {
   const nodeKey = (node: NodeRef | undefined): string =>
-    node
-      ? `${files?.get(node.file) ?? `${node.file.length}:${node.file}`}:${node.index}`
-      : '-';
+    node ? `${node.file.length}:${node.file}:${node.index}` : '-';
   const prefix = `${q.generation}:${q.checker}:${operationIDs.get(q.op)}:`;
   switch (q.op) {
     case 'configFileParsingDiagnostics':

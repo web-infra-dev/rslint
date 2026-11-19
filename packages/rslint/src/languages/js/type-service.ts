@@ -456,19 +456,11 @@ const declaredMemberKeys = new Set<PropertyKey>([
 export function guarded<T extends object>(
   object: T,
   ensure: () => void,
-  surface: string,
   has?: (target: T, key: string | symbol) => boolean,
 ): T {
   return new Proxy(object, {
     get(target, key, receiver) {
       ensure();
-      if (
-        typeof key === 'string' &&
-        !(key in target) &&
-        key !== 'then' &&
-        key !== 'toJSON'
-      )
-        unsupported(`${surface}.${key}`);
       const value: unknown = Reflect.get(target, key, receiver);
       return typeof value === 'function'
         ? (...args: unknown[]) => {
@@ -477,34 +469,33 @@ export function guarded<T extends object>(
           }
         : value;
     },
-    ownKeys:
-      surface === 'type' && has
-        ? (target) => {
-            ensure();
-            const keys = Reflect.ownKeys(target);
-            return has(target, 'declaredProperties')
-              ? keys
-              : keys.filter((key) => !declaredMemberKeys.has(key));
+    ownKeys: has
+      ? (target) => {
+          ensure();
+          const declared = has(target, 'declaredProperties');
+          return Reflect.ownKeys(target).filter((key) =>
+            declaredMemberKeys.has(key) ? declared : has(target, key),
+          );
+        }
+      : undefined,
+    getOwnPropertyDescriptor: has
+      ? (target, key) => {
+          ensure();
+          if (declaredMemberKeys.has(key)) {
+            const value: unknown = Reflect.get(target, key);
+            if (value === undefined) return undefined;
+            return {
+              value,
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            };
           }
-        : undefined,
-    getOwnPropertyDescriptor:
-      surface === 'type' && has
-        ? (target, key) => {
-            ensure();
-            if (declaredMemberKeys.has(key)) {
-              const value: unknown = Reflect.get(target, key);
-              return value === undefined
-                ? undefined
-                : {
-                    value,
-                    writable: true,
-                    enumerable: true,
-                    configurable: true,
-                  };
-            }
-            return Reflect.getOwnPropertyDescriptor(target, key);
-          }
-        : undefined,
+          return has(target, key)
+            ? Reflect.getOwnPropertyDescriptor(target, key)
+            : undefined;
+        }
+      : undefined,
     has: has
       ? (target, key) => {
           ensure();
@@ -618,10 +609,8 @@ export class TypeServiceClient {
   private shared: SharedTypeCacheReader | undefined;
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
-  private readonly fileOrdinals = new Map<string, number>();
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
-  private signatureOptionsUsed = false;
   private factBytes = 0;
   readonly program: ProgramView;
   readonly checker: CheckerView;
@@ -652,10 +641,6 @@ export class TypeServiceClient {
       this.shared.descriptor.generation !== descriptor.generation
     )
       throw new Error('foreign shared type cache');
-    descriptor.sources.forEach((source, index) => {
-      this.fileOrdinals.set(source.fileName, index + 1);
-      this.fileOrdinals.set(source.path, index + 1);
-    });
     this.syntax = new GenerationSyntaxViews(
       typescript,
       descriptor,
@@ -1231,8 +1216,6 @@ export class TypeServiceClient {
           if (candidates !== undefined || argumentCount !== undefined) {
             if (candidates?.length)
               throw new Error('signature candidate output array must be empty');
-            this.signatureOptionsUsed = true;
-            this.shared?.markSignatureOptionsUsed();
             const [resolved, ...ids] = this.query({
               op: 'resolvedSignatureWithOptions',
               args: {
@@ -1274,7 +1257,6 @@ export class TypeServiceClient {
       () => {
         this.ensure();
       },
-      'checker',
     );
     const compilerOptions = readCompilerOptions(
       typescript,
@@ -1378,7 +1360,6 @@ export class TypeServiceClient {
       () => {
         this.ensure();
       },
-      'program',
     );
   }
   private resolvedReferences():
@@ -1489,8 +1470,8 @@ export class TypeServiceClient {
       checker: this.descriptor.checker,
       ...request,
     };
-    const key = this.key(query);
-    if (!this.cacheable(query)) {
+    const key = typeQueryKey(query);
+    if (!isCacheableTypeQuery(query.op)) {
       const reader = this.ingest(
         query,
         this.transport!(query, key, false),
@@ -1516,9 +1497,6 @@ export class TypeServiceClient {
       if (this.facts.get(key) !== reader) reader.close();
     }
   }
-  private key(query: TypeServiceQuery): string {
-    return typeQueryKey(query, this.fileOrdinals);
-  }
   private store(key: string, bytes: Uint8Array): TypePacketReader {
     const existing = this.facts.get(key);
     if (existing) return existing;
@@ -1536,12 +1514,6 @@ export class TypeServiceClient {
     }
     return reader;
   }
-  private cacheable(query: TypeServiceQuery): boolean {
-    return isCacheableTypeQuery(
-      query.op,
-      this.signatureOptionsUsed || this.shared?.hasSignatureOptions === true,
-    );
-  }
   private ingest(
     query: TypeServiceQuery,
     bytes: Uint8Array,
@@ -1549,7 +1521,7 @@ export class TypeServiceClient {
   ): TypePacketReader {
     const reply = typeReplyPackets(bytes);
     for (const record of reply.records) {
-      const key = this.key({
+      const key = typeQueryKey({
         ...query,
         op: record.op,
         args: { id: record.id },
@@ -1558,7 +1530,7 @@ export class TypeServiceClient {
       if (this.facts.get(key) !== reader) reader.close();
     }
     return retain
-      ? this.store(this.key(query), reply.packet)
+      ? this.store(typeQueryKey(query), reply.packet)
       : new TypePacketReader(reply.packet);
   }
   /** Merge known misses only. Cache hits, including negative answers, never
@@ -1573,8 +1545,8 @@ export class TypeServiceClient {
         checker: this.descriptor.checker,
         ...request,
       };
-      if (!this.cacheable(query)) continue;
-      const key = this.key(query);
+      if (!isCacheableTypeQuery(query.op)) continue;
+      const key = typeQueryKey(query);
       if (this.facts.has(key) || missing.has(key)) continue;
       const shared = this.shared?.get(key);
       if (shared) {
@@ -1645,61 +1617,76 @@ export class TypeServiceClient {
       () => {
         this.ensure();
       },
-      kind,
       kind === 'type'
         ? (view, key) => {
+            const type = view as unknown as TypeView;
+            const tf = this.typescript.TypeFlags,
+              of = this.typescript.ObjectFlags;
             switch (key) {
+              case 'types':
+                return !!(
+                  type.flags &
+                  (tf.UnionOrIntersection | tf.TemplateLiteral)
+                );
+              case 'type':
+                return !!(type.flags & (tf.Index | tf.StringMapping));
+              case 'indexType':
+              case 'objectType':
+                return !!(type.flags & tf.IndexedAccess);
+              case 'checkType':
+              case 'extendsType':
               case 'root':
-                return !!(
-                  this.type(id)!.flags & this.typescript.TypeFlags.Conditional
-                );
+                return !!(type.flags & tf.Conditional);
               case 'texts':
-                return !!(
-                  this.type(id)!.flags &
-                  this.typescript.TypeFlags.TemplateLiteral
-                );
+                return !!(type.flags & tf.TemplateLiteral);
+              case 'value':
+              case 'escapedName':
+                return type[key] !== undefined;
               case 'elementFlags':
               case 'minLength':
               case 'fixedLength':
               case 'hasRestElement':
               case 'labeledElementDeclarations':
-                return this.typeField(id, 'tuple') !== undefined;
+                return type.combinedFlags !== undefined;
               case 'baseType':
-                return !!(
-                  this.type(id)!.flags & this.typescript.TypeFlags.Substitution
-                );
-              case 'pattern':
-              case 'node':
+                return !!(type.flags & tf.Substitution);
               case 'elementType':
               case 'finalArrayType':
+                return (
+                  !!((type.objectFlags ?? 0) & of.EvolvingArray) &&
+                  type[key] !== undefined
+                );
               case 'simplifiedForReading':
               case 'simplifiedForWriting':
+                return (
+                  !!(type.flags & tf.IndexedAccess) && type[key] !== undefined
+                );
+              case 'resolvedTrueType':
+              case 'resolvedFalseType':
+                return (
+                  !!(type.flags & tf.Conditional) && type[key] !== undefined
+                );
+              case 'node':
+                return (
+                  !!((type.objectFlags ?? 0) & of.Reference) &&
+                  type.node !== undefined
+                );
+              case 'pattern':
               case 'declaredProperties':
               case 'declaredCallSignatures':
               case 'declaredConstructSignatures':
               case 'declaredIndexInfos':
-              case 'resolvedTrueType':
-              case 'resolvedFalseType':
-                return Reflect.get(view, key) !== undefined;
+                return type[key] !== undefined;
+              case 'thisType':
+                return !!((type.objectFlags ?? 0) & of.ClassOrInterface);
+              case 'typeParameter':
+              case 'constraintType':
+              case 'templateType':
+              case 'modifiersType':
+                return !!((type.objectFlags ?? 0) & of.Mapped);
+              default:
+                return Reflect.has(view, key);
             }
-            if (
-              key !== 'typeParameter' &&
-              key !== 'constraintType' &&
-              key !== 'templateType' &&
-              key !== 'modifiersType' &&
-              key !== 'thisType'
-            )
-              return Reflect.has(view, key);
-            const flags: unknown = Reflect.get(view, 'objectFlags');
-            return (
-              typeof flags === 'number' &&
-              Boolean(
-                flags &
-                (key === 'thisType'
-                  ? this.typescript.ObjectFlags.ClassOrInterface
-                  : this.typescript.ObjectFlags.Mapped),
-              )
-            );
           }
         : undefined,
     );
