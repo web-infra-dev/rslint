@@ -1,17 +1,19 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
-
-
-import { getFixturesRootDir } from '../RuleTester';
-
-const rootPath = getFixturesRootDir();
+// Complete upstream suite: typescript-eslint v8.72.2.
+// https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/tests/rules/no-duplicate-type-constituents.test.ts
+// Go upstream tests verify each autofix pass; this suite verifies the native
+// multi-pass output, complete diagnostics and absence of suggestions.
+import { RuleTester } from '@rslint/rule-tester';
 
 const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
+  plugin: '@typescript-eslint',
+  filename: 'file.ts',
+  fixtureFiles: {
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: { strict: true, target: 'esnext' },
+      include: ['**/*.ts'],
+    }),
   },
+  languageOptions: { parserOptions: { project: './tsconfig.json' } },
 });
 
 ruleTester.run('no-duplicate-type-constituents', {
@@ -167,10 +169,11 @@ type T = Record<string, A | B>;
       code: 'type T = 1 | 1;',
       errors: [
         {
-          data: {
-            previous: '1',
-            type: 'Union',
-          },
+          column: 14,
+          message: "Union type constituent is duplicated with " + '1' + '.',
+          endColumn: 15,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -180,10 +183,11 @@ type T = Record<string, A | B>;
       code: 'type T = true & true;',
       errors: [
         {
-          data: {
-            previous: 'true',
-            type: 'Intersection',
-          },
+          column: 17,
+          message: "Intersection type constituent is duplicated with " + 'true' + '.',
+          endColumn: 21,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -193,10 +197,11 @@ type T = Record<string, A | B>;
       code: 'type T = null | null;',
       errors: [
         {
-          data: {
-            previous: 'null',
-            type: 'Union',
-          },
+          column: 17,
+          message: "Union type constituent is duplicated with " + 'null' + '.',
+          endColumn: 21,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -206,10 +211,11 @@ type T = Record<string, A | B>;
       code: 'type T = any | any;',
       errors: [
         {
-          data: {
-            previous: 'any',
-            type: 'Union',
-          },
+          column: 16,
+          message: "Union type constituent is duplicated with " + 'any' + '.',
+          endColumn: 19,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -219,38 +225,39 @@ type T = Record<string, A | B>;
       code: 'type T = { a: string | string };',
       errors: [
         {
-          data: {
-            previous: 'string',
-            type: 'Union',
-          },
+          column: 24,
+          message: "Union type constituent is duplicated with " + 'string' + '.',
+          endColumn: 30,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
       output: `type T = { a: string   };`,
     },
     {
-      skip:true,  // FIXME: not implemented yet
       code: 'type T = { a: string } | { a: string };',
       errors: [
         {
-          data: {
-            previous: '{ a: string }',
-            type: 'Union',
-          },
+          column: 26,
+          message: "Union type constituent is duplicated with " + '{ a: string }' + '.',
+          endColumn: 39,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
       output: `type T = { a: string }  ;`,
     },
     {
-      skip:true, // not implemented yet
       code: 'type T = { a: string; b: number } | { a: string; b: number };',
       errors: [
         {
-          data: {
-            previous: '{ a: string; b: number }',
-            type: 'Union',
-          },
+          column: 37,
+          message: "Union type constituent is duplicated with " + '{ a: string; b: number }' + '.',
+          endColumn: 61,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -260,10 +267,11 @@ type T = Record<string, A | B>;
       code: 'type T = Set<string> | Set<string>;',
       errors: [
         {
-          data: {
-            previous: 'Set<string>',
-            type: 'Union',
-          },
+          column: 24,
+          message: "Union type constituent is duplicated with " + 'Set<string>' + '.',
+          endColumn: 35,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -276,10 +284,11 @@ type ActuallyDuplicated = IsArray<number> | IsArray<string>;
       `,
       errors: [
         {
-          data: {
-            previous: 'IsArray<number>',
-            type: 'Union',
-          },
+          column: 45,
+          message: "Union type constituent is duplicated with " + 'IsArray<number>' + '.',
+          endColumn: 60,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -292,10 +301,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = string[] | string[];',
       errors: [
         {
-          data: {
-            previous: 'string[]',
-            type: 'Union',
-          },
+          column: 21,
+          message: "Union type constituent is duplicated with " + 'string[]' + '.',
+          endColumn: 29,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -305,10 +315,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = string[][] | string[][];',
       errors: [
         {
-          data: {
-            previous: 'string[][]',
-            type: 'Union',
-          },
+          column: 23,
+          message: "Union type constituent is duplicated with " + 'string[][]' + '.',
+          endColumn: 33,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -318,10 +329,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = [1, 2, 3] | [1, 2, 3];',
       errors: [
         {
-          data: {
-            previous: '[1, 2, 3]',
-            type: 'Union',
-          },
+          column: 22,
+          message: "Union type constituent is duplicated with " + '[1, 2, 3]' + '.',
+          endColumn: 31,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -331,10 +343,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = () => string | string;',
       errors: [
         {
-          data: {
-            previous: 'string',
-            type: 'Union',
-          },
+          column: 25,
+          message: "Union type constituent is duplicated with " + 'string' + '.',
+          endColumn: 31,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -344,10 +357,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = () => null | null;',
       errors: [
         {
-          data: {
-            previous: 'null',
-            type: 'Union',
-          },
+          column: 23,
+          message: "Union type constituent is duplicated with " + 'null' + '.',
+          endColumn: 27,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -357,10 +371,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: 'type T = (arg: string | string) => void;',
       errors: [
         {
-          data: {
-            previous: 'string',
-            type: 'Union',
-          },
+          column: 25,
+          message: "Union type constituent is duplicated with " + 'string' + '.',
+          endColumn: 31,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -370,10 +385,11 @@ type ActuallyDuplicated = IsArray<number>  ;
       code: "type T = 'A' | 'A';",
       errors: [
         {
-          data: {
-            previous: "'A'",
-            type: 'Union',
-          },
+          column: 16,
+          message: "Union type constituent is duplicated with " + "'A'" + '.',
+          endColumn: 19,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -386,10 +402,11 @@ type T = A | A;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 14,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 15,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -405,10 +422,11 @@ const a: A | A = 'A';
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 14,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 15,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -424,10 +442,11 @@ type T = A | /* comment */ A;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 28,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 29,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -445,17 +464,19 @@ type T = A1 | A2 | A3;
       `,
       errors: [
         {
-          data: {
-            previous: 'A1',
-            type: 'Union',
-          },
+          column: 15,
+          message: "Union type constituent is duplicated with " + 'A1' + '.',
+          endColumn: 17,
+          endLine: 5,
+          line: 5,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'A1',
-            type: 'Union',
-          },
+          column: 20,
+          message: "Union type constituent is duplicated with " + 'A1' + '.',
+          endColumn: 22,
+          endLine: 5,
+          line: 5,
           messageId: 'duplicate',
         },
       ],
@@ -474,10 +495,11 @@ type T = A | B | A;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 18,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 19,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
       ],
@@ -495,17 +517,19 @@ type T = A | B | A | B;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 18,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 19,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'B',
-            type: 'Union',
-          },
+          column: 22,
+          message: "Union type constituent is duplicated with " + 'B' + '.',
+          endColumn: 23,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
       ],
@@ -523,17 +547,19 @@ type T = A | B | A | A;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 18,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 19,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 22,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 23,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
       ],
@@ -552,10 +578,11 @@ type T = A | B | A | C;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 18,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 19,
+          endLine: 5,
+          line: 5,
           messageId: 'duplicate',
         },
       ],
@@ -574,10 +601,11 @@ type T = (A | B) | (A | B);
       `,
       errors: [
         {
-          data: {
-            previous: 'A | B',
-            type: 'Union',
-          },
+          column: 21,
+          message: "Union type constituent is duplicated with " + 'A | B' + '.',
+          endColumn: 27,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
       ],
@@ -594,10 +622,11 @@ type T = A | (A | A);
       `,
       errors: [
         {
-          data: {
-            previous: `A`,
-            type: 'Union',
-          },
+          column: 15,
+          message: "Union type constituent is duplicated with " + `A` + '.',
+          endColumn: 21,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -616,17 +645,19 @@ type F = (A | B) | (A | B) | ((C | D) & (A | B)) | (A | B);
       `,
       errors: [
         {
-          data: {
-            previous: 'A | B',
-            type: 'Union',
-          },
+          column: 21,
+          message: "Union type constituent is duplicated with " + 'A | B' + '.',
+          endColumn: 27,
+          endLine: 6,
+          line: 6,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'A | B',
-            type: 'Union',
-          },
+          column: 53,
+          message: "Union type constituent is duplicated with " + 'A | B' + '.',
+          endColumn: 59,
+          endLine: 6,
+          line: 6,
           messageId: 'duplicate',
         },
       ],
@@ -646,24 +677,27 @@ type C = (A | B) | A | B | (A | B);
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 20,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 21,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'B',
-            type: 'Union',
-          },
+          column: 24,
+          message: "Union type constituent is duplicated with " + 'B' + '.',
+          endColumn: 25,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'A | B',
-            type: 'Union',
-          },
+          column: 29,
+          message: "Union type constituent is duplicated with " + 'A | B' + '.',
+          endColumn: 35,
+          endLine: 4,
+          line: 4,
           messageId: 'duplicate',
         },
       ],
@@ -677,17 +711,19 @@ type C = (A | B)      ;
       code: 'type A = (number | string) | number | string;',
       errors: [
         {
-          data: {
-            previous: 'number',
-            type: 'Union',
-          },
+          column: 30,
+          message: "Union type constituent is duplicated with " + 'number' + '.',
+          endColumn: 36,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'string',
-            type: 'Union',
-          },
+          column: 39,
+          message: "Union type constituent is duplicated with " + 'string' + '.',
+          endColumn: 45,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -697,10 +733,11 @@ type C = (A | B)      ;
       code: 'type A = (number | (string | null)) | (string | (null | number));',
       errors: [
         {
-          data: {
-            previous: 'number | (string | null)',
-            type: 'Union',
-          },
+          column: 40,
+          message: "Union type constituent is duplicated with " + 'number | (string | null)' + '.',
+          endColumn: 65,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -710,17 +747,19 @@ type C = (A | B)      ;
       code: 'type A = (number & string) & number & string;',
       errors: [
         {
-          data: {
-            previous: 'number',
-            type: 'Intersection',
-          },
+          column: 30,
+          message: "Intersection type constituent is duplicated with " + 'number' + '.',
+          endColumn: 36,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'string',
-            type: 'Intersection',
-          },
+          column: 39,
+          message: "Intersection type constituent is duplicated with " + 'string' + '.',
+          endColumn: 45,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -730,24 +769,26 @@ type C = (A | B)      ;
       code: 'type A = number & string & (number & string);',
       errors: [
         {
-          data: {
-            previous: 'number',
-            type: 'Intersection',
-          },
+          column: 29,
+          message: "Intersection type constituent is duplicated with " + 'number' + '.',
+          endColumn: 35,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
         {
-          data: {
-            previous: 'string',
-            type: 'Intersection',
-          },
+          column: 38,
+          message: "Intersection type constituent is duplicated with " + 'string' + '.',
+          endColumn: 44,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
       output: [
         'type A = number & string & (  string);',
         'type A = number & string    ;',
-      ],
+      ].at(-1)!,
     },
     {
       code: `
@@ -756,10 +797,11 @@ type T = Record<string, A | A>;
       `,
       errors: [
         {
-          data: {
-            previous: 'A',
-            type: 'Union',
-          },
+          column: 29,
+          message: "Union type constituent is duplicated with " + 'A' + '.',
+          endColumn: 30,
+          endLine: 3,
+          line: 3,
           messageId: 'duplicate',
         },
       ],
@@ -772,10 +814,11 @@ type T = Record<string, A  >;
       code: 'type T = A | A | string | string;',
       errors: [
         {
-          data: {
-            previous: 'string',
-            type: 'Union',
-          },
+          column: 27,
+          message: "Union type constituent is duplicated with " + 'string' + '.',
+          endColumn: 33,
+          endLine: 1,
+          line: 1,
           messageId: 'duplicate',
         },
       ],
@@ -783,118 +826,244 @@ type T = Record<string, A  >;
     },
     {
       code: '(a?: string | undefined) => {};',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 15,
+          endColumn: 24,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: '(a?: string  ) => {};',
     },
     {
       code: `
-        type T = undefined;
-        (arg?: T | string) => {};
+type T = undefined;
+(arg?: T | string) => {};
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 8,
+          endColumn: 9,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        type T = undefined;
-        (arg?:   string) => {};
+type T = undefined;
+(arg?:   string) => {};
       `,
     },
     {
       code: `
-        interface F {
-          (a?: string | undefined): void;
-        }
+interface F {
+  (a?: string | undefined): void;
+}
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 17,
+          endColumn: 26,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        interface F {
-          (a?: string  ): void;
-        }
+interface F {
+  (a?: string  ): void;
+}
       `,
     },
     {
       code: 'type fn = new (a?: string | undefined) => void;',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 29,
+          endColumn: 38,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'type fn = new (a?: string  ) => void;',
     },
     {
       code: 'function f(a?: string | undefined) {}',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 25,
+          endColumn: 34,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'function f(a?: string  ) {}',
     },
     {
       code: 'f = function (a?: string | undefined) {};',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 28,
+          endColumn: 37,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'f = function (a?: string  ) {};',
     },
     {
       code: 'declare function f(a?: string | undefined): void;',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 33,
+          endColumn: 42,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'declare function f(a?: string  ): void;',
     },
     {
       code: `
-        declare class bb {
-          f(a?: string | undefined): void;
-        }
+declare class bb {
+  f(a?: string | undefined): void;
+}
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 18,
+          endColumn: 27,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        declare class bb {
-          f(a?: string  ): void;
-        }
+declare class bb {
+  f(a?: string  ): void;
+}
       `,
     },
     {
       code: `
-        interface ee {
-          f(a?: string | undefined): void;
-        }
+interface ee {
+  f(a?: string | undefined): void;
+}
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 18,
+          endColumn: 27,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        interface ee {
-          f(a?: string  ): void;
-        }
+interface ee {
+  f(a?: string  ): void;
+}
       `,
     },
     {
       code: `
-        interface ee {
-          new (a?: string | undefined): void;
-        }
+interface ee {
+  new (a?: string | undefined): void;
+}
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 21,
+          endColumn: 30,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        interface ee {
-          new (a?: string  ): void;
-        }
+interface ee {
+  new (a?: string  ): void;
+}
       `,
     },
     {
       code: 'type fn = (a?: string | undefined) => void;',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 25,
+          endColumn: 34,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'type fn = (a?: string  ) => void;',
     },
     {
       code: 'type fn = (a?: string | (undefined | number)) => void;',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 26,
+          endColumn: 35,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'type fn = (a?: string | (  number)) => void;',
     },
     {
       code: 'type fn = (a?: (undefined | number) | string) => void;',
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 17,
+          endColumn: 26,
+          endLine: 1,
+          line: 1,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: 'type fn = (a?: (  number) | string) => void;',
     },
     {
       code: `
-        abstract class cc {
-          abstract f(a?: string | undefined): void;
-        }
+abstract class cc {
+  abstract f(a?: string | undefined): void;
+}
       `,
-      errors: [{ messageId: 'unnecessary' }],
+      errors: [
+        {
+          column: 27,
+          endColumn: 36,
+          endLine: 3,
+          line: 3,
+          messageId: 'unnecessary',
+          message: 'Explicit undefined is unnecessary on an optional parameter.',
+        },
+      ],
       output: `
-        abstract class cc {
-          abstract f(a?: string  ): void;
-        }
+abstract class cc {
+  abstract f(a?: string  ): void;
+}
       `,
     },
   ],

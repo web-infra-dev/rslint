@@ -28,7 +28,23 @@ type Baz = 'a' | 'b' | 'c';
 function fn(x?: string) {}
 ```
 
+## Differences from upstream
+
+In typescript-eslint v8.72.2, autofixing a nested union or intersection with a leading separator can remove every member and leave invalid syntax:
+
+```typescript
+type T = string | number | (| string | number);
+```
+
+Rslint keeps at least one member in each surviving group during a fix pass. It still reports every duplicate, but defers removal of the last member so later passes can safely remove the redundant group. The same protection applies to explicit `undefined` in optional parameters. If there is no safe removal, the diagnostic is reported without an autofix.
+
+Rslint also excludes a containing group when looking for a previous occurrence of the same type. For example, `(string | never)` simplifies to `string`, but that does not make its own `string` member a duplicate. Removing that member would change the type.
+
+Separate `unique symbol` declarations retain their distinct identities, even when their syntax is identical. Repeated references to the same declared symbol or branded type can still be duplicates.
+
+Comments around a singleton group's member are preserved when its wrapping tokens are removed. Rslint reports a duplicate without an autofix if deletion would remove a lint directive, detach `@ts-expect-error` or `@ts-ignore` from its target, or change which code a line-based lint directive covers. This includes `global`, `globals`, and `exported` directives separated from their names by tabs or newlines. TypeScript targets follow TypeScript 6.0.3's ECMAScript whitespace and line-comment rules. A retained inline directive that controls a later statement does not prevent a safe fix on the current line. These checks preserve TypeScript diagnostics and other rules' behavior after fixing.
+
 ## Original Documentation
 
 - [typescript-eslint: no-duplicate-type-constituents](https://typescript-eslint.io/rules/no-duplicate-type-constituents)
-- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.67.0/packages/eslint-plugin/src/rules/no-duplicate-type-constituents.ts)
+- [Source code](https://github.com/typescript-eslint/typescript-eslint/blob/v8.72.2/packages/eslint-plugin/src/rules/no-duplicate-type-constituents.ts)
