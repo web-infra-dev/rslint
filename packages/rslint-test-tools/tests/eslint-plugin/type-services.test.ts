@@ -1915,7 +1915,12 @@ test('public checker, Program and source reads match TypeScript', async () => {
     expect(printed).toContain('[RuleLiteral]');
     expect(printed).not.toContain('types:');
     expect(inspect(literal, { depth: 0, customInspect: false })).toBe(printed);
-    expect(Object.isFrozen(Object.preventExtensions(literal))).toBe(false);
+    const checkerField = Object.getOwnPropertyDescriptor(literal, 'checker');
+    expect(checkerField?.configurable).toBe(false);
+    Object.preventExtensions(literal);
+    expect(Object.getOwnPropertyDescriptor(literal, 'checker')).toEqual(
+      checkerField,
+    );
     expect(() =>
       checker.typeToString(Object.create(literal) as object),
     ).toThrow('foreign type handle');
