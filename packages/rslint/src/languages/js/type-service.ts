@@ -462,8 +462,12 @@ const declaredMemberKeys = new Set<PropertyKey>([
 ]);
 
 const serviceView = Symbol();
-function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
-  const original = view[serviceView];
+// Node calls inspected plugin getters with the proxy target as their receiver.
+const typeProxies = new WeakMap<object, TypeView>();
+function canonicalView(view: TypeView): TypeView;
+function canonicalView(view: object): object;
+function canonicalView(view: object & { [serviceView]?: object }): object {
+  const original = view[serviceView] ?? typeProxies.get(view);
   // A transparent proxy forwards its target's prototype. A derived object
   // inherits the marker but has its own identity and cannot name a Go type.
   return original &&
@@ -497,6 +501,16 @@ function memo<T>(ensure: () => void, read: () => T): () => T {
     ensure();
     return (cached ??= { value: read() }).value;
   };
+}
+// Compiler records can carry plugin metadata, but their native data fields
+// describe the same object returned by other checker queries.
+function readonlyDataFields<T extends object>(record: T): T {
+  for (const key of Object.keys(record))
+    Object.defineProperty(record, key, {
+      configurable: false,
+      writable: false,
+    });
+  return record;
 }
 type ObjectKind = 'type' | 'symbol' | 'signature';
 interface ObjectBrand {
@@ -598,17 +612,6 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
-  // Node normally inspects a proxy's target directly, bypassing its ownKeys.
-  Object.defineProperty(prototype, Symbol.for('nodejs.util.inspect.custom'), {
-    configurable: true,
-    writable: true,
-    value(this: TypeView) {
-      return Object.defineProperties(
-        {},
-        Object.getOwnPropertyDescriptors(this),
-      );
-    },
-  });
   return prototype;
 }
 
@@ -1736,16 +1739,19 @@ export class TypeServiceClient {
   private indexInfo(fact: IndexInfoFact): IndexInfoView {
     const old = fact.id && this.indexInfos.get(fact.id);
     if (old) return old;
-    const info = {
-      components: fact.components?.map((ref) => this.syntax.nodeRef(ref)!),
+    const info = readonlyDataFields({
+      components:
+        fact.components &&
+        Object.freeze(fact.components.map((ref) => this.syntax.nodeRef(ref)!)),
       keyType: this.type(fact.keyType)!,
       type: this.type(fact.type)!,
       isReadonly: fact.isReadonly,
       declaration: this.syntax.nodeRef(fact.declaration),
-    };
+    });
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
+  private typeFieldNames?: ReadonlySet<PropertyKey>;
   private wrapType(
     fields: TypeView,
     hasField: (
@@ -1756,68 +1762,85 @@ export class TypeServiceClient {
     mappedFields: () => readonly number[] | undefined,
     hasDeclaredMembers: () => boolean,
   ): TypeView {
-    const target: TypeView = Object.create(this.typePrototype);
-    const available = (key: PropertyKey) =>
-      Object.hasOwn(fields, key) && Object.isExtensible(target);
-    const descriptor = (key: PropertyKey): PropertyDescriptor => {
-      const desc = Object.getOwnPropertyDescriptor(fields, key)!;
-      if ('value' in desc) desc.writable = false;
-      return desc;
+    // Keep the actual getters on the target. Node's inspector can display
+    // them and follow cycles without querying the checker.
+    Object.defineProperties(fields, {
+      id: { writable: false },
+      checker: { writable: false },
+    });
+    const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
+    let pluginFields: Set<PropertyKey> | undefined;
+    const managed = (key: PropertyKey) =>
+      native.has(key) && !pluginFields?.has(key);
+    const own = (key: PropertyKey) => {
+      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
+      return descriptor &&
+        (!descriptor.configurable ||
+          !Object.isExtensible(fields) ||
+          !managed(key) ||
+          hasField(key))
+        ? descriptor
+        : undefined;
     };
-    const install = (key: PropertyKey) =>
-      Object.defineProperty(target, key, {
-        ...descriptor(key),
-        configurable: false,
-      });
-    const fieldKeys = () => {
-      const declared = hasDeclaredMembers();
-      const mapped = mappedFields();
-      return Reflect.ownKeys(fields).filter((key) =>
-        declaredMemberKeys.has(key) ? declared : hasField(key, false, mapped),
+    const keys = () => {
+      const all = Reflect.ownKeys(fields);
+      if (!Object.isExtensible(fields)) return all;
+      const declared = hasDeclaredMembers(),
+        mapped = mappedFields();
+      return all.filter(
+        (key) =>
+          !managed(key) ||
+          (declaredMemberKeys.has(key)
+            ? declared
+            : hasField(key, false, mapped)),
       );
     };
-    const proxy: TypeView = new Proxy(target, {
+    const proxy: TypeView = new Proxy(fields, {
       get: (object, key, receiver) => {
         this.ensure();
         if (key === serviceView) return proxy;
-        if (Object.hasOwn(object, key) || !available(key))
-          return Reflect.get(object, key, receiver);
-        const value: unknown = Reflect.get(fields, key);
-        return value === undefined && Reflect.has(object, key) && !hasField(key)
-          ? Reflect.get(object, key, receiver)
-          : value;
+        const value: unknown = Reflect.get(object, key, receiver);
+        if (value === undefined && managed(key)) {
+          const proto = Reflect.getPrototypeOf(object);
+          if (proto && Reflect.has(proto, key) && !hasField(key))
+            return Reflect.get(proto, key, receiver);
+        }
+        return value;
       },
       has: (object, key) => {
         this.ensure();
-        return Reflect.has(object, key) || (available(key) && hasField(key));
+        if (!managed(key) || !Object.hasOwn(object, key))
+          return Reflect.has(object, key);
+        const proto = Reflect.getPrototypeOf(object);
+        return !!own(key) || (proto !== null && Reflect.has(proto, key));
       },
-      ownKeys: (object) => {
+      ownKeys: () => {
         this.ensure();
-        const own = Reflect.ownKeys(object);
-        if (!Object.isExtensible(object)) return own;
-        const keys = fieldKeys();
-        if (!own.length) return keys;
-        return Reflect.ownKeys(
-          Object.fromEntries([...keys, ...own].map((key) => [key, true])),
-        );
+        return keys();
       },
-      getOwnPropertyDescriptor: (object, key) => {
+      getOwnPropertyDescriptor: (_object, key) => {
         this.ensure();
-        return (
-          Reflect.getOwnPropertyDescriptor(object, key) ??
-          (available(key) && hasField(key) ? descriptor(key) : undefined)
-        );
+        return own(key);
+      },
+      set: (object, key, value, receiver) => {
+        this.ensure();
+        if (managed(key) && !hasField(key, true))
+          return Reflect.set(
+            Reflect.getPrototypeOf(object) ?? Object.create(null),
+            key,
+            value,
+            receiver,
+          );
+        return Reflect.set(object, key, value, receiver);
       },
       defineProperty: (object, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
-        if (
-          !Object.hasOwn(object, key) &&
-          available(key) &&
-          hasField(key, true)
-        ) {
-          if (!hasField(key)) return false;
-          const current = descriptor(key);
+        if (!managed(key))
+          return Reflect.defineProperty(object, key, attributes);
+        if (hasField(key, true)) {
+          const current = own(key);
+          if (!current) return false;
           for (const name of Object.keys(attributes)) {
             if (
               name !== 'configurable' &&
@@ -1829,27 +1852,30 @@ export class TypeServiceClient {
             )
               return false;
           }
-          if (attributes.configurable === false) install(key);
-          return true;
+        } else {
+          // Discard the absent placeholder so new plugin properties receive
+          // the ordinary defaults of Object.defineProperty or assignment.
+          if (!Object.isExtensible(object)) return false;
+          Reflect.deleteProperty(object, key);
+          (pluginFields ??= new Set()).add(key);
         }
         return Reflect.defineProperty(object, key, attributes);
       },
       deleteProperty: (object, key) => {
         this.ensure();
-        return Object.hasOwn(object, key)
-          ? Reflect.deleteProperty(object, key)
-          : !available(key) || !hasField(key);
+        return managed(key) ? !own(key) : Reflect.deleteProperty(object, key);
       },
       preventExtensions: (object) => {
         this.ensure();
         if (Object.isExtensible(object)) {
-          for (const key of fieldKeys()) {
-            if (!Object.hasOwn(object, key)) install(key);
-          }
+          const keep = new Set(keys());
+          for (const key of Reflect.ownKeys(object))
+            if (!keep.has(key)) Reflect.deleteProperty(object, key);
         }
         return Reflect.preventExtensions(object);
       },
     });
+    typeProxies.set(fields, proxy);
     return proxy;
   }
   private type(id: number): TypeView | undefined {
@@ -1896,7 +1922,7 @@ export class TypeServiceClient {
               )
             : undefined,
         };
-        Object.freeze(root);
+        readonlyDataFields(root);
         this.conditionalRoots.set(node, root);
         return root;
       });
@@ -1915,7 +1941,9 @@ export class TypeServiceClient {
         escapedName = memo(ensure, () => this.typeField(id, 'escapedName')),
         value = memo(ensure, () => {
           const literal = this.typeField(id, 'value');
-          return typeof literal === 'object' ? Object.freeze(literal) : literal;
+          return typeof literal === 'object'
+            ? readonlyDataFields(literal)
+            : literal;
         });
       const typeOperands = memo(ensure, () =>
         typeList(this.typeField(id, 'typeOperands')),

@@ -1907,6 +1907,11 @@ test('public checker, Program and source reads match TypeScript', async () => {
     ).toBeTypeOf('function');
     expect(() => owner.program.emit()).toThrow('Program.emit');
     const src = owner.program.getSourceFile(file) as ts.SourceFile;
+    const dictionary = checker.getTypeFromTypeNode(
+      (src.statements[5] as ts.TypeAliasDeclaration).type,
+    )!;
+    const index = checker.getIndexInfoOfType(dictionary, ts.IndexKind.String)!;
+    expect(Reflect.set(index, 'type', literal)).toBe(false);
     expect(() =>
       src.update('', { span: { start: 0, length: 0 }, newLength: 0 }),
     ).toThrow('SourceFile.update');
