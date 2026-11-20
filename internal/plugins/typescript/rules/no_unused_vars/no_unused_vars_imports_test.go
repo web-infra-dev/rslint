@@ -155,14 +155,15 @@ func TestNoUnusedVarsImports(t *testing.T) {
 		},
 
 		// --- import fix: partial removal ---
-		// first specifier unused, second used → remove first + trailing comma
+		// first specifier unused, second used → remove first + trailing comma,
+		// keeping the space after `{` like upstream
 		{
 			Code: `import { resolve, join } from "path"; console.log(join("a", "b"));`,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "unusedVar", Line: 1, Column: 10,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "removeUnusedVar",
-					Output:    `import { join } from "path"; console.log(join("a", "b"));`,
+					Output:    `import {  join } from "path"; console.log(join("a", "b"));`,
 				}},
 			}},
 		},
@@ -242,7 +243,7 @@ console.log(join("a", "b"));`,
 				{MessageId: "unusedVar", Line: 1, Column: 10,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "removeUnusedVar",
-						Output:    `import { resolve, basename } from "path"; console.log(resolve("/"));`,
+						Output:    `import {  resolve, basename } from "path"; console.log(resolve("/"));`,
 					}},
 				},
 				{MessageId: "unusedVar", Line: 1, Column: 25,
@@ -260,7 +261,7 @@ console.log(join("a", "b"));`,
 				{MessageId: "unusedVar", Line: 1, Column: 10,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "removeUnusedVar",
-						Output:    `import { b, c, d } from "./foo"; console.log(b);`,
+						Output:    `import {  b, c, d } from "./foo"; console.log(b);`,
 					}},
 				},
 				{MessageId: "unusedVar", Line: 1, Column: 16,

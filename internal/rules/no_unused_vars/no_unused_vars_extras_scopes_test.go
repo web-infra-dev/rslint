@@ -26,6 +26,63 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+func TestNoUnusedVarsCallbackLifetimeBoundaries(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: "let x = 0;\nx = (() => { return { next() { saved = this.next.bind(this); return x + 1; } }; })().next(); consume(saved());"},
+		{Code: "let x = 0;\nx = ({ next() { register(this.next); return x + 1; } }).next();"},
+		{Code: "let x = 0;\nx = ({ next(arg = (saved = this.next.bind(this))) { consume(arg); return x + 1; } }).next();"},
+		{Code: "let x = 0;\nx = ({ next() { saved = this; return x + 1; } }).next(); consume(saved.next());"},
+		{Code: "let x = 0;\nx = (() => { return class { static log() { consume(x); } static { queueMicrotask(this.log); } }; })().length;"},
+		{Code: "let x = 0;\nx = (class { static log() { consume(x); } static callback = register(this.log); }).name;"},
+		{Code: "let x = 0;\nx = await (async () => { await 0; queueMicrotask(() => consume(x)); return 1; })();"},
+		{Code: "let x = 0;\nx = await (async () => { await 0; return () => x; })();"},
+		{Code: "let x = 0;\nx = (function* () { yield 0; return x + 1; })().next().value;"},
+		{Code: "let x = 0;\nx = (async function* () { await 0; return x + 1; })().next();"},
+		{Code: "let x = 0;\nx = register([... [() => x]]);"},
+		{Code: "let x = 0;\nx = [...source(() => x)];"},
+		{Code: "let x = 0;\nx = ({...source, next() { register(this); return x + 1; }}).next();"},
+		{Code: "let x = 0;\nx = (() => { const fn = () => x; register(fn); return fn; })().length;"},
+	}
+	for index := range valid {
+		valid[index].Code += "\nexport {};"
+		valid[index].LanguageOptions = rule.LanguageOptions{SourceType: "module"}
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		"await (async () => { await 0; return x + 1; })()",
+		"await (async () => { await 0; (() => consume(x))(); return 1; })()",
+		"await (async () => x + 1).call(null)",
+		"await (async () => x + 1).bind(null)()",
+		"(function* () { return x + 1; })().next().value",
+		"(() => function* () { return x + 1; })()().next().value",
+		"(function* () { return x + 1; }).call(null).next().value",
+		"[...[() => x]]",
+		"[...[...[() => x]]]",
+		"(() => () => x).length",
+		"(() => { return () => x; }).name",
+		"(() => () => () => x)[\"length\"]",
+		"(() => () => x).bind(null).name",
+		"({next() { return x + 1; }}).next()",
+		"({offset: 1, next() { return this.offset + x; }}).next()",
+		"[...[() => x + 1]][0]()",
+		"[0, ...[() => x + 1]][1]()",
+		"[...[...[() => x + 1]]][0]()",
+		"(await (async () => () => x + 1)())()",
+		"register(() => (() => x).length)",
+		"(() => { register(() => x); return 1; }).length",
+		"(() => { return class { static log() { consume(x); } static { queueMicrotask(this.log); } }; }).length",
+		"(class { static read() { return x; } }).length",
+		"(() => class { read() { return x; } })().name",
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:            "let x = 0;\nx = " + expression + ";\nexport {};",
+			LanguageOptions: rule.LanguageOptions{SourceType: "module"},
+			Errors:          []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}
+
 func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 	signaturesCode := "type Fn = (callback: string) => void;\n" +
 		"interface I { method(methodArg: number): void; }\n" +
@@ -75,6 +132,13 @@ func TestNoUnusedVarsExtrasScopes(t *testing.T) {
 
 			// A callback passed through the RHS can execute later and stores its read.
 			{Code: `let x; x = consume(() => x);`},
+
+			// A concise arrow returns the callback, just like an explicit return.
+			// ESLint's nearest-call shortcut misclassifies these escaping values.
+			{Code: `let x; x = consume((() => () => x)());`},
+			{Code: `let x; x = consume((() => { return () => x; })());`},
+			{Code: `let x; x = consume((() => ({ read: () => x }))());`},
+			{Code: `let x; x = consume((() => (() => () => x)())());`},
 
 			// Local shadows do not consume an inline global, but a real global read does.
 			{Code: `/*global foo*/ function f(foo) { return foo; } consume(foo); f(1);`},
@@ -1484,4 +1548,99 @@ assigned = 2;
 	if suggestionOnly[1].Suggestions != nil || allEdits[1].Suggestions != nil {
 		t.Fatalf("write-only diagnostic unexpectedly has remove suggestions")
 	}
+}
+
+// TestNoUnusedVarsFunctionValueConsumers distinguishes storing a callback from
+// immediately invoking a returned or bound function. Block and concise returns
+// follow the same consumer; unknown storage remains a real use.
+// ESLint 10.14.0 misses the explicit-return/immediate-call case below: the
+// callback runs immediately and only updates x, just like the concise form.
+func TestNoUnusedVarsFunctionValueConsumers(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `/* global launch */ export function run() { type launch = number; const code: launch = 1; launch(code); }`},
+		{Code: `/* global Shape */ export function run() { const Shape = 1; let x: Shape; consume(x, Shape); }`},
+		{Code: `let off = () => {}; off = subscribe(function () { off(); }.bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off())().bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => { return () => off(); })());`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off()).bind(null)());`},
+		{Code: `let off = () => {}; off = subscribe((() => () => off())().bind(null).bind(null));`},
+		{Code: `let off = () => {}; off = subscribe((() => ({ handler: () => off() }))());`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		`(() => () => x + 1)()()`,
+		`(() => { return () => x + 1; })()()`,
+		`(() => () => () => x + 1)()()()`,
+		`(() => x + 1).bind(null)()`,
+		`(() => x + 1)["bind"](null)()`,
+		`(() => () => x + 1).bind(null)()()`,
+		`(() => () => x + 1)().call(null)`,
+		`(() => { return () => x + 1; })().apply(null, [])`,
+		`(() => x + 1).bind(null).bind(null)()`,
+		`(() => (() => x, 0))()`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "let x = 0;\nx = " + expression + ";",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
+}
+
+// TestNoUnusedVarsCallbackExecutionBoundaries covers deferred execution, literal
+// extraction, and metadata reads without invoking a callback. ESLint 10.14.0
+// and typescript-eslint 8.72.1 also miss some deferred reads and explicit
+// return consumers; these expectations preserve runtime behavior instead.
+func TestNoUnusedVarsCallbackExecutionBoundaries(t *testing.T) {
+	valid := []rule_tester.ValidTestCase{
+		{Code: `let x; x = (async () => { await 0; (() => consume(x))(); })();`},
+		{Code: `let x; x = (function* () { (() => consume(x))(); })();`},
+		{Code: `let x; x = (() => { return async () => { await 0; (() => consume(x))(); }; })()();`},
+		{Code: `let x; x = (() => x).bind(null, consume(() => x)).name;`},
+		{Code: `let x; x = (() => { return async () => { await 0; consume(x); }; })()();`},
+		{Code: `let x; x = (() => async () => { await 0; consume(x); })()();`},
+		{Code: `let x; x = (async () => { await 0; consume(x); })();`},
+		{Code: `let x; x = (() => { return function* () { yield x; }; })()();`},
+		{Code: `let x; x = (function* () { yield x; })();`},
+		{Code: `let x; x = (() => async () => { await 0; consume(x); })().call(null);`},
+		{Code: `let x; x = (() => function* () { yield x; })().bind(null)();`},
+		{Code: `let x; x = [(async () => { await 0; consume(x); })][0]();`},
+		{Code: `let x; x = ({ async run() { await 0; consume(x); } }).run();`},
+		{Code: `let x; x = [() => x][index]();`},
+		{Code: `let x; x = ({run: () => x})[key]();`},
+		{Code: `let x; x = ({run: () => x, ...source}).run();`},
+		{Code: `let x; x = ({run: () => x, [key]: replacement}).run();`},
+		{Code: `let x; x = ({get run() { return () => x; }}).run();`},
+		{Code: `let x; x = consume([() => x]);`},
+		{Code: `let x; x = consume({run: () => x});`},
+		{Code: `let x; x = (() => x).custom();`},
+		{Code: `let x; x = (() => x).bind(null, consume(() => x)).length;`},
+	}
+	var invalid []rule_tester.InvalidTestCase
+	for _, expression := range []string{
+		`[() => x + 1][0]()`,
+		`[() => x + 1]["0"]()`,
+		`({run: () => x + 1}).run()`,
+		`({run() { return x + 1; }}).run()`,
+		`({["run"]: () => x + 1})["run"]()`,
+		`({run: () => x + 1}).run.call(null)`,
+		`[{run: () => x + 1}][0].run()`,
+		`({run: [() => x + 1]}).run[0]()`,
+		`(() => [() => x + 1])()[0]()`,
+		`(() => { return {run: () => x + 1}; })().run()`,
+		`(() => x).length`,
+		`(() => x)["name"]`,
+		`(() => x).bind(null).length`,
+		`(() => () => x)().name`,
+		`[() => x][0].length`,
+		`({run() { return x; }}).run.name`,
+		`(async () => x).length`,
+		`(function* () { yield x; }).name`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{
+			Code:   "let x = 0;\nx = " + expression + ";",
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Message: "'x' is assigned a value but never used.", Line: 2, Column: 1, EndLine: 2, EndColumn: 2}},
+		})
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, valid, invalid)
 }

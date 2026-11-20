@@ -92,9 +92,9 @@ func TestNoUnusedVarsJsxFactory(t *testing.T) {
 					MessageId: "unusedVar", Line: 2, Column: 8,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "removeUnusedImportDeclaration",
-						// removeImportLine starts at node.Pos(), which includes the
-						// leading `@jsx` block comment as trivia, so it is removed too.
-						Output: "export const A = () => <div />;\n",
+						// Like upstream, only the import's own line is removed; the
+						// leading `@jsx` comment stays.
+						Output: "/** @jsx X.createElement */\nexport const A = () => <div />;\n",
 					}},
 				},
 			},
