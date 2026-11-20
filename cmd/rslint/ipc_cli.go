@@ -38,14 +38,12 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"slices"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
@@ -294,11 +292,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 			return 2
 		}
 		baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		if len(payload.Files) > 0 {
-			baseArgs.AllowFiles, baseArgs.AllowDirs = classifyPaths(payload.Files)
-			baseArgs.Positional = nil
-		}
-		prepareErr := prepareCLIInputs(ctx, &baseArgs)
+		prepareErr := prepareCLIInputs(ctx, &baseArgs, payload.Files)
 		if prepareErr == nil {
 			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
 		}
@@ -402,27 +396,6 @@ func (w acknowledgedOutputWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// classifyPaths splits exact IPC targets into files and directories using
-// lexical absolute paths. An Abs failure is skipped with a stderr warning
-// rather than silently dropping the path.
-func classifyPaths(paths []string) (files []string, dirs []string) {
-	for _, p := range paths {
-		absPath, err := filepath.Abs(p)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "rslint: filepath.Abs(%q) failed: %v\n", p, err)
-			continue
-		}
-		normalized := tspath.NormalizePath(absPath)
-		info, statErr := os.Stat(absPath)
-		if statErr == nil && info.IsDir() {
-			dirs = append(dirs, normalized)
-		} else {
-			files = append(files, normalized)
-		}
-	}
-	return files, dirs
-}
-
 func discoverCLIConfigCatalog(
 	ctx context.Context,
 	args *lintArgs,
@@ -432,11 +405,10 @@ func discoverCLIConfigCatalog(
 	if args == nil || payload == nil || payload.ConfigDiscovery == nil {
 		return nil
 	}
-	cwd, err := os.Getwd()
+	cwd, err := cliWorkingDirectory()
 	if err != nil {
 		return fmt.Errorf("get working directory for config discovery: %w", err)
 	}
-	cwd = tspath.NormalizePath(cwd)
 	request := discovery.ConfigDiscoveryRequest{
 		CWD:            cwd,
 		Directories:    rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, args.FS),

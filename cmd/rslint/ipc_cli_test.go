@@ -56,7 +56,7 @@ func TestClassifyPaths(t *testing.T) {
 	}
 	missing := filepath.Join(dir, "nope.ts")
 
-	files, dirs := classifyPaths([]string{dir, file, missing})
+	files, dirs := classifyPaths(dir, []string{dir, filepath.Base(file), missing})
 
 	wantDir := tspath.NormalizePath(dir)
 	if len(dirs) != 1 || dirs[0] != wantDir {

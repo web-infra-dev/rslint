@@ -166,13 +166,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		defer pprof.StopCPUProfile()
 	}
 
-	currentDirectory, err := os.Getwd()
+	workingDirectory, err := cliWorkingDirectory()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		return 1
 	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
-	workingDirectory := currentDirectory
+	currentDirectory := workingDirectory
 
 	if init {
 		if err := rslintconfig.InitDefaultConfig(currentDirectory); err != nil {
@@ -183,7 +182,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	}
 	var baseline *suppressions.File
 	if !typeCheckOnly {
-		baseline, err = suppressions.Open(workingDirectory, args.Suppressions)
+		baseline, err = suppressions.Open(args.Suppressions)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 2
@@ -317,9 +316,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			break
 		}
 	}
-	// Use CWD for display paths (not any config directory).
-	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
-	// so it already holds the normalized CWD.
+	// Display paths are relative to the invocation's working directory.
 	cwd := workingDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
@@ -631,7 +628,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err := ctx.Err(); err != nil {
 			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
 		}
-		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, targetPlan.Files)
+		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args)
 	}
 	if suppressionError == "" && format != output.FormatDefault && shouldShortCircuitMachineOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0

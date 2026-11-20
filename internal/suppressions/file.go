@@ -18,17 +18,16 @@ import (
 
 const DefaultFilename = "rslint-suppressions.json"
 
-// Open reads the CLI baseline and freezes the canonical working directory
-// for its file keys. A plain check without a baseline returns nil.
-func Open(cwd string, options Options) (*File, error) {
-	cwd = filepath.FromSlash(cwd)
+// Open reads the CLI baseline from the process working directory.
+// A plain check without a baseline returns nil.
+func Open(options Options) (*File, error) {
+	cwd, err := syscall.Getwd()
+	if err != nil {
+		return nil, err
+	}
 	f := &File{options: options}
 	path := filepath.Join(cwd, DefaultFilename)
 	if location := options.Location; location != "" {
-		baseDir, err := syscall.Getwd()
-		if err != nil {
-			return nil, err
-		}
 		path = location
 		if filepath.VolumeName(path) != "" || os.IsPathSeparator(path[0]) {
 			// Let Windows resolve drive-relative and current-drive-rooted paths.
@@ -37,14 +36,14 @@ func Open(cwd string, options Options) (*File, error) {
 				return nil, err
 			}
 		} else {
-			path = filepath.Join(baseDir, path)
+			path = filepath.Join(cwd, path)
 		}
 		info, err := os.Stat(path)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		if os.IsPathSeparator(location[len(location)-1]) || (info != nil && info.IsDir()) {
-			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(baseDir))
+			path = filepath.Join(path, "rslint-suppressions_"+cwdHash(cwd))
 		}
 	}
 	f.path = path
@@ -55,13 +54,17 @@ func Open(cwd string, options Options) (*File, error) {
 	if len(data) == 0 && options.Mode == Check {
 		return nil, nil //nolint:nilnil // No active baseline means the CLI can skip collecting linted files.
 	}
-	physical := osvfs.FS().Realpath(filepath.ToSlash(cwd))
-	f.cwd = tspath.EnsureTrailingDirectorySeparator(physical)
+	cwd = filepath.ToSlash(cwd)
+	if runtime.GOOS == "windows" {
+		// GetCurrentDirectory can retain a junction in the working directory.
+		cwd = osvfs.FS().Realpath(cwd)
+	}
+	f.cwd = tspath.EnsureTrailingDirectorySeparator(cwd)
 	f.entries = data
 	return f, nil
 }
 
-// Canonical paths under cwd already contain their slash-separated JSON key.
+// Lint paths under cwd already contain their slash-separated JSON key.
 func (f *File) fileKey(path string) string {
 	dir := f.cwd
 	if relative, ok := strings.CutPrefix(path, dir); ok {
@@ -78,7 +81,7 @@ func (f *File) fileKey(path string) string {
 		}
 		return tspath.GetRelativePathFromDirectory(dir, path, tspath.ComparePathsOptions{UseCaseSensitiveFileNames: true})
 	}
-	relative, _ := filepath.Rel(dir, path) // Both canonical paths have the same Unix root.
+	relative, _ := filepath.Rel(dir, path) // Both absolute paths have the same Unix root.
 	return relative
 }
 
