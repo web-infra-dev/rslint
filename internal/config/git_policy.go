@@ -305,8 +305,8 @@ func parseCollectedGitignorePatterns(collected []gitignore.Pattern, caseInsensit
 			// Git patterns are immutable after parsing. Fold them once here;
 			// the per-file matcher then only needs to fold the target path once,
 			// rather than allocating lower-case copies for every pattern/node.
-			pattern.Glob = strings.ToLower(pattern.Glob)
-			nodeGlob = strings.ToLower(nodeGlob)
+			pattern.Glob = gitignore.FoldCase(pattern.Glob)
+			nodeGlob = gitignore.FoldCase(nodeGlob)
 		}
 		if !strings.HasPrefix(pattern.Glob, nodeGlob) {
 			// Collected patterns always satisfy this compact-representation

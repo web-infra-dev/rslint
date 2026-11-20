@@ -15,7 +15,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"golang.org/x/sys/unix"
 )
 
@@ -23,9 +23,13 @@ func newCLIFileSystem() vfs.FS {
 	return darwinCLIFileSystem{bundled.WrapFS(cachedvfs.From(darwinRealpathFS{osvfs.FS()}))}
 }
 
+func newLSPFileSystem() vfs.FS {
+	return darwinCLIFileSystem{bundled.WrapFS(osvfs.FS())}
+}
+
 type darwinCLIFileSystem struct{ vfs.FS }
 
-var _ utils.StoredEntryNamer = darwinCLIFileSystem{}
+var _ gitignore.StoredEntryNamer = darwinCLIFileSystem{}
 
 // SameDirectoryEntry compares the final directory entries without merging
 // distinct hard links to a symlink. The caller checks each earlier component.
@@ -41,11 +45,16 @@ func (darwinCLIFileSystem) SameDirectoryEntry(left, right string) bool {
 	return darwinSameCaseLookup(left, right)
 }
 
-// APFS preserves distinct ASCII letters and punctuation in literal name
-// prefixes and suffixes, including on its case-insensitive variant.
-func (darwinCLIFileSystem) PreservesASCIILookupAnchors(path string) bool {
+// APFS preserves literal ASCII name prefixes and suffixes. A case-sensitive
+// parent additionally rules out spellings that differ only in ASCII case.
+func (darwinCLIFileSystem) ASCIILookupAnchors(path string) (preserved, exactCase bool) {
+	parent := filepath.Dir(path)
 	var volume unix.Statfs_t
-	return unix.Statfs(filepath.Dir(path), &volume) == nil && unix.ByteSliceToString(volume.Fstypename[:]) == "apfs"
+	if unix.Statfs(parent, &volume) != nil || unix.ByteSliceToString(volume.Fstypename[:]) != "apfs" {
+		return false, false
+	}
+	sensitive, err := unix.Pathconf(parent, pcCaseSensitive)
+	return true, err == nil && sensitive > 0
 }
 
 // StoredEntryName returns the actual leaf name without following its symlink.

@@ -15,6 +15,10 @@ func newCLIFileSystem() vfs.FS {
 	return bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 }
 
+func newLSPFileSystem() vfs.FS {
+	return bundled.WrapFS(osvfs.FS())
+}
+
 func getCLIWorkingDirectory() (string, error) {
 	return os.Getwd()
 }

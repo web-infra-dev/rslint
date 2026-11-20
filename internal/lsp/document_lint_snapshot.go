@@ -131,7 +131,7 @@ func (s *Server) documentTargetIdentity(uri lsproto.DocumentUri) target.File {
 	if s.documentPathNames == nil {
 		s.documentPathNames = config.NewInputPathNames(s.fs)
 	}
-	return target.File{PathIdentity: s.documentPathNames.File(physical, false)}
+	return target.File{PathIdentity: s.documentPathNames.LiveFile(physical, s.fs)}
 }
 
 func isDefaultExcludedLintPath(filePath string, cwd string, fs vfs.FS) bool {

@@ -169,6 +169,44 @@ func TestHandleFixAllCodeAction_GitignoredFile(t *testing.T) {
 	}
 }
 
+func TestFixAllObservesRenamedGitEntryWithoutFileNotification(t *testing.T) {
+	s, _, root := newConfigRefreshTestServer(t)
+	const content = "var value = 1;\n"
+	original := tspath.ResolvePath(root, "STRASSE.js")
+	renamed := tspath.ResolvePath(root, "Straße.js")
+	if err := os.WriteFile(original, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !s.fs.FileExists(renamed) {
+		t.Skip("this volume distinguishes the two file names")
+	}
+	if err := os.WriteFile(tspath.ResolvePath(root, ".gitignore"), []byte("/Straße.js\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s.initialized = true
+	s.defaultLibraryPath = bundled.LibPath()
+	s.gitPolicy = gitPolicyForLSPTest(s)
+	installJSConfigsForTest(s, map[string]config.RslintConfig{root: {{Rules: config.Rules{"no-var": "error"}}}})
+	uri := documentURIFromPath(original)
+	s.documents[uri] = content
+	assertActions := func(want int) {
+		t.Helper()
+		response, err := s.handleFixAllCodeAction(t.Context(), uri)
+		if err != nil || response.CommandOrCodeActionArray == nil || len(*response.CommandOrCodeActionArray) != want {
+			t.Fatalf("expected %d fix-all actions, got %+v, %v", want, response, err)
+		}
+	}
+	assertActions(1)
+	temporary := tspath.ResolvePath(root, "renaming.js")
+	if err := os.Rename(original, temporary); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(temporary, renamed); err != nil {
+		t.Fatal(err)
+	}
+	assertActions(0)
+}
+
 func TestHandleFixAllCodeActionUsesEditorBOM(t *testing.T) {
 	const content = "#!/usr/bin/env node\nexport {};\n"
 	for _, test := range []struct {

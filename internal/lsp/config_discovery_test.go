@@ -1742,11 +1742,17 @@ func TestDocumentGitPolicyCoverageRejectsRetargetedAliasesAndCodeActions(t *test
 
 type documentListingFS struct {
 	vfs.FS
-	listings int
+	leafParent     string
+	parentListings int
+	leafListings   int
 }
 
 func (fs *documentListingFS) GetAccessibleEntries(path string) vfs.Entries {
-	fs.listings++
+	if path == fs.leafParent {
+		fs.leafListings++
+	} else {
+		fs.parentListings++
+	}
 	return fs.FS.GetAccessibleEntries(path)
 }
 
@@ -1759,6 +1765,7 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 	if err := os.Mkdir(directory, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	fsys.leafParent = tspath.NormalizePath(fsys.Realpath(directory))
 	open := func(name string) lsproto.DocumentUri {
 		path := tspath.ResolvePath(directory, name)
 		if err := os.WriteFile(path, nil, 0o644); err != nil {
@@ -1772,7 +1779,8 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 	}
 	first, second := open("first.ts"), open("second.ts")
 	original := s.documentTargetIdentity(first)
-	reads := fsys.listings
+	reads := fsys.parentListings
+	leafReads := fsys.leafListings
 	if reads == 0 {
 		t.Fatal("first document did not observe its directory")
 	}
@@ -1780,8 +1788,8 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 		t.Fatalf("repeated observation changed from %+v to %+v", original, again)
 	}
 	s.documentTargetIdentity(second)
-	if fsys.listings != reads {
-		t.Fatalf("opening a sibling or repeating a request listed %d additional directories", fsys.listings-reads)
+	if fsys.parentListings != reads || fsys.leafListings != leafReads+2 {
+		t.Fatalf("repeated and sibling requests read %d ancestors and %d leaf parents", fsys.parentListings-reads, fsys.leafListings-leafReads)
 	}
 	renamed := tspath.ResolvePath(directory, "FIRST.ts")
 	if err := os.Rename(uriToPath(first), renamed); err != nil {
@@ -1793,8 +1801,8 @@ func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing
 		t.Fatal(err)
 	}
 	updated := s.documentTargetIdentity(first)
-	if fsys.listings == reads || fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
-		t.Fatalf("file notification retained an old observation: %+v, %d -> %d directory reads", updated, reads, fsys.listings)
+	if fsys.parentListings == reads || fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
+		t.Fatalf("file notification retained an old observation: %+v, %d -> %d directory reads", updated, reads, fsys.parentListings)
 	}
 	if err := os.Rename(renamed, uriToPath(first)); err != nil {
 		t.Fatal(err)

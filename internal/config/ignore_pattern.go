@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -315,8 +316,8 @@ func hasCaseInsensitivePattern(patterns []IgnorePattern) bool {
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
-		glob = strings.ToLower(glob)
-		path = strings.ToLower(path)
+		glob = gitignore.FoldCase(glob)
+		path = gitignore.FoldCase(path)
 	}
 	return utils.MatchGlob(glob, path)
 }
@@ -429,7 +430,7 @@ func (state *gitIgnorePathState) apply(pattern *IgnorePattern) bool {
 	path := state.path
 	if pattern.CaseInsensitive {
 		if state.lowerPath == "" {
-			state.lowerPath = strings.ToLower(path)
+			state.lowerPath = gitignore.FoldCase(path)
 		}
 		path = state.lowerPath
 	}
@@ -785,8 +786,8 @@ func (n negReach) overlaps(dirPath string) bool {
 		literal := np.literal
 		candidate := dirPath
 		if np.caseInsensitive {
-			literal = strings.ToLower(literal)
-			candidate = strings.ToLower(candidate)
+			literal = gitignore.FoldCase(literal)
+			candidate = gitignore.FoldCase(candidate)
 		}
 		if np.unrooted || segPrefixEither(literal, candidate) {
 			return true

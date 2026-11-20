@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/lsp"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -15,7 +14,7 @@ func runLSP(args []string) int {
 		Out:                lsp.ToWriter(os.Stdout),
 		Err:                os.Stderr,
 		Cwd:                utils.Must(os.Getwd()),
-		FS:                 bundled.WrapFS(osvfs.FS()),
+		FS:                 newLSPFileSystem(),
 		DefaultLibraryPath: bundled.LibPath(),
 	})
 	if err := s.Run(); err != nil {

@@ -2483,7 +2483,7 @@ func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T) {
-	directoryPath := t.TempDir()
+	directoryPath := osvfs.FS().Realpath(t.TempDir())
 	filePath := filepath.Join(directoryPath, "untouched.ts")
 	if err := os.WriteFile(filePath, []byte("a"), 0o644); err != nil {
 		t.Fatal(err)
@@ -2512,7 +2512,7 @@ func TestCLIFinalChangeCommitterValidatesCompleteDeltaBeforeWriting(t *testing.T
 }
 
 func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	paths := []string{tspath.ResolvePath(root, "first.ts"), tspath.ResolvePath(root, "second.ts"), tspath.ResolvePath(root, "unchanged.ts")}
 	stamp := time.Unix(1700000000, 0)
 	for _, path := range paths {
@@ -2556,7 +2556,7 @@ func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	first, second := tspath.ResolvePath(root, "first.js"), tspath.ResolvePath(root, "second.js")
 	if err := os.WriteFile(first, []byte("before"), 0o644); err != nil {
 		t.Fatal(err)
@@ -2622,7 +2622,7 @@ func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
 }
 
 func TestCLIFinalChangeCommitterChecksUnchangedNameForSingleLink(t *testing.T) {
-	root := tspath.NormalizePath(t.TempDir())
+	root := tspath.NormalizePath(osvfs.FS().Realpath(t.TempDir()))
 	path, alias := tspath.ResolvePath(root, "file.js"), tspath.ResolvePath(root, "alias.js")
 	if err := os.WriteFile(path, []byte("before"), 0o644); err != nil {
 		t.Fatal(err)
@@ -2777,7 +2777,7 @@ func TestCLIFinalChangeCommitterRejectsUnselectedPathBeforeAnyWrite(t *testing.T
 }
 
 func TestCLIFinalChangeCommitterRejectsStaleDiskGeneration(t *testing.T) {
-	filePath := filepath.Join(t.TempDir(), "stale.ts")
+	filePath := filepath.Join(osvfs.FS().Realpath(t.TempDir()), "stale.ts")
 	if err := os.WriteFile(filePath, []byte("new"), 0o644); err != nil {
 		t.Fatal(err)
 	}
