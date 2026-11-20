@@ -853,8 +853,11 @@ test('type and declaration identity survive closing one file', async () => {
       ).toBe(symbol);
       expect(declaration.getText()).toBe('value=1 as const');
       expect(declaration.getSourceFile()).toBe(source);
+      const getProperties = firstType.getProperties.bind(firstType);
+      getProperties();
       second.handle.close();
       owner.close();
+      expect(getProperties).toThrow('closed');
       expect(() => declaration.kind).toThrow('closed');
       expect(() => firstType.flags).toThrow('closed');
     } finally {
@@ -1908,6 +1911,8 @@ test('public checker, Program and source reads match TypeScript', async () => {
     const printed = inspect(literal, { depth: 0 });
     expect(printed).toContain('[RuleLiteral]');
     expect(printed).not.toContain('types:');
+    expect(inspect(literal, { depth: 0, customInspect: false })).toBe(printed);
+    expect(Object.isFrozen(Object.preventExtensions(literal))).toBe(false);
     expect(() =>
       checker.typeToString(Object.create(literal) as object),
     ).toThrow('foreign type handle');

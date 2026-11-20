@@ -474,31 +474,7 @@ function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
 }
 
 const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
-const inspectFields = Symbol();
-const inspectionViews = new WeakMap<object, WeakRef<object>>();
-
-// Node tracks cycles by the identity of the returned object. Only inspected
-// types need a display object, and holding a type does not retain its display.
-function inspectType(receiver: object, descriptors: PropertyDescriptorMap) {
-  const previous = inspectionViews.get(receiver)?.deref();
-  const display =
-    previous &&
-    Object.isExtensible(previous) &&
-    Reflect.ownKeys(previous).every((key) =>
-      Reflect.deleteProperty(previous, key),
-    )
-      ? previous
-      : {};
-  if (display !== previous) inspectionViews.set(receiver, new WeakRef(display));
-  for (const key of Reflect.ownKeys(descriptors)) {
-    if (key === inspectCustom) continue;
-    const descriptor = descriptors[key];
-    descriptor.configurable = true;
-    if (descriptor.get) descriptor.get = descriptor.get.bind(receiver);
-    Object.defineProperty(display, key, descriptor);
-  }
-  return display;
-}
+const inspectionReceivers = new WeakSet<object>();
 
 export function guarded<T extends object>(object: T, ensure: () => void): T {
   const proxy: T = new Proxy(object, {
@@ -554,11 +530,16 @@ type TypeScriptEnums = Pick<
 
 type TypePrototype = ReturnType<typeof makeTypePrototype>;
 
-function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
+function makeTypePrototype(
+  checker: CheckerView,
+  typescript: TypeScriptEnums,
+  ensure: () => void,
+) {
   const { TypeFlags: tf, ObjectFlags: of } = typescript;
   function cached<T>(read: (type: TypeView) => T) {
     const values = new WeakMap<TypeView, T>();
     return function (this: TypeView) {
+      ensure();
       const type = canonicalView(this);
       if (!values.has(type)) values.set(type, read(type));
       return values.get(type)!;
@@ -638,8 +619,23 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   Object.defineProperty(prototype, inspectCustom, {
     configurable: true,
     writable: true,
-    value(this: object & { [inspectFields]?: object }) {
-      return this[inspectFields] ?? this;
+    value(
+      this: object,
+      _depth: number,
+      options: { getters?: boolean | string },
+    ) {
+      if (!options?.getters || inspectionReceivers.has(this)) return this;
+      try {
+        ensure();
+      } catch {
+        return this;
+      }
+      // With getters enabled, Node calls each accessor on the proxy's target.
+      // Give it the rule's actual receiver. Returning this on the second pass
+      // keeps cycle detection and formatting inside the original inspection.
+      const receiver = new Proxy(this, {});
+      inspectionReceivers.add(receiver);
+      return receiver;
     },
   });
   return prototype;
@@ -732,6 +728,7 @@ export class TypeServiceClient {
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
   private readonly typePrototype: TypePrototype;
+  private readonly typeGuard: ProxyHandler<TypeView>;
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
   private factBytes = 0;
@@ -1385,7 +1382,20 @@ export class TypeServiceClient {
       typescript,
       descriptor.compilerOptions,
     );
-    this.typePrototype = makeTypePrototype(this.checker, typescript);
+    const ensure = this.ensure.bind(this);
+    this.typePrototype = makeTypePrototype(this.checker, typescript, ensure);
+    // Node inspects a proxy's immediate target, even when console.dir skips
+    // custom inspection. Public reflection checks the lifetime and leaves the
+    // trap absent so it delegates to that same target without a second query.
+    const live = { get: ensure };
+    this.typeGuard = Object.defineProperties(
+      {},
+      {
+        has: live,
+        ownKeys: live,
+        getOwnPropertyDescriptor: live,
+      },
+    );
     this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
@@ -1781,6 +1791,15 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
+  private typeFieldNames?: ReadonlySet<PropertyKey>;
+  private canInspectType(): boolean {
+    try {
+      this.ensure();
+      return true;
+    } catch {
+      return false;
+    }
+  }
   private wrapType(
     fields: TypeView,
     hasField: (
@@ -1791,81 +1810,85 @@ export class TypeServiceClient {
     mappedFields: () => readonly number[] | undefined,
     hasDeclaredMembers: () => boolean,
   ): TypeView {
-    const target: TypeView = Object.create(this.typePrototype);
-    const available = (key: PropertyKey) =>
-      Object.hasOwn(fields, key) && Object.isExtensible(target);
-    const descriptor = (key: PropertyKey): PropertyDescriptor => {
-      const desc = Object.getOwnPropertyDescriptor(fields, key)!;
-      if ('value' in desc) desc.writable = false;
-      return desc;
+    Object.defineProperties(fields, {
+      id: { writable: false },
+      checker: { writable: false },
+    });
+    const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
+    let pluginFields: Set<PropertyKey> | undefined;
+    const managed = (key: PropertyKey) =>
+      native.has(key) && !pluginFields?.has(key);
+    const own = (key: PropertyKey, live = true) => {
+      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
+      return descriptor &&
+        (!descriptor.configurable ||
+          !Object.isExtensible(fields) ||
+          !managed(key) ||
+          key === 'id' ||
+          (live && hasField(key)))
+        ? descriptor
+        : undefined;
     };
-    const install = (key: PropertyKey) =>
-      Object.defineProperty(target, key, {
-        ...descriptor(key),
-        configurable: false,
-      });
-    const fieldKeys = () => {
-      const declared = hasDeclaredMembers();
-      const mapped = mappedFields();
-      return Reflect.ownKeys(fields).filter((key) =>
-        declaredMemberKeys.has(key) ? declared : hasField(key, false, mapped),
+    const keys = (live = true) => {
+      const all = Reflect.ownKeys(fields);
+      if (!Object.isExtensible(fields)) return all;
+      if (!live) return all.filter((key) => own(key, false));
+      const declared = hasDeclaredMembers(),
+        mapped = mappedFields();
+      return all.filter(
+        (key) =>
+          !managed(key) ||
+          (declaredMemberKeys.has(key)
+            ? declared
+            : hasField(key, false, mapped)),
       );
     };
-    const proxy: TypeView = new Proxy(target, {
+    const backing: TypeView = new Proxy(fields, {
       get: (object, key, receiver: object) => {
-        if (key === serviceView) return proxy;
-        if (key === inspectFields) {
-          if (canonicalView(receiver) !== proxy) return undefined;
-          let descriptors: PropertyDescriptorMap;
-          try {
-            descriptors = Object.getOwnPropertyDescriptors(proxy);
-          } catch {
-            // After the checker or shared generation closes, logging can still
-            // show the handle and plugin-owned properties from the local target.
-            descriptors = Object.getOwnPropertyDescriptors(object);
-            descriptors.id = descriptor('id');
-          }
-          return inspectType(receiver, descriptors);
+        const self = receiver === backing ? view : receiver;
+        if (key === serviceView) return view;
+        if (receiver !== backing) this.ensure();
+        else if (key === Symbol.toStringTag && !this.canInspectType())
+          return Reflect.getOwnPropertyDescriptor(object, key)?.value;
+        const value: unknown = Reflect.get(object, key, self);
+        if (value === undefined && managed(key)) {
+          const proto = Reflect.getPrototypeOf(object);
+          if (proto && Reflect.has(proto, key) && !hasField(key))
+            return Reflect.get(proto, key, self);
         }
-        this.ensure();
-        if (Object.hasOwn(object, key) || !available(key))
-          return Reflect.get(object, key, receiver);
-        const value: unknown = Reflect.get(fields, key);
-        return value === undefined && Reflect.has(object, key) && !hasField(key)
-          ? Reflect.get(object, key, receiver)
-          : value;
+        return value;
       },
       has: (object, key) => {
-        this.ensure();
-        return Reflect.has(object, key) || (available(key) && hasField(key));
-      },
-      ownKeys: (object) => {
-        this.ensure();
-        const own = Reflect.ownKeys(object);
-        if (!Object.isExtensible(object)) return own;
-        const keys = fieldKeys();
-        if (!own.length) return keys;
-        return Reflect.ownKeys(
-          Object.fromEntries([...keys, ...own].map((key) => [key, true])),
-        );
-      },
-      getOwnPropertyDescriptor: (object, key) => {
-        this.ensure();
+        if (!managed(key) || !Object.hasOwn(object, key))
+          return Reflect.has(object, key);
+        const proto = Reflect.getPrototypeOf(object);
         return (
-          Reflect.getOwnPropertyDescriptor(object, key) ??
-          (available(key) && hasField(key) ? descriptor(key) : undefined)
+          !!own(key, this.canInspectType()) ||
+          (proto !== null && Reflect.has(proto, key))
         );
+      },
+      ownKeys: () => keys(this.canInspectType()),
+      getOwnPropertyDescriptor: (_object, key) =>
+        own(key, this.canInspectType()),
+      set: (object, key, value, receiver) => {
+        this.ensure();
+        if (managed(key) && !hasField(key, true))
+          return Reflect.set(
+            Reflect.getPrototypeOf(object) ?? Object.create(null),
+            key,
+            value,
+            receiver,
+          );
+        return Reflect.set(object, key, value, receiver);
       },
       defineProperty: (object, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
-        if (
-          !Object.hasOwn(object, key) &&
-          available(key) &&
-          hasField(key, true)
-        ) {
-          if (!hasField(key)) return false;
-          const current = descriptor(key);
+        if (!managed(key))
+          return Reflect.defineProperty(object, key, attributes);
+        if (hasField(key, true)) {
+          const current = own(key);
+          if (!current) return false;
           for (const name of Object.keys(attributes)) {
             if (
               name !== 'configurable' &&
@@ -1877,28 +1900,31 @@ export class TypeServiceClient {
             )
               return false;
           }
-          if (attributes.configurable === false) install(key);
-          return true;
+        } else {
+          // Discard the absent placeholder so new plugin properties receive
+          // the ordinary defaults of Object.defineProperty or assignment.
+          if (!Object.isExtensible(object)) return false;
+          Reflect.deleteProperty(object, key);
+          (pluginFields ??= new Set()).add(key);
         }
         return Reflect.defineProperty(object, key, attributes);
       },
       deleteProperty: (object, key) => {
         this.ensure();
-        return Object.hasOwn(object, key)
-          ? Reflect.deleteProperty(object, key)
-          : !available(key) || !hasField(key);
+        return managed(key) ? !own(key) : Reflect.deleteProperty(object, key);
       },
       preventExtensions: (object) => {
         this.ensure();
         if (Object.isExtensible(object)) {
-          for (const key of fieldKeys()) {
-            if (!Object.hasOwn(object, key)) install(key);
-          }
+          const keep = new Set(keys());
+          for (const key of Reflect.ownKeys(object))
+            if (!keep.has(key)) Reflect.deleteProperty(object, key);
         }
         return Reflect.preventExtensions(object);
       },
     });
-    return proxy;
+    const view = new Proxy(backing, this.typeGuard);
+    return view;
   }
   private type(id: number): TypeView | undefined {
     const create = (client: this): TypeView => {
