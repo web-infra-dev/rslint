@@ -1,6 +1,6 @@
-import { RuleTester } from '../rule-tester';
-
-const ruleTester = new RuleTester();
+// Upstream: eslint-plugin-jest@29.16.1, plus existing Rslint regressions.
+import { RuleTester, type ValidTestCase } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
 const generateInvalidCases = (
   operator: string,
@@ -14,22 +14,26 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 18 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 18 + operator.length + equalityMatcher.length,
       },
     ],
   },
   {
     code: `expect(value ${operator} 1,).${equalityMatcher}(true,);`,
     output: `expect(value,).${preferredMatcher}(1,);`,
-    parserOptions: { ecmaVersion: 2017 },
+    languageOptions: { ecmaVersion: 2017 },
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 19 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 19 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -39,9 +43,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 18 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 18 + operator.length + equalityMatcher.length + 2,
       },
     ],
   },
@@ -51,9 +57,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 27 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 27 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -63,9 +71,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 18 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 18 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -75,9 +85,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 18 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 18 + operator.length + equalityMatcher.length + 2,
       },
     ],
   },
@@ -87,9 +99,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 27 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 27 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -99,9 +113,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 22 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 22 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -111,9 +127,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 25 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 25 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -123,9 +141,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher: preferredMatcherWhenNegated },
+        message: `Prefer using \`${preferredMatcherWhenNegated}\` instead`,
         column: 31 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 31 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -135,9 +155,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 22 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 22 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -147,9 +169,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 31 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 31 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -159,9 +183,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 34 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 34 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -171,9 +197,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 37 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 37 + operator.length + equalityMatcher.length,
       },
     ],
   },
@@ -183,9 +211,11 @@ const generateInvalidCases = (
     errors: [
       {
         messageId: 'useToBeComparison',
-        data: { preferredMatcher },
+        message: `Prefer using \`${preferredMatcher}\` instead`,
         column: 37 + operator.length,
         line: 1,
+        endLine: 1,
+        endColumn: 37 + operator.length + equalityMatcher.length + 2,
       },
     ],
   },
@@ -215,58 +245,87 @@ const generateValidStringLiteralCases = (operator: string, matcher: string) =>
     `expect(${b} ${operator} ${a}).${matcher}(true)`,
   ]);
 
-const testComparisonOperator = (
-  operator: string,
-  preferredMatcher: string,
-  preferredMatcherWhenNegated: string,
-) => {
-  ruleTester.run(`prefer-comparison-matcher`, {} as never, {
+const operators = [
+  ['>', 'toBeGreaterThan', 'toBeLessThanOrEqual'],
+  ['<', 'toBeLessThan', 'toBeGreaterThanOrEqual'],
+  ['>=', 'toBeGreaterThanOrEqual', 'toBeLessThan'],
+  ['<=', 'toBeLessThanOrEqual', 'toBeGreaterThan'],
+] as const;
+const equalityMatchers = ['toBe', 'toEqual', 'toStrictEqual'];
+const extraValid: ValidTestCase[] = [
+  { code: 'expect.hasAssertions' },
+  { code: 'expect.hasAssertions()' },
+  { code: 'expect.assertions(1)' },
+  { code: 'expect(true).toBe(...true)' },
+  { code: 'expect()' },
+  { code: 'expect({}).toStrictEqual({})' },
+  { code: 'expect(a === b).toBe(true)' },
+  { code: 'expect(a !== 2).toStrictEqual(true)' },
+  { code: 'expect(a === b).not.toEqual(true)' },
+  { code: 'expect(a !== "string").toStrictEqual(true)' },
+  { code: 'expect(5 != a).toBe(true)' },
+  { code: 'expect(a == "string").toBe(true)' },
+  { code: 'expect(a == "string").not.toBe(true)' },
+  { code: 'expect().toStrictEqual({})' },
+];
+
+const comparisonCases = operators.map(
+  ([operator, preferred, negated], run) => ({
     valid: [
       { code: 'expect()' },
       { code: 'expect({}).toStrictEqual({})' },
-      { code: `expect(value).${preferredMatcher}(1);` },
-      { code: `expect(value).${preferredMatcherWhenNegated}(1);` },
-      { code: `expect(value).not.${preferredMatcher}(1);` },
-      { code: `expect(value).not.${preferredMatcherWhenNegated}(1);` },
-      ...['toBe', 'toEqual', 'toStrictEqual'].flatMap(
-        (equalityMatcher: string) =>
-          generateValidStringLiteralCases(operator, equalityMatcher).map(
-            (code) => ({ code }),
-          ),
+      { code: `expect(value).${preferred}(1);` },
+      { code: `expect(value).${negated}(1);` },
+      { code: `expect(value).not.${preferred}(1);` },
+      { code: `expect(value).not.${negated}(1);` },
+      ...equalityMatchers.flatMap((matcher) =>
+        generateValidStringLiteralCases(operator, matcher).map((code) => ({
+          code,
+        })),
       ),
-    ],
-    invalid: ['toBe', 'toEqual', 'toStrictEqual'].flatMap((equalityMatcher) =>
-      generateInvalidCases(
-        operator,
-        equalityMatcher,
-        preferredMatcher,
-        preferredMatcherWhenNegated,
-      ),
-    ),
-  });
-};
+    ].map((item, index) => ({ name: `run ${run} valid ${index}`, ...item })),
+    invalid: equalityMatchers
+      .flatMap((matcher) =>
+        generateInvalidCases(operator, matcher, preferred, negated),
+      )
+      .map((item, index) => ({ name: `run ${run} invalid ${index}`, ...item })),
+  }),
+);
 
-testComparisonOperator('>', 'toBeGreaterThan', 'toBeLessThanOrEqual');
-testComparisonOperator('<', 'toBeLessThan', 'toBeGreaterThanOrEqual');
-testComparisonOperator('>=', 'toBeGreaterThanOrEqual', 'toBeLessThan');
-testComparisonOperator('<=', 'toBeLessThanOrEqual', 'toBeGreaterThan');
-
-ruleTester.run(`prefer-comparison-matcher`, {} as never, {
+// Run the complete matrix once with upstream's ES2015 default. The trailing
+// argument-comma cases retain their explicit ES2017 override.
+const config = fixtureConfig();
+new RuleTester({
+  ...config,
+  languageOptions: { ...config.languageOptions, ecmaVersion: 2015 },
+}).run('prefer-comparison-matcher', {
   valid: [
-    { code: 'expect.hasAssertions' },
-    { code: 'expect.hasAssertions()' },
-    { code: 'expect.assertions(1)' },
-    { code: 'expect(true).toBe(...true)' },
-    { code: 'expect()' },
-    { code: 'expect({}).toStrictEqual({})' },
-    { code: 'expect(a === b).toBe(true)' },
-    { code: 'expect(a !== 2).toStrictEqual(true)' },
-    { code: 'expect(a === b).not.toEqual(true)' },
-    { code: 'expect(a !== "string").toStrictEqual(true)' },
-    { code: 'expect(5 != a).toBe(true)' },
-    { code: 'expect(a == "string").toBe(true)' },
-    { code: 'expect(a == "string").not.toBe(true)' },
-    { code: 'expect().toStrictEqual({})' },
+    ...comparisonCases.flatMap((cases) => cases.valid),
+    ...extraValid.map((item, index) => ({
+      name: `extra valid ${index}`,
+      ...item,
+    })),
   ],
-  invalid: [],
+  invalid: comparisonCases.flatMap((cases) => cases.invalid),
+});
+
+// Default configuration needs a smoke check, not a second complete matrix.
+new RuleTester(fixtureConfig()).run('prefer-comparison-matcher', {
+  valid: [
+    {
+      name: 'default configuration valid control',
+      code: 'expect(value).toBeGreaterThan(1);',
+    },
+  ],
+  invalid: [
+    {
+      ...generateInvalidCases(
+        '>',
+        'toBe',
+        'toBeGreaterThan',
+        'toBeLessThanOrEqual',
+      )[0],
+      name: 'default configuration autofix control',
+    },
+  ],
 });

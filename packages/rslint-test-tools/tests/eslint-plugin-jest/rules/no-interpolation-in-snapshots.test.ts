@@ -1,91 +1,126 @@
-import { RuleTester } from '../rule-tester';
+// Upstream reference: eslint-plugin-jest@29.16.0; includes existing Rslint regressions.
+// Additional cases from 29.16.6 retain their input and parser configuration.
+// Complete assertions record current native output; documented differences remain separate.
+import {
+  RuleTester,
+  type TestCase,
+  type ValidTestCase,
+} from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('no-interpolation-in-snapshots', {} as never, {
+new RuleTester(fixtureConfig()).run('no-interpolation-in-snapshots', {
   valid: [
-    { code: 'expect("something").toEqual("else");' },
-    { code: 'expect(something).toMatchInlineSnapshot();' },
-    { code: 'expect(something).toMatchInlineSnapshot(`No interpolation`);' },
-    {
-      code: 'expect(something).toMatchInlineSnapshot({}, `No interpolation`);',
-    },
-    { code: 'expect(something);' },
-    { code: 'expect(something).not;' },
-    { code: 'expect.toHaveAssertions();' },
-    { code: 'myObjectWants.toMatchInlineSnapshot({}, `${interpolated}`);' },
-    {
-      code: 'myObjectWants.toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
-    },
-    { code: 'toMatchInlineSnapshot({}, `${interpolated}`);' },
-    {
-      code: 'toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
-    },
-    { code: 'expect(something).toThrowErrorMatchingInlineSnapshot();' },
-    {
-      code: 'expect(something).toThrowErrorMatchingInlineSnapshot(`No interpolation`);',
-    },
+    ...(
+      [
+        'expect("something").toEqual("else");',
+        'expect(something).toMatchInlineSnapshot();',
+        'expect(something).toMatchInlineSnapshot(`No interpolation`);',
+        'expect(something).toMatchInlineSnapshot({}, `No interpolation`);',
+        'expect(something);',
+        'expect(something).not;',
+        'expect.toHaveAssertions();',
+        'myObjectWants.toMatchInlineSnapshot({}, `${interpolated}`);',
+        'myObjectWants.toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
+        'toMatchInlineSnapshot({}, `${interpolated}`);',
+        'toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
+        'expect(something).toThrowErrorMatchingInlineSnapshot();',
+        'expect(something).toThrowErrorMatchingInlineSnapshot(`No interpolation`);',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `run 0 valid ${index}`,
+      code,
+    })),
+    ...(
+      [
+        'expect("something").toEqual("else");',
+        'expect(something).toMatchInlineSnapshot();',
+        'expect(something).toMatchInlineSnapshot(`No interpolation`);',
+        'expect(something).toMatchInlineSnapshot({}, `No interpolation`);',
+        'expect(something);',
+        'expect(something).not;',
+        'expect.toHaveAssertions();',
+        'myObjectWants.toMatchInlineSnapshot({}, `${interpolated}`);',
+        'myObjectWants.toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
+        'toMatchInlineSnapshot({}, `${interpolated}`);',
+        'toMatchInlineSnapshot({}, `${interpolated1} ${interpolated2}`);',
+        'expect(something).toThrowErrorMatchingInlineSnapshot();',
+        'expect(something).toThrowErrorMatchingInlineSnapshot(`No interpolation`);',
+      ] as const
+    ).map((code, index): ValidTestCase => ({
+      name: `upstream no-interpolation-in-snapshots / valid ${index}`,
+      code,
+      languageOptions: {
+        ecmaVersion: 2017,
+      },
+    })),
   ],
   invalid: [
-    {
-      code: 'expect(something).toMatchInlineSnapshot(`${interpolated}`);',
+    ...(
+      [
+        ['expect(something).toMatchInlineSnapshot(`${interpolated}`);', 41],
+        ['expect(something).not.toMatchInlineSnapshot(`${interpolated}`);', 45],
+        ['expect(something).toMatchInlineSnapshot({}, `${interpolated}`);', 45],
+        [
+          'expect(something).not.toMatchInlineSnapshot({}, `${interpolated}`);',
+          49,
+        ],
+        [
+          'expect(something).toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
+          54,
+        ],
+        [
+          'expect(something).not.toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
+          58,
+        ],
+      ] as const
+    ).map(([code, column], index): TestCase => ({
+      name: `run 0 invalid ${index}`,
+      code,
       errors: [
         {
-          endColumn: 58,
-          column: 41,
           messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column,
+          endLine: 1,
+          endColumn: column + 17,
         },
       ],
-    },
-    {
-      code: 'expect(something).not.toMatchInlineSnapshot(`${interpolated}`);',
+    })),
+    ...(
+      [
+        ['expect(something).toMatchInlineSnapshot(`${interpolated}`);', 41],
+        ['expect(something).not.toMatchInlineSnapshot(`${interpolated}`);', 45],
+        ['expect(something).toMatchInlineSnapshot({}, `${interpolated}`);', 45],
+        [
+          'expect(something).not.toMatchInlineSnapshot({}, `${interpolated}`);',
+          49,
+        ],
+        [
+          'expect(something).toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
+          54,
+        ],
+        [
+          'expect(something).not.toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
+          58,
+        ],
+      ] as const
+    ).map(([code, column], index): TestCase => ({
+      name: `upstream no-interpolation-in-snapshots / invalid ${index}`,
+      code,
+      languageOptions: {
+        ecmaVersion: 2017,
+      },
       errors: [
         {
-          endColumn: 62,
-          column: 45,
           messageId: 'noInterpolation',
+          message: 'Do not use string interpolation inside of snapshots',
+          line: 1,
+          column,
+          endLine: 1,
+          endColumn: column + 17,
         },
       ],
-    },
-    {
-      code: 'expect(something).toMatchInlineSnapshot({}, `${interpolated}`);',
-      errors: [
-        {
-          endColumn: 62,
-          column: 45,
-          messageId: 'noInterpolation',
-        },
-      ],
-    },
-    {
-      code: 'expect(something).not.toMatchInlineSnapshot({}, `${interpolated}`);',
-      errors: [
-        {
-          endColumn: 66,
-          column: 49,
-          messageId: 'noInterpolation',
-        },
-      ],
-    },
-    {
-      code: 'expect(something).toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
-      errors: [
-        {
-          endColumn: 71,
-          column: 54,
-          messageId: 'noInterpolation',
-        },
-      ],
-    },
-    {
-      code: 'expect(something).not.toThrowErrorMatchingInlineSnapshot(`${interpolated}`);',
-      errors: [
-        {
-          endColumn: 75,
-          column: 58,
-          messageId: 'noInterpolation',
-        },
-      ],
-    },
+    })),
   ],
 });

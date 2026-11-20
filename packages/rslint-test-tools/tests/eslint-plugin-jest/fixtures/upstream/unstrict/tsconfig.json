@@ -1,12 +1,15 @@
 {
   "compilerOptions": {
-    "jsx": "react",
+    "jsx": "preserve",
     "target": "es5",
     "module": "commonjs",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
     "lib": ["es2015", "es2017", "esnext"],
-    "allowJs": true
+    "experimentalDecorators": true
   },
-  "include": ["files/**/*"]
+  "include": [
+    "file.ts",
+    "react.tsx"
+  ]
 }

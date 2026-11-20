@@ -6,6 +6,8 @@ define.fmt({
     '.vscode/',
     '.agents/skills/create-draft-release-notes',
     'typescript-go/',
+    // Preserve upstream fixture text, including intentional formatting cases.
+    'packages/rslint-test-tools/tests/eslint-plugin-jest/fixtures',
     'packages/rslint-test-tools/tests/typescript-eslint/fixtures',
     'packages/rslint-test-tools/tests/typescript-eslint/rules',
     'binaries/',
