@@ -474,13 +474,21 @@ function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
 }
 
 const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
+const localInspection = Symbol();
 const inspectionReceivers = new WeakSet<object>();
+const closedInspections = new WeakMap<object, object>();
 const rejectTypeEdit = () => false;
 
 const typeInspection = {
   configurable: true,
   writable: true,
-  value(this: object, _depth: number, options: { getters?: boolean | string }) {
+  value(
+    this: object & { [localInspection]?: object },
+    _depth: number,
+    options: { getters?: boolean | string },
+  ) {
+    const closed = this[localInspection];
+    if (closed) return closed;
     if (!options?.getters || inspectionReceivers.has(this)) return this;
     // With getters enabled, Node calls each accessor on the proxy's target.
     // Give it the rule's actual receiver. Returning this on the second pass
@@ -1802,9 +1810,7 @@ export class TypeServiceClient {
       key: PropertyKey,
       descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!,
     ) => {
-      // The local handle and checker are data properties. Their public
-      // descriptors can be sealed or frozen independently of compiler getters.
-      descriptor.configurable = 'value' in descriptor;
+      descriptor.configurable = false;
       Object.defineProperty(target, key, descriptor);
       return descriptor;
     };
@@ -1893,6 +1899,27 @@ export class TypeServiceClient {
             ? view
             : receiver;
         if (key === serviceView) return view;
+        if (key === localInspection) {
+          if (this.canInspectType() || canonicalView(self) !== view)
+            return undefined;
+          const previous = closedInspections.get(self);
+          if (previous) return previous;
+          // The type can stay in an error or a plugin cache after teardown.
+          // Render its local data without evaluating expired compiler getters.
+          const display = {};
+          for (const name of keys(false)) {
+            if (name === inspectCustom || (name !== 'id' && managed(name)))
+              continue;
+            const desc = own(name, false)!;
+            if (desc.get) {
+              if (name === Symbol.toStringTag) continue;
+              desc.get = desc.get.bind(self);
+            }
+            Object.defineProperty(display, name, desc);
+          }
+          closedInspections.set(self, Object.freeze(display));
+          return display;
+        }
         if (key === Symbol.toStringTag && !this.canInspectType())
           return (
             required(key) ?? Reflect.getOwnPropertyDescriptor(fields, key)
@@ -1948,19 +1975,8 @@ export class TypeServiceClient {
         this.ensure();
         if (key === 'typeArguments') return false;
         if (!managed(key)) return definePluginField(key, attributes);
-        if (hasField(key, true)) {
-          const current = own(key);
-          if (!current) return false;
-          if (
-            'value' in current &&
-            !Reflect.defineProperty(fields, key, {
-              ...attributes,
-              configurable: false,
-            })
-          )
-            return false;
-          return Reflect.defineProperty(target, key, attributes);
-        }
+        if (hasField(key, true))
+          return !!own(key) && Reflect.defineProperty(target, key, attributes);
         // An absent placeholder must not supply the descriptor defaults for
         // a new plugin property.
         if (!Object.isExtensible(fields)) return false;

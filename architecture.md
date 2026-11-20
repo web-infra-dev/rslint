@@ -1883,8 +1883,11 @@ Symbol member tables materialize on demand. Reads of transient symbol links
 and mapped-type fields observe the checker's current values without triggering
 resolution. Type methods and the `typeArguments` accessor are inherited.
 Field presence follows the TypeScript type kind and its current state. A mapped
-type exposes the slots the checker has already filled in one read. Type fields
-and their member lists are read-only. Checking a field's presence or listing
+type exposes the slots the checker has already filled in one read. Compiler
+fields are read-only and non-configurable, and their member lists are
+read-only. Preventing extensions preserves existing property descriptors.
+A type with only fixed, read-only properties then satisfies `Object.isFrozen`.
+Checking a field's presence or listing
 keys reads its metadata and leaves member objects lazy. Plugins can add their
 own properties with ordinary JavaScript descriptors. Transparent proxies
 preserve the original handle. Objects derived from a type have no checker
