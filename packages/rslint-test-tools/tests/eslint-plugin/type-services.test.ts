@@ -1895,6 +1895,16 @@ test('public checker, Program and source reads match TypeScript', async () => {
     expect(exercise(owner.program as unknown as ts.Program)).toEqual(
       exercise(reference),
     );
+    const checker = owner.program.getTypeChecker();
+    const literal = checker.getStringLiteralType('abc');
+    expect(Reflect.set(literal, 'value', 'changed')).toBe(false);
+    expect(checker.typeToString(literal)).toBe('"abc"');
+    expect(() =>
+      checker.typeToString(Object.create(literal) as object),
+    ).toThrow('foreign type handle');
+    expect(
+      Object.getOwnPropertyDescriptor(checker.getBooleanType(), 'types')?.get,
+    ).toBeTypeOf('function');
     expect(() => owner.program.emit()).toThrow('Program.emit');
     const src = owner.program.getSourceFile(file) as ts.SourceFile;
     expect(() =>
