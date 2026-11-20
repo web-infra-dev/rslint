@@ -1890,8 +1890,9 @@ own properties with ordinary JavaScript descriptors. Transparent proxies
 preserve the original handle. Objects derived from a type have no checker
 handle of their own. For plugin getters that use the type as a `WeakMap`
 key, use `util.inspect(type, { getters: true })` or pass `customInspect: true`
-to `console.dir`. With custom inspection disabled, Node calls getters on the
-proxy target. That target is read-only and has its own identity.
+to `console.dir`. With custom inspection disabled, Node unwraps proxies
+before invoking getters. A getter that uses its receiver as a key can then
+display a different value. Editing an unwrapped debugger target is unsupported.
 Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
 can change the checker's cached answers for every client. Node-dependent
