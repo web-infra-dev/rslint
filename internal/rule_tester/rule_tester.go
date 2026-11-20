@@ -213,8 +213,9 @@ func RunRuleTester(root Root, tsconfigPath string, t *testing.T, r *rule.Rule, v
 		assert.NilError(t, err, "error preparing lint plan. code:\n", code)
 
 		_, err = linter.RunLinter(linter.RunLinterOptions{
-			SingleThreaded: true,
-			LintPlan:       lintPlan,
+			SingleThreaded:  true,
+			LintPlan:        lintPlan,
+			ProjectAnalysis: true,
 			Consumer: rule.DiagnosticConsumer{
 				Demand: rule.EditDemandAll,
 				Report: func(diagnostic rule.RuleDiagnostic) {

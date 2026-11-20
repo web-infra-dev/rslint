@@ -82,6 +82,12 @@ type RunLinterOptions struct {
 	TypeCheck bool
 
 	Timing *TimingCollector
+
+	// ProjectAnalysis gives every rule of this pass one shared
+	// rule.GenerationScope over the plan's Programs. Set it only when the
+	// pass lints a source generation that stays frozen for the whole request
+	// (CLI, API and rule tests); editor passes leave it unset.
+	ProjectAnalysis bool
 }
 
 // LintSingleFileOptions configures a single-file, single-program rule pass.

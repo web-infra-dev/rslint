@@ -46,6 +46,13 @@ func prepareLintExecution(opts RunLinterOptions, mode ProgramExecution, projectT
 			return nil, err
 		}
 		execution.programs = make([]*programLintPlan, len(opts.LintPlan.programs))
+		if opts.ProjectAnalysis {
+			programs := make([]*program.Program, len(opts.LintPlan.programs))
+			for index := range opts.LintPlan.programs {
+				programs[index] = opts.LintPlan.programs[index].program
+			}
+			execution.options.generation = rule.NewGenerationScope(programs, opts.SingleThreaded)
+		}
 		for index, plan := range opts.LintPlan.programs {
 			// Only the task container is private. Its files and rules remain
 			// immutable shared content, including when a caller reuses the plan.
@@ -78,6 +85,7 @@ func validateProgramsInPlan(plan *LintPlan) error {
 }
 
 func (e *lintExecution) close() {
+	e.options.generation = nil
 	clear(e.programs)
 	e.programs = nil
 	clear(e.typeCheckPrograms)
