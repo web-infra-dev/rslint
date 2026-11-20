@@ -1691,6 +1691,9 @@ func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.S
 		}
 	}
 	for _, declaration := range symbol.Declarations {
+		if isNamingDottedNamespaceDeclaration(declaration) {
+			continue
+		}
 		container := declaration
 		if declaration.Kind == ast.KindVariableDeclaration {
 			initializer := declaration.Initializer()
@@ -1741,6 +1744,17 @@ func isNamingRead(sourceFile *ast.SourceFile, reference *ast.Node, symbol *ast.S
 	return rhs == nil || reference.Pos() < rhs.Pos() || reference.End() > rhs.End() || isNamingStorableFunctionRead(reference, rhs)
 }
 
+// Upstream represents A.B as a qualified namespace name, rather than a
+// definition of the base binding A. Apply that fact consistently to both
+// merged exports and self-reference containers. tsgo nests the declarations.
+func isNamingDottedNamespaceDeclaration(declaration *ast.Node) bool {
+	if declaration == nil || declaration.Kind != ast.KindModuleDeclaration {
+		return false
+	}
+	body := declaration.Body()
+	return body != nil && body.Kind == ast.KindModuleDeclaration
+}
+
 // A merge can make the binding used without giving every declaration the
 // exported modifier. Keep this fact local to the unused predicate.
 func isNamingMergedExported(symbol *ast.Symbol) bool {
@@ -1748,13 +1762,8 @@ func isNamingMergedExported(symbol *ast.Symbol) bool {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
-		if declaration.Kind == ast.KindModuleDeclaration {
-			body := declaration.Body()
-			// A.B is a qualified namespace declaration in the upstream AST;
-			// its export does not mark a local function named A as used.
-			if body != nil && body.Kind == ast.KindModuleDeclaration {
-				continue
-			}
+		if isNamingDottedNamespaceDeclaration(declaration) {
+			continue
 		}
 		switch declaration.Kind {
 		case ast.KindFunctionDeclaration, ast.KindClassDeclaration,

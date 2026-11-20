@@ -718,3 +718,56 @@ func TestNamingConventionCallbackAndNamespaceBoundaries(t *testing.T) {
 			{Code: "function bad_name(){} export namespace other_name.Inner{export type Entry=string;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
 		})
 }
+
+// Full expectations were checked against typescript-eslint 8.67.0.
+// Qualified namespace declarations must not hide reads of the base binding.
+func TestNamingConventionDottedNamespaceReferences(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NamingConventionRule,
+		[]rule_tester.ValidTestCase{
+			// same-named dotted namespace type read
+			{Code: "type bad_name = string;\nexport namespace bad_name.Inner {\n export type Value = bad_name;\n}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// different namespace type read
+			{Code: "type bad_name=string;export namespace Other.Inner {export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// simple namespace control
+			{Code: "type bad_name=string;export namespace bad_name {export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// non-exported dotted read
+			{Code: "type bad_name=string; namespace bad_name.Inner {type value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// deeper dotted read
+			{Code: "type bad_name=string;export namespace bad_name.Inner.Deep {export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// forward type declaration
+			{Code: "export namespace bad_name.Inner {export type Value=bad_name;} type bad_name=string;", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// recursive alias externally read
+			{Code: "type bad_name={next:bad_name};export namespace bad_name.Inner{export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// simple and dotted mixed read
+			{Code: "type bad_name=string;namespace bad_name{type self=bad_name;}export namespace bad_name.Inner{export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// interface dotted read
+			{Code: "interface bad_name{} export namespace bad_name.Inner{export type Value=bad_name;}", Options: []any{map[string]any{"selector": "interface", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// class dotted read
+			{Code: "class bad_name{} export namespace bad_name.Inner{export type Value=bad_name;}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+			// enum dotted read
+			{Code: "enum bad_name{good} export namespace bad_name.Inner{export type Value=bad_name;}", Options: []any{map[string]any{"selector": "enum", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}},
+		}, []rule_tester.InvalidTestCase{
+			// dotted namespace without type read
+			{Code: "type bad_name=string;export namespace bad_name.Inner {export type Value=number;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// recursive type control
+			{Code: "type bad_name={next:bad_name};", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// simple local self read
+			{Code: "type bad_name=string; namespace bad_name {type value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// deeper dotted no read
+			{Code: "type bad_name=string;export namespace bad_name.Inner.Deep {export type Value=number;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// recursive alias no external read
+			{Code: "type bad_name={next:bad_name};export namespace bad_name.Inner{export type Value=number;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// simple and dotted mixed no read
+			{Code: "type bad_name=string;namespace bad_name{type self=bad_name;}export namespace bad_name.Inner{export type Value=number;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// dotted shadowed alias
+			{Code: "type bad_name=string;export namespace bad_name.Inner{export type bad_name=number;export type Value=bad_name;}", Options: []any{map[string]any{"selector": "typeAlias", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Type Alias name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// interface dotted no read
+			{Code: "interface bad_name{} export namespace bad_name.Inner{export type Value=string;}", Options: []any{map[string]any{"selector": "interface", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Interface name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 11, EndLine: 1, EndColumn: 19}}},
+			// class dotted no read
+			{Code: "class bad_name{} export namespace bad_name.Inner{export type Value=string;}", Options: []any{map[string]any{"selector": "class", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Class name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 7, EndLine: 1, EndColumn: 15}}},
+			// enum dotted no read
+			{Code: "enum bad_name{good} export namespace bad_name.Inner{export type Value=string;}", Options: []any{map[string]any{"selector": "enum", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Enum name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 6, EndLine: 1, EndColumn: 14}}},
+			// function type query control
+			{Code: "function bad_name(){} export namespace bad_name.Inner{export type Value=typeof bad_name;}", Options: []any{map[string]any{"selector": "function", "modifiers": []any{"unused"}, "format": []any{"camelCase"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "doesNotMatchFormat", Message: "Function name `bad_name` must match one of the following formats: camelCase", Line: 1, Column: 10, EndLine: 1, EndColumn: 18}}},
+		})
+}
