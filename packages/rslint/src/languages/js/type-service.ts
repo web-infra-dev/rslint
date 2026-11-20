@@ -462,12 +462,8 @@ const declaredMemberKeys = new Set<PropertyKey>([
 ]);
 
 const serviceView = Symbol();
-// Node calls inspected plugin getters with the proxy target as their receiver.
-const typeProxies = new WeakMap<object, TypeView>();
-function canonicalView(view: TypeView): TypeView;
-function canonicalView(view: object): object;
-function canonicalView(view: object & { [serviceView]?: object }): object {
-  const original = view[serviceView] ?? typeProxies.get(view);
+function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
+  const original = view[serviceView];
   // A transparent proxy forwards its target's prototype. A derived object
   // inherits the marker but has its own identity and cannot name a Go type.
   return original &&
@@ -475,6 +471,33 @@ function canonicalView(view: object & { [serviceView]?: object }): object {
       Object.getPrototypeOf(view) === Object.getPrototypeOf(original))
     ? original
     : view;
+}
+
+const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
+const inspectFields = Symbol();
+const inspectionViews = new WeakMap<object, WeakRef<object>>();
+
+// Node tracks cycles by the identity of the returned object. Only inspected
+// types need a display object, and holding a type does not retain its display.
+function inspectType(receiver: object, descriptors: PropertyDescriptorMap) {
+  const previous = inspectionViews.get(receiver)?.deref();
+  const display =
+    previous &&
+    Object.isExtensible(previous) &&
+    Reflect.ownKeys(previous).every((key) =>
+      Reflect.deleteProperty(previous, key),
+    )
+      ? previous
+      : {};
+  if (display !== previous) inspectionViews.set(receiver, new WeakRef(display));
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key === inspectCustom) continue;
+    const descriptor = descriptors[key];
+    descriptor.configurable = true;
+    if (descriptor.get) descriptor.get = descriptor.get.bind(receiver);
+    Object.defineProperty(display, key, descriptor);
+  }
+  return display;
 }
 
 export function guarded<T extends object>(object: T, ensure: () => void): T {
@@ -612,6 +635,13 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
+  Object.defineProperty(prototype, inspectCustom, {
+    configurable: true,
+    writable: true,
+    value(this: object & { [inspectFields]?: object }) {
+      return this[inspectFields] ?? this;
+    },
+  });
   return prototype;
 }
 
@@ -1751,7 +1781,6 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
-  private typeFieldNames?: ReadonlySet<PropertyKey>;
   private wrapType(
     fields: TypeView,
     hasField: (
@@ -1762,85 +1791,81 @@ export class TypeServiceClient {
     mappedFields: () => readonly number[] | undefined,
     hasDeclaredMembers: () => boolean,
   ): TypeView {
-    // Keep the actual getters on the target. Node's inspector can display
-    // them and follow cycles without querying the checker.
-    Object.defineProperties(fields, {
-      id: { writable: false },
-      checker: { writable: false },
-    });
-    const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
-    let pluginFields: Set<PropertyKey> | undefined;
-    const managed = (key: PropertyKey) =>
-      native.has(key) && !pluginFields?.has(key);
-    const own = (key: PropertyKey) => {
-      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
-      return descriptor &&
-        (!descriptor.configurable ||
-          !Object.isExtensible(fields) ||
-          !managed(key) ||
-          hasField(key))
-        ? descriptor
-        : undefined;
+    const target: TypeView = Object.create(this.typePrototype);
+    const available = (key: PropertyKey) =>
+      Object.hasOwn(fields, key) && Object.isExtensible(target);
+    const descriptor = (key: PropertyKey): PropertyDescriptor => {
+      const desc = Object.getOwnPropertyDescriptor(fields, key)!;
+      if ('value' in desc) desc.writable = false;
+      return desc;
     };
-    const keys = () => {
-      const all = Reflect.ownKeys(fields);
-      if (!Object.isExtensible(fields)) return all;
-      const declared = hasDeclaredMembers(),
-        mapped = mappedFields();
-      return all.filter(
-        (key) =>
-          !managed(key) ||
-          (declaredMemberKeys.has(key)
-            ? declared
-            : hasField(key, false, mapped)),
+    const install = (key: PropertyKey) =>
+      Object.defineProperty(target, key, {
+        ...descriptor(key),
+        configurable: false,
+      });
+    const fieldKeys = () => {
+      const declared = hasDeclaredMembers();
+      const mapped = mappedFields();
+      return Reflect.ownKeys(fields).filter((key) =>
+        declaredMemberKeys.has(key) ? declared : hasField(key, false, mapped),
       );
     };
-    const proxy: TypeView = new Proxy(fields, {
-      get: (object, key, receiver) => {
-        this.ensure();
+    const proxy: TypeView = new Proxy(target, {
+      get: (object, key, receiver: object) => {
         if (key === serviceView) return proxy;
-        const value: unknown = Reflect.get(object, key, receiver);
-        if (value === undefined && managed(key)) {
-          const proto = Reflect.getPrototypeOf(object);
-          if (proto && Reflect.has(proto, key) && !hasField(key))
-            return Reflect.get(proto, key, receiver);
+        if (key === inspectFields) {
+          if (canonicalView(receiver) !== proxy) return undefined;
+          let descriptors: PropertyDescriptorMap;
+          try {
+            descriptors = Object.getOwnPropertyDescriptors(proxy);
+          } catch {
+            // After the checker or shared generation closes, logging can still
+            // show the handle and plugin-owned properties from the local target.
+            descriptors = Object.getOwnPropertyDescriptors(object);
+            descriptors.id = descriptor('id');
+          }
+          return inspectType(receiver, descriptors);
         }
-        return value;
+        this.ensure();
+        if (Object.hasOwn(object, key) || !available(key))
+          return Reflect.get(object, key, receiver);
+        const value: unknown = Reflect.get(fields, key);
+        return value === undefined && Reflect.has(object, key) && !hasField(key)
+          ? Reflect.get(object, key, receiver)
+          : value;
       },
       has: (object, key) => {
         this.ensure();
-        if (!managed(key) || !Object.hasOwn(object, key))
-          return Reflect.has(object, key);
-        const proto = Reflect.getPrototypeOf(object);
-        return !!own(key) || (proto !== null && Reflect.has(proto, key));
+        return Reflect.has(object, key) || (available(key) && hasField(key));
       },
-      ownKeys: () => {
+      ownKeys: (object) => {
         this.ensure();
-        return keys();
+        const own = Reflect.ownKeys(object);
+        if (!Object.isExtensible(object)) return own;
+        const keys = fieldKeys();
+        if (!own.length) return keys;
+        return Reflect.ownKeys(
+          Object.fromEntries([...keys, ...own].map((key) => [key, true])),
+        );
       },
-      getOwnPropertyDescriptor: (_object, key) => {
+      getOwnPropertyDescriptor: (object, key) => {
         this.ensure();
-        return own(key);
-      },
-      set: (object, key, value, receiver) => {
-        this.ensure();
-        if (managed(key) && !hasField(key, true))
-          return Reflect.set(
-            Reflect.getPrototypeOf(object) ?? Object.create(null),
-            key,
-            value,
-            receiver,
-          );
-        return Reflect.set(object, key, value, receiver);
+        return (
+          Reflect.getOwnPropertyDescriptor(object, key) ??
+          (available(key) && hasField(key) ? descriptor(key) : undefined)
+        );
       },
       defineProperty: (object, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
-        if (!managed(key))
-          return Reflect.defineProperty(object, key, attributes);
-        if (hasField(key, true)) {
-          const current = own(key);
-          if (!current) return false;
+        if (
+          !Object.hasOwn(object, key) &&
+          available(key) &&
+          hasField(key, true)
+        ) {
+          if (!hasField(key)) return false;
+          const current = descriptor(key);
           for (const name of Object.keys(attributes)) {
             if (
               name !== 'configurable' &&
@@ -1852,30 +1877,27 @@ export class TypeServiceClient {
             )
               return false;
           }
-        } else {
-          // Discard the absent placeholder so new plugin properties receive
-          // the ordinary defaults of Object.defineProperty or assignment.
-          if (!Object.isExtensible(object)) return false;
-          Reflect.deleteProperty(object, key);
-          (pluginFields ??= new Set()).add(key);
+          if (attributes.configurable === false) install(key);
+          return true;
         }
         return Reflect.defineProperty(object, key, attributes);
       },
       deleteProperty: (object, key) => {
         this.ensure();
-        return managed(key) ? !own(key) : Reflect.deleteProperty(object, key);
+        return Object.hasOwn(object, key)
+          ? Reflect.deleteProperty(object, key)
+          : !available(key) || !hasField(key);
       },
       preventExtensions: (object) => {
         this.ensure();
         if (Object.isExtensible(object)) {
-          const keep = new Set(keys());
-          for (const key of Reflect.ownKeys(object))
-            if (!keep.has(key)) Reflect.deleteProperty(object, key);
+          for (const key of fieldKeys()) {
+            if (!Object.hasOwn(object, key)) install(key);
+          }
         }
         return Reflect.preventExtensions(object);
       },
     });
-    typeProxies.set(fields, proxy);
     return proxy;
   }
   private type(id: number): TypeView | undefined {
