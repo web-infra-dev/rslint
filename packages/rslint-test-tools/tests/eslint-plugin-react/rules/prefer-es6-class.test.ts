@@ -1,23 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectShouldUseES6ClassError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'shouldUseES6Class',
-    'Component should use es6 class instead of createClass',
-    range,
-  );
+function expectShouldUseES6ClassError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldUseES6Class',
+    message: 'Component should use es6 class instead of createClass',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectShouldUseCreateClassError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldUseCreateClass',
-    'Component should use createClass instead of es6 class',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldUseCreateClass',
+    message: 'Component should use createClass instead of es6 class',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

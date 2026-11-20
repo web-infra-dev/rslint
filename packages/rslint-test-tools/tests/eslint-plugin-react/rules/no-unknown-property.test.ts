@@ -1,6 +1,5 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 const ruleTester = new RuleTester(fixtureConfig);
 
@@ -218,390 +217,555 @@ ruleTester.run('no-unknown-property', {
     {
       code: '<div hasOwnProperty="should not be allowed property"></div>;',
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'hasOwnProperty' found",
-          [1, 6, 1, 53],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'hasOwnProperty' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 53,
+        },
       ],
     },
     {
       code: '<div abc="should not be allowed property"></div>;',
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'abc' found",
-          [1, 6, 1, 42],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'abc' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 42,
+        },
       ],
     },
     {
       code: '<div aria-fake="should not be allowed property"></div>;',
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'aria-fake' found",
-          [1, 6, 1, 48],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'aria-fake' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 48,
+        },
       ],
     },
     {
       code: '<div someProp="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'someProp' found",
-          [1, 6, 1, 20],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'someProp' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: '<div class="bar"></div>;',
       output: '<div className="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'class' found, use 'className' instead",
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message: "Unknown property 'class' found, use 'className' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
       code: '<div for="bar"></div>;',
       output: '<div htmlFor="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'for' found, use 'htmlFor' instead",
-          [1, 6, 1, 15],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message: "Unknown property 'for' found, use 'htmlFor' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 15,
+        },
       ],
     },
     {
       code: '<div accept-charset="bar"></div>;',
       output: '<div acceptCharset="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'accept-charset' found, use 'acceptCharset' instead",
-          [1, 6, 1, 26],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'accept-charset' found, use 'acceptCharset' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: '<div http-equiv="bar"></div>;',
       output: '<div httpEquiv="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'http-equiv' found, use 'httpEquiv' instead",
-          [1, 6, 1, 22],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'http-equiv' found, use 'httpEquiv' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<div accesskey="bar"></div>;',
       output: '<div accessKey="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'accesskey' found, use 'accessKey' instead",
-          [1, 6, 1, 21],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'accesskey' found, use 'accessKey' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<div onclick="bar"></div>;',
       output: '<div onClick="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'onclick' found, use 'onClick' instead",
-          [1, 6, 1, 19],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message: "Unknown property 'onclick' found, use 'onClick' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
       code: '<div onmousedown="bar"></div>;',
       output: '<div onMouseDown="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'onmousedown' found, use 'onMouseDown' instead",
-          [1, 6, 1, 23],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'onmousedown' found, use 'onMouseDown' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
       ],
     },
     {
       code: '<div onMousedown="bar"></div>;',
       output: '<div onMouseDown="bar"></div>;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'onMousedown' found, use 'onMouseDown' instead",
-          [1, 6, 1, 23],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'onMousedown' found, use 'onMouseDown' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
       ],
     },
     {
       code: '<use xlink:href="bar" />;',
       output: '<use xlinkHref="bar" />;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'xlink:href' found, use 'xlinkHref' instead",
-          [1, 6, 1, 22],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'xlink:href' found, use 'xlinkHref' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<rect clip-path="bar" transform-origin="center" />;',
       output: '<rect clipPath="bar" transform-origin="center" />;',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'clip-path' found, use 'clipPath' instead",
-          [1, 7, 1, 22],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message: "Unknown property 'clip-path' found, use 'clipPath' instead",
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: '<script crossorigin nomodule />',
       output: '<script crossOrigin noModule />',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'crossorigin' found, use 'crossOrigin' instead",
-          [1, 9, 1, 20],
-        ),
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'nomodule' found, use 'noModule' instead",
-          [1, 21, 1, 29],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'crossorigin' found, use 'crossOrigin' instead",
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'unknownPropWithStandardName',
+          message: "Unknown property 'nomodule' found, use 'noModule' instead",
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 29,
+        },
       ],
     },
     {
       code: '<div crossorigin />',
       output: '<div crossOrigin />',
       errors: [
-        diagnostic(
-          'unknownPropWithStandardName',
-          "Unknown property 'crossorigin' found, use 'crossOrigin' instead",
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'unknownPropWithStandardName',
+          message:
+            "Unknown property 'crossorigin' found, use 'crossOrigin' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
       code: '<div crossOrigin />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'crossOrigin' found on tag 'div', but it is only allowed on: script, img, video, audio, link, image",
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'crossOrigin' found on tag 'div', but it is only allowed on: script, img, video, audio, link, image",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
       code: '<div as="audio" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'as' found on tag 'div', but it is only allowed on: link",
-          [1, 6, 1, 16],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'as' found on tag 'div', but it is only allowed on: link",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 16,
+        },
       ],
     },
     {
       code: '<div onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onResize={this.resize} onError={this.error} />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onAbort' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 6, 1, 26],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onDurationChange' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 27, 1, 65],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onEmptied' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 66, 1, 90],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onEnded' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 91, 1, 109],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onResize' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 110, 1, 132],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onError' found on tag 'div', but it is only allowed on: audio, video, img, link, source, script, picture, iframe",
-          [1, 133, 1, 153],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onAbort' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 26,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onDurationChange' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 65,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onEmptied' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 66,
+          endLine: 1,
+          endColumn: 90,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onEnded' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 91,
+          endLine: 1,
+          endColumn: 109,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onResize' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 110,
+          endLine: 1,
+          endColumn: 132,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onError' found on tag 'div', but it is only allowed on: audio, video, img, link, source, script, picture, iframe",
+          line: 1,
+          column: 133,
+          endLine: 1,
+          endColumn: 153,
+        },
       ],
     },
     {
       code: '<div onLoad={this.load} />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'onLoad' found on tag 'div', but it is only allowed on: script, img, link, picture, iframe, object, source, body",
-          [1, 6, 1, 24],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'onLoad' found on tag 'div', but it is only allowed on: script, img, link, picture, iframe, object, source, body",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: '<div fill="pink" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'fill' found on tag 'div', but it is only allowed on: altGlyph, circle, ellipse, g, line, marker, mask, path, polygon, polyline, rect, svg, symbol, text, textPath, tref, tspan, use, animate, animateColor, animateMotion, animateTransform, set",
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'fill' found on tag 'div', but it is only allowed on: altGlyph, circle, ellipse, g, line, marker, mask, path, polygon, polyline, rect, svg, symbol, text, textPath, tref, tspan, use, animate, animateColor, animateMotion, animateTransform, set",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
       code: '<div controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} allowFullScreen></div>',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'controls' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 6, 1, 30],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'loop' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 31, 1, 42],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'muted' found on tag 'div', but it is only allowed on: audio, video",
-          [1, 43, 1, 56],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'playsInline' found on tag 'div', but it is only allowed on: video",
-          [1, 77, 1, 95],
-        ),
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'allowFullScreen' found on tag 'div', but it is only allowed on: iframe, video",
-          [1, 96, 1, 111],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'controls' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'loop' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 42,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'muted' found on tag 'div', but it is only allowed on: audio, video",
+          line: 1,
+          column: 43,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'playsInline' found on tag 'div', but it is only allowed on: video",
+          line: 1,
+          column: 77,
+          endLine: 1,
+          endColumn: 95,
+        },
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'allowFullScreen' found on tag 'div', but it is only allowed on: iframe, video",
+          line: 1,
+          column: 96,
+          endLine: 1,
+          endColumn: 111,
+        },
       ],
     },
     {
       code: '<div download="foo" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'download' found on tag 'div', but it is only allowed on: a, area",
-          [1, 6, 1, 20],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'download' found on tag 'div', but it is only allowed on: a, area",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: '<div imageSrcSet="someImageSrcSet" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'imageSrcSet' found on tag 'div', but it is only allowed on: link",
-          [1, 6, 1, 35],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'imageSrcSet' found on tag 'div', but it is only allowed on: link",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 35,
+        },
       ],
     },
     {
       code: '<div imageSizes="someImageSizes" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'imageSizes' found on tag 'div', but it is only allowed on: link",
-          [1, 6, 1, 33],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'imageSizes' found on tag 'div', but it is only allowed on: link",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 33,
+        },
       ],
     },
     {
       code: '<div data-xml-anything="invalid" />',
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'data-xml-anything' found",
-          [1, 6, 1, 33],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'data-xml-anything' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 33,
+        },
       ],
     },
     {
       code: '<div data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;',
       errors: [
-        diagnostic(
-          'dataLowercaseRequired',
-          "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-testID', use 'data-testid' instead",
-          [1, 6, 1, 23],
-        ),
-        diagnostic(
-          'dataLowercaseRequired',
-          "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-under_sCoRe', use 'data-under_score' instead",
-          [1, 24, 1, 46],
-        ),
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'dataNotAnDataAttribute' found",
-          [1, 47, 1, 75],
-        ),
+        {
+          messageId: 'dataLowercaseRequired',
+          message:
+            "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-testID', use 'data-testid' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+        {
+          messageId: 'dataLowercaseRequired',
+          message:
+            "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-under_sCoRe', use 'data-under_score' instead",
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 46,
+        },
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'dataNotAnDataAttribute' found",
+          line: 1,
+          column: 47,
+          endLine: 1,
+          endColumn: 75,
+        },
       ],
       options: [{ requireDataLowercase: true }],
     },
     {
       code: '<App data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;',
       errors: [
-        diagnostic(
-          'dataLowercaseRequired',
-          "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-testID', use 'data-testid' instead",
-          [1, 6, 1, 23],
-        ),
-        diagnostic(
-          'dataLowercaseRequired',
-          "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-under_sCoRe', use 'data-under_score' instead",
-          [1, 24, 1, 46],
-        ),
+        {
+          messageId: 'dataLowercaseRequired',
+          message:
+            "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-testID', use 'data-testid' instead",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 23,
+        },
+        {
+          messageId: 'dataLowercaseRequired',
+          message:
+            "React does not recognize data-* props with uppercase characters on a DOM element. Found 'data-under_sCoRe', use 'data-under_score' instead",
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 46,
+        },
       ],
       options: [{ requireDataLowercase: true }],
     },
     {
       code: '<div abbr="abbr" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'abbr' found on tag 'div', but it is only allowed on: th, td",
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'abbr' found on tag 'div', but it is only allowed on: th, td",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
       code: '<div webkitDirectory="" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'webkitDirectory' found on tag 'div', but it is only allowed on: input",
-          [1, 6, 1, 24],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'webkitDirectory' found on tag 'div', but it is only allowed on: input",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: '<div webkitdirectory="" />',
       errors: [
-        diagnostic(
-          'invalidPropOnTag',
-          "Invalid property 'webkitdirectory' found on tag 'div', but it is only allowed on: input",
-          [1, 6, 1, 24],
-        ),
+        {
+          messageId: 'invalidPropOnTag',
+          message:
+            "Invalid property 'webkitdirectory' found on tag 'div', but it is only allowed on: input",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
 
@@ -611,11 +775,14 @@ ruleTester.run('no-unknown-property', {
       code: `<div allowTransparency="true" />`,
       settings: { react: { version: '16.1.0' } },
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'allowTransparency' found",
-          [1, 6, 1, 30],
-        ),
+        {
+          messageId: 'unknownProp',
+          message: "Unknown property 'allowTransparency' found",
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -627,11 +794,15 @@ ruleTester.run('no-unknown-property', {
         </div>
       `,
       errors: [
-        diagnostic(
-          'unknownProp',
-          "Unknown property 'data-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash:c' found",
-          [2, 30, 2, 326],
-        ),
+        {
+          messageId: 'unknownProp',
+          message:
+            "Unknown property 'data-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash-crash:c' found",
+          line: 2,
+          column: 30,
+          endLine: 2,
+          endColumn: 326,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

@@ -1,29 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNewLineError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'newLine',
-    'Prop `bar` must be placed on a new line',
-    range,
-  );
+function expectNewLineError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'newLine',
+    message: 'Prop `bar` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNewLineError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'newLine',
-    'Prop `baz` must be placed on a new line',
-    range,
-  );
+function expectNewLineError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'newLine',
+    message: 'Prop `baz` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNewLineError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'newLine',
-    'Prop `spread` must be placed on a new line',
-    range,
-  );
+function expectNewLineError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'newLine',
+    message: 'Prop `spread` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -197,11 +214,14 @@ ruleTester.run('jsx-max-props-per-line', {
     {
       code: `<Foo bar="baz" qux="quux" />`,
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `qux` must be placed on a new line',
-          [1, 16, 1, 26],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `qux` must be placed on a new line',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
       output: `<Foo bar="baz"
 qux="quux" />`,
@@ -211,11 +231,14 @@ qux="quux" />`,
       code: `<Foo bar="baz" qux="quux" abc="def" />`,
       options: [{ maximum: 1 }],
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `qux` must be placed on a new line',
-          [1, 16, 1, 26],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `qux` must be placed on a new line',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
       output: `<Foo bar="baz"
 qux="quux"
@@ -483,11 +506,14 @@ baz
       `,
       options: [{ maximum: { single: 1, multi: 2 } }],
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `bor` must be placed on a new line',
-          [3, 19, 3, 22],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `bor` must be placed on a new line',
+          line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 22,
+        },
       ],
       output: `
         <App foo bar
@@ -504,11 +530,14 @@ bor
       `,
       options: [{ maximum: { single: 3, multi: 2 } }],
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `bor` must be placed on a new line',
-          [2, 26, 2, 29],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `bor` must be placed on a new line',
+          line: 2,
+          column: 26,
+          endLine: 2,
+          endColumn: 29,
+        },
       ],
       output: `
         <App foo bar
@@ -567,11 +596,14 @@ baz bor
       `,
       options: [{ maximum: { multi: 1, single: 1 } }],
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `keyField` must be placed on a new line',
-          [2, 38, 2, 51],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `keyField` must be placed on a new line',
+          line: 2,
+          column: 38,
+          endLine: 2,
+          endColumn: 51,
+        },
       ],
       output: `
         <DataTable<Items> fullscreen
@@ -598,11 +630,14 @@ fullscreen keyField="id" items={items}
       `,
       options: [{ maximum: { multi: 1, single: 1 } }],
       errors: [
-        diagnostic(
-          'newLine',
-          'Prop `keyField` must be placed on a new line',
-          [3, 12, 3, 25],
-        ),
+        {
+          messageId: 'newLine',
+          message: 'Prop `keyField` must be placed on a new line',
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 25,
+        },
       ],
       output: `
         <DataTable<Items>

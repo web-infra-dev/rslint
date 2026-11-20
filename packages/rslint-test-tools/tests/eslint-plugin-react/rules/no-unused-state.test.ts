@@ -4,10 +4,19 @@ import {
   upstreamScriptOptions,
   upstreamModuleOptions,
 } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnusedStateFieldError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('unusedStateField', "Unused state field: 'foo'", range);
+function expectUnusedStateFieldError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedStateField',
+    message: "Unused state field: 'foo'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -1413,11 +1422,14 @@ ruleTester.run('no-unused-state', {
       `,
       errors: [
         expectUnusedStateFieldError([5, 15, 5, 21]),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'bar'",
-          [6, 15, 6, 21],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'bar'",
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 21,
+        },
       ],
     },
     // ---- Wrapped class expression ----
@@ -1430,11 +1442,14 @@ ruleTester.run('no-unused-state', {
         });
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'dummy'",
-          [4, 17, 4, 28],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'dummy'",
+          line: 4,
+          column: 17,
+          endLine: 4,
+          endColumn: 28,
+        },
       ],
     },
     // ---- setState with unused initial ----
@@ -1456,11 +1471,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'initial'",
-          [4, 13, 4, 27],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'initial'",
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 27,
+        },
       ],
     },
 
@@ -1508,11 +1526,14 @@ ruleTester.run('no-unused-state', {
         })
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: '123'",
-          [4, 22, 4, 30],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: '123'",
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1529,11 +1550,14 @@ ruleTester.run('no-unused-state', {
         })
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'true'",
-          [4, 22, 4, 31],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'true'",
+          line: 4,
+          column: 22,
+          endLine: 4,
+          endColumn: 31,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1604,11 +1628,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'foo \n bar'",
-          [3, 21, 3, 38],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'foo \n bar'",
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 38,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1623,11 +1650,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'true'",
-          [3, 21, 3, 30],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'true'",
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1642,11 +1672,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: '123'",
-          [3, 21, 3, 29],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: '123'",
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1661,11 +1694,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: '123.12'",
-          [3, 21, 3, 32],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: '123.12'",
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 32,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1784,11 +1820,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'qux'",
-          [8, 15, 8, 21],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'qux'",
+          line: 8,
+          column: 15,
+          endLine: 8,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1804,11 +1843,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'bar'",
-          [3, 29, 3, 35],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'bar'",
+          line: 3,
+          column: 29,
+          endLine: 3,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1886,11 +1928,14 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'id'",
-          [6, 15, 6, 22],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'id'",
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -1947,56 +1992,87 @@ ruleTester.run('no-unused-state', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisStateAliasPropUnused'",
-          [4, 13, 4, 37],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisStateAliasRestPropUnused'",
-          [5, 13, 5, 41],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisDestructStateAliasPropUnused'",
-          [6, 13, 6, 45],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisDestructStateAliasRestPropUnused'",
-          [7, 13, 7, 49],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisDestructStateDestructRestPropUnused'",
-          [8, 13, 8, 52],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisSetStatePropUnused'",
-          [9, 13, 9, 35],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisSetStateRestPropUnused'",
-          [10, 13, 10, 39],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisStatePropUnused'",
-          [15, 54, 15, 73],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisStateDestructPropUnused'",
-          [16, 55, 16, 82],
-        ),
-        diagnostic(
-          'unusedStateField',
-          "Unused state field: 'thisDestructStateDestructPropUnused'",
-          [17, 65, 17, 100],
-        ),
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisStateAliasPropUnused'",
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 37,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisStateAliasRestPropUnused'",
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 41,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisDestructStateAliasPropUnused'",
+          line: 6,
+          column: 13,
+          endLine: 6,
+          endColumn: 45,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisDestructStateAliasRestPropUnused'",
+          line: 7,
+          column: 13,
+          endLine: 7,
+          endColumn: 49,
+        },
+        {
+          messageId: 'unusedStateField',
+          message:
+            "Unused state field: 'thisDestructStateDestructRestPropUnused'",
+          line: 8,
+          column: 13,
+          endLine: 8,
+          endColumn: 52,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisSetStatePropUnused'",
+          line: 9,
+          column: 13,
+          endLine: 9,
+          endColumn: 35,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisSetStateRestPropUnused'",
+          line: 10,
+          column: 13,
+          endLine: 10,
+          endColumn: 39,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisStatePropUnused'",
+          line: 15,
+          column: 54,
+          endLine: 15,
+          endColumn: 73,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisStateDestructPropUnused'",
+          line: 16,
+          column: 55,
+          endLine: 16,
+          endColumn: 82,
+        },
+        {
+          messageId: 'unusedStateField',
+          message: "Unused state field: 'thisDestructStateDestructPropUnused'",
+          line: 17,
+          column: 65,
+          endLine: 17,
+          endColumn: 100,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },

@@ -1,21 +1,33 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPropOnNewLineError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propOnNewLine',
-    'Property should be placed on a new line',
-    range,
-  );
+function expectPropOnNewLineError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propOnNewLine',
+    message: 'Property should be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPropOnSameLineError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propOnSameLine',
-    'Property should be placed on the same line as the component declaration',
-    range,
-  );
+function expectPropOnSameLineError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propOnSameLine',
+    message:
+      'Property should be placed on the same line as the component declaration',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

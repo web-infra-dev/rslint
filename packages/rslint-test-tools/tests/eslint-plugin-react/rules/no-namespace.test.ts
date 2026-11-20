@@ -1,13 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoNamespaceError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noNamespace',
-    'React component ns:Panel must not be in a namespace, as React does not support them',
-    range,
-  );
+function expectNoNamespaceError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noNamespace',
+    message:
+      'React component ns:Panel must not be in a namespace, as React does not support them',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -94,11 +100,15 @@ ruleTester.run('no-namespace', {
     {
       code: 'React.createElement("ns:A"); /* eslint-disable react/no-namespace */ React.createElement("ns:B");',
       errors: [
-        diagnostic(
-          'noNamespace',
-          'React component ns:A must not be in a namespace, as React does not support them',
-          [1, 1, 1, 28],
-        ),
+        {
+          messageId: 'noNamespace',
+          message:
+            'React component ns:A must not be in a namespace, as React does not support them',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     // ---- Upstream invalid: lower-case namespace ----
@@ -111,13 +121,27 @@ ruleTester.run('no-namespace', {
       {
         code: `<${name} />`,
         errors: [
-          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 5]),
+          {
+            messageId: 'noNamespace',
+            message: message(name),
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: name.length + 5,
+          },
         ],
       },
       {
         code: `React.createElement("${name}")`,
         errors: [
-          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 24]),
+          {
+            messageId: 'noNamespace',
+            message: message(name),
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: name.length + 24,
+          },
         ],
       },
     ]),
@@ -131,13 +155,27 @@ ruleTester.run('no-namespace', {
       {
         code: `<${name} />`,
         errors: [
-          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 5]),
+          {
+            messageId: 'noNamespace',
+            message: message(name),
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: name.length + 5,
+          },
         ],
       },
       {
         code: `React.createElement("${name}")`,
         errors: [
-          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 24]),
+          {
+            messageId: 'noNamespace',
+            message: message(name),
+            line: 1,
+            column: 1,
+            endLine: 1,
+            endColumn: name.length + 24,
+          },
         ],
       },
     ]),

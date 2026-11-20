@@ -1,53 +1,93 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPatternMismatchError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `something` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message:
+      "Prop name `something` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPatternMismatchError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `enabled` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message:
+      "Prop name `enabled` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPatternMismatchError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `enabled` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message: "Prop name `enabled` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPatternMismatchError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `semi` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message:
+      "Prop name `semi` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPatternMismatchError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `showScore` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message:
+      "Prop name `showScore` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPatternMismatchError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'patternMismatch',
-    "Prop name `failingItIs` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-    range,
-  );
+function expectPatternMismatchError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'patternMismatch',
+    message:
+      "Prop name `failingItIs` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -796,11 +836,15 @@ ruleTester.run('boolean-prop-naming', {
       options: [{ rule: patternIs }],
       errors: [
         expectPatternMismatchError3([2, 27, 2, 43]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `switched` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [3, 27, 3, 44],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `switched` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 3,
+          column: 27,
+          endLine: 3,
+          endColumn: 44,
+        },
       ],
     },
     // HOC wrapping with import.
@@ -829,11 +873,15 @@ ruleTester.run('boolean-prop-naming', {
         },
       ],
       errors: [
-        diagnostic(
-          'patternMismatch',
-          'It is better if your prop (something) matches this pattern: (^is[A-Z]([A-Za-z0-9]?)+)',
-          [5, 28, 5, 53],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            'It is better if your prop (something) matches this pattern: (^is[A-Z]([A-Za-z0-9]?)+)',
+          line: 5,
+          column: 28,
+          endLine: 5,
+          endColumn: 53,
+        },
       ],
     },
     // Custom propTypeNames including bare identifiers.
@@ -855,11 +903,15 @@ ruleTester.run('boolean-prop-naming', {
       ],
       errors: [
         expectPatternMismatchError1([4, 13, 4, 50]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `somethingElse` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [5, 13, 5, 32],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `somethingElse` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 32,
+        },
       ],
     },
     // propWrapperFunctions: bare-string entry.
@@ -916,11 +968,15 @@ ruleTester.run('boolean-prop-naming', {
       options: [{ rule: patternIs }],
       errors: [
         expectPatternMismatchError1([3, 32, 3, 57]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `fooBar` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [4, 20, 4, 35],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `fooBar` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 4,
+          column: 20,
+          endLine: 4,
+          endColumn: 35,
+        },
       ],
     },
     // Interface heritage `extends`.
@@ -932,16 +988,24 @@ ruleTester.run('boolean-prop-naming', {
       `,
       options: [{ rule: patternIs }],
       errors: [
-        diagnostic(
-          'patternMismatch',
-          "Prop name `hidden` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [2, 26, 2, 41],
-        ),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `ready` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [3, 40, 3, 54],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `hidden` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 2,
+          column: 26,
+          endLine: 2,
+          endColumn: 41,
+        },
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `ready` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 3,
+          column: 40,
+          endLine: 3,
+          endColumn: 54,
+        },
       ],
     },
     // Optional / readonly modifiers.
@@ -953,11 +1017,15 @@ ruleTester.run('boolean-prop-naming', {
       options: [{ rule: patternIs }],
       errors: [
         expectPatternMismatchError3([2, 24, 2, 42]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `visible` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [2, 43, 2, 68],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `visible` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 2,
+          column: 43,
+          endLine: 2,
+          endColumn: 68,
+        },
       ],
     },
     // The same existing name-based lookup issue applies to ns.sub.C.
@@ -1113,11 +1181,15 @@ ruleTester.run('boolean-prop-naming', {
       ],
       errors: [
         expectPatternMismatchError1([4, 13, 4, 60]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `somethingElse` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-          [5, 13, 5, 42],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `somethingElse` doesn't match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 42,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1224,11 +1296,14 @@ ruleTester.run('boolean-prop-naming', {
         },
       ],
       errors: [
-        diagnostic(
-          'patternMismatch',
-          "Boolean prop names must begin with either 'is' or 'has'",
-          [5, 28, 5, 53],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message: "Boolean prop names must begin with either 'is' or 'has'",
+          line: 5,
+          column: 28,
+          endLine: 5,
+          endColumn: 53,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1469,11 +1544,15 @@ ruleTester.run('boolean-prop-naming', {
       options: [{ rule: '^(is|has)[A-Z]([A-Za-z0-9]?)+' }],
       errors: [
         expectPatternMismatchError2([3, 11, 3, 27]),
-        diagnostic(
-          'patternMismatch',
-          "Prop name `lol` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-          [7, 11, 7, 23],
-        ),
+        {
+          messageId: 'patternMismatch',
+          message:
+            "Prop name `lol` doesn't match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

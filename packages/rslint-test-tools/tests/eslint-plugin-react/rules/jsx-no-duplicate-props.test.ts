@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoDuplicatePropsError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('noDuplicateProps', 'No duplicate props allowed', range);
+function expectNoDuplicatePropsError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDuplicateProps',
+    message: 'No duplicate props allowed',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoThisInSFCError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noThisInSFC',
-    'Stateless functional components should not use `this`',
-    range,
-  );
+function expectNoThisInSFCError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noThisInSFC',
+    message: 'Stateless functional components should not use `this`',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

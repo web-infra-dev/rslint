@@ -1,21 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamES2015Options } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnnecessaryCurlyError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unnecessaryCurly',
-    'Curly braces are unnecessary here.',
-    range,
-  );
+function expectUnnecessaryCurlyError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unnecessaryCurly',
+    message: 'Curly braces are unnecessary here.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingCurlyError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingCurly',
-    'Need to wrap this literal in a JSX expression.',
-    range,
-  );
+function expectMissingCurlyError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingCurly',
+    message: 'Need to wrap this literal in a JSX expression.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

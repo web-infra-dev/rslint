@@ -1,96 +1,140 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/no-object-type-as-default-prop.js
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectForbiddenTypeDefaultParamError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError3(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError4(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'd has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'd has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError5(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError6(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError7(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError8(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenTypeDefaultParamError9(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenTypeDefaultParam',
-    'i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenTypeDefaultParam',
+    message:
+      'i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

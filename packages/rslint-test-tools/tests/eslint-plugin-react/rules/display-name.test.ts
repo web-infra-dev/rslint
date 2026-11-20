@@ -1,23 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoDisplayNameError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noDisplayName',
-    'Component definition is missing display name',
-    range,
-  );
+function expectNoDisplayNameError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDisplayName',
+    message: 'Component definition is missing display name',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoContextDisplayNameError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noContextDisplayName',
-    'Context definition is missing display name',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noContextDisplayName',
+    message: 'Context definition is missing display name',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

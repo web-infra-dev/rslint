@@ -1,13 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectInlineElementError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'inlineElement',
-    'Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.',
-    range,
-  );
+function expectInlineElementError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'inlineElement',
+    message:
+      'Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

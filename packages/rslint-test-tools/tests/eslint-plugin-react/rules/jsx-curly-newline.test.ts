@@ -1,25 +1,60 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnexpectedBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unexpectedBefore',
-    "Unexpected newline before '}'.",
-    range,
-  );
+function expectUnexpectedBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unexpectedBefore',
+    message: "Unexpected newline before '}'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectExpectedBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('expectedBefore', "Expected newline before '}'.", range);
+function expectExpectedBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'expectedBefore',
+    message: "Expected newline before '}'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnexpectedAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('unexpectedAfter', "Unexpected newline after '{'.", range);
+function expectUnexpectedAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unexpectedAfter',
+    message: "Unexpected newline after '{'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectExpectedAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('expectedAfter', "Expected newline after '{'.", range);
+function expectExpectedAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'expectedAfter',
+    message: "Expected newline after '{'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

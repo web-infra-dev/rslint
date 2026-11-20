@@ -1,13 +1,18 @@
 import { RuleTester, type TestCase } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSetStateError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSetState',
-    'Do not use setState in componentDidUpdate',
-    range,
-  );
+function expectNoSetStateError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSetState',
+    message: 'Do not use setState in componentDidUpdate',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 // Reuse each lifecycle input under the upstream React 16.3 version override.

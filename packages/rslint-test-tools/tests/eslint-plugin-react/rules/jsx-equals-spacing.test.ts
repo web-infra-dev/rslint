@@ -1,29 +1,60 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSpaceBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSpaceBefore',
-    "There should be no space before '='",
-    range,
-  );
+function expectNoSpaceBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSpaceBefore',
+    message: "There should be no space before '='",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNeedSpaceBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('needSpaceBefore', "A space is required before '='", range);
+function expectNeedSpaceBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'needSpaceBefore',
+    message: "A space is required before '='",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNeedSpaceAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('needSpaceAfter', "A space is required after '='", range);
+function expectNeedSpaceAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'needSpaceAfter',
+    message: "A space is required after '='",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoSpaceAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSpaceAfter',
-    "There should be no space after '='",
-    range,
-  );
+function expectNoSpaceAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSpaceAfter',
+    message: "There should be no space after '='",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

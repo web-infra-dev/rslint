@@ -1,21 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPropIsForbiddenError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propIsForbidden',
-    'Prop "id" is forbidden on DOM Nodes',
-    range,
-  );
+function expectPropIsForbiddenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "id" is forbidden on DOM Nodes',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('', 'Please use class instead of ClassName', range);
+function expectError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message: 'Please use class instead of ClassName',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('', 'Avoid using otherProp', range);
+function expectError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message: 'Avoid using otherProp',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -245,11 +270,14 @@ ruleTester.run('forbid-dom-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'propIsForbidden',
-          'Prop "otherProp" is forbidden on DOM Nodes',
-          [3, 17, 3, 32],
-        ),
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "otherProp" is forbidden on DOM Nodes',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 32,
+        },
       ],
     },
     {
@@ -264,11 +292,15 @@ ruleTester.run('forbid-dom-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'propIsForbiddenWithValue',
-          'Prop "someProp" with value "someValue" is forbidden on DOM Nodes',
-          [3, 16, 3, 36],
-        ),
+        {
+          messageId: 'propIsForbiddenWithValue',
+          message:
+            'Prop "someProp" with value "someValue" is forbidden on DOM Nodes',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 36,
+        },
       ],
     },
     {
@@ -309,11 +341,14 @@ ruleTester.run('forbid-dom-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'propIsForbidden',
-          'Prop "className" is forbidden on DOM Nodes',
-          [3, 16, 3, 31],
-        ),
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "className" is forbidden on DOM Nodes',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 31,
+        },
         expectError3([4, 18, 4, 33]),
       ],
     },
@@ -338,11 +373,14 @@ ruleTester.run('forbid-dom-props', {
         },
       ],
       errors: [
-        diagnostic(
-          '',
-          'Avoid using the accept attribute on <form>',
-          [3, 17, 3, 30],
-        ),
+        {
+          messageId: '',
+          message: 'Avoid using the accept attribute on <form>',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 30,
+        },
       ],
     },
     {
@@ -409,16 +447,22 @@ ruleTester.run('forbid-dom-props', {
         expectError2([3, 16, 3, 31]),
         expectError2([5, 19, 5, 37]),
         expectError3([6, 18, 6, 33]),
-        diagnostic(
-          '',
-          'Do not use thirdProp with values bar and baz on p',
-          [9, 16, 9, 31],
-        ),
-        diagnostic(
-          '',
-          'Do not use thirdProp with values bar and baz on p',
-          [10, 16, 10, 31],
-        ),
+        {
+          messageId: '',
+          message: 'Do not use thirdProp with values bar and baz on p',
+          line: 9,
+          column: 16,
+          endLine: 9,
+          endColumn: 31,
+        },
+        {
+          messageId: '',
+          message: 'Do not use thirdProp with values bar and baz on p',
+          line: 10,
+          column: 16,
+          endLine: 10,
+          endColumn: 31,
+        },
       ],
     },
 
@@ -429,11 +473,14 @@ ruleTester.run('forbid-dom-props', {
       options: [{ forbid: ['id', 'className'] }],
       errors: [
         expectPropIsForbiddenError([1, 16, 1, 22]),
-        diagnostic(
-          'propIsForbidden',
-          'Prop "className" is forbidden on DOM Nodes',
-          [1, 23, 1, 36],
-        ),
+        {
+          messageId: 'propIsForbidden',
+          message: 'Prop "className" is forbidden on DOM Nodes',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
     },
     // Real-world: `target="_blank"` security ban via disallowedValues.
@@ -451,11 +498,15 @@ ruleTester.run('forbid-dom-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'propIsForbiddenWithValue',
-          'Prop "target" with value "_blank" is forbidden on DOM Nodes',
-          [1, 14, 1, 29],
-        ),
+        {
+          messageId: 'propIsForbiddenWithValue',
+          message:
+            'Prop "target" with value "_blank" is forbidden on DOM Nodes',
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 29,
+        },
       ],
     },
     // Same forbid name appearing as both string and object entry —
@@ -467,7 +518,16 @@ ruleTester.run('forbid-dom-props', {
           forbid: ['id', { propName: 'id', message: 'Object wins' }],
         },
       ],
-      errors: [diagnostic('', 'Object wins', [1, 6, 1, 12])],
+      errors: [
+        {
+          messageId: '',
+          message: 'Object wins',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
     },
     // Same prop attribute appearing twice on the same element — both fire.
     {

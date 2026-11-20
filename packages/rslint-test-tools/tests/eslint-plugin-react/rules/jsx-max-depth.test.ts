@@ -1,37 +1,64 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamES2015Options } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectWrongDepthError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongDepth',
-    'Expected the depth of nested jsx elements to be <= 0, but found 1.',
-    range,
-  );
+function expectWrongDepthError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 0, but found 1.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongDepthError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongDepth',
-    'Expected the depth of nested jsx elements to be <= 1, but found 2.',
-    range,
-  );
+function expectWrongDepthError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 1, but found 2.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongDepthError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongDepth',
-    'Expected the depth of nested jsx elements to be <= 2, but found 3.',
-    range,
-  );
+function expectWrongDepthError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 2, but found 3.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongDepthError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongDepth',
-    'Expected the depth of nested jsx elements to be <= 0, but found 2.',
-    range,
-  );
+function expectWrongDepthError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongDepth',
+    message:
+      'Expected the depth of nested jsx elements to be <= 0, but found 2.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -889,11 +916,15 @@ ruleTester.run('jsx-max-depth', {
       `,
       options: [{ max: 4 }],
       errors: [
-        diagnostic(
-          'wrongDepth',
-          'Expected the depth of nested jsx elements to be <= 4, but found 5.',
-          [9, 19, 11, 28],
-        ),
+        {
+          messageId: 'wrongDepth',
+          message:
+            'Expected the depth of nested jsx elements to be <= 4, but found 5.',
+          line: 9,
+          column: 19,
+          endLine: 11,
+          endColumn: 28,
+        },
       ],
     },
     // ---- Parens around resolved identifier still report ----
@@ -1041,11 +1072,15 @@ ruleTester.run('jsx-max-depth', {
       code: `<a><b><c><d><e><f><g /></f></e></d></c></b></a>`,
       options: [{ max: 5 }],
       errors: [
-        diagnostic(
-          'wrongDepth',
-          'Expected the depth of nested jsx elements to be <= 5, but found 6.',
-          [1, 19, 1, 24],
-        ),
+        {
+          messageId: 'wrongDepth',
+          message:
+            'Expected the depth of nested jsx elements to be <= 5, but found 6.',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
 
@@ -1314,11 +1349,15 @@ ruleTester.run('jsx-max-depth', {
       `,
       options: [{ max: 4 }],
       errors: [
-        diagnostic(
-          'wrongDepth',
-          'Expected the depth of nested jsx elements to be <= 4, but found 5.',
-          [9, 19, 11, 28],
-        ),
+        {
+          messageId: 'wrongDepth',
+          message:
+            'Expected the depth of nested jsx elements to be <= 4, but found 5.',
+          line: 9,
+          column: 19,
+          endLine: 11,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamES2015Options,
     },

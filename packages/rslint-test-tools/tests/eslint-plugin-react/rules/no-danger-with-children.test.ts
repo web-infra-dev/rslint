@@ -1,15 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectDangerWithChildrenError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'dangerWithChildren',
-    'Only set one of `children` or `props.dangerouslySetInnerHTML`',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'dangerWithChildren',
+    message: 'Only set one of `children` or `props.dangerouslySetInnerHTML`',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

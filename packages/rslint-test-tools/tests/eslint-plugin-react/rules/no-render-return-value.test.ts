@@ -1,21 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoReturnValueError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noReturnValue',
-    'Do not depend on the return value from ReactDOM.render',
-    range,
-  );
+function expectNoReturnValueError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noReturnValue',
+    message: 'Do not depend on the return value from ReactDOM.render',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoReturnValueError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noReturnValue',
-    'Do not depend on the return value from React.render',
-    range,
-  );
+function expectNoReturnValueError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noReturnValue',
+    message: 'Do not depend on the return value from React.render',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoIsMountedError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('noIsMounted', 'Do not use isMounted', range);
+function expectNoIsMountedError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noIsMounted',
+    message: 'Do not use isMounted',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,23 +1,33 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectFragmentsNotSupportedError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'fragmentsNotSupported',
-    'Fragments are only supported starting from React v16.2. Please disable the `react/jsx-fragments` rule in `eslint` settings or upgrade your version of React.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'fragmentsNotSupported',
+    message:
+      'Fragments are only supported starting from React v16.2. Please disable the `react/jsx-fragments` rule in `eslint` settings or upgrade your version of React.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPreferFragmentError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'preferFragment',
-    'Prefer fragment shorthand over Act.Frag',
-    range,
-  );
+function expectPreferFragmentError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'preferFragment',
+    message: 'Prefer fragment shorthand over Act.Frag',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -138,11 +148,14 @@ ruleTester.run('jsx-fragments', {
       options: ['element'],
       settings,
       errors: [
-        diagnostic(
-          'preferPragma',
-          'Prefer Act.Frag over fragment shorthand',
-          [1, 1, 1, 13],
-        ),
+        {
+          messageId: 'preferPragma',
+          message: 'Prefer Act.Frag over fragment shorthand',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
       output: `<Act.Frag><Foo /></Act.Frag>`,
     },
@@ -165,11 +178,14 @@ ruleTester.run('jsx-fragments', {
       output: '/** @jsx Preact.h */ <></>',
       settings,
       errors: [
-        diagnostic(
-          'preferFragment',
-          'Prefer fragment shorthand over Preact.Frag',
-          [1, 22, 1, 36],
-        ),
+        {
+          messageId: 'preferFragment',
+          message: 'Prefer fragment shorthand over Preact.Frag',
+          line: 1,
+          column: 22,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
     },
     {

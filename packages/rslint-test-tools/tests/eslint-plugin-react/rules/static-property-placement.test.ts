@@ -1,185 +1,263 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNotStaticClassPropError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'propTypes' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message: "'propTypes' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'propTypes' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'propTypes' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError3(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'displayName' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'displayName' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError4(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'propTypes' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'propTypes' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotStaticClassPropError5(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'childContextTypes' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message:
+      "'childContextTypes' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotStaticClassPropError6(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'contextTypes' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message: "'contextTypes' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotStaticClassPropError7(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'contextType' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message: "'contextType' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotStaticClassPropError8(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'displayName' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message: "'displayName' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotStaticClassPropError9(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notStaticClassProp',
-    "'defaultProps' should be declared as a static class property.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notStaticClassProp',
+    message: "'defaultProps' should be declared as a static class property.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError10(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'childContextTypes' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'childContextTypes' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError11(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'contextTypes' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'contextTypes' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError12(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'contextType' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'contextType' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDeclareOutsideClassError13(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'declareOutsideClass',
-    "'defaultProps' should be declared outside the class body.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'declareOutsideClass',
+    message: "'defaultProps' should be declared outside the class body.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError14(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'childContextTypes' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'childContextTypes' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError15(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'contextTypes' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'contextTypes' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError16(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'contextType' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'contextType' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError17(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'displayName' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'displayName' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNotGetterClassFuncError18(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'notGetterClassFunc',
-    "'defaultProps' should be declared as a static getter class function.",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notGetterClassFunc',
+    message:
+      "'defaultProps' should be declared as a static getter class function.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

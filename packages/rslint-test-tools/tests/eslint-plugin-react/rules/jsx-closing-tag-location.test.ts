@@ -1,21 +1,33 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamES2015Options } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMatchIndentError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'matchIndent',
-    'Expected closing tag to match indentation of opening.',
-    range,
-  );
+function expectMatchIndentError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'matchIndent',
+    message: 'Expected closing tag to match indentation of opening.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectOnOwnLineError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'onOwnLine',
-    'Closing tag of a multiline JSX expression must be on its own line.',
-    range,
-  );
+function expectOnOwnLineError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'onOwnLine',
+    message:
+      'Closing tag of a multiline JSX expression must be on its own line.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -242,11 +254,15 @@ ruleTester.run('jsx-closing-tag-location', {
       `,
       options: ['line-aligned'],
       errors: [
-        diagnostic(
-          'alignWithOpening',
-          'Expected closing tag to be aligned with the line containing the opening tag',
-          [4, 19, 4, 25],
-        ),
+        {
+          messageId: 'alignWithOpening',
+          message:
+            'Expected closing tag to be aligned with the line containing the opening tag',
+          line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 25,
+        },
       ],
       output: `
         const x = <App>

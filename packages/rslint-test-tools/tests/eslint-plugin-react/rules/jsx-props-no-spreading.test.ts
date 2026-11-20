@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSpreadingError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('noSpreading', 'Prop spreading is forbidden', range);
+function expectNoSpreadingError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSpreading',
+    message: 'Prop spreading is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,69 +1,116 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectWrongIndentError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 1 tab character but found 0.',
-    range,
-  );
+function expectWrongIndentError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 1 tab character but found 0.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 4 space characters but found 0.',
-    range,
-  );
+function expectWrongIndentError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 4 space characters but found 0.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 12 space characters but found 8.',
-    range,
-  );
+function expectWrongIndentError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 12 space characters but found 8.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 12 space characters but found 11.',
-    range,
-  );
+function expectWrongIndentError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 12 space characters but found 11.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 12 space characters but found 10.',
-    range,
-  );
+function expectWrongIndentError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 12 space characters but found 10.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 10 space characters but found 12.',
-    range,
-  );
+function expectWrongIndentError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 10 space characters but found 12.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError7(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 10 space characters but found 8.',
-    range,
-  );
+function expectWrongIndentError7(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 10 space characters but found 8.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectWrongIndentError8(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 16 space characters but found 12.',
-    range,
-  );
+function expectWrongIndentError8(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 16 space characters but found 12.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -1431,11 +1478,14 @@ b\`;
       code: `<App>\n  <Foo />\n</App>;`,
       output: `<App>\n    <Foo />\n</App>;`,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 4 space characters but found 2.',
-          [2, 3, 2, 10],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 4 space characters but found 2.',
+          line: 2,
+          column: 3,
+          endLine: 2,
+          endColumn: 10,
+        },
       ],
     },
     // ---- 2-space option, child over-indented ----
@@ -1444,11 +1494,14 @@ b\`;
       output: `<App>\n  <Foo />\n</App>;`,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 2 space characters but found 4.',
-          [2, 5, 2, 12],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 2 space characters but found 4.',
+          line: 2,
+          column: 5,
+          endLine: 2,
+          endColumn: 12,
+        },
       ],
     },
     // ---- Tab option ----
@@ -1463,11 +1516,14 @@ b\`;
       code: `<App>\n    <Foo />\n      </App>;`,
       output: `<App>\n    <Foo />\n</App>;`,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 0 space characters but found 6.',
-          [3, 7, 3, 13],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 0 space characters but found 6.',
+          line: 3,
+          column: 7,
+          endLine: 3,
+          endColumn: 13,
+        },
       ],
     },
     // ---- JsxExpression mis-indented ----
@@ -1475,11 +1531,14 @@ b\`;
       code: `<App>\n   {test}\n</App>;`,
       output: `<App>\n    {test}\n</App>;`,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 4 space characters but found 3.',
-          [2, 4, 2, 10],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 4 space characters but found 3.',
+          line: 2,
+          column: 4,
+          endLine: 2,
+          endColumn: 10,
+        },
       ],
     },
     // ---- JsxText mis-indented ----
@@ -1494,11 +1553,14 @@ b\`;
       output: `var x = (\n  <div>\n    {condition && (\n      <p>Bar</p>\n    )}\n  </div>\n);`,
       options: [2, { indentLogicalExpressions: true }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 6 space characters but found 4.',
-          [4, 5, 4, 8],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 6 space characters but found 4.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 8,
+        },
       ],
     },
     // ---- Multiline ternary alternate at wrong indent ----
@@ -1513,11 +1575,14 @@ b\`;
       output: `var W = React.memo(() => (\n  <App>\n    <Foo />\n  </App>\n));`,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 4 space characters but found 8.',
-          [3, 9, 3, 16],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 4 space characters but found 8.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 16,
+        },
       ],
     },
     // ---- Member expression tag with mis-indented child ----
@@ -1526,11 +1591,14 @@ b\`;
       output: `var x = (\n  <Foo.Bar>\n    <Foo.Baz />\n  </Foo.Bar>\n);`,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 4 space characters but found 8.',
-          [3, 9, 3, 20],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 4 space characters but found 8.',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 20,
+        },
       ],
     },
     // ---- checkAttributes:true — `)}` realigned to attribute name ----
@@ -1656,16 +1724,22 @@ b\`;
       `,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 10 space characters but found 17.',
-          [3, 11, 5, 25],
-        ),
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 10 space characters but found 17.',
-          [5, 18, 5, 24],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 10 space characters but found 17.',
+          line: 3,
+          column: 11,
+          endLine: 5,
+          endColumn: 25,
+        },
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 10 space characters but found 17.',
+          line: 5,
+          column: 18,
+          endLine: 5,
+          endColumn: 24,
+        },
       ],
       output: `
         function App() {
@@ -1750,11 +1824,14 @@ b\`;
         </App>
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 20 space characters but found 19.',
-          [5, 20, 5, 33],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 20 space characters but found 19.',
+          line: 5,
+          column: 20,
+          endLine: 5,
+          endColumn: 33,
+        },
       ],
       output: `
         <App>
@@ -1796,11 +1873,14 @@ b\`;
 \t\t\t`,
       options: ['tab'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 7 tab characters but found 6.',
-          [5, 7, 5, 20],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 7 tab characters but found 6.',
+          line: 5,
+          column: 7,
+          endLine: 5,
+          endColumn: 20,
+        },
       ],
       output: `
 \t\t\t\t<App>
@@ -1824,11 +1904,14 @@ b\`;
 \t\t\t`,
       options: ['tab'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 5 tab characters but found 4.',
-          [4, 5, 4, 12],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 5 tab characters but found 4.',
+          line: 4,
+          column: 5,
+          endLine: 4,
+          endColumn: 12,
+        },
       ],
       output: `
 \t\t\t\t<App>
@@ -1928,11 +2011,14 @@ b\`;
         </div>
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 20 space characters but found 16.',
-          [6, 17, 6, 24],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 20 space characters but found 16.',
+          line: 6,
+          column: 17,
+          endLine: 6,
+          endColumn: 24,
+        },
       ],
       output: `
         <div>
@@ -1959,11 +2045,14 @@ b\`;
         </div>
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 20 space characters but found 16.',
-          [6, 17, 6, 24],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 20 space characters but found 16.',
+          line: 6,
+          column: 17,
+          endLine: 6,
+          endColumn: 24,
+        },
       ],
       output: `
         <div>
@@ -2031,11 +2120,14 @@ b\`;
             <Bar />
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 8 space characters but found 12.',
-          [3, 13, 3, 20],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 8 space characters but found 12.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 20,
+        },
       ],
       output: `
         foo ? <Foo /> :
@@ -2068,11 +2160,14 @@ b\`;
               <Bar />
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 8 space characters but found 14.',
-          [4, 15, 4, 22],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 8 space characters but found 14.',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 22,
+        },
       ],
       output: `
         foo ? <Foo />
@@ -2474,11 +2569,14 @@ const Component = () => (
     `,
       options: ['tab', { checkAttributes: true }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 2 tab characters but found 0.',
-          [9, 1, 9, 2],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 2 tab characters but found 0.',
+          line: 9,
+          column: 1,
+          endLine: 9,
+          endColumn: 2,
+        },
       ],
       output: `
 const Component = () => (
@@ -2509,11 +2607,14 @@ const Component = () => (
       `,
       options: [2, { indentLogicalExpressions: true }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 16 space characters but found 14.',
-          [6, 15, 6, 18],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 16 space characters but found 14.',
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 18,
+        },
       ],
       output: `
         function Foo() {
@@ -2540,11 +2641,14 @@ const Component = () => (
         </span>
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 16 space characters but found 20.',
-          [5, 21, 5, 40],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 16 space characters but found 20.',
+          line: 5,
+          column: 21,
+          endLine: 5,
+          endColumn: 40,
+        },
       ],
       output: `
         <span>
@@ -2568,11 +2672,14 @@ const Component = () => (
         </span>
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 16 space characters but found 20.',
-          [5, 21, 5, 40],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 16 space characters but found 20.',
+          line: 5,
+          column: 21,
+          endLine: 5,
+          endColumn: 40,
+        },
       ],
       output: `
         <span>
@@ -2723,11 +2830,14 @@ const Component = () => (
         };
       `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 18 space characters but found 8.',
-          [5, 9, 5, 14],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 18 space characters but found 8.',
+          line: 5,
+          column: 9,
+          endLine: 5,
+          endColumn: 14,
+        },
       ],
       output: `
         const StatelessComponent = () => {
@@ -2903,16 +3013,22 @@ const Component = () => (
       `,
       options: [4],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 20 space characters but found 28.',
-          [6, 22, 9, 23],
-        ),
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 20 space characters but found 22.',
-          [9, 23, 9, 26],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 20 space characters but found 28.',
+          line: 6,
+          column: 22,
+          endLine: 9,
+          endColumn: 23,
+        },
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 20 space characters but found 22.',
+          line: 9,
+          column: 23,
+          endLine: 9,
+          endColumn: 26,
+        },
       ],
       output: `
         import React from 'react';

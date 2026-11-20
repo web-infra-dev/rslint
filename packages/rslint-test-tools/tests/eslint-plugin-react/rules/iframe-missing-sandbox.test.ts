@@ -1,31 +1,48 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectInvalidCombinationError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'invalidCombination',
-    'An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'invalidCombination',
+    message:
+      'An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectAttributeMissingError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'attributeMissing',
-    'An iframe element is missing a sandbox attribute',
-    range,
-  );
+function expectAttributeMissingError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'attributeMissing',
+    message: 'An iframe element is missing a sandbox attribute',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectInvalidValueError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'invalidValue',
-    'An iframe element defines a sandbox attribute with invalid value "__unknown__"',
-    range,
-  );
+function expectInvalidValueError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'invalidValue',
+    message:
+      'An iframe element defines a sandbox attribute with invalid value "__unknown__"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -123,11 +140,15 @@ ruleTester.run('iframe-missing-sandbox', {
       code: `const sandbox = "sandbox"; React.createElement("iframe", { [/** @type {string} */ (sandbox)]: "unknown" });`,
       filename: 'files/iframe-sandbox.jsx',
       errors: [
-        diagnostic(
-          'invalidValue',
-          'An iframe element defines a sandbox attribute with invalid value "unknown"',
-          [1, 28, 1, 107],
-        ),
+        {
+          messageId: 'invalidValue',
+          message:
+            'An iframe element defines a sandbox attribute with invalid value "unknown"',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 107,
+        },
       ],
     },
     {

@@ -1,15 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNoPotentialLeakedRenderError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noPotentialLeakedRender',
-    'Potential leaked value that might cause unintentionally rendered values or rendering crashes',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noPotentialLeakedRender',
+    message:
+      'Potential leaked value that might cause unintentionally rendered values or rendering crashes',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

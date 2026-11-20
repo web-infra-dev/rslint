@@ -1,17 +1,21 @@
-import { RuleTester } from '@rslint/rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectMissingRefParameterError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'missingRefParameter',
-    'forwardRef is used with this component but no ref parameter is set',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingRefParameter',
+    message:
+      'forwardRef is used with this component but no ref parameter is set',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

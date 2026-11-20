@@ -1,41 +1,60 @@
 // Ported from eslint-plugin-react v7.37.5, tests/lib/rules/default-props-match-prop-types.js.
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
-function expectDefaultHasNoTypeError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'defaultHasNoType',
-    'defaultProp "baz" has no corresponding propTypes declaration.',
-    range,
-  );
+function expectDefaultHasNoTypeError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'defaultHasNoType',
+    message: 'defaultProp "baz" has no corresponding propTypes declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectRequiredHasDefaultError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'requiredHasDefault',
-    'defaultProp "bar" defined for isRequired propType.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'requiredHasDefault',
+    message: 'defaultProp "bar" defined for isRequired propType.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectRequiredHasDefaultError3(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'requiredHasDefault',
-    'defaultProp "foo" defined for isRequired propType.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'requiredHasDefault',
+    message: 'defaultProp "foo" defined for isRequired propType.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectDefaultHasNoTypeError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'defaultHasNoType',
-    'defaultProp "frob" has no corresponding propTypes declaration.',
-    range,
-  );
+function expectDefaultHasNoTypeError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'defaultHasNoType',
+    message: 'defaultProp "frob" has no corresponding propTypes declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -1142,11 +1161,14 @@ ruleTester.run('default-props-match-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'requiredHasDefault',
-          'defaultProp "name" defined for isRequired propType.',
-          [10, 15, 10, 27],
-        ),
+        {
+          messageId: 'requiredHasDefault',
+          message: 'defaultProp "name" defined for isRequired propType.',
+          line: 10,
+          column: 15,
+          endLine: 10,
+          endColumn: 27,
+        },
       ],
     },
     {
@@ -1416,11 +1438,15 @@ ruleTester.run('default-props-match-prop-types', {
       `,
 
       errors: [
-        diagnostic(
-          'defaultHasNoType',
-          'defaultProp "fooBar" has no corresponding propTypes declaration.',
-          [9, 13, 9, 29],
-        ),
+        {
+          messageId: 'defaultHasNoType',
+          message:
+            'defaultProp "fooBar" has no corresponding propTypes declaration.',
+          line: 9,
+          column: 13,
+          endLine: 9,
+          endColumn: 29,
+        },
         expectRequiredHasDefaultError3([10, 13, 10, 23]),
       ],
     },
@@ -1440,11 +1466,15 @@ ruleTester.run('default-props-match-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'requiredHasDefault',
-          'defaultProp "firstProperty" defined for isRequired propType.',
-          [12, 11, 12, 43],
-        ),
+        {
+          messageId: 'requiredHasDefault',
+          message:
+            'defaultProp "firstProperty" defined for isRequired propType.',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 43,
+        },
       ],
     },
 
@@ -1546,11 +1576,14 @@ ruleTester.run('default-props-match-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'requiredHasDefault',
-          'defaultProp "disabled" defined for isRequired propType.',
-          [13, 15, 13, 30],
-        ),
+        {
+          messageId: 'requiredHasDefault',
+          message: 'defaultProp "disabled" defined for isRequired propType.',
+          line: 13,
+          column: 15,
+          endLine: 13,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

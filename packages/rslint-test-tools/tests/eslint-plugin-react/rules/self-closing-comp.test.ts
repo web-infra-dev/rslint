@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNotSelfClosingError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'notSelfClosing',
-    'Empty components are self-closing',
-    range,
-  );
+function expectNotSelfClosingError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'notSelfClosing',
+    message: 'Empty components are self-closing',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

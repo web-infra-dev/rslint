@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoMultiSpreadingError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noMultiSpreading',
-    'Spreading the same expression multiple times is forbidden',
-    range,
-  );
+function expectNoMultiSpreadingError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noMultiSpreading',
+    message: 'Spreading the same expression multiple times is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

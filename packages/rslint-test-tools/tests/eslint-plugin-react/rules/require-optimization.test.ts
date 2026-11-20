@@ -1,15 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNoShouldComponentUpdateError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noShouldComponentUpdate',
-    'Component is not optimized. Please add a shouldComponentUpdate method.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noShouldComponentUpdate',
+    message:
+      'Component is not optimized. Please add a shouldComponentUpdate method.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

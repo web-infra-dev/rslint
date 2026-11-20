@@ -1,65 +1,116 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectTypoStaticClassPropError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'typoStaticClassProp',
-    'Typo in static class property declaration',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoStaticClassProp',
+    message: 'Typo in static class property declaration',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'typoPropType',
-    'Typo in declared prop type: Number',
-    range,
-  );
+function expectTypoPropTypeError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropType',
+    message: 'Typo in declared prop type: Number',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeChainError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'typoPropTypeChain',
-    'Typo in prop type chain qualifier: isrequired',
-    range,
-  );
+function expectTypoPropTypeChainError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropTypeChain',
+    message: 'Typo in prop type chain qualifier: isrequired',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('typoPropType', 'Typo in declared prop type: bools', range);
+function expectTypoPropTypeError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropType',
+    message: 'Typo in declared prop type: bools',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('typoPropType', 'Typo in declared prop type: Array', range);
+function expectTypoPropTypeError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropType',
+    message: 'Typo in declared prop type: Array',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'typoPropType',
-    'Typo in declared prop type: function',
-    range,
-  );
+function expectTypoPropTypeError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropType',
+    message: 'Typo in declared prop type: function',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectTypoPropTypeError7(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'typoPropType',
-    'Typo in declared prop type: objectof',
-    range,
-  );
+function expectTypoPropTypeError7(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropType',
+    message: 'Typo in declared prop type: objectof',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectTypoPropDeclarationError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'typoPropDeclaration',
-    'Typo in property declaration',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'typoPropDeclaration',
+    message: 'Typo in property declaration',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -1375,71 +1426,123 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps',
-          [3, 11, 3, 49],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount',
-          [4, 11, 4, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_ComponentWillMount should be UNSAFE_componentWillMount',
-          [5, 11, 5, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount',
-          [6, 11, 6, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps',
-          [7, 11, 7, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_ComponentWillReceiveProps should be UNSAFE_componentWillReceiveProps',
-          [8, 11, 8, 49],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate',
-          [9, 11, 9, 38],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate',
-          [10, 11, 10, 36],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_ComponentWillUpdate should be UNSAFE_componentWillUpdate',
-          [11, 11, 11, 43],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: GetSnapshotBeforeUpdate should be getSnapshotBeforeUpdate',
-          [12, 11, 12, 40],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate',
-          [13, 11, 13, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentDidCatch should be componentDidCatch',
-          [14, 11, 14, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount',
-          [15, 11, 15, 37],
-        ),
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 49,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_ComponentWillMount should be UNSAFE_componentWillMount',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount',
+          line: 6,
+          column: 11,
+          endLine: 6,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_ComponentWillReceiveProps should be UNSAFE_componentWillReceiveProps',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 49,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate',
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 38,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate',
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 36,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_ComponentWillUpdate should be UNSAFE_componentWillUpdate',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 43,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: GetSnapshotBeforeUpdate should be getSnapshotBeforeUpdate',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 40,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate',
+          line: 13,
+          column: 11,
+          endLine: 13,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentDidCatch should be componentDidCatch',
+          line: 14,
+          column: 11,
+          endLine: 14,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount',
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 37,
+        },
       ],
     },
     // ---- Upstream: typoLifecycleMethod — First-letter-uppercase variant ----
@@ -1465,76 +1568,132 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Getderivedstatefromprops should be getDerivedStateFromProps',
-          [3, 11, 3, 48],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentwillmount should be componentWillMount',
-          [4, 11, 4, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_Componentwillmount should be UNSAFE_componentWillMount',
-          [5, 11, 5, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentdidmount should be componentDidMount',
-          [6, 11, 6, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentwillreceiveprops should be componentWillReceiveProps',
-          [7, 11, 7, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_Componentwillreceiveprops should be UNSAFE_componentWillReceiveProps',
-          [8, 11, 8, 49],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Shouldcomponentupdate should be shouldComponentUpdate',
-          [9, 11, 9, 38],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentwillupdate should be componentWillUpdate',
-          [10, 11, 10, 36],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: UNSAFE_Componentwillupdate should be UNSAFE_componentWillUpdate',
-          [11, 11, 11, 43],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Getsnapshotbeforeupdate should be getSnapshotBeforeUpdate',
-          [12, 11, 12, 40],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentdidupdate should be componentDidUpdate',
-          [13, 11, 13, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentdidcatch should be componentDidCatch',
-          [14, 11, 14, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Componentwillunmount should be componentWillUnmount',
-          [15, 11, 15, 37],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: Render should be render',
-          [16, 11, 18, 12],
-        ),
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Getderivedstatefromprops should be getDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 48,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentwillmount should be componentWillMount',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_Componentwillmount should be UNSAFE_componentWillMount',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentdidmount should be componentDidMount',
+          line: 6,
+          column: 11,
+          endLine: 6,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentwillreceiveprops should be componentWillReceiveProps',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_Componentwillreceiveprops should be UNSAFE_componentWillReceiveProps',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 49,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Shouldcomponentupdate should be shouldComponentUpdate',
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 38,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentwillupdate should be componentWillUpdate',
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 36,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: UNSAFE_Componentwillupdate should be UNSAFE_componentWillUpdate',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 43,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Getsnapshotbeforeupdate should be getSnapshotBeforeUpdate',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 40,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentdidupdate should be componentDidUpdate',
+          line: 13,
+          column: 11,
+          endLine: 13,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentdidcatch should be componentDidCatch',
+          line: 14,
+          column: 11,
+          endLine: 14,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Componentwillunmount should be componentWillUnmount',
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 37,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: Render should be render',
+          line: 16,
+          column: 11,
+          endLine: 18,
+          endColumn: 12,
+        },
       ],
     },
     // ---- Upstream: typoLifecycleMethod — lowercase variant ----
@@ -1560,71 +1719,123 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: getderivedstatefromprops should be getDerivedStateFromProps',
-          [3, 11, 3, 48],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentwillmount should be componentWillMount',
-          [4, 11, 4, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: unsafe_componentwillmount should be UNSAFE_componentWillMount',
-          [5, 11, 5, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentdidmount should be componentDidMount',
-          [6, 11, 6, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentwillreceiveprops should be componentWillReceiveProps',
-          [7, 11, 7, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: unsafe_componentwillreceiveprops should be UNSAFE_componentWillReceiveProps',
-          [8, 11, 8, 49],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: shouldcomponentupdate should be shouldComponentUpdate',
-          [9, 11, 9, 38],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentwillupdate should be componentWillUpdate',
-          [10, 11, 10, 36],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: unsafe_componentwillupdate should be UNSAFE_componentWillUpdate',
-          [11, 11, 11, 43],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: getsnapshotbeforeupdate should be getSnapshotBeforeUpdate',
-          [12, 11, 12, 40],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentdidupdate should be componentDidUpdate',
-          [13, 11, 13, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentdidcatch should be componentDidCatch',
-          [14, 11, 14, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: componentwillunmount should be componentWillUnmount',
-          [15, 11, 15, 37],
-        ),
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: getderivedstatefromprops should be getDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 48,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentwillmount should be componentWillMount',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: unsafe_componentwillmount should be UNSAFE_componentWillMount',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentdidmount should be componentDidMount',
+          line: 6,
+          column: 11,
+          endLine: 6,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentwillreceiveprops should be componentWillReceiveProps',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: unsafe_componentwillreceiveprops should be UNSAFE_componentWillReceiveProps',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 49,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: shouldcomponentupdate should be shouldComponentUpdate',
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 38,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentwillupdate should be componentWillUpdate',
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 36,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: unsafe_componentwillupdate should be UNSAFE_componentWillUpdate',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 43,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: getsnapshotbeforeupdate should be getSnapshotBeforeUpdate',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 40,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentdidupdate should be componentDidUpdate',
+          line: 13,
+          column: 11,
+          endLine: 13,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentdidcatch should be componentDidCatch',
+          line: 14,
+          column: 11,
+          endLine: 14,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: componentwillunmount should be componentWillUnmount',
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 37,
+        },
       ],
     },
     // ---- Upstream: typoPropType (single) ----
@@ -1695,11 +1906,14 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'typoPropType',
-          'Typo in declared prop type: String',
-          [6, 26, 6, 32],
-        ),
+        {
+          messageId: 'typoPropType',
+          message: 'Typo in declared prop type: String',
+          line: 6,
+          column: 26,
+          endLine: 6,
+          endColumn: 32,
+        },
       ],
     },
     // ---- Upstream: typoPropType — inside oneOfType ----
@@ -1866,11 +2080,14 @@ ruleTester.run('no-typos', {
       class Component extends React.Component {};
     `,
       errors: [
-        diagnostic(
-          'noReactBinding',
-          "`'react'` imported without a local `React` binding.",
-          [2, 7, 2, 22],
-        ),
+        {
+          messageId: 'noReactBinding',
+          message: "`'react'` imported without a local `React` binding.",
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 22,
+        },
       ],
     },
     // ---- Upstream: typoPropType — destructured from react ----
@@ -1959,56 +2176,96 @@ ruleTester.run('no-typos', {
         expectTypoPropDeclarationError([4, 11, 4, 20]),
         expectTypoPropDeclarationError([5, 11, 5, 28]),
         expectTypoPropDeclarationError([6, 11, 6, 23]),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: getdefaultProps should be getDefaultProps',
-          [7, 11, 7, 32],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: getinitialState should be getInitialState',
-          [8, 11, 8, 32],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: getChildcontext should be getChildContext',
-          [9, 11, 9, 32],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount',
-          [10, 11, 10, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount',
-          [11, 11, 11, 34],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps',
-          [12, 11, 12, 42],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate',
-          [13, 11, 13, 38],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate',
-          [14, 11, 14, 36],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate',
-          [15, 11, 15, 35],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount',
-          [16, 11, 16, 37],
-        ),
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: getdefaultProps should be getDefaultProps',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 32,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: getinitialState should be getInitialState',
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 32,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: getChildcontext should be getChildContext',
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 32,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount',
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount',
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 34,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps',
+          line: 12,
+          column: 11,
+          endLine: 12,
+          endColumn: 42,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate',
+          line: 13,
+          column: 11,
+          endLine: 13,
+          endColumn: 38,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate',
+          line: 14,
+          column: 11,
+          endLine: 14,
+          endColumn: 36,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate',
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 35,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount',
+          line: 16,
+          column: 11,
+          endLine: 16,
+          endColumn: 37,
+        },
       ],
     },
     // ---- Upstream: staticLifecycleMethod ----
@@ -2019,11 +2276,15 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'staticLifecycleMethod',
-          'Lifecycle method should be static: getDerivedStateFromProps',
-          [3, 11, 3, 41],
-        ),
+        {
+          messageId: 'staticLifecycleMethod',
+          message:
+            'Lifecycle method should be static: getDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 41,
+        },
       ],
     },
     // ---- Upstream: staticLifecycleMethod + typoLifecycleMethod combined ----
@@ -2034,16 +2295,24 @@ ruleTester.run('no-typos', {
         }
       `,
       errors: [
-        diagnostic(
-          'staticLifecycleMethod',
-          'Lifecycle method should be static: GetDerivedStateFromProps',
-          [3, 11, 3, 41],
-        ),
-        diagnostic(
-          'typoLifecycleMethod',
-          'Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps',
-          [3, 11, 3, 41],
-        ),
+        {
+          messageId: 'staticLifecycleMethod',
+          message:
+            'Lifecycle method should be static: GetDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 41,
+        },
+        {
+          messageId: 'typoLifecycleMethod',
+          message:
+            'Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 41,
+        },
       ],
     },
     // ---- Upstream: noPropTypesBinding ----
@@ -2052,11 +2321,15 @@ ruleTester.run('no-typos', {
         import 'prop-types'
       `,
       errors: [
-        diagnostic(
-          'noPropTypesBinding',
-          "`'prop-types'` imported without a local `PropTypes` binding.",
-          [2, 9, 2, 28],
-        ),
+        {
+          messageId: 'noPropTypesBinding',
+          message:
+            "`'prop-types'` imported without a local `PropTypes` binding.",
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 28,
+        },
       ],
     },
 

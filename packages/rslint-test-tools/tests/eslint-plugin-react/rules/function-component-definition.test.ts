@@ -1,33 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectArrowFunctionError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'arrow-function',
-    'Function component is not an arrow function',
-    range,
-  );
+function expectArrowFunctionError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'arrow-function',
+    message: 'Function component is not an arrow function',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectFunctionDeclarationError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'function-declaration',
-    'Function component is not a function declaration',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'function-declaration',
+    message: 'Function component is not a function declaration',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectFunctionExpressionError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'function-expression',
-    'Function component is not a function expression',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'function-expression',
+    message: 'Function component is not a function expression',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

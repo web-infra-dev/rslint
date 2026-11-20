@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectDangerousPropError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'dangerousProp',
-    "Dangerous property 'dangerouslySetInnerHTML' found",
-    range,
-  );
+function expectDangerousPropError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'dangerousProp',
+    message: "Dangerous property 'dangerouslySetInnerHTML' found",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

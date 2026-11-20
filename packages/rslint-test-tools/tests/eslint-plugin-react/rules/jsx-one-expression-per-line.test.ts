@@ -1,6 +1,5 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 const parserOptions = {
   ecmaVersion: 2018,
@@ -10,84 +9,144 @@ const parserOptions = {
   },
 };
 
-function expectMoveToNewLineError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`{"foo"}` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`{"foo"}` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`{"bar"}` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`{"bar"}` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`Bar` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`Bar` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    "`{ I18n.t('baz') }` must be placed on a new line",
-    range,
-  );
+function expectMoveToNewLineError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: "`{ I18n.t('baz') }` must be placed on a new line",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`Baz` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`Baz` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`input` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`input` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError7(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`Foo` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError7(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`Foo` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError8(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '` baz        ` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError8(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '` baz        ` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError9(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`{          foo        }` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError9(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`{          foo        }` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMoveToNewLineError10(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'moveToNewLine',
-    '`button` must be placed on a new line',
-    range,
-  );
+function expectMoveToNewLineError10(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'moveToNewLine',
+    message: '`button` must be placed on a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -321,11 +380,14 @@ foo
 </App>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`foo` must be placed on a new line',
-          [2, 14, 2, 17],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`foo` must be placed on a new line',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 17,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -359,11 +421,14 @@ bar
 </div>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '` bar        ` must be placed on a new line',
-          [3, 18, 4, 9],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '` bar        ` must be placed on a new line',
+          line: 3,
+          column: 18,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -395,11 +460,14 @@ foo
 </div>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`foo        ` must be placed on a new line',
-          [3, 19, 4, 9],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`foo        ` must be placed on a new line',
+          line: 3,
+          column: 19,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -448,16 +516,22 @@ foo
 </Text>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`{ bar }` must be placed on a new line',
-          [2, 34, 2, 41],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`Text` must be placed on a new line',
-          [2, 42, 2, 49],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`{ bar }` must be placed on a new line',
+          line: 2,
+          column: 34,
+          endLine: 2,
+          endColumn: 41,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message: '`Text` must be placed on a new line',
+          line: 2,
+          column: 42,
+          endLine: 2,
+          endColumn: 49,
+        },
         expectMoveToNewLineError4([2, 50, 2, 67]),
       ],
       languageOptions: { parserOptions: parserOptions },
@@ -500,16 +574,22 @@ foo
       errors: [
         expectMoveToNewLineError3([2, 35, 2, 41]),
         expectMoveToNewLineError5([2, 42, 2, 48]),
-        diagnostic(
-          'moveToNewLine',
-          '`Bunk` must be placed on a new line',
-          [2, 49, 2, 56],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`Bruno` must be placed on a new line',
-          [2, 57, 2, 65],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`Bunk` must be placed on a new line',
+          line: 2,
+          column: 49,
+          endLine: 2,
+          endColumn: 56,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message: '`Bruno` must be placed on a new line',
+          line: 2,
+          column: 57,
+          endLine: 2,
+          endColumn: 65,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -617,11 +697,14 @@ foo
         </div>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`span` must be placed on a new line',
-          [3, 18, 3, 26],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`span` must be placed on a new line',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 26,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -655,11 +738,14 @@ foo
 </div>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '` foo        ` must be placed on a new line',
-          [3, 20, 4, 9],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '` foo        ` must be placed on a new line',
+          line: 3,
+          column: 20,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -928,11 +1014,14 @@ baz
         </App>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '` baz ` must be placed on a new line',
-          [4, 18, 4, 23],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '` baz ` must be placed on a new line',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 23,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -1126,11 +1215,14 @@ foo
       `,
       options: [{ allow: 'none' }],
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`foo` must be placed on a new line',
-          [2, 14, 2, 17],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`foo` must be placed on a new line',
+          line: 2,
+          column: 14,
+          endLine: 2,
+          endColumn: 17,
+        },
       ],
     },
     {
@@ -1157,11 +1249,14 @@ foo
       `,
       options: [{ allow: 'literal' }],
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`foo        ` must be placed on a new line',
-          [2, 14, 3, 9],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`foo        ` must be placed on a new line',
+          line: 2,
+          column: 14,
+          endLine: 3,
+          endColumn: 9,
+        },
       ],
     },
     {
@@ -1205,11 +1300,14 @@ baz
 </App>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`baz` must be placed on a new line',
-          [5, 10, 5, 13],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`baz` must be placed on a new line',
+          line: 5,
+          column: 10,
+          endLine: 5,
+          endColumn: 13,
+        },
       ],
     },
     {
@@ -1226,11 +1324,14 @@ foo
 </App>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`foo        bar        ` must be placed on a new line',
-          [2, 14, 4, 9],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`foo        bar        ` must be placed on a new line',
+          line: 2,
+          column: 14,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
     },
     {
@@ -1259,11 +1360,14 @@ foo
         </App>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`<></>` must be placed on a new line',
-          [3, 18, 3, 23],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`<></>` must be placed on a new line',
+          line: 3,
+          column: 18,
+          endLine: 3,
+          endColumn: 23,
+        },
       ],
 
       languageOptions: { parserOptions: parserOptions },
@@ -1302,16 +1406,22 @@ a
         </div>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`a` must be placed on a new line',
-          [3, 22, 3, 23],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`{a}` must be placed on a new line',
-          [4, 18, 4, 21],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`a` must be placed on a new line',
+          line: 3,
+          column: 22,
+          endLine: 3,
+          endColumn: 23,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message: '`{a}` must be placed on a new line',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 21,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -1332,11 +1442,14 @@ a
         );
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`{"Hi people"}` must be placed on a new line',
-          [3, 15, 3, 28],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`{"Hi people"}` must be placed on a new line',
+          line: 3,
+          column: 15,
+          endLine: 3,
+          endColumn: 28,
+        },
         expectMoveToNewLineError10([3, 28, 3, 37]),
       ],
       languageOptions: { parserOptions: parserOptions },
@@ -1384,21 +1497,32 @@ Hi people
         </Layout>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`Welcome to your new Gatsby site.` must be placed on a new line',
-          [3, 12, 3, 44],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`Now go build something great.` must be placed on a new line',
-          [4, 12, 4, 41],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`Hi people` must be placed on a new line',
-          [5, 13, 5, 22],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message:
+            '`Welcome to your new Gatsby site.` must be placed on a new line',
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 44,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message:
+            '`Now go build something great.` must be placed on a new line',
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 41,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message: '`Hi people` must be placed on a new line',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 22,
+        },
         expectMoveToNewLineError10([5, 22, 5, 31]),
       ],
       languageOptions: { parserOptions: parserOptions },
@@ -1454,16 +1578,22 @@ Go to page 2
         </Layout>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`Link` must be placed on a new line',
-          [5, 17, 5, 56],
-        ),
-        diagnostic(
-          'moveToNewLine',
-          '`Go to page 2` must be placed on a new line',
-          [5, 37, 5, 49],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`Link` must be placed on a new line',
+          line: 5,
+          column: 17,
+          endLine: 5,
+          endColumn: 56,
+        },
+        {
+          messageId: 'moveToNewLine',
+          message: '`Go to page 2` must be placed on a new line',
+          line: 5,
+          column: 37,
+          endLine: 5,
+          endColumn: 49,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },
@@ -1487,11 +1617,14 @@ Go to page 2
         </Layout>
       `,
       errors: [
-        diagnostic(
-          'moveToNewLine',
-          '`Go to page 2` must be placed on a new line',
-          [6, 21, 6, 33],
-        ),
+        {
+          messageId: 'moveToNewLine',
+          message: '`Go to page 2` must be placed on a new line',
+          line: 6,
+          column: 21,
+          endLine: 6,
+          endColumn: 33,
+        },
       ],
       languageOptions: { parserOptions: parserOptions },
     },

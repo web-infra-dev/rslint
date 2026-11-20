@@ -1,37 +1,50 @@
-import { RuleTester } from '@rslint/rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectUnescapedEntityAltsError1(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'unescapedEntityAlts',
-    "`'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.",
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unescapedEntityAlts',
+    message: "`'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`.",
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectUnescapedEntityAltsError2(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'unescapedEntityAlts',
-    '`"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unescapedEntityAlts',
+    message: '`"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
-function expectUnescapedEntityError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unescapedEntity',
-    'HTML entity, `&` , must be escaped.',
-    range,
-  );
+function expectUnescapedEntityError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unescapedEntity',
+    message: 'HTML entity, `&` , must be escaped.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -632,18 +645,21 @@ ruleTester.run('no-unescaped-entities', {
       code: `var Hello = <span>foo & bar</span>`,
       options: [{ forbid: [{ char: '&', alternatives: ['&amp;'] }] }],
       errors: [
-        diagnostic(
-          'unescapedEntityAlts',
-          '`&` can be escaped with `&amp;`.',
-          [1, 23, 1, 24],
-          [
+        {
+          messageId: 'unescapedEntityAlts',
+          message: '`&` can be escaped with `&amp;`.',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 24,
+          suggestions: [
             {
               messageId: 'replaceWithAlt',
               desc: 'Replace with `&amp;`.',
               output: 'var Hello = <span>foo &amp; bar</span>',
             },
           ],
-        ),
+        },
       ],
     },
     // forbid: mix of string + object entries
@@ -656,18 +672,21 @@ ruleTester.run('no-unescaped-entities', {
       ],
       errors: [
         expectUnescapedEntityError([1, 20, 1, 21]),
-        diagnostic(
-          'unescapedEntityAlts',
-          '`$` can be escaped with `&#36;`.',
-          [1, 24, 1, 25],
-          [
+        {
+          messageId: 'unescapedEntityAlts',
+          message: '`$` can be escaped with `&#36;`.',
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+          suggestions: [
             {
               messageId: 'replaceWithAlt',
               desc: 'Replace with `&#36;`.',
               output: 'var Hello = <div>a & b &#36; c</div>',
             },
           ],
-        ),
+        },
       ],
     },
     // multi-byte Unicode custom forbid char (fullwidth apostrophe U+FF07)
@@ -675,11 +694,14 @@ ruleTester.run('no-unescaped-entities', {
       code: `var Hello = <div>fullwidth\uff07quote</div>`,
       options: [{ forbid: ['\uff07'] }],
       errors: [
-        diagnostic(
-          'unescapedEntity',
-          'HTML entity, `＇` , must be escaped.',
-          [1, 27, 1, 28],
-        ),
+        {
+          messageId: 'unescapedEntity',
+          message: 'HTML entity, `＇` , must be escaped.',
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     // UTF-16 column stays correct when a multi-byte char precedes the match
@@ -1063,11 +1085,14 @@ ruleTester.run('no-unescaped-entities', {
       `,
       options: [{ forbid: [{ char: '&', alternatives: ['&amp;'] }] }],
       errors: [
-        diagnostic(
-          'unescapedEntityAlts',
-          '`&` can be escaped with `&amp;`.',
-          [4, 30, 4, 31],
-          [
+        {
+          messageId: 'unescapedEntityAlts',
+          message: '`&` can be escaped with `&amp;`.',
+          line: 4,
+          column: 30,
+          endLine: 4,
+          endColumn: 31,
+          suggestions: [
             {
               messageId: 'replaceWithAlt',
               desc: 'Replace with `&amp;`.',
@@ -1075,7 +1100,7 @@ ruleTester.run('no-unescaped-entities', {
                 '\n        var Hello = createReactClass({\n          render: function() {\n            return <span>foo &amp; bar</span>;\n          }\n        });\n      ',
             },
           ],
-        ),
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

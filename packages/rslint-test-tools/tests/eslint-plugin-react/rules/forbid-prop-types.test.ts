@@ -1,41 +1,60 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectForbiddenPropTypeError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic('forbiddenPropType', 'Prop type "any" is forbidden', range);
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenPropType',
+    message: 'Prop type "any" is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenPropTypeError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenPropType',
-    'Prop type "array" is forbidden',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenPropType',
+    message: 'Prop type "array" is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenPropTypeError3(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenPropType',
-    'Prop type "object" is forbidden',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenPropType',
+    message: 'Prop type "object" is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectForbiddenPropTypeError4(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'forbiddenPropType',
-    'Prop type "instanceOf" is forbidden',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenPropType',
+    message: 'Prop type "instanceOf" is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -710,11 +729,14 @@ ruleTester.run('forbid-prop-types', {
         });
       `,
       errors: [
-        diagnostic(
-          'forbiddenPropType',
-          'Prop type "number" is forbidden',
-          [4, 13, 4, 32],
-        ),
+        {
+          messageId: 'forbiddenPropType',
+          message: 'Prop type "number" is forbidden',
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 32,
+        },
       ],
       options: [{ forbid: ['number'] }],
     },
@@ -1675,11 +1697,14 @@ ruleTester.run('forbid-prop-types', {
       `,
       options: [{ forbid: ['objectOf'] }],
       errors: [
-        diagnostic(
-          'forbiddenPropType',
-          'Prop type "objectOf" is forbidden',
-          [5, 11, 5, 27],
-        ),
+        {
+          messageId: 'forbiddenPropType',
+          message: 'Prop type "objectOf" is forbidden',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

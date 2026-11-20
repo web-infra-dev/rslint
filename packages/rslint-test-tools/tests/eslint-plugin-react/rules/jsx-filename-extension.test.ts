@@ -1,15 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNoJSXWithExtensionError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noJSXWithExtension',
-    "JSX not allowed in files with extension '.js'",
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noJSXWithExtension',
+    message: "JSX not allowed in files with extension '.js'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -136,11 +139,14 @@ ruleTester.run('jsx-filename-extension', {
       filename: 'src/virtual.tsx',
       options: [{ extensions: ['.tsx'], allow: 'as-needed' }],
       errors: [
-        diagnostic(
-          'extensionOnlyForJSX',
-          "Only files containing JSX may use the extension '.tsx'",
-          [1, 1, 1, 1],
-        ),
+        {
+          messageId: 'extensionOnlyForJSX',
+          message: "Only files containing JSX may use the extension '.tsx'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+        },
       ],
     },
 
@@ -160,11 +166,14 @@ ruleTester.run('jsx-filename-extension', {
       options: [{ allow: 'as-needed' }],
       filename: 'MyComponent.jsx',
       errors: [
-        diagnostic(
-          'extensionOnlyForJSX',
-          "Only files containing JSX may use the extension '.jsx'",
-          [1, 1, 1, 1],
-        ),
+        {
+          messageId: 'extensionOnlyForJSX',
+          message: "Only files containing JSX may use the extension '.jsx'",
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 1,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -186,11 +195,14 @@ ruleTester.run('jsx-filename-extension', {
       options: [{ extensions: ['.js'] }],
       filename: 'MyComponent.jsx',
       errors: [
-        diagnostic(
-          'noJSXWithExtension',
-          "JSX not allowed in files with extension '.jsx'",
-          [1, 50, 3, 7],
-        ),
+        {
+          messageId: 'noJSXWithExtension',
+          message: "JSX not allowed in files with extension '.jsx'",
+          line: 1,
+          column: 50,
+          endLine: 3,
+          endColumn: 7,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -209,11 +221,14 @@ ruleTester.run('jsx-filename-extension', {
       options: [{ extensions: ['.js'] }],
       filename: 'MyComponent.jsx',
       errors: [
-        diagnostic(
-          'noJSXWithExtension',
-          "JSX not allowed in files with extension '.jsx'",
-          [1, 50, 2, 4],
-        ),
+        {
+          messageId: 'noJSXWithExtension',
+          message: "JSX not allowed in files with extension '.jsx'",
+          line: 1,
+          column: 50,
+          endLine: 2,
+          endColumn: 4,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

@@ -1,18 +1,21 @@
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/5d4bf128fb506f604f1bb61bcf76fa8caeea6a1a/tests/lib/rules/async-server-action.js
-import { RuleTester } from '@rslint/rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectAsyncServerActionError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'asyncServerAction',
-    'Server Actions must be async',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'asyncServerAction',
+    message: 'Server Actions must be async',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,25 +1,60 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectBindCallError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('bindCall', 'JSX props should not use .bind()', range);
+function expectBindCallError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'bindCall',
+    message: 'JSX props should not use .bind()',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectArrowFuncError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'arrowFunc',
-    'JSX props should not use arrow functions',
-    range,
-  );
+function expectArrowFuncError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'arrowFunc',
+    message: 'JSX props should not use arrow functions',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectFuncError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('func', 'JSX props should not use functions', range);
+function expectFuncError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'func',
+    message: 'JSX props should not use functions',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectBindExpressionError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('bindExpression', 'JSX props should not use ::', range);
+function expectBindExpressionError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'bindExpression',
+    message: 'JSX props should not use ::',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

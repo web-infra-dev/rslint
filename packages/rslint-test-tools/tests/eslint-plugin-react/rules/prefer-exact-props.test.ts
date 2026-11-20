@@ -1,22 +1,33 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/prefer-exact-props.js
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPropTypesError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propTypes',
-    "Component propTypes should be exact by using 'exact'.",
-    range,
-  );
+function expectPropTypesError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propTypes',
+    message: "Component propTypes should be exact by using 'exact'.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectFlowError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'flow',
-    'Component flow props should be set with exact objects.',
-    range,
-  );
+function expectFlowError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'flow',
+    message: 'Component flow props should be set with exact objects.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -347,11 +358,15 @@ ruleTester.run('prefer-exact-props', {
         ],
       },
       errors: [
-        diagnostic(
-          'propTypes',
-          "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
-          [10, 9, 10, 28],
-        ),
+        {
+          messageId: 'propTypes',
+          message:
+            "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
+          line: 10,
+          column: 9,
+          endLine: 10,
+          endColumn: 28,
+        },
       ],
     },
     {
@@ -376,11 +391,15 @@ ruleTester.run('prefer-exact-props', {
         ],
       },
       errors: [
-        diagnostic(
-          'propTypes',
-          "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
-          [13, 9, 13, 28],
-        ),
+        {
+          messageId: 'propTypes',
+          message:
+            "Component propTypes should be exact by using one of 'exact', 'forbidExtraProps'.",
+          line: 13,
+          column: 9,
+          endLine: 13,
+          endColumn: 28,
+        },
       ],
     },
     {

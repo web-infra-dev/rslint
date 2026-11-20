@@ -1,27 +1,35 @@
-import { RuleTester } from '@rslint/rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectUseStateErrorMessageError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'useStateErrorMessage',
-    'useState call is not destructured into value + setter pair',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'useStateErrorMessage',
+    message: 'useState call is not destructured into value + setter pair',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectUseStateErrorMessageOrAddOptionError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'useStateErrorMessageOrAddOption',
-    'useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'useStateErrorMessageOrAddOption',
+    message:
+      'useState call is not destructured into value + setter pair (you can allow destructuring by enabling "allowDestructuredState" option)',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

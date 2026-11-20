@@ -1,29 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMissingParensError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingParens',
-    'Missing parentheses around multilines JSX',
-    range,
-  );
+function expectMissingParensError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingParens',
+    message: 'Missing parentheses around multilines JSX',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectExtraParensError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'extraParens',
-    'Expected no parentheses around multilines JSX',
-    range,
-  );
+function expectExtraParensError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'extraParens',
+    message: 'Expected no parentheses around multilines JSX',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectParensOnNewLinesError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'parensOnNewLines',
-    'Parentheses around JSX should be on separate lines',
-    range,
-  );
+function expectParensOnNewLinesError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'parensOnNewLines',
+    message: 'Parentheses around JSX should be on separate lines',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

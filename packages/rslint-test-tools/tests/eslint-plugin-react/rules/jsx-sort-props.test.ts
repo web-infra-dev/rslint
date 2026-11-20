@@ -1,49 +1,74 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectSortPropsByAlphaError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'sortPropsByAlpha',
-    'Props should be sorted alphabetically',
-    range,
-  );
+function expectSortPropsByAlphaError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'sortPropsByAlpha',
+    message: 'Props should be sorted alphabetically',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectListCallbacksLastError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'listCallbacksLast',
-    'Callbacks must be listed after all other props',
-    range,
-  );
+function expectListCallbacksLastError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'listCallbacksLast',
+    message: 'Callbacks must be listed after all other props',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectListShorthandFirstError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'listShorthandFirst',
-    'Shorthand props must be listed before all other props',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'listShorthandFirst',
+    message: 'Shorthand props must be listed before all other props',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectListReservedPropsFirstError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'listReservedPropsFirst',
-    'Reserved props must be listed before all other props',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'listReservedPropsFirst',
+    message: 'Reserved props must be listed before all other props',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectListShorthandLastError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'listShorthandLast',
-    'Shorthand props must be listed after all other props',
-    range,
-  );
+function expectListShorthandLastError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'listShorthandLast',
+    message: 'Shorthand props must be listed after all other props',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -416,11 +441,14 @@ ruleTester.run('jsx-sort-props', {
       code: '<App key={4} />',
       options: [{ reservedFirst: [] }],
       errors: [
-        diagnostic(
-          'listIsEmpty',
-          'A customized reserved first list must not be empty',
-          [1, 6, 1, 13],
-        ),
+        {
+          messageId: 'listIsEmpty',
+          message: 'A customized reserved first list must not be empty',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
     },
 
@@ -865,11 +893,15 @@ ruleTester.run('jsx-sort-props', {
       code: `<App key={5} />`,
       options: [{ reservedFirst: ['notReserved'] }],
       errors: [
-        diagnostic(
-          'noUnreservedProps',
-          'A customized reserved first list must only contain a subset of React reserved props. Remove: notReserved',
-          [1, 6, 1, 13],
-        ),
+        {
+          messageId: 'noUnreservedProps',
+          message:
+            'A customized reserved first list must only contain a subset of React reserved props. Remove: notReserved',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -893,11 +925,14 @@ ruleTester.run('jsx-sort-props', {
       `,
       options: [{ multiline: 'first' }],
       errors: [
-        diagnostic(
-          'listMultilineFirst',
-          'Multiline props must be listed before all other props',
-          [4, 11, 4, 12],
-        ),
+        {
+          messageId: 'listMultilineFirst',
+          message: 'Multiline props must be listed before all other props',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 12,
+        },
       ],
       output: `
         <App
@@ -922,11 +957,14 @@ ruleTester.run('jsx-sort-props', {
       `,
       options: [{ multiline: 'first', shorthandFirst: true }],
       errors: [
-        diagnostic(
-          'listMultilineFirst',
-          'Multiline props must be listed before all other props',
-          [4, 11, 4, 12],
-        ),
+        {
+          messageId: 'listMultilineFirst',
+          message: 'Multiline props must be listed before all other props',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 12,
+        },
         expectListShorthandFirstError([7, 11, 7, 12]),
       ],
       output: `
@@ -952,11 +990,14 @@ ruleTester.run('jsx-sort-props', {
       `,
       options: [{ multiline: 'last' }],
       errors: [
-        diagnostic(
-          'listMultilineLast',
-          'Multiline props must be listed after all other props',
-          [3, 11, 3, 12],
-        ),
+        {
+          messageId: 'listMultilineLast',
+          message: 'Multiline props must be listed after all other props',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 12,
+        },
       ],
       output: `
         <App
@@ -1051,11 +1092,14 @@ ruleTester.run('jsx-sort-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'listMultilineLast',
-          'Multiline props must be listed after all other props',
-          [4, 11, 4, 20],
-        ),
+        {
+          messageId: 'listMultilineLast',
+          message: 'Multiline props must be listed after all other props',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 20,
+        },
         expectListReservedPropsFirstError([12, 11, 12, 14]),
         expectListShorthandFirstError([13, 11, 13, 21]),
         expectListCallbacksLastError([19, 11, 19, 21]),

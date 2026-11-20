@@ -1,29 +1,47 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectBadHandlerNameError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'badHandlerName',
-    "Handler function for onChange prop key must be a camelCase name beginning with 'handle' only",
-    range,
-  );
+function expectBadHandlerNameError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badHandlerName',
+    message:
+      "Handler function for onChange prop key must be a camelCase name beginning with 'handle' only",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectBadPropKeyError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'badPropKey',
-    "Prop key for handleChange must begin with 'on'",
-    range,
-  );
+function expectBadPropKeyError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badPropKey',
+    message: "Prop key for handleChange must begin with 'on'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectBadPropKeyError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'badPropKey',
-    "Prop key for handleChange must begin with 'when'",
-    range,
-  );
+function expectBadPropKeyError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'badPropKey',
+    message: "Prop key for handleChange must begin with 'when'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -613,21 +631,30 @@ ruleTester.run('jsx-handler-names', {
         { checkLocalVariables: true, ignoreComponentNames: ['MyLibrary*'] },
       ],
       errors: [
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleInput must begin with 'on'",
-          [5, 27, 5, 58],
-        ),
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleCheckbox must begin with 'on'",
-          [6, 30, 6, 64],
-        ),
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleButton must begin with 'on'",
-          [7, 28, 7, 60],
-        ),
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleInput must begin with 'on'",
+          line: 5,
+          column: 27,
+          endLine: 5,
+          endColumn: 58,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleCheckbox must begin with 'on'",
+          line: 6,
+          column: 30,
+          endLine: 6,
+          endColumn: 64,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleButton must begin with 'on'",
+          line: 7,
+          column: 28,
+          endLine: 7,
+          endColumn: 60,
+        },
       ],
     },
 
@@ -661,11 +688,15 @@ ruleTester.run('jsx-handler-names', {
       code: `var x = <TestComponent disabled onChange={this.bad1} onClick={this.bad2} />`,
       errors: [
         expectBadHandlerNameError([1, 33, 1, 53]),
-        diagnostic(
-          'badHandlerName',
-          "Handler function for onClick prop key must be a camelCase name beginning with 'handle' only",
-          [1, 54, 1, 73],
-        ),
+        {
+          messageId: 'badHandlerName',
+          message:
+            "Handler function for onClick prop key must be a camelCase name beginning with 'handle' only",
+          line: 1,
+          column: 54,
+          endLine: 1,
+          endColumn: 73,
+        },
       ],
     },
 
@@ -837,21 +868,30 @@ ruleTester.run('jsx-handler-names', {
         { checkLocalVariables: true, ignoreComponentNames: ['MyLibrary*'] },
       ],
       errors: [
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleInput must begin with 'on'",
-          [5, 27, 5, 58],
-        ),
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleCheckbox must begin with 'on'",
-          [6, 30, 6, 64],
-        ),
-        diagnostic(
-          'badPropKey',
-          "Prop key for handleButton must begin with 'on'",
-          [7, 28, 7, 60],
-        ),
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleInput must begin with 'on'",
+          line: 5,
+          column: 27,
+          endLine: 5,
+          endColumn: 58,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleCheckbox must begin with 'on'",
+          line: 6,
+          column: 30,
+          endLine: 6,
+          endColumn: 64,
+        },
+        {
+          messageId: 'badPropKey',
+          message: "Prop key for handleButton must begin with 'on'",
+          line: 7,
+          column: 28,
+          endLine: 7,
+          endColumn: 60,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

@@ -1,29 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnusedWithClassError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedWithClass',
-    'Unused method or property "handleClick" of class "Foo"',
-    range,
-  );
+function expectUnusedWithClassError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedWithClass',
+    message: 'Unused method or property "handleClick" of class "Foo"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedWithClassError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedWithClass',
-    'Unused method or property "foo" of class "Foo"',
-    range,
-  );
+function expectUnusedWithClassError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedWithClass',
+    message: 'Unused method or property "foo" of class "Foo"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedWithClassError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedWithClass',
-    'Unused method or property "action" of class "Foo"',
-    range,
-  );
+function expectUnusedWithClassError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedWithClass',
+    message: 'Unused method or property "action" of class "Foo"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -584,11 +601,15 @@ ruleTester.run('no-unused-class-component-methods', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedWithClass',
-          'Unused method or property "getDerivedStateFromProps" of class "Foo"',
-          [3, 11, 3, 35],
-        ),
+        {
+          messageId: 'unusedWithClass',
+          message:
+            'Unused method or property "getDerivedStateFromProps" of class "Foo"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 35,
+        },
       ],
     },
     // ---- Unused class field ----
@@ -602,11 +623,14 @@ ruleTester.run('no-unused-class-component-methods', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedWithClass',
-          'Unused method or property "property" of class "Foo"',
-          [3, 11, 3, 19],
-        ),
+        {
+          messageId: 'unusedWithClass',
+          message: 'Unused method or property "property" of class "Foo"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 19,
+        },
       ],
     },
     // ---- Unused method on createReactClass (no className) ----
@@ -620,11 +644,14 @@ ruleTester.run('no-unused-class-component-methods', {
         })
       `,
       errors: [
-        diagnostic(
-          'unused',
-          'Unused method or property "handleClick"',
-          [3, 11, 3, 22],
-        ),
+        {
+          messageId: 'unused',
+          message: 'Unused method or property "handleClick"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 22,
+        },
       ],
     },
     // ---- Multiple unused methods reported in source order ----
@@ -639,11 +666,14 @@ ruleTester.run('no-unused-class-component-methods', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedWithClass',
-          'Unused method or property "handleScroll" of class "Foo"',
-          [3, 11, 3, 23],
-        ),
+        {
+          messageId: 'unusedWithClass',
+          message: 'Unused method or property "handleScroll" of class "Foo"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 23,
+        },
         expectUnusedWithClassError1([4, 11, 4, 22]),
       ],
     },
@@ -699,7 +729,14 @@ ruleTester.run('no-unused-class-component-methods', {
         })
       `,
       errors: [
-        diagnostic('unused', 'Unused method or property "a"', [3, 11, 3, 12]),
+        {
+          messageId: 'unused',
+          message: 'Unused method or property "a"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 12,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -785,11 +822,14 @@ ruleTester.run('no-unused-class-component-methods', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedWithClass',
-          'Unused method or property "getInitialState" of class "Foo"',
-          [3, 11, 3, 26],
-        ),
+        {
+          messageId: 'unusedWithClass',
+          message: 'Unused method or property "getInitialState" of class "Foo"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 26,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -821,11 +861,15 @@ ruleTester.run('no-unused-class-component-methods', {
          }
        `,
       errors: [
-        diagnostic(
-          'unusedWithClass',
-          'Unused method or property "foo" of class "ClassAssignPropertyInMethodTest"',
-          [4, 19, 4, 22],
-        ),
+        {
+          messageId: 'unusedWithClass',
+          message:
+            'Unused method or property "foo" of class "ClassAssignPropertyInMethodTest"',
+          line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

@@ -3,14 +3,20 @@
 // The React wrapper checks counts and messages; Go tests assert IDs and ranges.
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectWithIdentifierMsgError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'withIdentifierMsg',
-    "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-    range,
-  );
+function expectWithIdentifierMsgError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'withIdentifierMsg',
+    message:
+      "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -112,66 +118,90 @@ ruleTester.run('jsx-no-constructed-context-values', {
     {
       code: 'function Component() { const foo = []; return (<Context.Provider value={foo}></Context.Provider>) }',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'foo' array (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [1, 36, 1, 38],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'foo' array (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 38,
+        },
       ],
     },
     // Upstream invalid 3.
     {
       code: 'function Component() { const foo = () => {}; return (<Context.Provider value={foo}></Context.Provider>)}',
       errors: [
-        diagnostic(
-          'withIdentifierMsgFunc',
-          "The 'foo' function expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
-          [1, 36, 1, 44],
-        ),
+        {
+          messageId: 'withIdentifierMsgFunc',
+          message:
+            "The 'foo' function expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 44,
+        },
       ],
     },
     // Upstream invalid 4.
     {
       code: 'function Component() { const foo = function bar(){}; return (<Context.Provider value={foo}></Context.Provider>)}',
       errors: [
-        diagnostic(
-          'withIdentifierMsgFunc',
-          "The 'foo' function expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
-          [1, 36, 1, 52],
-        ),
+        {
+          messageId: 'withIdentifierMsgFunc',
+          message:
+            "The 'foo' function expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 52,
+        },
       ],
     },
     // Upstream invalid 5.
     {
       code: 'function Component() { const foo = class SomeClass{}; return (<Context.Provider value={foo}></Context.Provider>)}',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'foo' class expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [1, 36, 1, 53],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'foo' class expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 53,
+        },
       ],
     },
     // Upstream invalid 6.
     {
       code: 'function Component() { const foo = new SomeClass(); return (<Context.Provider value={foo}></Context.Provider>)}',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'foo' new expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [1, 36, 1, 51],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'foo' new expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 1,
+          column: 36,
+          endLine: 1,
+          endColumn: 51,
+        },
       ],
     },
     // Upstream invalid 7.
     {
       code: 'function Component() { function foo() {}; return (<Context.Provider value={foo}></Context.Provider>)}',
       errors: [
-        diagnostic(
-          'withIdentifierMsgFunc',
-          "The 'foo' function declaration (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
-          [1, 24, 1, 41],
-        ),
+        {
+          messageId: 'withIdentifierMsgFunc',
+          message:
+            "The 'foo' function declaration (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useCallback hook.",
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 41,
+        },
       ],
     },
     // Upstream invalid 8.
@@ -208,132 +238,180 @@ ruleTester.run('jsx-no-constructed-context-values', {
     {
       code: '\n        function Component() {\n          let a = {};\n          a = 10;\n          return (<Context.Provider value={a}></Context.Provider>);\n        }\n      ',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'a' object (at line 3) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [3, 19, 3, 21],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'a' object (at line 3) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 3,
+          column: 19,
+          endLine: 3,
+          endColumn: 21,
+        },
       ],
     },
     // Upstream invalid 15.
     {
       code: '\n        function Component() {\n          const foo = {};\n          const bar = foo;\n          return (<Context.Provider value={bar}></Context.Provider>);\n        }\n      ',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'bar' object (at line 3) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [3, 23, 3, 25],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'bar' object (at line 3) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 3,
+          column: 23,
+          endLine: 3,
+          endColumn: 25,
+        },
       ],
     },
     // Upstream invalid 16.
     {
       code: '\n        function Component(foo) {\n          let bar = true ? foo : {};\n          return (<Context.Provider value={bar}></Context.Provider>);\n        }\n      ',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'bar' object (at line 3) passed as the value prop to the Context provider (at line 4) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [3, 34, 3, 36],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'bar' object (at line 3) passed as the value prop to the Context provider (at line 4) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 3,
+          column: 34,
+          endLine: 3,
+          endColumn: 36,
+        },
       ],
     },
     // Upstream invalid 17.
     {
       code: 'function Component() { return (<Context.Provider value={{foo: "bar"}}></Context.Provider>);}',
       errors: [
-        diagnostic(
-          'defaultMsg',
-          'The object passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.',
-          [1, 57, 1, 69],
-        ),
+        {
+          messageId: 'defaultMsg',
+          message:
+            'The object passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.',
+          line: 1,
+          column: 57,
+          endLine: 1,
+          endColumn: 69,
+        },
       ],
     },
     // Upstream invalid 18.
     {
       code: 'function Component() { const Wrapper = (<SomeComp />); return (<Context.Provider value={Wrapper}></Context.Provider>);}',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'Wrapper' JSX element (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [1, 41, 1, 53],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'Wrapper' JSX element (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 53,
+        },
       ],
     },
     // Upstream invalid 19.
     {
       code: 'function Component() { const someRegex = /HelloWorld/; return (<Context.Provider value={someRegex}></Context.Provider>);}',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'someRegex' regular expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [1, 42, 1, 54],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'someRegex' regular expression (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 1,
+          column: 42,
+          endLine: 1,
+          endColumn: 54,
+        },
       ],
     },
     // Upstream invalid 20.
     {
       code: '\n        function Component() {\n          let foo = null;\n          let bar = x = () => {};\n          return (<Context.Provider value={bar}></Context.Provider>);\n        }\n      ',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'bar' assignment expression (at line 4) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [4, 25, 4, 33],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'bar' assignment expression (at line 4) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 4,
+          column: 25,
+          endLine: 4,
+          endColumn: 33,
+        },
       ],
     },
     // Upstream invalid 21.
     {
       code: "\n        import React from 'react';\n\n        const Context = React.createContext();\n        function Component() {\n          function foo() {};\n          return (<Context value={foo}></Context>)\n        }\n      ",
       errors: [
-        diagnostic(
-          'withIdentifierMsgFunc',
-          "The 'foo' function declaration (at line 6) passed as the value prop to the Context provider (at line 7) changes every render. To fix this consider wrapping it in a useCallback hook.",
-          [6, 11, 6, 28],
-        ),
+        {
+          messageId: 'withIdentifierMsgFunc',
+          message:
+            "The 'foo' function declaration (at line 6) passed as the value prop to the Context provider (at line 7) changes every render. To fix this consider wrapping it in a useCallback hook.",
+          line: 6,
+          column: 11,
+          endLine: 6,
+          endColumn: 28,
+        },
       ],
     },
     // Upstream invalid 22.
     {
       code: '\n        const MyContext = createContext();\n        function Component() { const foo = {}; return (<MyContext value={foo}></MyContext>) }\n      ',
       errors: [
-        diagnostic(
-          'withIdentifierMsg',
-          "The 'foo' object (at line 3) passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          [3, 44, 3, 46],
-        ),
+        {
+          messageId: 'withIdentifierMsg',
+          message:
+            "The 'foo' object (at line 3) passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.",
+          line: 3,
+          column: 44,
+          endLine: 3,
+          endColumn: 46,
+        },
       ],
     },
     // Upstream invalid 23.
     {
       code: '\n        const MyContext = createContext();\n        function Component() { return (<MyContext value={{foo: "bar"}}></MyContext>); }\n      ',
       errors: [
-        diagnostic(
-          'defaultMsg',
-          'The object passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.',
-          [3, 58, 3, 70],
-        ),
+        {
+          messageId: 'defaultMsg',
+          message:
+            'The object passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.',
+          line: 3,
+          column: 58,
+          endLine: 3,
+          endColumn: 70,
+        },
       ],
     },
     // Documentation: inline object (return fragment wrapped in a component).
     {
       code: "function Component() {\n  return (\n    <SomeContext.Provider value={{foo: 'bar'}}>\n      ...\n    </SomeContext.Provider>\n  );\n}",
       errors: [
-        diagnostic(
-          'defaultMsg',
-          'The object passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.',
-          [3, 34, 3, 46],
-        ),
+        {
+          messageId: 'defaultMsg',
+          message:
+            'The object passed as the value prop to the Context provider (at line 3) changes every render. To fix this consider wrapping it in a useMemo hook.',
+          line: 3,
+          column: 34,
+          endLine: 3,
+          endColumn: 46,
+        },
       ],
     },
     // Documentation: React 19 context.
     {
       code: "import React from 'react';\nconst MyContext = React.createContext();\nfunction Component() {\n  function foo() {}\n  return (<MyContext value={foo}></MyContext>);\n}",
       errors: [
-        diagnostic(
-          'withIdentifierMsgFunc',
-          "The 'foo' function declaration (at line 4) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useCallback hook.",
-          [4, 3, 4, 20],
-        ),
+        {
+          messageId: 'withIdentifierMsgFunc',
+          message:
+            "The 'foo' function declaration (at line 4) passed as the value prop to the Context provider (at line 5) changes every render. To fix this consider wrapping it in a useCallback hook.",
+          line: 4,
+          column: 3,
+          endLine: 4,
+          endColumn: 20,
+        },
       ],
     },
   ],

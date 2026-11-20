@@ -1,23 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMissingPropertyError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingProperty',
-    '`checked` should be used with either `onChange` or `readOnly`.',
-    range,
-  );
+function expectMissingPropertyError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingProperty',
+    message: '`checked` should be used with either `onChange` or `readOnly`.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectExclusiveCheckedAttributeError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'exclusiveCheckedAttribute',
-    'Use either `checked` or `defaultChecked`, but not both.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'exclusiveCheckedAttribute',
+    message: 'Use either `checked` or `defaultChecked`, but not both.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

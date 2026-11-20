@@ -1,25 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectUseDestructAssignmentError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'useDestructAssignment',
-    'Must use destructuring props assignment',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'useDestructAssignment',
+    message: 'Must use destructuring props assignment',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectDestructureInSignatureError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'destructureInSignature',
-    'Must destructure props in the function signature.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'destructureInSignature',
+    message: 'Must destructure props in the function signature.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -532,11 +539,15 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['never'],
       errors: [
-        diagnostic(
-          'noDestructPropsInSFCArg',
-          'Must never use destructuring props assignment in SFC argument',
-          [2, 29, 4, 10],
-        ),
+        {
+          messageId: 'noDestructPropsInSFCArg',
+          message:
+            'Must never use destructuring props assignment in SFC argument',
+          line: 2,
+          column: 29,
+          endLine: 4,
+          endColumn: 10,
+        },
       ],
     },
     {
@@ -558,11 +569,14 @@ ruleTester.run('destructuring-assignment', {
         };
       `,
       errors: [
-        diagnostic(
-          'useDestructAssignment',
-          'Must use destructuring state assignment',
-          [4, 26, 4, 40],
-        ),
+        {
+          messageId: 'useDestructAssignment',
+          message: 'Must use destructuring state assignment',
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 40,
+        },
       ],
     },
     {
@@ -576,11 +590,14 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['never'],
       errors: [
-        diagnostic(
-          'noDestructAssignment',
-          'Must never use destructuring props assignment',
-          [4, 19, 4, 39],
-        ),
+        {
+          messageId: 'noDestructAssignment',
+          message: 'Must never use destructuring props assignment',
+          line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 39,
+        },
       ],
     },
     {
@@ -610,11 +627,15 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['never'],
       errors: [
-        diagnostic(
-          'noDestructContextInSFCArg',
-          'Must never use destructuring context assignment in SFC argument',
-          [2, 29, 4, 10],
-        ),
+        {
+          messageId: 'noDestructContextInSFCArg',
+          message:
+            'Must never use destructuring context assignment in SFC argument',
+          line: 2,
+          column: 29,
+          endLine: 4,
+          endColumn: 10,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -628,11 +649,14 @@ ruleTester.run('destructuring-assignment', {
         };
       `,
       errors: [
-        diagnostic(
-          'useDestructAssignment',
-          'Must use destructuring context assignment',
-          [4, 26, 4, 42],
-        ),
+        {
+          messageId: 'useDestructAssignment',
+          message: 'Must use destructuring context assignment',
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 42,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -716,11 +740,14 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['never'],
       errors: [
-        diagnostic(
-          'noDestructAssignment',
-          'Must never use destructuring props assignment',
-          [3, 17, 3, 42],
-        ),
+        {
+          messageId: 'noDestructAssignment',
+          message: 'Must never use destructuring props assignment',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 42,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -736,11 +763,14 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['never'],
       errors: [
-        diagnostic(
-          'noDestructAssignment',
-          'Must never use destructuring state assignment',
-          [4, 19, 4, 39],
-        ),
+        {
+          messageId: 'noDestructAssignment',
+          message: 'Must never use destructuring state assignment',
+          line: 4,
+          column: 19,
+          endLine: 4,
+          endColumn: 39,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -779,11 +809,14 @@ ruleTester.run('destructuring-assignment', {
       `,
       options: ['always'],
       errors: [
-        diagnostic(
-          'useDestructAssignment',
-          'Must use destructuring context assignment',
-          [3, 21, 3, 37],
-        ),
+        {
+          messageId: 'useDestructAssignment',
+          message: 'Must use destructuring context assignment',
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 37,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

@@ -2,26 +2,47 @@
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/jsx-newline.js
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectRequireError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('require', 'JSX element should start in a new line', range);
+function expectRequireError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'require',
+    message: 'JSX element should start in a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectAllowMultilinesError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'allowMultilines',
-    'Multiline JSX elements should start in a new line',
-    range,
-  );
+function expectAllowMultilinesError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'allowMultilines',
+    message: 'Multiline JSX elements should start in a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPreventError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'prevent',
-    'JSX element should not start in a new line',
-    range,
-  );
+function expectPreventError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'prevent',
+    message: 'JSX element should not start in a new line',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 new RuleTester(fixtureConfig).run('jsx-newline', {

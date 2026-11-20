@@ -1,197 +1,340 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMissingPropTypeError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'name' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'name' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'foo' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'foo' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'foo.bar' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'foo.bar' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'a.nope' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'a.nope' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'lastname' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'lastname' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'a.b' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'a.b' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError7(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'a.b.c' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError7(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'a.b.c' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError8(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'firstname' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError8(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'firstname' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError9(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'b' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError9(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'b' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError10(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'source' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError10(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'source' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError11(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'text' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError11(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'text' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError12(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'name.lastname' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError12(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'name.lastname' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError13(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'result.notok' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError13(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'result.notok' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError14(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'test' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError14(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'test' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError15(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'bar' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError15(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'bar' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError16(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'person.lastname' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError16(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'person.lastname' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError17(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'fooBar' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError17(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'fooBar' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError18(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'foo.baz' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError18(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'foo.baz' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError19(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'cryptoCurrency' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError19(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'cryptoCurrency' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError20(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'first.name' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError20(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'first.name' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError21(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'username' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError21(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'username' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError22(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'foo.c' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError22(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'foo.c' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError23(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'l' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError23(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'l' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingPropTypeError24(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingPropType',
-    "'nonExistent' is missing in props validation",
-    range,
-  );
+function expectMissingPropTypeError24(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingPropType',
+    message: "'nonExistent' is missing in props validation",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -5710,11 +5853,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'a.b.nope' is missing in props validation",
-          [4, 25, 4, 29],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'a.b.nope' is missing in props validation",
+          line: 4,
+          column: 25,
+          endLine: 4,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5763,11 +5909,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'cat' is missing in props validation",
-          [5, 32, 5, 35],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'cat' is missing in props validation",
+          line: 5,
+          column: 32,
+          endLine: 5,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5782,11 +5931,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'cat' is missing in props validation",
-          [5, 32, 5, 35],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'cat' is missing in props validation",
+          line: 5,
+          column: 32,
+          endLine: 5,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5817,11 +5969,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'title' is missing in props validation",
-          [4, 27, 4, 32],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'title' is missing in props validation",
+          line: 4,
+          column: 27,
+          endLine: 4,
+          endColumn: 32,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5908,11 +6063,14 @@ ruleTester.run('prop-types', {
         });
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'propWithoutTypeDefinition' is missing in props validation",
-          [7, 65, 7, 90],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'propWithoutTypeDefinition' is missing in props validation",
+          line: 7,
+          column: 65,
+          endLine: 7,
+          endColumn: 90,
+        },
         expectMissingPropTypeError1([12, 43, 12, 47]),
       ],
       languageOptions: upstreamModuleOptions,
@@ -6006,21 +6164,30 @@ ruleTester.run('prop-types', {
       `,
       errors: [
         expectMissingPropTypeError7([4, 28, 4, 29]),
-        diagnostic(
-          'missingPropType',
-          "'a.__.d' is missing in props validation",
-          [5, 29, 5, 30],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'a.__.d.length' is missing in props validation",
-          [5, 31, 5, 37],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'a.anything.e' is missing in props validation",
-          [6, 35, 6, 36],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'a.__.d' is missing in props validation",
+          line: 5,
+          column: 29,
+          endLine: 5,
+          endColumn: 30,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'a.__.d.length' is missing in props validation",
+          line: 5,
+          column: 31,
+          endLine: 5,
+          endColumn: 37,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'a.anything.e' is missing in props validation",
+          line: 6,
+          column: 35,
+          endLine: 6,
+          endColumn: 36,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6045,26 +6212,38 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'a[].c' is missing in props validation",
-          [5, 29, 5, 30],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'a[].d' is missing in props validation",
-          [6, 29, 6, 30],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'a[].d.length' is missing in props validation",
-          [6, 31, 6, 37],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'a[].e' is missing in props validation",
-          [7, 33, 7, 34],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'a[].c' is missing in props validation",
+          line: 5,
+          column: 29,
+          endLine: 5,
+          endColumn: 30,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'a[].d' is missing in props validation",
+          line: 6,
+          column: 29,
+          endLine: 6,
+          endColumn: 30,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'a[].d.length' is missing in props validation",
+          line: 6,
+          column: 31,
+          endLine: 6,
+          endColumn: 37,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'a[].e' is missing in props validation",
+          line: 7,
+          column: 33,
+          endLine: 7,
+          endColumn: 34,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6092,11 +6271,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'a.length' is missing in props validation",
-          [4, 26, 4, 32],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'a.length' is missing in props validation",
+          line: 4,
+          column: 26,
+          endLine: 4,
+          endColumn: 32,
+        },
         expectMissingPropTypeError6([5, 26, 5, 27]),
       ],
       languageOptions: upstreamModuleOptions,
@@ -6118,11 +6300,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'propX' is missing in props validation",
-          [6, 15, 6, 20],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'propX' is missing in props validation",
+          line: 6,
+          column: 15,
+          endLine: 6,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6139,11 +6324,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'some.value' is missing in props validation",
-          [4, 24, 4, 36],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'some.value' is missing in props validation",
+          line: 4,
+          column: 24,
+          endLine: 4,
+          endColumn: 36,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6160,11 +6348,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'arr' is missing in props validation",
-          [4, 24, 4, 29],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'arr' is missing in props validation",
+          line: 4,
+          column: 24,
+          endLine: 4,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6184,11 +6375,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'arr[].some.value' is missing in props validation",
-          [4, 34, 4, 46],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'arr[].some.value' is missing in props validation",
+          line: 4,
+          column: 34,
+          endLine: 4,
+          endColumn: 46,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6399,11 +6593,14 @@ ruleTester.run('prop-types', {
       `,
       errors: [
         expectMissingPropTypeError10([5, 42, 5, 48]),
-        diagnostic(
-          'missingPropType',
-          "'source.uri' is missing in props validation",
-          [5, 49, 5, 52],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'source.uri' is missing in props validation",
+          line: 5,
+          column: 49,
+          endLine: 5,
+          endColumn: 52,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6432,11 +6629,14 @@ ruleTester.run('prop-types', {
       `,
       errors: [
         expectMissingPropTypeError10([5, 47, 5, 53]),
-        diagnostic(
-          'missingPropType',
-          "'source.uri' is missing in props validation",
-          [5, 54, 5, 57],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'source.uri' is missing in props validation",
+          line: 5,
+          column: 54,
+          endLine: 5,
+          endColumn: 57,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6506,21 +6706,30 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'names' is missing in props validation",
-          [3, 28, 3, 33],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'names.map' is missing in props validation",
-          [3, 34, 3, 37],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'company' is missing in props validation",
-          [4, 41, 4, 48],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'names' is missing in props validation",
+          line: 3,
+          column: 28,
+          endLine: 3,
+          endColumn: 33,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'names.map' is missing in props validation",
+          line: 3,
+          column: 34,
+          endLine: 3,
+          endColumn: 37,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'company' is missing in props validation",
+          line: 4,
+          column: 41,
+          endLine: 4,
+          endColumn: 48,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6715,11 +6924,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'person.name.lastname' is missing in props validation",
-          [5, 55, 5, 63],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'person.name.lastname' is missing in props validation",
+          line: 5,
+          column: 55,
+          endLine: 5,
+          endColumn: 63,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6736,11 +6948,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'person.name.lastname' is missing in props validation",
-          [6, 55, 6, 63],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'person.name.lastname' is missing in props validation",
+          line: 6,
+          column: 55,
+          endLine: 6,
+          endColumn: 63,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6762,11 +6977,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'people[].name.lastname' is missing in props validation",
-          [8, 52, 8, 60],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'people[].name.lastname' is missing in props validation",
+          line: 8,
+          column: 52,
+          endLine: 8,
+          endColumn: 60,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6789,11 +7007,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'people[].name.lastname' is missing in props validation",
-          [9, 52, 9, 60],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'people[].name.lastname' is missing in props validation",
+          line: 9,
+          column: 52,
+          endLine: 9,
+          endColumn: 60,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6863,16 +7084,22 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'names' is missing in props validation",
-          [2, 30, 2, 35],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'names.map' is missing in props validation",
-          [3, 25, 3, 28],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'names' is missing in props validation",
+          line: 2,
+          column: 30,
+          endLine: 2,
+          endColumn: 35,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'names.map' is missing in props validation",
+          line: 3,
+          column: 25,
+          endLine: 3,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6884,11 +7111,14 @@ ruleTester.run('prop-types', {
         )
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'toggle' is missing in props validation",
-          [3, 37, 3, 43],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'toggle' is missing in props validation",
+          line: 3,
+          column: 37,
+          endLine: 3,
+          endColumn: 43,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6959,11 +7189,15 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'name.constructor.firstname' is missing in props validation",
-          [3, 47, 3, 56],
-        ),
+        {
+          messageId: 'missingPropType',
+          message:
+            "'name.constructor.firstname' is missing in props validation",
+          line: 3,
+          column: 47,
+          endLine: 3,
+          endColumn: 56,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7700,11 +7934,14 @@ ruleTester.run('prop-types', {
       );
     `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'bad' is missing in props validation",
-          [23, 20, 23, 23],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'bad' is missing in props validation",
+          line: 23,
+          column: 20,
+          endLine: 23,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7759,11 +7996,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'zoo' is missing in props validation",
-          [4, 36, 4, 39],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'zoo' is missing in props validation",
+          line: 4,
+          column: 36,
+          endLine: 4,
+          endColumn: 39,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7804,11 +8044,14 @@ ruleTester.run('prop-types', {
         export default ForAttendees;
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'page' is missing in props validation",
-          [2, 33, 2, 37],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'page' is missing in props validation",
+          line: 2,
+          column: 33,
+          endLine: 2,
+          endColumn: 37,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7938,11 +8181,14 @@ ruleTester.run('prop-types', {
         export default MyComponent;
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'usedProp' is missing in props validation",
-          [6, 25, 6, 33],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'usedProp' is missing in props validation",
+          line: 6,
+          column: 25,
+          endLine: 6,
+          endColumn: 33,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7977,11 +8223,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'a' is missing in props validation",
-          [4, 37, 4, 38],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'a' is missing in props validation",
+          line: 4,
+          column: 37,
+          endLine: 4,
+          endColumn: 38,
+        },
         expectMissingPropTypeError6([5, 17, 5, 18]),
         expectMissingPropTypeError7([5, 19, 5, 20]),
       ],
@@ -8012,11 +8261,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'initialValues' is missing in props validation",
-          [13, 43, 13, 56],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'initialValues' is missing in props validation",
+          line: 13,
+          column: 43,
+          endLine: 13,
+          endColumn: 56,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8039,11 +8291,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'notOne' is missing in props validation",
-          [12, 42, 12, 48],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'notOne' is missing in props validation",
+          line: 12,
+          column: 42,
+          endLine: 12,
+          endColumn: 48,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8087,11 +8342,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'user.age' is missing in props validation",
-          [17, 27, 17, 30],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'user.age' is missing in props validation",
+          line: 17,
+          column: 27,
+          endLine: 17,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8159,16 +8417,22 @@ ruleTester.run('prop-types', {
         );
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'length' is missing in props validation",
-          [2, 23, 2, 29],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'ordering' is missing in props validation",
-          [2, 31, 2, 39],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'length' is missing in props validation",
+          line: 2,
+          column: 23,
+          endLine: 2,
+          endColumn: 29,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'ordering' is missing in props validation",
+          line: 2,
+          column: 31,
+          endLine: 2,
+          endColumn: 39,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8329,11 +8593,14 @@ ruleTester.run('prop-types', {
       );`,
       settings: { componentWrapperFunctions: ['observer'] },
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'componentId' is missing in props validation",
-          [3, 12, 3, 23],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'componentId' is missing in props validation",
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8355,11 +8622,14 @@ ruleTester.run('prop-types', {
         componentWrapperFunctions: [{ property: 'observer', object: 'Mobx' }],
       },
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'id' is missing in props validation",
-          [3, 12, 3, 14],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'id' is missing in props validation",
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8376,11 +8646,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'value' is missing in props validation",
-          [5, 21, 5, 26],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'value' is missing in props validation",
+          line: 5,
+          column: 21,
+          endLine: 5,
+          endColumn: 26,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8405,11 +8678,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'userId' is missing in props validation",
-          [10, 19, 10, 25],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'userId' is missing in props validation",
+          line: 10,
+          column: 19,
+          endLine: 10,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8434,11 +8710,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'user' is missing in props validation",
-          [10, 27, 10, 31],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'user' is missing in props validation",
+          line: 10,
+          column: 27,
+          endLine: 10,
+          endColumn: 31,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8464,11 +8743,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'userId' is missing in props validation",
-          [11, 19, 11, 25],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'userId' is missing in props validation",
+          line: 11,
+          column: 19,
+          endLine: 11,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8490,11 +8772,14 @@ ruleTester.run('prop-types', {
         ) => (<div />)
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'onClick' is missing in props validation",
-          [11, 13, 11, 20],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'onClick' is missing in props validation",
+          line: 11,
+          column: 13,
+          endLine: 11,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8514,11 +8799,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'books' is missing in props validation",
-          [10, 17, 10, 22],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'books' is missing in props validation",
+          line: 10,
+          column: 17,
+          endLine: 10,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8559,11 +8847,14 @@ ruleTester.run('prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'dateCreated' is missing in props validation",
-          [14, 36, 14, 47],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'dateCreated' is missing in props validation",
+          line: 14,
+          column: 36,
+          endLine: 14,
+          endColumn: 47,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8671,11 +8962,14 @@ ruleTester.run('prop-types', {
         export default InputField;
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'type' is missing in props validation",
-          [4, 31, 4, 35],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'type' is missing in props validation",
+          line: 4,
+          column: 31,
+          endLine: 4,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -8761,11 +9055,14 @@ ruleTester.run('prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'someIncorrectProp' is missing in props validation",
-          [8, 16, 8, 33],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'someIncorrectProp' is missing in props validation",
+          line: 8,
+          column: 16,
+          endLine: 8,
+          endColumn: 33,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -9110,36 +9407,54 @@ ruleTester.run('prop-types', {
       }
       `,
       errors: [
-        diagnostic(
-          'missingPropType',
-          "'prop_' is missing in props validation",
-          [2, 32, 2, 37],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'prop_.events' is missing in props validation",
-          [5, 28, 5, 34],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'prop_.events.map' is missing in props validation",
-          [5, 35, 5, 38],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'prop$' is missing in props validation",
-          [12, 32, 12, 37],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'prop$.events' is missing in props validation",
-          [15, 26, 15, 32],
-        ),
-        diagnostic(
-          'missingPropType',
-          "'prop$.events.map' is missing in props validation",
-          [15, 33, 15, 36],
-        ),
+        {
+          messageId: 'missingPropType',
+          message: "'prop_' is missing in props validation",
+          line: 2,
+          column: 32,
+          endLine: 2,
+          endColumn: 37,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'prop_.events' is missing in props validation",
+          line: 5,
+          column: 28,
+          endLine: 5,
+          endColumn: 34,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'prop_.events.map' is missing in props validation",
+          line: 5,
+          column: 35,
+          endLine: 5,
+          endColumn: 38,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'prop$' is missing in props validation",
+          line: 12,
+          column: 32,
+          endLine: 12,
+          endColumn: 37,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'prop$.events' is missing in props validation",
+          line: 15,
+          column: 26,
+          endLine: 15,
+          endColumn: 32,
+        },
+        {
+          messageId: 'missingPropType',
+          message: "'prop$.events.map' is missing in props validation",
+          line: 15,
+          column: 33,
+          endLine: 15,
+          endColumn: 36,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

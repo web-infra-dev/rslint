@@ -1,37 +1,64 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnsafeMethodError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unsafeMethod',
-    'UNSAFE_componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-    range,
-  );
+function expectUnsafeMethodError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnsafeMethodError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unsafeMethod',
-    'componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-    range,
-  );
+function expectUnsafeMethodError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnsafeMethodError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unsafeMethod',
-    'UNSAFE_componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-    range,
-  );
+function expectUnsafeMethodError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnsafeMethodError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unsafeMethod',
-    'UNSAFE_componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-    range,
-  );
+function expectUnsafeMethodError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -284,16 +311,24 @@ ruleTester.run('no-unsafe', {
       settings: { react: { version: '16.4.0' } },
       errors: [
         expectUnsafeMethodError2([3, 11, 3, 34]),
-        diagnostic(
-          'unsafeMethod',
-          'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-          [4, 11, 4, 41],
-        ),
-        diagnostic(
-          'unsafeMethod',
-          'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-          [5, 11, 5, 35],
-        ),
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 41,
+        },
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 35,
+        },
       ],
     },
     // ---- Upstream invalid #2: React.Component + UNSAFE_ at 16.3.0 ----
@@ -325,16 +360,24 @@ ruleTester.run('no-unsafe', {
       settings: { react: { version: '16.3.0' } },
       errors: [
         expectUnsafeMethodError2([3, 11, 3, 44]),
-        diagnostic(
-          'unsafeMethod',
-          'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-          [4, 11, 4, 51],
-        ),
-        diagnostic(
-          'unsafeMethod',
-          'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
-          [5, 11, 5, 45],
-        ),
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 51,
+        },
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 45,
+        },
       ],
     },
     // ---- Upstream invalid #4: createReactClass + UNSAFE_ at 16.3.0 ----

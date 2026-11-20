@@ -1,33 +1,61 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMissingIterKeyError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingIterKey',
-    'Missing "key" prop for element in iterator',
-    range,
-  );
+function expectMissingIterKeyError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingIterKey',
+    message: 'Missing "key" prop for element in iterator',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectMissingArrayKeyError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingArrayKey',
-    'Missing "key" prop for element in array',
-    range,
-  );
+function expectMissingArrayKeyError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingArrayKey',
+    message: 'Missing "key" prop for element in array',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectKeyBeforeSpreadError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'keyBeforeSpread',
-    '`key` prop must be placed before any `{...spread}, to avoid conflicting with React’s new JSX transform: https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html`',
-    range,
-  );
+function expectKeyBeforeSpreadError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'keyBeforeSpread',
+    message:
+      '`key` prop must be placed before any `{...spread}, to avoid conflicting with React’s new JSX transform: https://reactjs.org/blog/2020/09/22/introducing-the-new-jsx-transform.html`',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNonUniqueKeysError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('nonUniqueKeys', '`key` prop must be unique', range);
+function expectNonUniqueKeysError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'nonUniqueKeys',
+    message: '`key` prop must be unique',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -394,11 +422,15 @@ ruleTester.run('jsx-key', {
       code: '[1, 2, 3].map(x => <>{x}</>);',
       options: [{ checkFragmentShorthand: true }],
       errors: [
-        diagnostic(
-          'missingIterKeyUsePrag',
-          'Missing "key" prop for element in iterator. Shorthand fragment syntax does not support providing keys. Use React.Fragment instead',
-          [1, 20, 1, 28],
-        ),
+        {
+          messageId: 'missingIterKeyUsePrag',
+          message:
+            'Missing "key" prop for element in iterator. Shorthand fragment syntax does not support providing keys. Use React.Fragment instead',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     // Fragment shorthand in array literal (option on).
@@ -406,11 +438,15 @@ ruleTester.run('jsx-key', {
       code: '[<></>];',
       options: [{ checkFragmentShorthand: true }],
       errors: [
-        diagnostic(
-          'missingArrayKeyUsePrag',
-          'Missing "key" prop for element in array. Shorthand fragment syntax does not support providing keys. Use React.Fragment instead',
-          [1, 2, 1, 7],
-        ),
+        {
+          messageId: 'missingArrayKeyUsePrag',
+          message:
+            'Missing "key" prop for element in array. Shorthand fragment syntax does not support providing keys. Use React.Fragment instead',
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 7,
+        },
       ],
     },
     // checkKeyMustBeforeSpread — key after spread in array context.
@@ -583,11 +619,15 @@ ruleTester.run('jsx-key', {
       options: [{ checkFragmentShorthand: true }],
       settings: { react: { pragma: 'Act', fragment: 'Frag' } },
       errors: [
-        diagnostic(
-          'missingIterKeyUsePrag',
-          'Missing "key" prop for element in iterator. Shorthand fragment syntax does not support providing keys. Use Act.Frag instead',
-          [1, 20, 1, 28],
-        ),
+        {
+          messageId: 'missingIterKeyUsePrag',
+          message:
+            'Missing "key" prop for element in iterator. Shorthand fragment syntax does not support providing keys. Use Act.Frag instead',
+          line: 1,
+          column: 20,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -597,11 +637,15 @@ ruleTester.run('jsx-key', {
       options: [{ checkFragmentShorthand: true }],
       settings: { react: { pragma: 'Act', fragment: 'Frag' } },
       errors: [
-        diagnostic(
-          'missingArrayKeyUsePrag',
-          'Missing "key" prop for element in array. Shorthand fragment syntax does not support providing keys. Use Act.Frag instead',
-          [1, 2, 1, 7],
-        ),
+        {
+          messageId: 'missingArrayKeyUsePrag',
+          message:
+            'Missing "key" prop for element in array. Shorthand fragment syntax does not support providing keys. Use Act.Frag instead',
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 7,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

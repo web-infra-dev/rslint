@@ -1,14 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 // Migrated from eslint-plugin-react v7.37.5.
-function expectPropsNotSortedError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propsNotSorted',
-    'Default prop types declarations should be sorted alphabetically',
-    range,
-  );
+function expectPropsNotSortedError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propsNotSorted',
+    message: 'Default prop types declarations should be sorted alphabetically',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

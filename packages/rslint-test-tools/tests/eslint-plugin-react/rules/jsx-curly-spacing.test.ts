@@ -1,49 +1,88 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSpaceAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSpaceAfter',
-    "There should be no space after '{'",
-    range,
-  );
+function expectNoSpaceAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSpaceAfter',
+    message: "There should be no space after '{'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoSpaceBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSpaceBefore',
-    "There should be no space before '}'",
-    range,
-  );
+function expectNoSpaceBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSpaceBefore',
+    message: "There should be no space before '}'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectSpaceNeededAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('spaceNeededAfter', "A space is required after '{'", range);
+function expectSpaceNeededAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'spaceNeededAfter',
+    message: "A space is required after '{'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectSpaceNeededBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'spaceNeededBefore',
-    "A space is required before '}'",
-    range,
-  );
+function expectSpaceNeededBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'spaceNeededBefore',
+    message: "A space is required before '}'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoNewlineAfterError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noNewlineAfter',
-    "There should be no newline after '{'",
-    range,
-  );
+function expectNoNewlineAfterError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noNewlineAfter',
+    message: "There should be no newline after '{'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoNewlineBeforeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noNewlineBefore',
-    "There should be no newline before '}'",
-    range,
-  );
+function expectNoNewlineBeforeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noNewlineBefore',
+    message: "There should be no newline before '}'",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

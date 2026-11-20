@@ -1,29 +1,46 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectOnlyOneSpaceError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'onlyOneSpace',
-    'Expected only one space between "foo" and "bar"',
-    range,
-  );
+function expectOnlyOneSpaceError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'onlyOneSpace',
+    message: 'Expected only one space between "foo" and "bar"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoLineGapError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noLineGap',
-    'Expected no line gap between "title" and "onClick"',
-    range,
-  );
+function expectNoLineGapError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noLineGap',
+    message: 'Expected no line gap between "title" and "onClick"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoLineGapError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noLineGap',
-    'Expected no line gap between "onClick" and "type"',
-    range,
-  );
+function expectNoLineGapError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noLineGap',
+    message: 'Expected no line gap between "onClick" and "type"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -191,22 +208,28 @@ ruleTester.run('jsx-props-no-multi-spaces', {
     {
       code: `<Foo  bar="baz" />`,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "Foo" and "bar"',
-          [1, 7, 1, 16],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "Foo" and "bar"',
+          line: 1,
+          column: 7,
+          endLine: 1,
+          endColumn: 16,
+        },
       ],
       output: `<Foo bar="baz" />`,
     },
     {
       code: `<Foo bar="baz"  qux="quux" />`,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "bar" and "qux"',
-          [1, 17, 1, 27],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "bar" and "qux"',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 27,
+        },
       ],
       output: `<Foo bar="baz" qux="quux" />`,
     },
@@ -218,11 +241,14 @@ ruleTester.run('jsx-props-no-multi-spaces', {
         <App  foo />
       `,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "App" and "foo"',
-          [2, 15, 2, 18],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "App" and "foo"',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 18,
+        },
       ],
       output: `
         <App foo />
@@ -257,11 +283,14 @@ ruleTester.run('jsx-props-no-multi-spaces', {
         <App  foo   bar />
       `,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "App" and "foo"',
-          [2, 15, 2, 18],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "App" and "foo"',
+          line: 2,
+          column: 15,
+          endLine: 2,
+          endColumn: 18,
+        },
         expectOnlyOneSpaceError([2, 21, 2, 24]),
       ],
       output: `
@@ -275,16 +304,22 @@ ruleTester.run('jsx-props-no-multi-spaces', {
         <App foo  {...test}  bar />
       `,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "foo" and "test"',
-          [2, 19, 2, 28],
-        ),
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "test" and "bar"',
-          [2, 30, 2, 33],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "foo" and "test"',
+          line: 2,
+          column: 19,
+          endLine: 2,
+          endColumn: 28,
+        },
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "test" and "bar"',
+          line: 2,
+          column: 30,
+          endLine: 2,
+          endColumn: 33,
+        },
       ],
       output: `
         <App foo {...test} bar />
@@ -295,11 +330,14 @@ ruleTester.run('jsx-props-no-multi-spaces', {
       name: 'Upstream invalid 5 (7.37.5)',
       code: `<Foo.Bar  baz="quux" />`,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "Foo.Bar" and "baz"',
-          [1, 11, 1, 21],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message: 'Expected only one space between "Foo.Bar" and "baz"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
       output: `<Foo.Bar baz="quux" />`,
       languageOptions: upstreamModuleOptions,
@@ -310,11 +348,15 @@ ruleTester.run('jsx-props-no-multi-spaces', {
         <Foobar.Foo.Bar.Baz.Qux.Quux.Quuz.Corge.Grault.Garply.Waldo.Fred.Plugh  xyzzy="thud" />
       `,
       errors: [
-        diagnostic(
-          'onlyOneSpace',
-          'Expected only one space between "Foobar.Foo.Bar.Baz.Qux.Quux.Quuz.Corge.Grault.Garply.Waldo.Fred.Plugh" and "xyzzy"',
-          [2, 81, 2, 93],
-        ),
+        {
+          messageId: 'onlyOneSpace',
+          message:
+            'Expected only one space between "Foobar.Foo.Bar.Baz.Qux.Quux.Quuz.Corge.Grault.Garply.Waldo.Fred.Plugh" and "xyzzy"',
+          line: 2,
+          column: 81,
+          endLine: 2,
+          endColumn: 93,
+        },
       ],
       output: `
         <Foobar.Foo.Bar.Baz.Qux.Quux.Quuz.Corge.Grault.Garply.Waldo.Fred.Plugh xyzzy="thud" />
@@ -331,11 +373,14 @@ ruleTester.run('jsx-props-no-multi-spaces', {
         />
       `,
       errors: [
-        diagnostic(
-          'noLineGap',
-          'Expected no line gap between "title" and "type"',
-          [5, 11, 5, 24],
-        ),
+        {
+          messageId: 'noLineGap',
+          message: 'Expected no line gap between "title" and "type"',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

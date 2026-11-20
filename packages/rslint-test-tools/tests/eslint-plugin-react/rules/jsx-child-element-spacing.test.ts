@@ -1,21 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamES2015Options } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectSpacingBeforeNextError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'spacingBeforeNext',
-    'Ambiguous spacing before next element a',
-    range,
-  );
+function expectSpacingBeforeNextError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'spacingBeforeNext',
+    message: 'Ambiguous spacing before next element a',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectSpacingAfterPrevError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'spacingAfterPrev',
-    'Ambiguous spacing after previous element a',
-    range,
-  );
+function expectSpacingAfterPrevError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'spacingAfterPrev',
+    message: 'Ambiguous spacing after previous element a',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -361,11 +372,14 @@ ruleTester.run('jsx-child-element-spacing', {
         </App>
       `,
       errors: [
-        diagnostic(
-          'spacingBeforeNext',
-          'Ambiguous spacing before next element code',
-          [4, 11, 4, 11],
-        ),
+        {
+          messageId: 'spacingBeforeNext',
+          message: 'Ambiguous spacing before next element code',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 11,
+        },
       ],
     },
     // ---- Upstream: two separate spacingBeforeNext reports in a row ----
@@ -413,11 +427,14 @@ ruleTester.run('jsx-child-element-spacing', {
         </App>
       `,
       errors: [
-        diagnostic(
-          'spacingAfterPrev',
-          'Ambiguous spacing after previous element img',
-          [3, 17, 3, 17],
-        ),
+        {
+          messageId: 'spacingAfterPrev',
+          message: 'Ambiguous spacing after previous element img',
+          line: 3,
+          column: 17,
+          endLine: 3,
+          endColumn: 17,
+        },
       ],
     },
     // ---- Edge: text before self-closing inline element on a new line ----
@@ -429,11 +446,14 @@ ruleTester.run('jsx-child-element-spacing', {
         </App>
       `,
       errors: [
-        diagnostic(
-          'spacingBeforeNext',
-          'Ambiguous spacing before next element input',
-          [4, 11, 4, 11],
-        ),
+        {
+          messageId: 'spacingBeforeNext',
+          message: 'Ambiguous spacing before next element input',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 11,
+        },
       ],
     },
     // ---- Edge: nested element reports independently — only inner <p> matches ----
@@ -474,11 +494,14 @@ ruleTester.run('jsx-child-element-spacing', {
       `,
       errors: [
         expectSpacingBeforeNextError([5, 13, 5, 13]),
-        diagnostic(
-          'spacingAfterPrev',
-          'Ambiguous spacing after previous element span',
-          [7, 25, 7, 25],
-        ),
+        {
+          messageId: 'spacingAfterPrev',
+          message: 'Ambiguous spacing after previous element span',
+          line: 7,
+          column: 25,
+          endLine: 7,
+          endColumn: 25,
+        },
       ],
     },
     // ---- Edge: textarea (uncommon inline tag) before text on a new line ----
@@ -490,11 +513,14 @@ ruleTester.run('jsx-child-element-spacing', {
         </App>
       `,
       errors: [
-        diagnostic(
-          'spacingBeforeNext',
-          'Ambiguous spacing before next element textarea',
-          [4, 11, 4, 11],
-        ),
+        {
+          messageId: 'spacingBeforeNext',
+          message: 'Ambiguous spacing before next element textarea',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 11,
+        },
       ],
     },
   ],

@@ -1,45 +1,79 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectDeprecatedError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'deprecated',
-    'React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead',
-    range,
-  );
+function expectDeprecatedError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'deprecated',
+    message:
+      'React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectDeprecatedError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'deprecated',
-    'React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead',
-    range,
-  );
+function expectDeprecatedError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'deprecated',
+    message:
+      'React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectDeprecatedError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'deprecated',
-    'componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
-    range,
-  );
+function expectDeprecatedError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'deprecated',
+    message:
+      'componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectDeprecatedError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'deprecated',
-    'componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
-    range,
-  );
+function expectDeprecatedError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'deprecated',
+    message:
+      'componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectDeprecatedError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'deprecated',
-    'componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
-    range,
-  );
+function expectDeprecatedError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'deprecated',
+    message:
+      'componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -217,41 +251,57 @@ ruleTester.run('no-deprecated', {
     {
       code: `React.renderComponent()`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.renderComponent is deprecated since React 0.12.0, use React.render instead',
-          [1, 1, 1, 22],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.renderComponent is deprecated since React 0.12.0, use React.render instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     {
       code: `this.transferPropsTo()`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'this.transferPropsTo is deprecated since React 0.12.0, use spread operator ({...}) instead',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'this.transferPropsTo is deprecated since React 0.12.0, use spread operator ({...}) instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: `React.addons.TestUtils`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.addons.TestUtils is deprecated since React 15.5.0, use ReactDOM.TestUtils instead',
-          [1, 1, 1, 23],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.addons.TestUtils is deprecated since React 15.5.0, use ReactDOM.TestUtils instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 23,
+        },
       ],
     },
     {
       code: `React.render(element, container);`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.render is deprecated since React 0.14.0, use ReactDOM.render instead',
-          [1, 1, 1, 13],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.render is deprecated since React 0.14.0, use ReactDOM.render instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
     },
     {
@@ -265,11 +315,15 @@ ruleTester.run('no-deprecated', {
     {
       code: `React.DOM.div`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead',
-          [1, 1, 1, 10],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
       ],
     },
 
@@ -294,11 +348,15 @@ ruleTester.run('no-deprecated', {
     {
       code: `import {printDOM} from 'react-addons-perf';`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead',
-          [1, 9, 1, 17],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead',
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
 
@@ -333,16 +391,24 @@ ruleTester.run('no-deprecated', {
         ReactDOM.render(<div></div>, container);
       `,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot',
-          [2, 18, 2, 24],
-        ),
-        diagnostic(
-          'deprecated',
-          'ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot',
-          [3, 9, 3, 24],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 24,
+        },
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 24,
+        },
       ],
     },
     {
@@ -351,16 +417,24 @@ ruleTester.run('no-deprecated', {
         ReactDOMServer.renderToNodeStream(element);
       `,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream',
-          [2, 18, 2, 36],
-        ),
-        diagnostic(
-          'deprecated',
-          'ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream',
-          [3, 9, 3, 42],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 36,
+        },
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 42,
+        },
       ],
     },
 
@@ -370,11 +444,15 @@ ruleTester.run('no-deprecated', {
       code: `Foo.renderComponent()`,
       settings: { react: { pragma: 'Foo' } },
       errors: [
-        diagnostic(
-          'deprecated',
-          'Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -382,11 +460,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 2 (7.37.5)',
       code: `/** @jsx Foo */ Foo.renderComponent()`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead',
-          [1, 17, 1, 36],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -394,11 +476,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 5 (7.37.5)',
       code: `React.addons.classSet()`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.addons.classSet is deprecated since React 0.13.0, use the npm module classnames instead',
-          [1, 1, 1, 22],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.addons.classSet is deprecated since React 0.13.0, use the npm module classnames instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -406,11 +492,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 7 (7.37.5)',
       code: `React.unmountComponentAtNode(container);`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead',
-          [1, 1, 1, 29],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -418,11 +508,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 8 (7.37.5)',
       code: `React.findDOMNode(instance);`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead',
-          [1, 1, 1, 18],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -430,11 +524,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 9 (7.37.5)',
       code: `React.renderToString(element);`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -442,11 +540,15 @@ ruleTester.run('no-deprecated', {
       name: 'Upstream invalid 10 (7.37.5)',
       code: `React.renderToStaticMarkup(element);`,
       errors: [
-        diagnostic(
-          'deprecated',
-          'React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead',
-          [1, 1, 1, 27],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -455,11 +557,15 @@ ruleTester.run('no-deprecated', {
       code: `Foo.createClass({});`,
       settings: { react: { pragma: 'Foo' } },
       errors: [
-        diagnostic(
-          'deprecated',
-          'Foo.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead',
-          [1, 1, 1, 16],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'Foo.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -491,11 +597,15 @@ ruleTester.run('no-deprecated', {
         const {printDOM} = ReactPerf;
       `,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead',
-          [3, 16, 3, 24],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -605,16 +715,24 @@ ruleTester.run('no-deprecated', {
         ReactDOM.hydrate(<div></div>, container);
       `,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot',
-          [2, 18, 2, 25],
-        ),
-        diagnostic(
-          'deprecated',
-          'ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot',
-          [3, 9, 3, 25],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 25,
+        },
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -625,16 +743,24 @@ ruleTester.run('no-deprecated', {
         ReactDOM.unmountComponentAtNode(container);
       `,
       errors: [
-        diagnostic(
-          'deprecated',
-          'ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot',
-          [2, 18, 2, 40],
-        ),
-        diagnostic(
-          'deprecated',
-          'ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot',
-          [3, 9, 3, 40],
-        ),
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 40,
+        },
+        {
+          messageId: 'deprecated',
+          message:
+            'ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot',
+          line: 3,
+          column: 9,
+          endLine: 3,
+          endColumn: 40,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

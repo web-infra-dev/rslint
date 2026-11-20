@@ -1,25 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNoChildrenInVoidElError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noChildrenInVoidEl',
-    'Void DOM element <br /> cannot receive children.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noChildrenInVoidEl',
+    message: 'Void DOM element <br /> cannot receive children.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoChildrenInVoidElError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noChildrenInVoidEl',
-    'Void DOM element <img /> cannot receive children.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noChildrenInVoidEl',
+    message: 'Void DOM element <img /> cannot receive children.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

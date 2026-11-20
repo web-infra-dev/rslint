@@ -1,37 +1,61 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPropIsForbiddenError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propIsForbidden',
-    'Prop "className" is forbidden on Components',
-    range,
-  );
+function expectPropIsForbiddenError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "className" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPropIsForbiddenError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propIsForbidden',
-    'Prop "style" is forbidden on Components',
-    range,
-  );
+function expectPropIsForbiddenError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "style" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectPropIsForbiddenError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propIsForbidden',
-    'Prop "kebab-case-prop" is forbidden on Components',
-    range,
-  );
+function expectPropIsForbiddenError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "kebab-case-prop" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    '',
-    'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
-    range,
-  );
+function expectError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message:
+      'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -545,11 +569,14 @@ ruleTester.run('forbid-component-props', {
         },
       ],
       errors: [
-        diagnostic(
-          '',
-          'Please use ourCoolClassName instead of ClassName',
-          [2, 28, 2, 43],
-        ),
+        {
+          messageId: '',
+          message: 'Please use ourCoolClassName instead of ClassName',
+          line: 2,
+          column: 28,
+          endLine: 2,
+          endColumn: 43,
+        },
       ],
     },
     {
@@ -575,12 +602,22 @@ ruleTester.run('forbid-component-props', {
         },
       ],
       errors: [
-        diagnostic(
-          '',
-          'Please use ourCoolClassName instead of ClassName',
-          [3, 16, 3, 31],
-        ),
-        diagnostic('', 'Avoid using option', [4, 18, 4, 31]),
+        {
+          messageId: '',
+          message: 'Please use ourCoolClassName instead of ClassName',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 31,
+        },
+        {
+          messageId: '',
+          message: 'Avoid using option',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 31,
+        },
       ],
     },
     {
@@ -604,7 +641,14 @@ ruleTester.run('forbid-component-props', {
       ],
       errors: [
         expectPropIsForbiddenError1([3, 16, 3, 31]),
-        diagnostic('', 'Avoid using option', [4, 18, 4, 31]),
+        {
+          messageId: '',
+          message: 'Avoid using option',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 31,
+        },
       ],
     },
     {
@@ -640,7 +684,16 @@ ruleTester.run('forbid-component-props', {
           ],
         },
       ],
-      errors: [diagnostic('', 'Avoid using kebab-case', [3, 16, 3, 37])],
+      errors: [
+        {
+          messageId: '',
+          message: 'Avoid using kebab-case',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 37,
+        },
+      ],
     },
     {
       code: `
@@ -706,7 +759,14 @@ ruleTester.run('forbid-component-props', {
         },
       ],
       errors: [
-        diagnostic('', 'className available only for icons', [5, 22, 5, 41]),
+        {
+          messageId: '',
+          message: 'className available only for icons',
+          line: 5,
+          column: 22,
+          endLine: 5,
+          endColumn: 41,
+        },
       ],
     },
     {
@@ -736,8 +796,22 @@ ruleTester.run('forbid-component-props', {
         },
       ],
       errors: [
-        diagnostic('', 'style available only for SVGs', [4, 21, 4, 53]),
-        diagnostic('', 'className available only for icons', [6, 22, 6, 41]),
+        {
+          messageId: '',
+          message: 'style available only for SVGs',
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 53,
+        },
+        {
+          messageId: '',
+          message: 'className available only for icons',
+          line: 6,
+          column: 22,
+          endLine: 6,
+          endColumn: 41,
+        },
       ],
     },
     {
@@ -854,7 +928,16 @@ ruleTester.run('forbid-component-props', {
           ],
         },
       ],
-      errors: [diagnostic('', 'First pattern', [1, 6, 1, 17])],
+      errors: [
+        {
+          messageId: '',
+          message: 'First pattern',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // 2-segment member expression `<Foo.Bar>`: tag is canonical "Foo.Bar".
     {

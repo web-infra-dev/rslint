@@ -2,65 +2,94 @@
 // Flow-only cases are retained as explicit skips in the Go upstream suite.
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 function expectShouldHaveDefaultError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldHaveDefault',
-    'propType "foo" is not required, but has no corresponding defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldHaveDefault',
+    message:
+      'propType "foo" is not required, but has no corresponding defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectShouldHaveDefaultError2(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldHaveDefault',
-    'propType "baz" is not required, but has no corresponding defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldHaveDefault',
+    message:
+      'propType "baz" is not required, but has no corresponding defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectShouldHaveDefaultError3(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldHaveDefault',
-    'propType "bar" is not required, but has no corresponding defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldHaveDefault',
+    message:
+      'propType "bar" is not required, but has no corresponding defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectShouldHaveDefaultError4(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldHaveDefault',
-    'propType "name" is not required, but has no corresponding defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldHaveDefault',
+    message:
+      'propType "name" is not required, but has no corresponding defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoDefaultWithRequiredError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noDefaultWithRequired',
-    'propType "foo" is required and should not have a defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDefaultWithRequired',
+    message:
+      'propType "foo" is required and should not have a defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectShouldHaveDefaultError6(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'shouldHaveDefault',
-    'propType "two" is not required, but has no corresponding defaultProps declaration.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'shouldHaveDefault',
+    message:
+      'propType "two" is not required, but has no corresponding defaultProps declaration.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -634,11 +663,15 @@ ruleTester.run('require-default-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'shouldAssignObjectDefault',
-          'propType "foo" is not required, but has no corresponding default argument value.',
-          [6, 41, 6, 44],
-        ),
+        {
+          messageId: 'shouldAssignObjectDefault',
+          message:
+            'propType "foo" is not required, but has no corresponding default argument value.',
+          line: 6,
+          column: 41,
+          endLine: 6,
+          endColumn: 44,
+        },
       ],
     },
     {
@@ -649,11 +682,15 @@ ruleTester.run('require-default-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'destructureInSignature',
-          'Must destructure props in the function signature to initialize an optional prop.',
-          [5, 39, 5, 44],
-        ),
+        {
+          messageId: 'destructureInSignature',
+          message:
+            'Must destructure props in the function signature to initialize an optional prop.',
+          line: 5,
+          column: 39,
+          endLine: 5,
+          endColumn: 44,
+        },
       ],
     },
     {
@@ -664,11 +701,15 @@ ruleTester.run('require-default-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'shouldAssignObjectDefault',
-          'propType "foo" is not required, but has no corresponding default argument value.',
-          [2, 41, 2, 44],
-        ),
+        {
+          messageId: 'shouldAssignObjectDefault',
+          message:
+            'propType "foo" is not required, but has no corresponding default argument value.',
+          line: 2,
+          column: 41,
+          endLine: 2,
+          endColumn: 44,
+        },
       ],
     },
     {
@@ -798,11 +839,15 @@ ruleTester.run('require-default-props', {
     {
       code: "\n        class Hello extends React.Component {\n          static get propTypes() {\n            return {\n              'first-name': PropTypes.string\n            };\n          }\n          render() {\n            return <div>Hello {this.props['first-name']}</div>;\n          }\n        }\n      ",
       errors: [
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "first-name" is not required, but has no corresponding defaultProps declaration.',
-          [5, 15, 5, 45],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "first-name" is not required, but has no corresponding defaultProps declaration.',
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 45,
+        },
       ],
     },
     {
@@ -858,11 +903,14 @@ ruleTester.run('require-default-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'noDefaultPropsWithFunction',
-          'Don’t use defaultProps with function components.',
-          [2, 9, 4, 10],
-        ),
+        {
+          messageId: 'noDefaultPropsWithFunction',
+          message: 'Don’t use defaultProps with function components.',
+          line: 2,
+          column: 9,
+          endLine: 4,
+          endColumn: 10,
+        },
       ],
     },
     {
@@ -873,41 +921,57 @@ ruleTester.run('require-default-props', {
         },
       ],
       errors: [
-        diagnostic(
-          'destructureInSignature',
-          'Must destructure props in the function signature to initialize an optional prop.',
-          [2, 24, 2, 29],
-        ),
+        {
+          messageId: 'destructureInSignature',
+          message:
+            'Must destructure props in the function signature to initialize an optional prop.',
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 29,
+        },
       ],
     },
     {
       code: "\n        import PropTypes from 'prop-types';\n        import React from 'react';\n\n        const MyComponent= (props) => {\n          switch (props.usedProp) {\n            case 1:\n              return (<div />);\n            default:\n              return <div />;\n          }\n        };\n\n        MyComponent.propTypes = {\n          usedProp: PropTypes.string,\n        };\n\n        export default MyComponent;\n      ",
       errors: [
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "usedProp" is not required, but has no corresponding defaultProps declaration.',
-          [15, 11, 15, 37],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "usedProp" is not required, but has no corresponding defaultProps declaration.',
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 37,
+        },
       ],
     },
     {
       code: '\n        Foo.propTypes = {\n          a: PropTypes.string,\n        }\n\n        export default function Foo(props) {\n          return <p>{props.a}</p>\n        };\n      ',
       errors: [
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "a" is not required, but has no corresponding defaultProps declaration.',
-          [3, 11, 3, 30],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "a" is not required, but has no corresponding defaultProps declaration.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 30,
+        },
       ],
     },
     {
       code: '\n        type Props = {\n          history: {\n            push: Function,\n          },\n          match?: {\n            params?: {\n              date?: string\n            },\n          },\n        };\n\n        export const Daily = ({ history, match: {\n          params: {\n            date = moment().toISOString(),\n          } = {},\n        } = {} }: Props) => (\n              <div>\n                <div style={{ textAlign: \'right\', paddingRight: \'25px\' }}>\n                  Show <DatePicker\n                    selected={moment(date)}\n                    className="datetime"\n                    onChange={d => history.push(`./${d.toISOString()}`)}\n                  />\n                </div>\n                <WithData url="/payments/daily" body={{ date: moment(date).toISOString() }}>\n                  <Flashcards date={moment(date)} />\n                </WithData>\n              </div>\n        );\n      ',
       errors: [
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "match" is not required, but has no corresponding defaultProps declaration.',
-          [6, 11, 10, 13],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "match" is not required, but has no corresponding defaultProps declaration.',
+          line: 6,
+          column: 11,
+          endLine: 10,
+          endColumn: 13,
+        },
       ],
     },
     {
@@ -935,11 +999,15 @@ ruleTester.run('require-default-props', {
       ],
       errors: [
         expectNoDefaultWithRequiredError([2, 39, 2, 50]),
-        diagnostic(
-          'shouldAssignObjectDefault',
-          'propType "bar" is not required, but has no corresponding default argument value.',
-          [2, 52, 2, 55],
-        ),
+        {
+          messageId: 'shouldAssignObjectDefault',
+          message:
+            'propType "bar" is not required, but has no corresponding default argument value.',
+          line: 2,
+          column: 52,
+          endLine: 2,
+          endColumn: 55,
+        },
       ],
     },
 
@@ -1232,11 +1300,15 @@ ruleTester.run('require-default-props', {
         }
       `,
       errors: [
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "one" is not required, but has no corresponding defaultProps declaration.',
-          [2, 33, 2, 45],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "one" is not required, but has no corresponding defaultProps declaration.',
+          line: 2,
+          column: 33,
+          endLine: 2,
+          endColumn: 45,
+        },
         expectShouldHaveDefaultError6([2, 52, 2, 64]),
       ],
       languageOptions: upstreamModuleOptions,
@@ -1299,11 +1371,15 @@ ruleTester.run('require-default-props', {
       `,
       errors: [
         expectShouldHaveDefaultError6([3, 11, 3, 23]),
-        diagnostic(
-          'shouldHaveDefault',
-          'propType "one" is not required, but has no corresponding defaultProps declaration.',
-          [6, 33, 6, 45],
-        ),
+        {
+          messageId: 'shouldHaveDefault',
+          message:
+            'propType "one" is not required, but has no corresponding defaultProps declaration.',
+          line: 6,
+          column: 33,
+          endLine: 6,
+          endColumn: 45,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

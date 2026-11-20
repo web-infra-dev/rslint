@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectReadOnlyPropError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('readOnlyProp', "Prop 'name' should be read-only.", range);
+function expectReadOnlyPropError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'readOnlyProp',
+    message: "Prop 'name' should be read-only.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -410,16 +419,22 @@ ruleTester.run('prefer-read-only-props', {
         }
       `,
       errors: [
-        diagnostic(
-          'readOnlyProp',
-          "Prop 'firstName' should be read-only.",
-          [2, 24, 2, 41],
-        ),
-        diagnostic(
-          'readOnlyProp',
-          "Prop 'lastName' should be read-only.",
-          [3, 24, 3, 40],
-        ),
+        {
+          messageId: 'readOnlyProp',
+          message: "Prop 'firstName' should be read-only.",
+          line: 2,
+          column: 24,
+          endLine: 2,
+          endColumn: 41,
+        },
+        {
+          messageId: 'readOnlyProp',
+          message: "Prop 'lastName' should be read-only.",
+          line: 3,
+          column: 24,
+          endLine: 3,
+          endColumn: 40,
+        },
       ],
       output: `
         type PropsA = {readonly firstName: string};
@@ -542,11 +557,14 @@ ruleTester.run('prefer-read-only-props', {
         }
       `,
       errors: [
-        diagnostic(
-          'readOnlyProp',
-          "Prop 'lastName' should be read-only.",
-          [4, 11, 4, 28],
-        ),
+        {
+          messageId: 'readOnlyProp',
+          message: "Prop 'lastName' should be read-only.",
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 28,
+        },
       ],
       output: `
         type Props = {

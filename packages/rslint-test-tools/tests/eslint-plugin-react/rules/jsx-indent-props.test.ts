@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectWrongIndentError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'wrongIndent',
-    'Expected indentation of 14 space characters but found 12.',
-    range,
-  );
+function expectWrongIndentError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'wrongIndent',
+    message: 'Expected indentation of 14 space characters but found 12.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -138,11 +143,14 @@ ruleTester.run('jsx-indent-props', {
       code: `\n        <App\n          foo\n        />\n      `,
       output: `\n        <App\n            foo\n        />\n      `,
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 12 space characters but found 10.',
-          [3, 11, 3, 14],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 12 space characters but found 10.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 14,
+        },
       ],
     },
 
@@ -152,11 +160,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App\n          foo\n        />\n      `,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 10 space characters but found 12.',
-          [3, 13, 3, 16],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 10 space characters but found 12.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 16,
+        },
       ],
     },
 
@@ -177,11 +188,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        const test = true\n          ? <span attr="value" />\n          : (\n            <span\n              attr="otherValue"\n            />\n          )\n      `,
       options: [2],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 14 space characters but found 16.',
-          [6, 17, 6, 34],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 14 space characters but found 16.',
+          line: 6,
+          column: 17,
+          endLine: 6,
+          endColumn: 34,
+        },
       ],
     },
 
@@ -221,11 +235,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App1\n\tfoo\n        />\n      `,
       options: ['tab'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 1 tab character but found 0.',
-          [3, 13, 3, 16],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 1 tab character but found 0.',
+          line: 3,
+          column: 13,
+          endLine: 3,
+          endColumn: 16,
+        },
       ],
     },
 
@@ -235,11 +252,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n\t\t\t\t<App\n\t\t\t\t\tfoo\n\t\t\t\t/>\n\t\t\t`,
       options: ['tab'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 5 tab characters but found 7.',
-          [3, 8, 3, 11],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 5 tab characters but found 7.',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 11,
+        },
       ],
     },
 
@@ -249,11 +269,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App a\n             b\n        />\n      `,
       options: ['first'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 13 space characters but found 10.',
-          [3, 11, 3, 12],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 13 space characters but found 10.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 12,
+        },
       ],
     },
     {
@@ -261,11 +284,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App  a\n              b\n        />\n      `,
       options: ['first'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 14 space characters but found 11.',
-          [3, 12, 3, 13],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 14 space characters but found 11.',
+          line: 3,
+          column: 12,
+          endLine: 3,
+          endColumn: 13,
+        },
       ],
     },
     {
@@ -273,11 +299,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App\n              a\n              b\n        />\n      `,
       options: ['first'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 14 space characters but found 11.',
-          [4, 12, 4, 13],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 14 space characters but found 11.',
+          line: 4,
+          column: 12,
+          endLine: 4,
+          endColumn: 13,
+        },
       ],
     },
     {
@@ -285,16 +314,22 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        <App\n          a\n          b\n          c\n        />\n      `,
       options: ['first'],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 10 space characters but found 9.',
-          [4, 10, 4, 11],
-        ),
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 10 space characters but found 11.',
-          [5, 12, 5, 13],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 10 space characters but found 9.',
+          line: 4,
+          column: 10,
+          endLine: 4,
+          endColumn: 11,
+        },
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 10 space characters but found 11.',
+          line: 5,
+          column: 12,
+          endLine: 5,
+          endColumn: 13,
+        },
       ],
     },
 
@@ -305,11 +340,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n            id="id"\n          >\n            test\n          </div>\n        }\n      `,
       options: [{ indentMode: 2, ignoreTernaryOperator: false }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 12 space characters but found 14.',
-          [8, 15, 8, 22],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 12 space characters but found 14.',
+          line: 8,
+          column: 15,
+          endLine: 8,
+          endColumn: 22,
+        },
       ],
     },
     {
@@ -317,11 +355,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n            id="id"\n          >\n            test\n          </div>\n        }\n      `,
       options: [{ indentMode: 2, ignoreTernaryOperator: true }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 12 space characters but found 14.',
-          [8, 15, 8, 22],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 12 space characters but found 14.',
+          line: 8,
+          column: 15,
+          endLine: 8,
+          endColumn: 22,
+        },
       ],
     },
 
@@ -331,11 +372,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       options: [{ indentMode: 'tab', ignoreTernaryOperator: false }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 6 tab characters but found 7.',
-          [8, 8, 8, 15],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 6 tab characters but found 7.',
+          line: 8,
+          column: 8,
+          endLine: 8,
+          endColumn: 15,
+        },
       ],
     },
     {
@@ -343,11 +387,14 @@ ruleTester.run('jsx-indent-props', {
       output: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       options: [{ indentMode: 'tab', ignoreTernaryOperator: true }],
       errors: [
-        diagnostic(
-          'wrongIndent',
-          'Expected indentation of 6 tab characters but found 7.',
-          [8, 8, 8, 15],
-        ),
+        {
+          messageId: 'wrongIndent',
+          message: 'Expected indentation of 6 tab characters but found 7.',
+          line: 8,
+          column: 8,
+          endLine: 8,
+          endColumn: 15,
+        },
       ],
     },
   ],

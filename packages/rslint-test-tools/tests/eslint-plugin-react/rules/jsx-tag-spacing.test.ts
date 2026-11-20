@@ -4,7 +4,6 @@
 // Intentional differences for unsafe fixes and proportional spacing are noted below.
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 // generate options object that disables checks other than the tested one
 
@@ -57,61 +56,87 @@ function beforeClosingOptions(option: string) {
 // -----------------------------------------------------------------------------
 
 function expectBeforeCloseNeedSpaceError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'beforeCloseNeedSpace',
-    'Whitespace is required before closing bracket',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'beforeCloseNeedSpace',
+    message: 'Whitespace is required before closing bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectBeforeSelfCloseNeedSpaceError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'beforeSelfCloseNeedSpace',
-    'A space is required before closing bracket',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'beforeSelfCloseNeedSpace',
+    message: 'A space is required before closing bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectBeforeSelfCloseNoSpaceError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'beforeSelfCloseNoSpace',
-    'A space is forbidden before closing bracket',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'beforeSelfCloseNoSpace',
+    message: 'A space is forbidden before closing bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectAfterOpenNoSpaceError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'afterOpenNoSpace',
-    'A space is forbidden after opening bracket',
-    range,
-  );
+function expectAfterOpenNoSpaceError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'afterOpenNoSpace',
+    message: 'A space is forbidden after opening bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectAfterOpenNeedSpaceError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'afterOpenNeedSpace',
-    'A space is required after opening bracket',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'afterOpenNeedSpace',
+    message: 'A space is required after opening bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectBeforeCloseNoSpaceError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'beforeCloseNoSpace',
-    'A space is forbidden before closing bracket',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'beforeCloseNoSpace',
+    message: 'A space is forbidden before closing bracket',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -415,11 +440,14 @@ ruleTester.run('jsx-tag-spacing', {
 />`,
       options: beforeSelfClosingOptions('proportional-always'),
       errors: [
-        diagnostic(
-          'beforeSelfCloseNeedNewline',
-          'A newline is required before closing bracket',
-          [3, 20, 3, 20],
-        ),
+        {
+          messageId: 'beforeSelfCloseNeedNewline',
+          message: 'A newline is required before closing bracket',
+          line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 20,
+        },
       ],
     },
     {
@@ -432,11 +460,14 @@ ruleTester.run('jsx-tag-spacing', {
 />`,
       options: beforeSelfClosingOptions('proportional-always'),
       errors: [
-        diagnostic(
-          'beforeSelfCloseNeedNewline',
-          'A newline is required before closing bracket',
-          [3, 20, 3, 20],
-        ),
+        {
+          messageId: 'beforeSelfCloseNeedNewline',
+          message: 'A newline is required before closing bracket',
+          line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 20,
+        },
       ],
     },
     {
@@ -457,11 +488,14 @@ ruleTester.run('jsx-tag-spacing', {
       `,
       options: beforeClosingOptions('proportional-always'),
       errors: [
-        diagnostic(
-          'beforeCloseNeedNewline',
-          'A newline is required before closing bracket',
-          [4, 15, 4, 15],
-        ),
+        {
+          messageId: 'beforeCloseNeedNewline',
+          message: 'A newline is required before closing bracket',
+          line: 4,
+          column: 15,
+          endLine: 4,
+          endColumn: 15,
+        },
       ],
     },
     {
@@ -480,11 +514,14 @@ ruleTester.run('jsx-tag-spacing', {
       `,
       options: beforeClosingOptions('proportional-always'),
       errors: [
-        diagnostic(
-          'beforeCloseNeedNewline',
-          'A newline is required before closing bracket',
-          [3, 20, 3, 20],
-        ),
+        {
+          messageId: 'beforeCloseNeedNewline',
+          message: 'A newline is required before closing bracket',
+          line: 3,
+          column: 20,
+          endLine: 3,
+          endColumn: 20,
+        },
       ],
     },
     {
@@ -497,11 +534,14 @@ ruleTester.run('jsx-tag-spacing', {
       code: '<App/ >;',
       output: '<App/>;',
       errors: [
-        diagnostic(
-          'selfCloseSlashNoSpace',
-          'Whitespace is forbidden between `/` and `>`; write `/>`',
-          [1, 5, 1, 8],
-        ),
+        {
+          messageId: 'selfCloseSlashNoSpace',
+          message: 'Whitespace is forbidden between `/` and `>`; write `/>`',
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 8,
+        },
       ],
       options: closingSlashOptions('never'),
     },
@@ -514,11 +554,14 @@ ruleTester.run('jsx-tag-spacing', {
         <App_selfCloseSlashNoSpace/>
       `,
       errors: [
-        diagnostic(
-          'selfCloseSlashNoSpace',
-          'Whitespace is forbidden between `/` and `>`; write `/>`',
-          [2, 35, 3, 10],
-        ),
+        {
+          messageId: 'selfCloseSlashNoSpace',
+          message: 'Whitespace is forbidden between `/` and `>`; write `/>`',
+          line: 2,
+          column: 35,
+          endLine: 3,
+          endColumn: 10,
+        },
       ],
       options: closingSlashOptions('never'),
     },
@@ -528,11 +571,14 @@ ruleTester.run('jsx-tag-spacing', {
       // Upstream inserts `< /App>`; rslint omits this unparseable fix.
 
       errors: [
-        diagnostic(
-          'closeSlashNeedSpace',
-          'Whitespace is required between `<` and `/`; write `< /`',
-          [1, 17, 1, 19],
-        ),
+        {
+          messageId: 'closeSlashNeedSpace',
+          message: 'Whitespace is required between `<` and `/`; write `< /`',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
       options: closingSlashOptions('always'),
     },
@@ -540,11 +586,14 @@ ruleTester.run('jsx-tag-spacing', {
       code: '<p/>',
       output: '<p/ >',
       errors: [
-        diagnostic(
-          'selfCloseSlashNeedSpace',
-          'Whitespace is required between `/` and `>`; write `/ >`',
-          [1, 3, 1, 5],
-        ),
+        {
+          messageId: 'selfCloseSlashNeedSpace',
+          message: 'Whitespace is required between `/` and `>`; write `/ >`',
+          line: 1,
+          column: 3,
+          endLine: 1,
+          endColumn: 5,
+        },
       ],
       options: closingSlashOptions('always'),
     },

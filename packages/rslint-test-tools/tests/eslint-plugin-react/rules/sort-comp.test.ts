@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnsortedPropsError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unsortedProps',
-    'render should be placed after displayName',
-    range,
-  );
+function expectUnsortedPropsError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsortedProps',
+    message: 'render should be placed after displayName',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -720,11 +725,14 @@ ruleTester.run('sort-comp', {
         componentDidMount() {}
       }`,
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'render should be placed after componentDidMount',
-          [2, 9, 2, 20],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'render should be placed after componentDidMount',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 20,
+        },
       ],
     },
     {
@@ -741,11 +749,14 @@ ruleTester.run('sort-comp', {
       }`,
       options: [{ order: ['lifecycle', 'render'] }],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'onClick should be placed after render',
-          [2, 9, 2, 21],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'onClick should be placed after render',
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 21,
+        },
       ],
     },
 
@@ -790,11 +801,14 @@ ruleTester.run('sort-comp', {
         });
       `,
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'render should be placed after onClick',
-          [4, 11, 6, 12],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'render should be placed after onClick',
+          line: 4,
+          column: 11,
+          endLine: 6,
+          endColumn: 12,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -812,11 +826,14 @@ ruleTester.run('sort-comp', {
         };
       `,
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'render should be placed after onClick',
-          [5, 13, 7, 14],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'render should be placed after onClick',
+          line: 5,
+          column: 13,
+          endLine: 7,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -834,11 +851,14 @@ ruleTester.run('sort-comp', {
       `,
       options: [{ order: ['lifecycle', 'render'] }],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'onClick should be placed after render',
-          [5, 11, 5, 33],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'onClick should be placed after render',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 33,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -870,11 +890,14 @@ ruleTester.run('sort-comp', {
         }
       `,
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'props should be placed after state',
-          [4, 11, 4, 35],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'props should be placed after state',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -902,11 +925,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'constructor should be placed after props',
-          [4, 11, 4, 27],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'constructor should be placed after props',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -935,11 +961,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'state should be placed after constructor',
-          [5, 11, 5, 30],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'state should be placed after constructor',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -969,11 +998,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'componentDidMountOk should be placed after getA',
-          [4, 11, 4, 35],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'componentDidMountOk should be placed after getA',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 35,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1001,11 +1033,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'constructor should be placed after getter functions',
-          [4, 11, 4, 27],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'constructor should be placed after getter functions',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1033,11 +1068,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'constructor should be placed after setter functions',
-          [4, 11, 4, 27],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'constructor should be placed after setter functions',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1061,11 +1099,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'foo should be placed before constructor',
-          [7, 11, 7, 30],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'foo should be placed before constructor',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 30,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1094,11 +1135,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'foo should be placed before constructor',
-          [7, 11, 7, 19],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'foo should be placed before constructor',
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1114,11 +1158,14 @@ ruleTester.run('sort-comp', {
       `,
       options: [{ order: ['setters', 'lifecycle', 'render'] }],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'setters should be placed after render',
-          [4, 11, 4, 23],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'setters should be placed after render',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1133,11 +1180,14 @@ ruleTester.run('sort-comp', {
       `,
       options: [{ order: ['foo', 'render'] }],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'render should be placed after foo',
-          [4, 11, 4, 22],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'render should be placed after foo',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1155,11 +1205,14 @@ ruleTester.run('sort-comp', {
       `,
       options: [{ order: ['static-variables', 'static-methods'] }],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'getDerivedStateFromProps should be placed after foo',
-          [3, 11, 3, 47],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'getDerivedStateFromProps should be placed after foo',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 47,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1180,11 +1233,14 @@ ruleTester.run('sort-comp', {
         { order: ['instance-variables', 'static-variables', 'static-methods'] },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'foo should be placed after bar',
-          [3, 11, 3, 22],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'foo should be placed after bar',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1211,11 +1267,14 @@ ruleTester.run('sort-comp', {
         },
       ],
       errors: [
-        diagnostic(
-          'unsortedProps',
-          'bar should be placed after render',
-          [4, 11, 4, 22],
-        ),
+        {
+          messageId: 'unsortedProps',
+          message: 'bar should be placed after render',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

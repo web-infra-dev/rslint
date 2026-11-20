@@ -1,23 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectOmitBooleanError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'omitBoolean',
-    'Value must be omitted for boolean attribute `foo`',
-    range,
-  );
+function expectOmitBooleanError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'omitBoolean',
+    message: 'Value must be omitted for boolean attribute `foo`',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectOmitPropAndBooleanError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'omitPropAndBoolean',
-    'Value must be omitted for `false` attribute: `bak`',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'omitPropAndBoolean',
+    message: 'Value must be omitted for `false` attribute: `bak`',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -90,11 +99,14 @@ ruleTester.run('jsx-boolean-value', {
       code: `<Foo disabled={true} />`,
       options: ['never'],
       errors: [
-        diagnostic(
-          'omitBoolean',
-          'Value must be omitted for boolean attribute `disabled`',
-          [1, 6, 1, 21],
-        ),
+        {
+          messageId: 'omitBoolean',
+          message: 'Value must be omitted for boolean attribute `disabled`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
       output: `<Foo disabled />`,
     },
@@ -102,11 +114,14 @@ ruleTester.run('jsx-boolean-value', {
       code: `<Foo disabled />`,
       options: ['always'],
       errors: [
-        diagnostic(
-          'setBoolean',
-          'Value must be set for boolean attribute `disabled`',
-          [1, 6, 1, 14],
-        ),
+        {
+          messageId: 'setBoolean',
+          message: 'Value must be set for boolean attribute `disabled`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 14,
+        },
       ],
       output: `<Foo disabled={true} />`,
     },
@@ -126,11 +141,14 @@ ruleTester.run('jsx-boolean-value', {
       options: ['always', { never: ['foo', 'bar'] }],
       errors: [
         expectOmitBooleanError([1, 6, 1, 16]),
-        diagnostic(
-          'omitBoolean',
-          'Value must be omitted for boolean attribute `bar`',
-          [1, 17, 1, 27],
-        ),
+        {
+          messageId: 'omitBoolean',
+          message: 'Value must be omitted for boolean attribute `bar`',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 27,
+        },
       ],
       output: `<App foo bar baz={true} />;`,
       languageOptions: upstreamModuleOptions,
@@ -154,11 +172,14 @@ ruleTester.run('jsx-boolean-value', {
       code: `<App foo />;`,
       options: ['always'],
       errors: [
-        diagnostic(
-          'setBoolean',
-          'Value must be set for boolean attribute `foo`',
-          [1, 6, 1, 9],
-        ),
+        {
+          messageId: 'setBoolean',
+          message: 'Value must be set for boolean attribute `foo`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 9,
+        },
       ],
       output: `<App foo={true} />;`,
       languageOptions: upstreamModuleOptions,
@@ -168,16 +189,22 @@ ruleTester.run('jsx-boolean-value', {
       code: `<App foo bar baz />;`,
       options: ['never', { always: ['foo', 'bar'] }],
       errors: [
-        diagnostic(
-          'setBoolean',
-          'Value must be set for boolean attribute `foo`',
-          [1, 6, 1, 9],
-        ),
-        diagnostic(
-          'setBoolean',
-          'Value must be set for boolean attribute `bar`',
-          [1, 10, 1, 13],
-        ),
+        {
+          messageId: 'setBoolean',
+          message: 'Value must be set for boolean attribute `foo`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 9,
+        },
+        {
+          messageId: 'setBoolean',
+          message: 'Value must be set for boolean attribute `bar`',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
       output: `<App foo={true} bar={true} baz />;`,
       languageOptions: upstreamModuleOptions,
@@ -187,11 +214,14 @@ ruleTester.run('jsx-boolean-value', {
       code: `<App foo={false} bak={false} />;`,
       options: ['never', { assumeUndefinedIsFalse: true }],
       errors: [
-        diagnostic(
-          'omitPropAndBoolean',
-          'Value must be omitted for `false` attribute: `foo`',
-          [1, 6, 1, 17],
-        ),
+        {
+          messageId: 'omitPropAndBoolean',
+          message: 'Value must be omitted for `false` attribute: `foo`',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
         expectOmitPropAndBooleanError([1, 18, 1, 29]),
       ],
       output: `<App />;`,
@@ -216,11 +246,14 @@ ruleTester.run('jsx-boolean-value', {
         { assumeUndefinedIsFalse: true, never: ['baz', 'bak'] },
       ],
       errors: [
-        diagnostic(
-          'omitPropAndBoolean',
-          'Value must be omitted for `false` attribute: `baz`',
-          [1, 29, 1, 40],
-        ),
+        {
+          messageId: 'omitPropAndBoolean',
+          message: 'Value must be omitted for `false` attribute: `baz`',
+          line: 1,
+          column: 29,
+          endLine: 1,
+          endColumn: 40,
+        },
         expectOmitPropAndBooleanError([1, 41, 1, 52]),
       ],
       output: `<App foo={true} bar={false} />;`,
@@ -232,16 +265,22 @@ ruleTester.run('jsx-boolean-value', {
       options: ['always', { never: ['foo', 'bar'] }],
       errors: [
         expectOmitBooleanError([1, 6, 1, 16]),
-        diagnostic(
-          'omitBoolean',
-          'Value must be omitted for boolean attribute `bar`',
-          [1, 17, 1, 27],
-        ),
-        diagnostic(
-          'setBoolean',
-          'Value must be set for boolean attribute `baz`',
-          [1, 28, 1, 31],
-        ),
+        {
+          messageId: 'omitBoolean',
+          message: 'Value must be omitted for boolean attribute `bar`',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 27,
+        },
+        {
+          messageId: 'setBoolean',
+          message: 'Value must be set for boolean attribute `baz`',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
       output: `<App foo bar baz={true} />;`,
       languageOptions: upstreamModuleOptions,

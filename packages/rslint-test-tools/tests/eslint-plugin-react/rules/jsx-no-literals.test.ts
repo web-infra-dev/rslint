@@ -1,127 +1,188 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectLiteralNotInJSXExpressionError1(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'literalNotInJSXExpression',
-    'Missing JSX expression container around literal string: "test"',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'literalNotInJSXExpression',
+    message: 'Missing JSX expression container around literal string: "test"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectInvalidPropValueError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'invalidPropValue',
-    'Invalid prop value: "bar="test""',
-    range,
-  );
+function expectInvalidPropValueError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'invalidPropValue',
+    message: 'Invalid prop value: "bar="test""',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoStringsInJSXError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noStringsInJSX',
-    'Strings not allowed in JSX files: "\'Test\'"',
-    range,
-  );
+function expectNoStringsInJSXError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInJSX',
+    message: 'Strings not allowed in JSX files: "\'Test\'"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoStringsInJSXError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noStringsInJSX',
-    'Strings not allowed in JSX files: "`Test`"',
-    range,
-  );
+function expectNoStringsInJSXError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInJSX',
+    message: 'Strings not allowed in JSX files: "`Test`"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoStringsInAttributesError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noStringsInAttributes',
-    'Strings not allowed in attributes: ""foo bar""',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInAttributes',
+    message: 'Strings not allowed in attributes: ""foo bar""',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectLiteralNotInJSXExpressionError6(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'literalNotInJSXExpression',
-    'Missing JSX expression container around literal string: "baz bob"',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'literalNotInJSXExpression',
+    message:
+      'Missing JSX expression container around literal string: "baz bob"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectRestrictedAttributeStringError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'restrictedAttributeString',
-    'Restricted attribute string: ""test"" in className',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'restrictedAttributeString',
+    message: 'Restricted attribute string: ""test"" in className',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectLiteralNotInJSXExpressionError8(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'literalNotInJSXExpression',
-    'Missing JSX expression container around literal string: "foo"',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'literalNotInJSXExpression',
+    message: 'Missing JSX expression container around literal string: "foo"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoStringsInJSXInElementError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noStringsInJSXInElement',
-    'Strings not allowed in JSX files: "\'bar\'" in T',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInJSXInElement',
+    message: 'Strings not allowed in JSX files: "\'bar\'" in T',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectNoStringsInAttributesInElementError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noStringsInAttributesInElement',
-    'Strings not allowed in attributes: ""bar2"" in T',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInAttributesInElement',
+    message: 'Strings not allowed in attributes: ""bar2"" in T',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoStringsInJSXError11(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noStringsInJSX',
-    'Strings not allowed in JSX files: "\'foo\'"',
-    range,
-  );
+function expectNoStringsInJSXError11(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noStringsInJSX',
+    message: 'Strings not allowed in JSX files: "\'foo\'"',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectInvalidPropValueError12(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'invalidPropValue',
-    'Invalid prop value: "foo1="bar""',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'invalidPropValue',
+    message: 'Invalid prop value: "foo1="bar""',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectLiteralNotInJSXExpressionInElementError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'literalNotInJSXExpressionInElement',
-    'Missing JSX expression container around literal string: "foo" in T',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'literalNotInJSXExpressionInElement',
+    message:
+      'Missing JSX expression container around literal string: "foo" in T',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -916,11 +977,15 @@ const { T: U } = require('foo');
 </div>
 `,
       errors: [
-        diagnostic(
-          'literalNotInJSXExpression',
-          'Missing JSX expression container around literal string: "asdjfl"',
-          [3, 3, 3, 9],
-        ),
+        {
+          messageId: 'literalNotInJSXExpression',
+          message:
+            'Missing JSX expression container around literal string: "asdjfl"',
+          line: 3,
+          column: 3,
+          endLine: 3,
+          endColumn: 9,
+        },
       ],
     },
 
@@ -938,11 +1003,14 @@ const { T: U } = require('foo');
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
         expectInvalidPropValueError2([1, 6, 1, 16]),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "Test"',
-          [1, 17, 1, 21],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "Test"',
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     // ---- TemplateLiteral handler ----
@@ -960,11 +1028,14 @@ const { T: U } = require('foo');
       code: '<Foo bar={`Test ${baz}`} />',
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`Test ${baz}`"',
-          [1, 11, 1, 24],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`Test ${baz}`"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
 
@@ -973,11 +1044,14 @@ const { T: U } = require('foo');
       code: `<img alt='blank image'></img>`,
       options: [{ noAttributeStrings: true }],
       errors: [
-        diagnostic(
-          'noStringsInAttributes',
-          'Strings not allowed in attributes: "\'blank image\'"',
-          [1, 10, 1, 23],
-        ),
+        {
+          messageId: 'noStringsInAttributes',
+          message: 'Strings not allowed in attributes: "\'blank image\'"',
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 23,
+        },
       ],
     },
     {
@@ -1009,27 +1083,36 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ restrictedAttributes: ['className', 'id'] }],
       errors: [
         expectRestrictedAttributeStringError([1, 6, 1, 22]),
-        diagnostic(
-          'restrictedAttributeString',
-          'Restricted attribute string: ""foo"" in id',
-          [1, 23, 1, 31],
-        ),
+        {
+          messageId: 'restrictedAttributeString',
+          message: 'Restricted attribute string: ""foo"" in id',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 31,
+        },
       ],
     },
     {
       code: `<div title="text">test</div>`,
       options: [{ restrictedAttributes: ['title'], noStrings: true }],
       errors: [
-        diagnostic(
-          'restrictedAttributeString',
-          'Restricted attribute string: ""text"" in title',
-          [1, 6, 1, 18],
-        ),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "test"',
-          [1, 19, 1, 23],
-        ),
+        {
+          messageId: 'restrictedAttributeString',
+          message: 'Restricted attribute string: ""text"" in title',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "test"',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 23,
+        },
       ],
     },
     {
@@ -1043,11 +1126,14 @@ export const WithAttributesAndChildren = ({}) => (
       ],
       errors: [
         expectRestrictedAttributeStringError([1, 6, 1, 22]),
-        diagnostic(
-          'invalidPropValue',
-          'Invalid prop value: "title="hello""',
-          [1, 23, 1, 36],
-        ),
+        {
+          messageId: 'invalidPropValue',
+          message: 'Invalid prop value: "title="hello""',
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 36,
+        },
       ],
     },
 
@@ -1062,11 +1148,15 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ elementOverrides: { T: {} } }],
       errors: [
         expectLiteralNotInJSXExpressionError8([3, 8, 3, 11]),
-        diagnostic(
-          'literalNotInJSXExpressionInElement',
-          'Missing JSX expression container around literal string: "bar" in T',
-          [4, 6, 4, 9],
-        ),
+        {
+          messageId: 'literalNotInJSXExpressionInElement',
+          message:
+            'Missing JSX expression container around literal string: "bar" in T',
+          line: 4,
+          column: 6,
+          endLine: 4,
+          endColumn: 9,
+        },
       ],
     },
     {
@@ -1117,11 +1207,14 @@ export const WithAttributesAndChildren = ({}) => (
         },
       ],
       errors: [
-        diagnostic(
-          'restrictedAttributeStringInElement',
-          'Restricted attribute string: ""submit"" in type of Button',
-          [4, 11, 4, 24],
-        ),
+        {
+          messageId: 'restrictedAttributeStringInElement',
+          message: 'Restricted attribute string: ""submit"" in type of Button',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 24,
+        },
       ],
     },
     {
@@ -1140,16 +1233,23 @@ export const WithAttributesAndChildren = ({}) => (
         },
       ],
       errors: [
-        diagnostic(
-          'restrictedAttributeString',
-          'Restricted attribute string: ""wrapper"" in className',
-          [3, 8, 3, 27],
-        ),
-        diagnostic(
-          'restrictedAttributeStringInElement',
-          'Restricted attribute string: ""submit-btn"" in id of Button',
-          [4, 27, 4, 42],
-        ),
+        {
+          messageId: 'restrictedAttributeString',
+          message: 'Restricted attribute string: ""wrapper"" in className',
+          line: 3,
+          column: 8,
+          endLine: 3,
+          endColumn: 27,
+        },
+        {
+          messageId: 'restrictedAttributeStringInElement',
+          message:
+            'Restricted attribute string: ""submit-btn"" in id of Button',
+          line: 4,
+          column: 27,
+          endLine: 4,
+          endColumn: 42,
+        },
       ],
     },
 
@@ -1215,11 +1315,15 @@ export const WithAttributesAndChildren = ({}) => (
         });
       `,
       errors: [
-        diagnostic(
-          'literalNotInJSXExpression',
-          'Missing JSX expression container around literal string: "hello"',
-          [3, 22, 3, 27],
-        ),
+        {
+          messageId: 'literalNotInJSXExpression',
+          message:
+            'Missing JSX expression container around literal string: "hello"',
+          line: 3,
+          column: 22,
+          endLine: 3,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1237,11 +1341,15 @@ export const WithAttributesAndChildren = ({}) => (
         }
       `,
       errors: [
-        diagnostic(
-          'literalNotInJSXExpression',
-          'Missing JSX expression container around literal string: "asdjfl"',
-          [6, 17, 6, 23],
-        ),
+        {
+          messageId: 'literalNotInJSXExpression',
+          message:
+            'Missing JSX expression container around literal string: "asdjfl"',
+          line: 6,
+          column: 17,
+          endLine: 6,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1261,11 +1369,15 @@ export const WithAttributesAndChildren = ({}) => (
         }
       `,
       errors: [
-        diagnostic(
-          'literalNotInJSXExpression',
-          'Missing JSX expression container around literal string: "asdjfl\n                test\n                foo"',
-          [6, 17, 8, 20],
-        ),
+        {
+          messageId: 'literalNotInJSXExpression',
+          message:
+            'Missing JSX expression container around literal string: "asdjfl\n                test\n                foo"',
+          line: 6,
+          column: 17,
+          endLine: 8,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1325,11 +1437,14 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
         expectInvalidPropValueError2([2, 14, 2, 24]),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "Test"',
-          [3, 11, 3, 15],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "Test"',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 15,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1349,11 +1464,14 @@ export const WithAttributesAndChildren = ({}) => (
       code: `<Foo bar={\`\${baz}\`} />`,
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`${baz}`"',
-          [1, 11, 1, 19],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`${baz}`"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1362,16 +1480,22 @@ export const WithAttributesAndChildren = ({}) => (
       code: `<Foo bar={\`foo\` + 'bar'} />`,
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`foo`"',
-          [1, 11, 1, 16],
-        ),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "\'bar\'"',
-          [1, 19, 1, 24],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`foo`"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "\'bar\'"',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1380,16 +1504,22 @@ export const WithAttributesAndChildren = ({}) => (
       code: `<Foo bar={\`foo\` + \`bar\`} />`,
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`foo`"',
-          [1, 11, 1, 16],
-        ),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`bar`"',
-          [1, 19, 1, 24],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`foo`"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`bar`"',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1399,11 +1529,14 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
         expectNoStringsInJSXError11([1, 11, 1, 16]),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "`bar`"',
-          [1, 19, 1, 24],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "`bar`"',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1421,11 +1554,14 @@ export const WithAttributesAndChildren = ({}) => (
       ],
       errors: [
         expectNoStringsInJSXError11([4, 30, 4, 35]),
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "asdf"',
-          [4, 37, 4, 41],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "asdf"',
+          line: 4,
+          column: 37,
+          endLine: 4,
+          endColumn: 41,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1434,11 +1570,14 @@ export const WithAttributesAndChildren = ({}) => (
       code: `<Foo bar={'bar'} />`,
       options: [{ noStrings: true, ignoreProps: false }],
       errors: [
-        diagnostic(
-          'noStringsInJSX',
-          'Strings not allowed in JSX files: "\'bar\'"',
-          [1, 11, 1, 16],
-        ),
+        {
+          messageId: 'noStringsInJSX',
+          message: 'Strings not allowed in JSX files: "\'bar\'"',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1449,11 +1588,14 @@ export const WithAttributesAndChildren = ({}) => (
       `,
       options: [{ noAttributeStrings: true }],
       errors: [
-        diagnostic(
-          'noStringsInAttributes',
-          'Strings not allowed in attributes: "\'blank image\'"',
-          [2, 18, 2, 31],
-        ),
+        {
+          messageId: 'noStringsInAttributes',
+          message: 'Strings not allowed in attributes: "\'blank image\'"',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 31,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1489,11 +1631,15 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ elementOverrides: { T: {} } }],
       errors: [
         expectLiteralNotInJSXExpressionError8([3, 16, 3, 19]),
-        diagnostic(
-          'literalNotInJSXExpressionInElement',
-          'Missing JSX expression container around literal string: "bar" in T',
-          [4, 14, 4, 17],
-        ),
+        {
+          messageId: 'literalNotInJSXExpressionInElement',
+          message:
+            'Missing JSX expression container around literal string: "bar" in T',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 17,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1522,11 +1668,15 @@ export const WithAttributesAndChildren = ({}) => (
         },
       ],
       errors: [
-        diagnostic(
-          'literalNotInJSXExpression',
-          'Missing JSX expression container around literal string: "bar"',
-          [2, 21, 2, 24],
-        ),
+        {
+          messageId: 'literalNotInJSXExpression',
+          message:
+            'Missing JSX expression container around literal string: "bar"',
+          line: 2,
+          column: 21,
+          endLine: 2,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1557,11 +1707,14 @@ export const WithAttributesAndChildren = ({}) => (
       errors: [
         expectLiteralNotInJSXExpressionError8([3, 16, 3, 19]),
         expectNoStringsInJSXInElementError([4, 15, 4, 20]),
-        diagnostic(
-          'noStringsInJSXInElement',
-          'Strings not allowed in JSX files: "\'baz\'" in T',
-          [4, 27, 4, 32],
-        ),
+        {
+          messageId: 'noStringsInJSXInElement',
+          message: 'Strings not allowed in JSX files: "\'baz\'" in T',
+          line: 4,
+          column: 27,
+          endLine: 4,
+          endColumn: 32,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1702,11 +1855,14 @@ export const WithAttributesAndChildren = ({}) => (
       ],
       errors: [
         expectInvalidPropValueError12([3, 16, 3, 26]),
-        diagnostic(
-          'invalidPropValue',
-          'Invalid prop value: "foo3="bar""',
-          [4, 30, 4, 40],
-        ),
+        {
+          messageId: 'invalidPropValue',
+          message: 'Invalid prop value: "foo3="bar""',
+          line: 4,
+          column: 30,
+          endLine: 4,
+          endColumn: 40,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1733,11 +1889,14 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ elementOverrides: { T: { noAttributeStrings: true } } }],
       errors: [
         expectNoStringsInAttributesInElementError([4, 19, 4, 25]),
-        diagnostic(
-          'noStringsInAttributesInElement',
-          'Strings not allowed in attributes: ""bar3"" in T',
-          [4, 36, 4, 42],
-        ),
+        {
+          messageId: 'noStringsInAttributesInElement',
+          message: 'Strings not allowed in attributes: ""bar3"" in T',
+          line: 4,
+          column: 36,
+          endLine: 4,
+          endColumn: 42,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1801,11 +1960,15 @@ export const WithAttributesAndChildren = ({}) => (
       ],
       errors: [
         expectLiteralNotInJSXExpressionInElementError([4, 14, 4, 17]),
-        diagnostic(
-          'literalNotInJSXExpressionInElement',
-          'Missing JSX expression container around literal string: "baz" in T',
-          [6, 14, 6, 17],
-        ),
+        {
+          messageId: 'literalNotInJSXExpressionInElement',
+          message:
+            'Missing JSX expression container around literal string: "baz" in T',
+          line: 6,
+          column: 14,
+          endLine: 6,
+          endColumn: 17,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1825,11 +1988,14 @@ export const WithAttributesAndChildren = ({}) => (
         },
       ],
       errors: [
-        diagnostic(
-          'invalidPropValueInElement',
-          'Invalid prop value: "foo2="bar2"" in T',
-          [4, 14, 4, 25],
-        ),
+        {
+          messageId: 'invalidPropValueInElement',
+          message: 'Invalid prop value: "foo2="bar2"" in T',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1843,11 +2009,14 @@ export const WithAttributesAndChildren = ({}) => (
       `,
       options: [{ noAttributeStrings: true, elementOverrides: { T: {} } }],
       errors: [
-        diagnostic(
-          'noStringsInAttributes',
-          'Strings not allowed in attributes: ""bar1""',
-          [3, 21, 3, 27],
-        ),
+        {
+          messageId: 'noStringsInAttributes',
+          message: 'Strings not allowed in attributes: ""bar1""',
+          line: 3,
+          column: 21,
+          endLine: 3,
+          endColumn: 27,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1862,11 +2031,15 @@ export const WithAttributesAndChildren = ({}) => (
       options: [{ elementOverrides: { T: {}, U: {} } }],
       errors: [
         expectLiteralNotInJSXExpressionInElementError([3, 14, 3, 17]),
-        diagnostic(
-          'literalNotInJSXExpressionInElement',
-          'Missing JSX expression container around literal string: "bar" in U',
-          [4, 14, 4, 17],
-        ),
+        {
+          messageId: 'literalNotInJSXExpressionInElement',
+          message:
+            'Missing JSX expression container around literal string: "bar" in U',
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 17,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1898,11 +2071,14 @@ export const WithAttributesAndChildren = ({}) => (
       `,
       options: [{ elementOverrides: { T: { noStrings: true }, U: {} } }],
       errors: [
-        diagnostic(
-          'noStringsInJSXInElement',
-          'Strings not allowed in JSX files: "\'foo\'" in T',
-          [2, 13, 2, 18],
-        ),
+        {
+          messageId: 'noStringsInJSXInElement',
+          message: 'Strings not allowed in JSX files: "\'foo\'" in T',
+          line: 2,
+          column: 13,
+          endLine: 2,
+          endColumn: 18,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1915,11 +2091,15 @@ export const WithAttributesAndChildren = ({}) => (
         { elementOverrides: { T: { allowedStrings: ['foo'] }, U: {} } },
       ],
       errors: [
-        diagnostic(
-          'literalNotInJSXExpressionInElement',
-          'Missing JSX expression container around literal string: "foo" in U',
-          [2, 18, 2, 21],
-        ),
+        {
+          messageId: 'literalNotInJSXExpressionInElement',
+          message:
+            'Missing JSX expression container around literal string: "foo" in U',
+          line: 2,
+          column: 18,
+          endLine: 2,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

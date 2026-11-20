@@ -4,18 +4,47 @@ import {
   upstreamScriptOptions,
   upstreamModuleOptions,
 } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUndefinedError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('undefined', "'App' is not defined.", range);
+function expectUndefinedError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'App' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUndefinedError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('undefined', "'appp' is not defined.", range);
+function expectUndefinedError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'appp' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUndefinedError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('undefined', "'Foo' is not defined.", range);
+function expectUndefinedError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'Foo' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -181,7 +210,14 @@ ruleTester.run('jsx-no-undef', {
     {
       code: `var React: any; React.render(<Appp.Foo />);`,
       errors: [
-        diagnostic('undefined', "'Appp' is not defined.", [1, 31, 1, 35]),
+        {
+          messageId: 'undefined',
+          message: "'Appp' is not defined.",
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 35,
+        },
       ],
     },
     {
@@ -203,7 +239,14 @@ ruleTester.run('jsx-no-undef', {
       `,
       options: [{ allowGlobals: false }],
       errors: [
-        diagnostic('undefined', "'Text' is not defined.", [4, 14, 4, 18]),
+        {
+          messageId: 'undefined',
+          message: "'Text' is not defined.",
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
       ],
     },
     {
@@ -214,49 +257,110 @@ ruleTester.run('jsx-no-undef', {
     // ---- Additional edge cases ----
     {
       code: `<Bar></Bar>;`,
-      errors: [diagnostic('undefined', "'Bar' is not defined.", [1, 2, 1, 5])],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Bar' is not defined.",
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
     },
     {
       code: `var x = <Outer.Inner />;`,
       errors: [
-        diagnostic('undefined', "'Outer' is not defined.", [1, 10, 1, 15]),
+        {
+          messageId: 'undefined',
+          message: "'Outer' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
       ],
     },
     {
       code: `var x = <_Undeclared />;`,
       errors: [
-        diagnostic(
-          'undefined',
-          "'_Undeclared' is not defined.",
-          [1, 10, 1, 21],
-        ),
+        {
+          messageId: 'undefined',
+          message: "'_Undeclared' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: `var x = <Undeclared />;`,
       options: [{ allowGlobals: true }],
       errors: [
-        diagnostic('undefined', "'Undeclared' is not defined.", [1, 10, 1, 20]),
+        {
+          messageId: 'undefined',
+          message: "'Undeclared' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: `const Outer: any = null; var x = <Outer attr={<InnerBad />}><ChildBad /></Outer>;`,
       errors: [
-        diagnostic('undefined', "'InnerBad' is not defined.", [1, 48, 1, 56]),
-        diagnostic('undefined', "'ChildBad' is not defined.", [1, 62, 1, 70]),
+        {
+          messageId: 'undefined',
+          message: "'InnerBad' is not defined.",
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'undefined',
+          message: "'ChildBad' is not defined.",
+          line: 1,
+          column: 62,
+          endLine: 1,
+          endColumn: 70,
+        },
       ],
     },
     {
       code: `var x = true ? <A /> : <B />;`,
       errors: [
-        diagnostic('undefined', "'A' is not defined.", [1, 17, 1, 18]),
-        diagnostic('undefined', "'B' is not defined.", [1, 25, 1, 26]),
+        {
+          messageId: 'undefined',
+          message: "'A' is not defined.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'undefined',
+          message: "'B' is not defined.",
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: `var x = <><Undef /></>;`,
       errors: [
-        diagnostic('undefined', "'Undef' is not defined.", [1, 12, 1, 17]),
+        {
+          messageId: 'undefined',
+          message: "'Undef' is not defined.",
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 17,
+        },
       ],
     },
     {
@@ -265,7 +369,16 @@ ruleTester.run('jsx-no-undef', {
     },
     {
       code: `try {} catch (e: any) {} var x = <e.Foo />;`,
-      errors: [diagnostic('undefined', "'e' is not defined.", [1, 35, 1, 36])],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'e' is not defined.",
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `for (let Foo: any; false; ) {} var x = <Foo />;`,
@@ -283,7 +396,14 @@ ruleTester.run('jsx-no-undef', {
       name: 'Upstream invalid 1 (7.37.5)',
       code: `/*eslint no-undef:1*/ var React; React.render(<Appp.Foo />);`,
       errors: [
-        diagnostic('undefined', "'Appp' is not defined.", [1, 48, 1, 52]),
+        {
+          messageId: 'undefined',
+          message: "'Appp' is not defined.",
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 52,
+        },
       ],
       languageOptions: upstreamScriptOptions,
     },
@@ -317,7 +437,14 @@ ruleTester.run('jsx-no-undef', {
         globals: { Text: true },
       },
       errors: [
-        diagnostic('undefined', "'Text' is not defined.", [4, 14, 4, 18]),
+        {
+          messageId: 'undefined',
+          message: "'Text' is not defined.",
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
       ],
     },
     {

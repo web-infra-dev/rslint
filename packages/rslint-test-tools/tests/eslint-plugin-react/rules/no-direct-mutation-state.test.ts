@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoDirectMutationError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noDirectMutation',
-    'Do not mutate state directly. Use setState().',
-    range,
-  );
+function expectNoDirectMutationError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noDirectMutation',
+    message: 'Do not mutate state directly. Use setState().',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

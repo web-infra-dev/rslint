@@ -1,77 +1,101 @@
-import { RuleTester } from '@rslint/rule-tester';
+import { RuleTester, type ExpectedSuggestion } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNeverValidError1(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'neverValid',
-    '“alternatex” is never a valid “rel” attribute value.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'neverValid',
+    message: '“alternatex” is never a valid “rel” attribute value.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectOnlyMeaningfulForError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'onlyMeaningfulFor',
-    'The ”rel“ attribute only has meaning on the tags: "<link>", "<a>", "<area>", "<form>"',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'onlyMeaningfulFor',
+    message:
+      'The ”rel“ attribute only has meaning on the tags: "<link>", "<a>", "<area>", "<form>"',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectOnlyStringsError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'onlyStrings',
-    '“rel” attribute only supports strings.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'onlyStrings',
+    message: '“rel” attribute only supports strings.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectNeverValidError4(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'neverValid',
-    '“foobar” is never a valid “rel” attribute value.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'neverValid',
+    message: '“foobar” is never a valid “rel” attribute value.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectSpaceDelimitedError(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'spaceDelimited',
-    '”rel“ attribute values should be space delimited.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'spaceDelimited',
+    message: '”rel“ attribute values should be space delimited.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 function expectNeverValidError6(
-  range: Parameters<typeof diagnostic>[2],
-  suggestions?: Parameters<typeof diagnostic>[3],
+  range: [line: number, column: number, endLine: number, endColumn: number],
+  suggestions?: ExpectedSuggestion[],
 ) {
-  return diagnostic(
-    'neverValid',
-    '“batgo” is never a valid “rel” attribute value.',
-    range,
-    suggestions,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'neverValid',
+    message: '“batgo” is never a valid “rel” attribute value.',
+    line,
+    column,
+    endLine,
+    endColumn,
+    ...(suggestions === undefined ? {} : { suggestions }),
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -347,35 +371,43 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: 'React.createElement("a", { rel: "alternatex alternate" })',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“alternatex alternate” is never a valid “rel” attribute value.',
-          [1, 33, 1, 55],
-          [
+        {
+          messageId: 'neverValid',
+          message:
+            '“alternatex alternate” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 55,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute alternatex alternate”',
               output: 'React.createElement("a", { rel: "" })',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: 'React.createElement("a", { rel: ["alternatex alternate"] })',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“alternatex alternate” is never a valid “rel” attribute value.',
-          [1, 34, 1, 56],
-          [
+        {
+          messageId: 'neverValid',
+          message:
+            '“alternatex alternate” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 56,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute alternatex alternate”',
               output: 'React.createElement("a", { rel: [""] })',
             },
           ],
-        ),
+        },
       ],
     },
     {
@@ -396,35 +428,43 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: 'React.createElement("a", { rel: "alternate alternatex" })',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“alternate alternatex” is never a valid “rel” attribute value.',
-          [1, 33, 1, 55],
-          [
+        {
+          messageId: 'neverValid',
+          message:
+            '“alternate alternatex” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 55,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute alternate alternatex”',
               output: 'React.createElement("a", { rel: "" })',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: 'React.createElement("a", { rel: ["alternate alternatex"] })',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“alternate alternatex” is never a valid “rel” attribute value.',
-          [1, 34, 1, 56],
-          [
+        {
+          messageId: 'neverValid',
+          message:
+            '“alternate alternatex” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 34,
+          endLine: 1,
+          endColumn: 56,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute alternate alternatex”',
               output: 'React.createElement("a", { rel: [""] })',
             },
           ],
-        ),
+        },
       ],
     },
     {
@@ -449,28 +489,34 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: '<a rel></a>',
       errors: [
-        diagnostic(
-          'emptyIsMeaningless',
-          'An empty “rel” attribute is meaningless.',
-          [1, 4, 1, 7],
-          [
+        {
+          messageId: 'emptyIsMeaningless',
+          message: 'An empty “rel” attribute is meaningless.',
+          line: 1,
+          column: 4,
+          endLine: 1,
+          endColumn: 7,
+          suggestions: [
             {
               messageId: 'suggestRemoveEmpty',
               desc: '"remove empty attribute rel"',
               output: '<a ></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: 'React.createElement("a", { rel() { return 1; } })',
       errors: [
-        diagnostic(
-          'noMethod',
-          'The ”rel“ attribute cannot be a method.',
-          [1, 28, 1, 47],
-        ),
+        {
+          messageId: 'noMethod',
+          message: 'The ”rel“ attribute cannot be a method.',
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 47,
+        },
       ],
     },
     {
@@ -792,84 +838,104 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: '<a rel="canonical"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“canonical” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 19],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“canonical” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 19,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute canonical”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="dns-prefetch"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“dns-prefetch” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“dns-prefetch” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute dns-prefetch”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="icon"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“icon” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 14],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“icon” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 14,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute icon”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="shortcut"></link>',
       errors: [
-        diagnostic(
-          'notAlone',
-          '“shortcut” must be directly followed by “icon”.',
-          [1, 11, 1, 21],
-        ),
+        {
+          messageId: 'notAlone',
+          message: '“shortcut” must be directly followed by “icon”.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: '<link rel="shortcut foo"></link>',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“foo” is never a valid “rel” attribute value.',
-          [1, 11, 1, 25],
-          [
+        {
+          messageId: 'neverValid',
+          message: '“foo” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 25,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute foo”',
               output: '<link rel="shortcut "></link>',
             },
           ],
-        ),
-        diagnostic(
-          'notPaired',
-          '“shortcut” can not be directly followed by “foo” without “icon”.',
-          [1, 11, 1, 25],
-        ),
+        },
+        {
+          messageId: 'notPaired',
+          message:
+            '“shortcut” can not be directly followed by “foo” without “icon”.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 25,
+        },
       ],
     },
     {
@@ -890,23 +956,29 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: '<link rel="shortcut  foo"></link>',
       errors: [
-        diagnostic(
-          'neverValid',
-          '“foo” is never a valid “rel” attribute value.',
-          [1, 11, 1, 26],
-          [
+        {
+          messageId: 'neverValid',
+          message: '“foo” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 26,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute foo”',
               output: '<link rel="shortcut  "></link>',
             },
           ],
-        ),
-        diagnostic(
-          'notAlone',
-          '“shortcut” must be directly followed by “icon”.',
-          [1, 11, 1, 26],
-        ),
+        },
+        {
+          messageId: 'notAlone',
+          message: '“shortcut” must be directly followed by “icon”.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 26,
+        },
         expectSpaceDelimitedError(
           [1, 11, 1, 26],
           [
@@ -922,715 +994,867 @@ ruleTester.run('no-invalid-html-attribute', {
     {
       code: '<a rel="manifest"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“manifest” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 18],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“manifest” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute manifest”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="modulepreload"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“modulepreload” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“modulepreload” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute modulepreload”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="pingback"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“pingback” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 18],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“pingback” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute pingback”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="preconnect"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preconnect” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 20],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“preconnect” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preconnect”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="prefetch"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prefetch” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 18],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“prefetch” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 18,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prefetch”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="preload"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preload” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 17],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“preload” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 17,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preload”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="prerender"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prerender” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 19],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“prerender” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 19,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prerender”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<a rel="stylesheet"></a>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“stylesheet” is not a valid “rel” attribute value for <a>.',
-          [1, 8, 1, 20],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“stylesheet” is not a valid “rel” attribute value for <a>.',
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 20,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute stylesheet”',
               output: '<a rel=""></a>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="canonical"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“canonical” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“canonical” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute canonical”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="dns-prefetch"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“dns-prefetch” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 25],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“dns-prefetch” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 25,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute dns-prefetch”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="icon"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“icon” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 17],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“icon” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 17,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute icon”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="manifest"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“manifest” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“manifest” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute manifest”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="modulepreload"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“modulepreload” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 26],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“modulepreload” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 26,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute modulepreload”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="pingback"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“pingback” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“pingback” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute pingback”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="preconnect"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preconnect” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“preconnect” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preconnect”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="prefetch"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prefetch” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“prefetch” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prefetch”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="preload"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preload” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 20],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“preload” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 20,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preload”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="prerender"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prerender” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“prerender” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prerender”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<area rel="stylesheet"></area>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“stylesheet” is not a valid “rel” attribute value for <area>.',
-          [1, 11, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“stylesheet” is not a valid “rel” attribute value for <area>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute stylesheet”',
               output: '<area rel=""></area>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="bookmark"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“bookmark” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“bookmark” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute bookmark”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="external"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“external” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“external” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute external”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="nofollow"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“nofollow” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“nofollow” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute nofollow”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="noopener"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“noopener” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“noopener” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute noopener”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="noreferrer"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“noreferrer” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“noreferrer” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute noreferrer”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="opener"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“opener” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 19],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“opener” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 19,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute opener”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<link rel="tag"></link>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“tag” is not a valid “rel” attribute value for <link>.',
-          [1, 11, 1, 16],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“tag” is not a valid “rel” attribute value for <link>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute tag”',
               output: '<link rel=""></link>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="alternate"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“alternate” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“alternate” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute alternate”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="author"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“author” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 19],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“author” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 19,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute author”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="bookmark"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“bookmark” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“bookmark” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute bookmark”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="canonical"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“canonical” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“canonical” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute canonical”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="dns-prefetch"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“dns-prefetch” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 25],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“dns-prefetch” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 25,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute dns-prefetch”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="icon"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“icon” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 17],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“icon” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 17,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute icon”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="manifest"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“manifest” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“manifest” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute manifest”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="modulepreload"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“modulepreload” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 26],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“modulepreload” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 26,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute modulepreload”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="pingback"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“pingback” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“pingback” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute pingback”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="preconnect"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preconnect” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“preconnect” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preconnect”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="prefetch"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prefetch” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 21],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“prefetch” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 21,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prefetch”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="preload"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“preload” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 20],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“preload” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 20,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute preload”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="prerender"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“prerender” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 22],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“prerender” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 22,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute prerender”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="stylesheet"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“stylesheet” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 23],
-          [
+        {
+          messageId: 'notValidFor',
+          message:
+            '“stylesheet” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 23,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute stylesheet”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel="tag"></form>',
       errors: [
-        diagnostic(
-          'notValidFor',
-          '“tag” is not a valid “rel” attribute value for <form>.',
-          [1, 11, 1, 16],
-          [
+        {
+          messageId: 'notValidFor',
+          message: '“tag” is not a valid “rel” attribute value for <form>.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 16,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute tag”',
               output: '<form rel=""></form>',
             },
           ],
-        ),
+        },
       ],
     },
     {
       code: '<form rel=""></form>',
       errors: [
-        diagnostic(
-          'noEmpty',
-          'An empty “rel” attribute is meaningless.',
-          [1, 11, 1, 13],
-          [
+        {
+          messageId: 'noEmpty',
+          message: 'An empty “rel” attribute is meaningless.',
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 13,
+          suggestions: [
             {
               messageId: 'suggestRemoveEmpty',
               desc: '"remove empty attribute rel"',
               output: '<form ></form>',
             },
           ],
-        ),
+        },
       ],
     },
 
@@ -1640,18 +1864,21 @@ ruleTester.run('no-invalid-html-attribute', {
       skip: 'Known no-invalid-html-attribute behavior gap: native reports 0 diagnostics for this input; upstream reports 1.',
       code: `React.createElement("a", { rel: 1 })`,
       errors: [
-        diagnostic(
-          'neverValid',
-          '“1” is never a valid “rel” attribute value.',
-          [1, 33, 1, 34],
-          [
+        {
+          messageId: 'neverValid',
+          message: '“1” is never a valid “rel” attribute value.',
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 34,
+          suggestions: [
             {
               messageId: 'suggestRemoveInvalid',
               desc: '“remove invalid attribute 1”',
               output: 'React.createElement("a", { rel:  })',
             },
           ],
-        ),
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

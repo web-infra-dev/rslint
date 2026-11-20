@@ -1,21 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSetStateError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSetState',
-    'Do not use setState in componentWillUpdate',
-    range,
-  );
+function expectNoSetStateError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSetState',
+    message: 'Do not use setState in componentWillUpdate',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNoSetStateError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noSetState',
-    'Do not use setState in UNSAFE_componentWillUpdate',
-    range,
-  );
+function expectNoSetStateError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSetState',
+    message: 'Do not use setState in UNSAFE_componentWillUpdate',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

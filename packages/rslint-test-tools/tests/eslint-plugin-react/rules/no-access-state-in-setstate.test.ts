@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamScriptOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUseCallbackError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'useCallback',
-    'Use callback in setState when referencing the previous state.',
-    range,
-  );
+function expectUseCallbackError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'useCallback',
+    message: 'Use callback in setState when referencing the previous state.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

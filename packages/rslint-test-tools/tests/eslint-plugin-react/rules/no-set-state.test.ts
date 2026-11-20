@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoSetStateError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('noSetState', 'Do not use setState', range);
+function expectNoSetStateError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noSetState',
+    message: 'Do not use setState',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,25 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectStringInRefDeprecatedError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'stringInRefDeprecated',
-    'Using string literals in ref attributes is deprecated.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'stringInRefDeprecated',
+    message: 'Using string literals in ref attributes is deprecated.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectThisRefsDeprecatedError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'thisRefsDeprecated',
-    'Using this.refs is deprecated.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'thisRefsDeprecated',
+    message: 'Using this.refs is deprecated.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

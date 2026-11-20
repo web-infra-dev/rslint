@@ -1,41 +1,64 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNestChildrenError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'nestChildren',
-    'Do not pass children as props. Instead, nest children between the opening and closing tags.',
-    range,
-  );
+function expectNestChildrenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'nestChildren',
+    message:
+      'Do not pass children as props. Instead, nest children between the opening and closing tags.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectPassChildrenAsArgsError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'passChildrenAsArgs',
-    'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'passChildrenAsArgs',
+    message:
+      'Do not pass children as props. Instead, pass them as additional arguments to React.createElement.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectNestFunctionError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'nestFunction',
-    'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
-    range,
-  );
+function expectNestFunctionError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'nestFunction',
+    message:
+      'Do not nest a function between the opening and closing tags. Instead, pass it as a prop.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectPassFunctionAsArgsError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'passFunctionAsArgs',
-    'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'passFunctionAsArgs',
+    message:
+      'Do not pass a function as an additional argument to React.createElement. Instead, pass it as a prop.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

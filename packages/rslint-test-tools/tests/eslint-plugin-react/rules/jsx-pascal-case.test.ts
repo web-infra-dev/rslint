@@ -1,23 +1,33 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUsePascalCaseError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'usePascalCase',
-    'Imported JSX component TEST_COMPONENT must be in PascalCase',
-    range,
-  );
+function expectUsePascalCaseError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'usePascalCase',
+    message: 'Imported JSX component TEST_COMPONENT must be in PascalCase',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectUsePascalOrSnakeCaseError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'usePascalOrSnakeCase',
-    'Imported JSX component __ must be in PascalCase or SCREAMING_SNAKE_CASE',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'usePascalOrSnakeCase',
+    message:
+      'Imported JSX component __ must be in PascalCase or SCREAMING_SNAKE_CASE',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -270,11 +280,15 @@ ruleTester.run('jsx-pascal-case', {
     {
       code: `<Test_component />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Test_component must be in PascalCase',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message:
+            'Imported JSX component Test_component must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
@@ -284,44 +298,59 @@ ruleTester.run('jsx-pascal-case', {
     {
       code: `<YMCA />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component YMCA must be in PascalCase',
-          [1, 1, 1, 9],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component YMCA must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
       ],
     },
     {
       code: `<_TEST_COMPONENT />;`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component _TEST_COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component _TEST_COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: `<TEST_COMPONENT_ />;`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component TEST_COMPONENT_ must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component TEST_COMPONENT_ must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     {
       code: `<TEST-COMPONENT />;`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component TEST-COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component TEST-COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
@@ -333,11 +362,14 @@ ruleTester.run('jsx-pascal-case', {
       code: `<_div />;`,
       options: [{ allowLeadingUnderscore: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component _div must be in PascalCase',
-          [1, 1, 1, 9],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component _div must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
       ],
     },
     {
@@ -348,53 +380,69 @@ ruleTester.run('jsx-pascal-case', {
     {
       code: `<$a />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component $a must be in PascalCase',
-          [1, 1, 1, 7],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component $a must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
       ],
     },
     {
       code: `<Foo_DEPRECATED />;`,
       options: [{ ignore: ['*_FOO'] }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Foo_DEPRECATED must be in PascalCase',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message:
+            'Imported JSX component Foo_DEPRECATED must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
       code: `<Styled.h1 />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component h1 must be in PascalCase',
-          [1, 1, 1, 14],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component h1 must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
       ],
     },
     {
       code: `<$Typography.P />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component $Typography must be in PascalCase',
-          [1, 1, 1, 18],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component $Typography must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
       ],
     },
     {
       code: `<STYLED.h1 />;`,
       options: [{ allowNamespace: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component STYLED must be in PascalCase',
-          [1, 1, 1, 14],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component STYLED must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
       ],
     },
 
@@ -411,171 +459,224 @@ ruleTester.run('jsx-pascal-case', {
       code: `<_test />;`,
       options: [{ allowLeadingUnderscore: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component _test must be in PascalCase',
-          [1, 1, 1, 10],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component _test must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
       ],
     },
     {
       code: `<BAD_NAME />;`,
       options: [{ ignore: ['GOOD_NAME'] }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component BAD_NAME must be in PascalCase',
-          [1, 1, 1, 13],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component BAD_NAME must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
     },
     {
       code: `<Foo.bar />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component bar must be in PascalCase',
-          [1, 1, 1, 12],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component bar must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
       ],
     },
     {
       code: `<Foo.bad_name.Baz />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component bad_name must be in PascalCase',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component bad_name must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: `<Foo.Bar.baz />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component baz must be in PascalCase',
-          [1, 1, 1, 16],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component baz must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
       ],
     },
     {
       code: `<div><FOO_A /><FOO_B /></div>;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component FOO_A must be in PascalCase',
-          [1, 6, 1, 15],
-        ),
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component FOO_B must be in PascalCase',
-          [1, 15, 1, 24],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component FOO_A must be in PascalCase',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 15,
+        },
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component FOO_B must be in PascalCase',
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 24,
+        },
       ],
     },
     {
       code: `<Wrapper>{true && <Bad_Inner />}</Wrapper>;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Bad_Inner must be in PascalCase',
-          [1, 19, 1, 32],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component Bad_Inner must be in PascalCase',
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 32,
+        },
       ],
     },
     {
       code: `<Wrapper prop={<Bad_Attr />} />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Bad_Attr must be in PascalCase',
-          [1, 16, 1, 28],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component Bad_Attr must be in PascalCase',
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 28,
+        },
       ],
     },
     {
       code: `<$Weird />;`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component $Weird must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 11],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component $Weird must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 11,
+        },
       ],
     },
     {
       code: `<Modal:bad_header />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component bad_header must be in PascalCase',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component bad_header must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: `<BAD_NS:Header />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component BAD_NS must be in PascalCase',
-          [1, 1, 1, 18],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component BAD_NS must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
       ],
     },
     {
       code: `<Modal:bad_Name />;`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component bad_Name must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component bad_Name must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
     },
     {
       code: `<BAD_NS:Header />;`,
       options: [{ allowNamespace: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component BAD_NS must be in PascalCase',
-          [1, 1, 1, 18],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component BAD_NS must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
       ],
     },
     {
       code: `<Foo.$Bar />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component $Bar must be in PascalCase',
-          [1, 1, 1, 13],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component $Bar must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 13,
+        },
       ],
     },
     {
       code: `<Bad_Name<string> />;`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Bad_Name must be in PascalCase',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component Bad_Name must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     {
       code: `<Año_BAD />;`,
       options: [{ ignore: ['Año_DIFFERENT'] }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Año_BAD must be in PascalCase',
-          [1, 1, 1, 12],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component Año_BAD must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 12,
+        },
       ],
     },
 
@@ -584,11 +685,15 @@ ruleTester.run('jsx-pascal-case', {
       name: 'Upstream invalid 0 (7.37.5)',
       code: `<Test_component />`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Test_component must be in PascalCase',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message:
+            'Imported JSX component Test_component must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -602,11 +707,14 @@ ruleTester.run('jsx-pascal-case', {
       name: 'Upstream invalid 2 (7.37.5)',
       code: `<YMCA />`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component YMCA must be in PascalCase',
-          [1, 1, 1, 9],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component YMCA must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -615,11 +723,15 @@ ruleTester.run('jsx-pascal-case', {
       code: `<_TEST_COMPONENT />`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component _TEST_COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component _TEST_COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -628,11 +740,15 @@ ruleTester.run('jsx-pascal-case', {
       code: `<TEST_COMPONENT_ />`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component TEST_COMPONENT_ must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component TEST_COMPONENT_ must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -641,11 +757,15 @@ ruleTester.run('jsx-pascal-case', {
       code: `<TEST-COMPONENT />`,
       options: [{ allowAllCaps: true }],
       errors: [
-        diagnostic(
-          'usePascalOrSnakeCase',
-          'Imported JSX component TEST-COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalOrSnakeCase',
+          message:
+            'Imported JSX component TEST-COMPONENT must be in PascalCase or SCREAMING_SNAKE_CASE',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -661,11 +781,14 @@ ruleTester.run('jsx-pascal-case', {
       code: `<_div />`,
       options: [{ allowLeadingUnderscore: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component _div must be in PascalCase',
-          [1, 1, 1, 9],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component _div must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 9,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -680,11 +803,14 @@ ruleTester.run('jsx-pascal-case', {
       name: 'Upstream invalid 9 (7.37.5)',
       code: `<$a />`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component $a must be in PascalCase',
-          [1, 1, 1, 7],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component $a must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 7,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -693,11 +819,15 @@ ruleTester.run('jsx-pascal-case', {
       code: `<Foo_DEPRECATED />`,
       options: [{ ignore: ['*_FOO'] }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component Foo_DEPRECATED must be in PascalCase',
-          [1, 1, 1, 19],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message:
+            'Imported JSX component Foo_DEPRECATED must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -705,11 +835,14 @@ ruleTester.run('jsx-pascal-case', {
       name: 'Upstream invalid 11 (7.37.5)',
       code: `<Styled.h1 />`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component h1 must be in PascalCase',
-          [1, 1, 1, 14],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component h1 must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -717,11 +850,14 @@ ruleTester.run('jsx-pascal-case', {
       name: 'Upstream invalid 12 (7.37.5)',
       code: `<$Typography.P />`,
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component $Typography must be in PascalCase',
-          [1, 1, 1, 18],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component $Typography must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 18,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -730,11 +866,14 @@ ruleTester.run('jsx-pascal-case', {
       code: `<STYLED.h1 />`,
       options: [{ allowNamespace: true }],
       errors: [
-        diagnostic(
-          'usePascalCase',
-          'Imported JSX component STYLED must be in PascalCase',
-          [1, 1, 1, 14],
-        ),
+        {
+          messageId: 'usePascalCase',
+          message: 'Imported JSX component STYLED must be in PascalCase',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

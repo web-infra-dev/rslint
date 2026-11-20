@@ -1,9 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoArrayIndexError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic('noArrayIndex', 'Do not use Array index in keys', range);
+function expectNoArrayIndexError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noArrayIndex',
+    message: 'Do not use Array index in keys',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectOnlyOneComponentError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'onlyOneComponent',
-    'Declare only one React component per file',
-    range,
-  );
+function expectOnlyOneComponentError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'onlyOneComponent',
+    message: 'Declare only one React component per file',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

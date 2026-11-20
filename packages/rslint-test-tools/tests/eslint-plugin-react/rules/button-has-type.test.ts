@@ -1,37 +1,61 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectMissingTypeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'missingType',
-    'Missing an explicit type attribute for button',
-    range,
-  );
+function expectMissingTypeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'missingType',
+    message: 'Missing an explicit type attribute for button',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectInvalidValueError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'invalidValue',
-    '"foo" is an invalid value for button type attribute',
-    range,
-  );
+function expectInvalidValueError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'invalidValue',
+    message: '"foo" is an invalid value for button type attribute',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectComplexTypeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'complexType',
-    'The button type attribute must be specified by a static string or a trivial ternary expression',
-    range,
-  );
+function expectComplexTypeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'complexType',
+    message:
+      'The button type attribute must be specified by a static string or a trivial ternary expression',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectForbiddenValueError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'forbiddenValue',
-    '"reset" is an invalid value for button type attribute',
-    range,
-  );
+function expectForbiddenValueError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenValue',
+    message: '"reset" is an invalid value for button type attribute',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -205,11 +229,14 @@ ruleTester.run('button-has-type', {
     {
       code: `<button type/>`,
       errors: [
-        diagnostic(
-          'invalidValue',
-          '"true" is an invalid value for button type attribute',
-          [1, 1, 1, 15],
-        ),
+        {
+          messageId: 'invalidValue',
+          message: '"true" is an invalid value for button type attribute',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 15,
+        },
       ],
     },
     {
@@ -241,22 +268,28 @@ ruleTester.run('button-has-type', {
     {
       code: `<button type={0x1}/>`,
       errors: [
-        diagnostic(
-          'invalidValue',
-          '"1" is an invalid value for button type attribute',
-          [1, 1, 1, 21],
-        ),
+        {
+          messageId: 'invalidValue',
+          message: '"1" is an invalid value for button type attribute',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 21,
+        },
       ],
     },
     // Boolean value expression
     {
       code: `<button type={true}/>`,
       errors: [
-        diagnostic(
-          'invalidValue',
-          '"true" is an invalid value for button type attribute',
-          [1, 1, 1, 22],
-        ),
+        {
+          messageId: 'invalidValue',
+          message: '"true" is an invalid value for button type attribute',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
       ],
     },
     // Spread without type
@@ -279,11 +312,14 @@ ruleTester.run('button-has-type', {
       code: `<button type={a ? "foo" : "bar"}/>`,
       errors: [
         expectInvalidValueError([1, 1, 1, 35]),
-        diagnostic(
-          'invalidValue',
-          '"bar" is an invalid value for button type attribute',
-          [1, 1, 1, 35],
-        ),
+        {
+          messageId: 'invalidValue',
+          message: '"bar" is an invalid value for button type attribute',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 35,
+        },
       ],
     },
     // Complex expression types
@@ -317,11 +353,14 @@ ruleTester.run('button-has-type', {
     {
       code: `<button type={1n}/>`,
       errors: [
-        diagnostic(
-          'invalidValue',
-          '"1" is an invalid value for button type attribute',
-          [1, 1, 1, 20],
-        ),
+        {
+          messageId: 'invalidValue',
+          message: '"1" is an invalid value for button type attribute',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
       ],
     },
     // Paren-wrapped callee / args — ESTree-flattening parity

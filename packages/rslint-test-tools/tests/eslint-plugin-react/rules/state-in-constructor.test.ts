@@ -1,27 +1,34 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/state-in-constructor.js
 // The Go upstream suite also asserts message IDs, full ranges, and absence of edits.
 function expectStateInitClassPropError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'stateInitClassProp',
-    'State initialization should be in a class property',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'stateInitClassProp',
+    message: 'State initialization should be in a class property',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectStateInitConstructorError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'stateInitConstructor',
-    'State initialization should be in a constructor',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'stateInitConstructor',
+    message: 'State initialization should be in a constructor',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

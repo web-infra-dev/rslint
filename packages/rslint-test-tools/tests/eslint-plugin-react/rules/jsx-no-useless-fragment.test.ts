@@ -1,23 +1,33 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNeedsMoreChildrenError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'NeedsMoreChildren',
-    'Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.',
-    range,
-  );
+function expectNeedsMoreChildrenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'NeedsMoreChildren',
+    message:
+      'Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 function expectChildOfHtmlElementError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'ChildOfHtmlElement',
-    'Passing a fragment to an HTML element is useless.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'ChildOfHtmlElement',
+    message: 'Passing a fragment to an HTML element is useless.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

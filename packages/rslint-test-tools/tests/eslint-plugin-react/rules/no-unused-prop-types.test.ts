@@ -1,125 +1,214 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectUnusedPropTypeError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'name' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'name' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'unused' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'unused' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError3(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'zap' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'zap' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError4(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'something' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'something' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError5(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'bar' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError5(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'bar' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError6(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'baz' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError6(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'baz' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError7(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'foo' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError7(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'foo' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError8(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'prop1' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError8(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'prop1' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError9(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'prop2' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError9(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'prop2' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError10(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'prop2.*' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError10(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'prop2.*' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError11(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'lastname' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError11(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'lastname' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError12(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'z' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError12(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'z' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError13(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'y' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError13(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'y' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError14(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'books' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError14(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'books' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectUnusedPropTypeError15(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'unusedPropType',
-    "'username' PropType is defined but prop is never used",
-    range,
-  );
+function expectUnusedPropTypeError15(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unusedPropType',
+    message: "'username' PropType is defined but prop is never used",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -4445,11 +4534,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       errors: [
         expectUnusedPropTypeError2([4, 13, 4, 19]),
-        diagnostic(
-          'unusedPropType',
-          "'anotherunused' PropType is defined but prop is never used",
-          [5, 13, 5, 26],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'anotherunused' PropType is defined but prop is never used",
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 26,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4486,11 +4578,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a.b' PropType is defined but prop is never used",
-          [10, 13, 10, 14],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a.b' PropType is defined but prop is never used",
+          line: 10,
+          column: 13,
+          endLine: 10,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4513,11 +4608,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a.b.c' PropType is defined but prop is never used",
-          [11, 15, 11, 16],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a.b.c' PropType is defined but prop is never used",
+          line: 11,
+          column: 15,
+          endLine: 11,
+          endColumn: 16,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4542,11 +4640,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a.*.unused' PropType is defined but prop is never used",
-          [13, 15, 13, 21],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a.*.unused' PropType is defined but prop is never used",
+          line: 13,
+          column: 15,
+          endLine: 13,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4573,11 +4674,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a.*.unused' PropType is defined but prop is never used",
-          [15, 15, 15, 21],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a.*.unused' PropType is defined but prop is never used",
+          line: 15,
+          column: 15,
+          endLine: 15,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4606,16 +4710,23 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a.unused' PropType is defined but prop is never used",
-          [16, 15, 16, 21],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'a.anotherunused' PropType is defined but prop is never used",
-          [17, 15, 17, 28],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a.unused' PropType is defined but prop is never used",
+          line: 16,
+          column: 15,
+          endLine: 16,
+          endColumn: 21,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'a.anotherunused' PropType is defined but prop is never used",
+          line: 17,
+          column: 15,
+          endLine: 17,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4633,11 +4744,14 @@ ruleTester.run('no-unused-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'some.unused' PropType is defined but prop is never used",
-          [9, 11, 9, 24],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'some.unused' PropType is defined but prop is never used",
+          line: 9,
+          column: 11,
+          endLine: 9,
+          endColumn: 24,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -4660,11 +4774,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'arr.*.some.unused' PropType is defined but prop is never used",
-          [11, 15, 11, 28],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'arr.*.some.unused' PropType is defined but prop is never used",
+          line: 11,
+          column: 15,
+          endLine: 11,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5039,11 +5157,14 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'b' PropType is defined but prop is never used",
-          [3, 25, 3, 26],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'b' PropType is defined but prop is never used",
+          line: 3,
+          column: 25,
+          endLine: 3,
+          endColumn: 26,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5123,11 +5244,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'name.unused' PropType is defined but prop is never used",
-          [5, 15, 5, 29],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'name.unused' PropType is defined but prop is never used",
+          line: 5,
+          column: 15,
+          endLine: 5,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5145,11 +5269,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'name.unused' PropType is defined but prop is never used",
-          [2, 30, 2, 44],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'name.unused' PropType is defined but prop is never used",
+          line: 2,
+          column: 30,
+          endLine: 2,
+          endColumn: 44,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5166,11 +5293,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person.name.unused' PropType is defined but prop is never used",
-          [3, 35, 3, 49],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'person.name.unused' PropType is defined but prop is never used",
+          line: 3,
+          column: 35,
+          endLine: 3,
+          endColumn: 49,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5188,11 +5319,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person.name.unused' PropType is defined but prop is never used",
-          [2, 39, 2, 53],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'person.name.unused' PropType is defined but prop is never used",
+          line: 2,
+          column: 39,
+          endLine: 2,
+          endColumn: 53,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5214,11 +5349,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'people.*.name.unused' PropType is defined but prop is never used",
-          [2, 31, 2, 45],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'people.*.name.unused' PropType is defined but prop is never used",
+          line: 2,
+          column: 31,
+          endLine: 2,
+          endColumn: 45,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5241,11 +5380,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'people.*.name.unused' PropType is defined but prop is never used",
-          [2, 31, 2, 45],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'people.*.name.unused' PropType is defined but prop is never used",
+          line: 2,
+          column: 31,
+          endLine: 2,
+          endColumn: 45,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5263,16 +5406,22 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'result.ok' PropType is defined but prop is never used",
-          [2, 33, 2, 53],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'result.ok' PropType is defined but prop is never used",
-          [2, 57, 2, 75],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'result.ok' PropType is defined but prop is never used",
+          line: 2,
+          column: 33,
+          endLine: 2,
+          endColumn: 53,
+        },
+        {
+          messageId: 'unusedPropType',
+          message: "'result.ok' PropType is defined but prop is never used",
+          line: 2,
+          column: 57,
+          endLine: 2,
+          endColumn: 75,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5939,11 +6088,14 @@ ruleTester.run('no-unused-prop-types', {
         export default connect(mapStateToProps, mapDispatchToProps)(HellowQueries)
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'aProp' PropType is defined but prop is never used",
-          [8, 11, 8, 16],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'aProp' PropType is defined but prop is never used",
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 16,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -5966,11 +6118,14 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'unusedProp' PropType is defined but prop is never used",
-          [7, 11, 7, 29],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'unusedProp' PropType is defined but prop is never used",
+          line: 7,
+          column: 11,
+          endLine: 7,
+          endColumn: 29,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6073,11 +6228,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       settings: { react: { flowVersion: '0.53' } },
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person' PropType is defined but prop is never used",
-          [3, 47, 3, 53],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'person' PropType is defined but prop is never used",
+          line: 3,
+          column: 47,
+          endLine: 3,
+          endColumn: 53,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6094,11 +6252,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       settings: { react: { flowVersion: '0.52' } },
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person' PropType is defined but prop is never used",
-          [3, 53, 3, 67],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'person' PropType is defined but prop is never used",
+          line: 3,
+          column: 53,
+          endLine: 3,
+          endColumn: 67,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6137,11 +6298,14 @@ ruleTester.run('no-unused-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'doSomething' PropType is defined but prop is never used",
-          [15, 11, 15, 22],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'doSomething' PropType is defined but prop is never used",
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6165,11 +6329,14 @@ ruleTester.run('no-unused-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'doSomething' PropType is defined but prop is never used",
-          [15, 11, 15, 22],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'doSomething' PropType is defined but prop is never used",
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6249,11 +6416,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       settings: { react: { version: '16.2.0' } },
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'defaultValue' PropType is defined but prop is never used",
-          [4, 13, 4, 25],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'defaultValue' PropType is defined but prop is never used",
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6277,11 +6447,14 @@ ruleTester.run('no-unused-prop-types', {
       `,
       settings: { react: { version: '16.2.0' } },
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'defaultValue' PropType is defined but prop is never used",
-          [4, 13, 4, 25],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'defaultValue' PropType is defined but prop is never used",
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 25,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6305,11 +6478,14 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'age' PropType is defined but prop is never used",
-          [10, 11, 10, 14],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'age' PropType is defined but prop is never used",
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6331,21 +6507,30 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'a' PropType is defined but prop is never used",
-          [8, 11, 8, 12],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'a.b' PropType is defined but prop is never used",
-          [9, 13, 9, 14],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'a.b.c' PropType is defined but prop is never used",
-          [13, 9, 13, 49],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'a' PropType is defined but prop is never used",
+          line: 8,
+          column: 11,
+          endLine: 8,
+          endColumn: 12,
+        },
+        {
+          messageId: 'unusedPropType',
+          message: "'a.b' PropType is defined but prop is never used",
+          line: 9,
+          column: 13,
+          endLine: 9,
+          endColumn: 14,
+        },
+        {
+          messageId: 'unusedPropType',
+          message: "'a.b.c' PropType is defined but prop is never used",
+          line: 13,
+          column: 9,
+          endLine: 13,
+          endColumn: 49,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6492,11 +6677,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person.lastname' PropType is defined but prop is never used",
-          [6, 12, 6, 28],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'person.lastname' PropType is defined but prop is never used",
+          line: 6,
+          column: 12,
+          endLine: 6,
+          endColumn: 28,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6518,11 +6707,15 @@ ruleTester.run('no-unused-prop-types', {
       `,
       options: [{ skipShapeProps: false }],
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'person.lastname' PropType is defined but prop is never used",
-          [11, 13, 11, 21],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'person.lastname' PropType is defined but prop is never used",
+          line: 11,
+          column: 13,
+          endLine: 11,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6564,11 +6757,14 @@ ruleTester.run('no-unused-prop-types', {
         export default MyComponent;
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'unUsedProp' PropType is defined but prop is never used",
-          [16, 11, 16, 21],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'unUsedProp' PropType is defined but prop is never used",
+          line: 16,
+          column: 11,
+          endLine: 16,
+          endColumn: 21,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6588,16 +6784,22 @@ ruleTester.run('no-unused-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'fooUnused' PropType is defined but prop is never used",
-          [10, 11, 10, 20],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'barUnused' PropType is defined but prop is never used",
-          [11, 11, 11, 20],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'fooUnused' PropType is defined but prop is never used",
+          line: 10,
+          column: 11,
+          endLine: 10,
+          endColumn: 20,
+        },
+        {
+          messageId: 'unusedPropType',
+          message: "'barUnused' PropType is defined but prop is never used",
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 20,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6654,56 +6856,96 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'prevPropUnused' PropType is defined but prop is never used",
-          [4, 13, 4, 27],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'nextPropUnused' PropType is defined but prop is never used",
-          [5, 13, 5, 27],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'setStatePropUnused' PropType is defined but prop is never used",
-          [6, 13, 6, 31],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisPropsAliasDestructPropUnused' PropType is defined but prop is never used",
-          [7, 13, 7, 45],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisPropsAliasPropUnused' PropType is defined but prop is never used",
-          [8, 13, 8, 37],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisDestructPropsAliasDestructPropUnused' PropType is defined but prop is never used",
-          [9, 13, 9, 53],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisDestructPropsAliasPropUnused' PropType is defined but prop is never used",
-          [10, 13, 10, 45],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisDestructPropsDestructPropUnused' PropType is defined but prop is never used",
-          [11, 13, 11, 48],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisPropsDestructPropUnused' PropType is defined but prop is never used",
-          [12, 13, 12, 40],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'thisPropsPropUnused' PropType is defined but prop is never used",
-          [13, 13, 13, 32],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'prevPropUnused' PropType is defined but prop is never used",
+          line: 4,
+          column: 13,
+          endLine: 4,
+          endColumn: 27,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'nextPropUnused' PropType is defined but prop is never used",
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 27,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'setStatePropUnused' PropType is defined but prop is never used",
+          line: 6,
+          column: 13,
+          endLine: 6,
+          endColumn: 31,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisPropsAliasDestructPropUnused' PropType is defined but prop is never used",
+          line: 7,
+          column: 13,
+          endLine: 7,
+          endColumn: 45,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisPropsAliasPropUnused' PropType is defined but prop is never used",
+          line: 8,
+          column: 13,
+          endLine: 8,
+          endColumn: 37,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisDestructPropsAliasDestructPropUnused' PropType is defined but prop is never used",
+          line: 9,
+          column: 13,
+          endLine: 9,
+          endColumn: 53,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisDestructPropsAliasPropUnused' PropType is defined but prop is never used",
+          line: 10,
+          column: 13,
+          endLine: 10,
+          endColumn: 45,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisDestructPropsDestructPropUnused' PropType is defined but prop is never used",
+          line: 11,
+          column: 13,
+          endLine: 11,
+          endColumn: 48,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisPropsDestructPropUnused' PropType is defined but prop is never used",
+          line: 12,
+          column: 13,
+          endLine: 12,
+          endColumn: 40,
+        },
+        {
+          messageId: 'unusedPropType',
+          message:
+            "'thisPropsPropUnused' PropType is defined but prop is never used",
+          line: 13,
+          column: 13,
+          endLine: 13,
+          endColumn: 32,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6812,11 +7054,14 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'aria-label' PropType is defined but prop is never used",
-          [3, 11, 3, 23],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'aria-label' PropType is defined but prop is never used",
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 23,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -6831,11 +7076,14 @@ ruleTester.run('no-unused-prop-types', {
         }
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'1234' PropType is defined but prop is never used",
-          [3, 10, 3, 14],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'1234' PropType is defined but prop is never used",
+          line: 3,
+          column: 10,
+          endLine: 3,
+          endColumn: 14,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7009,16 +7257,22 @@ ruleTester.run('no-unused-prop-types', {
         };
       `,
       errors: [
-        diagnostic(
-          'unusedPropType',
-          "'age' PropType is defined but prop is never used",
-          [11, 11, 11, 14],
-        ),
-        diagnostic(
-          'unusedPropType',
-          "'birthday' PropType is defined but prop is never used",
-          [15, 11, 15, 19],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'age' PropType is defined but prop is never used",
+          line: 11,
+          column: 11,
+          endLine: 11,
+          endColumn: 14,
+        },
+        {
+          messageId: 'unusedPropType',
+          message: "'birthday' PropType is defined but prop is never used",
+          line: 15,
+          column: 11,
+          endLine: 15,
+          endColumn: 19,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -7199,11 +7453,14 @@ ruleTester.run('no-unused-prop-types', {
       settings: { react: { createClass: 'createClass' } },
       errors: [
         expectUnusedPropTypeError7([7, 13, 7, 16]),
-        diagnostic(
-          'unusedPropType',
-          "'propTypes' PropType is defined but prop is never used",
-          [8, 13, 8, 22],
-        ),
+        {
+          messageId: 'unusedPropType',
+          message: "'propTypes' PropType is defined but prop is never used",
+          line: 8,
+          column: 13,
+          endLine: 8,
+          endColumn: 22,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },

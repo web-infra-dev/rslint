@@ -1,15 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
 function expectNoShouldCompUpdateError(
-  range: Parameters<typeof diagnostic>[2],
+  range: [line: number, column: number, endLine: number, endColumn: number],
 ) {
-  return diagnostic(
-    'noShouldCompUpdate',
-    'Foo does not need shouldComponentUpdate when extending React.PureComponent.',
-    range,
-  );
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noShouldCompUpdate',
+    message:
+      'Foo does not need shouldComponentUpdate when extending React.PureComponent.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -123,11 +127,15 @@ ruleTester.run('no-redundant-should-component-update', {
         }
       `,
       errors: [
-        diagnostic(
-          'noShouldCompUpdate',
-          'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
-          [3, 18, 7, 12],
-        ),
+        {
+          messageId: 'noShouldCompUpdate',
+          message:
+            'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
+          line: 3,
+          column: 18,
+          endLine: 7,
+          endColumn: 12,
+        },
       ],
     },
     // ---- Upstream invalid: nested ClassExpression bare PureComponent ----
@@ -142,11 +150,15 @@ ruleTester.run('no-redundant-should-component-update', {
         }
       `,
       errors: [
-        diagnostic(
-          'noShouldCompUpdate',
-          'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
-          [3, 18, 7, 12],
-        ),
+        {
+          messageId: 'noShouldCompUpdate',
+          message:
+            'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
+          line: 3,
+          column: 18,
+          endLine: 7,
+          endColumn: 12,
+        },
       ],
     },
     // ---- Upstream invalid: anonymous ClassExpression assigned to var (name from binding) ----

@@ -1,13 +1,18 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectNoRenderReturnError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'noRenderReturn',
-    'Your render method should have a return statement',
-    range,
-  );
+function expectNoRenderReturnError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noRenderReturn',
+    message: 'Your render method should have a return statement',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

@@ -1,21 +1,34 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectLifecycleError1(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'lifecycle',
-    'render is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-    range,
-  );
+function expectLifecycleError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'lifecycle',
+    message:
+      'render is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectLifecycleError2(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'lifecycle',
-    'getInitialState is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-    range,
-  );
+function expectLifecycleError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'lifecycle',
+    message:
+      'getInitialState is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -453,25 +466,43 @@ ruleTester.run('no-arrow-function-lifecycle', {
     ...instanceLifecycles.map((name) => ({
       code: `var Hello = createReactClass({ ${name}: () => { return null; } });`,
       errors: [
-        diagnostic('lifecycle', message(name), [1, 32, 1, name.length + 56]),
+        {
+          messageId: 'lifecycle',
+          message: message(name),
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: name.length + 56,
+        },
       ],
       output: `var Hello = createReactClass({ ${name}: function() { return null; } });`,
     })),
     ...instanceLifecycles.map((name) => ({
       code: `class Hello extends React.Component { ${name} = () => { return null; } }`,
       errors: [
-        diagnostic('lifecycle', message(name), [1, 39, 1, name.length + 64]),
+        {
+          messageId: 'lifecycle',
+          message: message(name),
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: name.length + 64,
+        },
       ],
       output: `class Hello extends React.Component { ${name}() { return null; } }`,
     })),
     {
       code: 'class Hello extends React.Component { static getDerivedStateFromProps = () => { return null; } }',
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getDerivedStateFromProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [1, 39, 1, 95],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getDerivedStateFromProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 1,
+          column: 39,
+          endLine: 1,
+          endColumn: 95,
+        },
       ],
       output: `class Hello extends React.Component { static getDerivedStateFromProps() { return null; } }`,
     },
@@ -501,11 +532,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getDefaultProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 48],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getDefaultProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 48,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -541,11 +576,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getChildContext is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 48],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getChildContext is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 48,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -564,11 +603,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 39],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 39,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -587,11 +630,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 46],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 46,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -610,11 +657,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 38],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 38,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -633,11 +684,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 46],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 46,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -656,11 +711,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 53],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 53,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -679,11 +738,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'shouldComponentUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 56],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'shouldComponentUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 56,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -702,11 +765,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 40],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 40,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -725,11 +792,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 47],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 47,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -748,11 +819,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getSnapshotBeforeUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 56],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getSnapshotBeforeUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 56,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -771,11 +846,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 39],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 39,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -794,11 +873,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidCatch is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 38],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidCatch is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 38,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -817,11 +900,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         });
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillUnmount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [3, 11, 3, 41],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillUnmount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 3,
+          column: 11,
+          endLine: 3,
+          endColumn: 41,
+        },
       ],
       output: `
         var Hello = createReactClass({
@@ -858,11 +945,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getDefaultProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 49],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getDefaultProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 49,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -906,11 +997,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getChildContext is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 49],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getChildContext is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 49,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -932,11 +1027,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getDerivedStateFromProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 65],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getDerivedStateFromProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 65,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -958,11 +1057,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 40],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 40,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -984,11 +1087,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 47],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 47,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1010,11 +1117,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 39],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidMount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 39,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1036,11 +1147,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 47],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 47,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1062,11 +1177,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 54],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillReceiveProps is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 54,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1088,11 +1207,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'shouldComponentUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 57],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'shouldComponentUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 57,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1114,11 +1237,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 41],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 41,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1140,11 +1267,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'UNSAFE_componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 48],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'UNSAFE_componentWillUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 48,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1166,11 +1297,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'getSnapshotBeforeUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 57],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'getSnapshotBeforeUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 57,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1192,11 +1327,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 49],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidUpdate is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 49,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1218,11 +1357,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentDidCatch is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 39],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentDidCatch is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 39,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `
@@ -1244,11 +1387,15 @@ ruleTester.run('no-arrow-function-lifecycle', {
         }
       `,
       errors: [
-        diagnostic(
-          'lifecycle',
-          'componentWillUnmount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
-          [4, 11, 4, 42],
-        ),
+        {
+          messageId: 'lifecycle',
+          message:
+            'componentWillUnmount is a React lifecycle method, and should not be an arrow function or in a class field. Use an instance method instead.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 42,
+        },
         expectLifecycleError1([5, 11, 5, 45]),
       ],
       output: `

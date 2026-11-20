@@ -1,13 +1,19 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectForbiddenPropTypeError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'forbiddenPropType',
-    'Using propTypes from another component is not safe because they may be removed in production builds',
-    range,
-  );
+function expectForbiddenPropTypeError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'forbiddenPropType',
+    message:
+      'Using propTypes from another component is not safe because they may be removed in production builds',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);

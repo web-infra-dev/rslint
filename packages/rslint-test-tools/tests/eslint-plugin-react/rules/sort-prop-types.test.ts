@@ -1,21 +1,32 @@
 import { RuleTester } from '@rslint/rule-tester';
 import { fixtureConfig, upstreamModuleOptions } from '../config';
-import { diagnostic } from '../expectations';
 
-function expectPropsNotSortedError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'propsNotSorted',
-    'Prop types declarations should be sorted alphabetically',
-    range,
-  );
+function expectPropsNotSortedError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propsNotSorted',
+    message: 'Prop types declarations should be sorted alphabetically',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
-function expectCallbackPropsLastError(range: Parameters<typeof diagnostic>[2]) {
-  return diagnostic(
-    'callbackPropsLast',
-    'Callback prop types must be listed after all other prop types',
-    range,
-  );
+function expectCallbackPropsLastError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'callbackPropsLast',
+    message: 'Callback prop types must be listed after all other prop types',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
 }
 
 const ruleTester = new RuleTester(fixtureConfig);
@@ -910,11 +921,15 @@ ruleTester.run('sort-prop-types', {
       `,
       options: [{ requiredFirst: true }],
       errors: [
-        diagnostic(
-          'requiredPropsFirst',
-          'Required prop types must be listed before all other prop types',
-          [5, 13, 5, 53],
-        ),
+        {
+          messageId: 'requiredPropsFirst',
+          message:
+            'Required prop types must be listed before all other prop types',
+          line: 5,
+          column: 13,
+          endLine: 5,
+          endColumn: 53,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
@@ -1102,11 +1117,15 @@ ruleTester.run('sort-prop-types', {
       `,
       options: [{ sortShapeProp: true, requiredFirst: true }],
       errors: [
-        diagnostic(
-          'requiredPropsFirst',
-          'Required prop types must be listed before all other prop types',
-          [12, 13, 12, 43],
-        ),
+        {
+          messageId: 'requiredPropsFirst',
+          message:
+            'Required prop types must be listed before all other prop types',
+          line: 12,
+          column: 13,
+          endLine: 12,
+          endColumn: 43,
+        },
       ],
       languageOptions: upstreamModuleOptions,
     },
