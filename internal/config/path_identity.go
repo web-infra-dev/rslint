@@ -29,7 +29,8 @@ type entryNameStatus uint8
 const (
 	entryNameUsable entryNameStatus = iota
 	entryNameUnlisted
-	entryNameUnlistedWithASCIIAnchors
+	entryNameUnlistedFoldedASCII
+	entryNameUnlistedExactASCII
 )
 
 func (identity PathIdentity) normalized() PathIdentity {

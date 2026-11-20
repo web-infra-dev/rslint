@@ -411,6 +411,7 @@ type readerTestFS struct {
 }
 
 func (fsys *readerTestFS) UseCaseSensitiveFileNames() bool { return fsys.caseSensitive }
+func (*readerTestFS) Stat(string) vfs.FileInfo             { return nil }
 func (fsys *readerTestFS) DirectoryExists(path string) bool {
 	if fsys.beforeMarker != nil {
 		fsys.beforeMarker(path)

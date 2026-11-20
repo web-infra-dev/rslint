@@ -2,6 +2,7 @@ package gitignore
 
 import (
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -10,6 +11,12 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// StoredEntryNamer reports the name stored in the parent directory without
+// following the entry's final symlink.
+type StoredEntryNamer interface {
+	StoredEntryName(path string) (string, error)
+}
 
 // Source is one observed .gitignore in physical repository coordinates.
 type Source struct {
@@ -66,12 +73,30 @@ func (reader *Reader) marker(directory string) *repositoryMarker {
 			if reader.fs == nil || (!reader.fs.DirectoryExists(marker) && !reader.fs.FileExists(marker)) {
 				return nil
 			}
-			return &repositoryMarker{sync.OnceValue(func() bool { return reader.caseInsensitive(directory, ".git") })}
+			return &repositoryMarker{sync.OnceValue(func() bool { return reader.repositoryCaseInsensitive(directory, marker) })}
 		})
 		reader.markers[id] = load
 	}
 	reader.mu.Unlock()
 	return load()
+}
+
+func (reader *Reader) repositoryCaseInsensitive(directory, marker string) bool {
+	// A linked worktree can have its config on another volume. A repository
+	// can also override the mode chosen by git init.
+	// Let Git resolve its own config only for a marker on the host filesystem.
+	info := reader.fs.Stat(marker)
+	if os.SameFile(info, info) && (info.Mode().IsRegular() && info.Size() > 0 ||
+		info.IsDir() && reader.fs.FileExists(tspath.CombinePaths(marker, "HEAD"))) {
+		if native, err := os.Stat(marker); err == nil && os.SameFile(info, native) {
+			cmd := exec.Command("git", "--git-dir="+marker, "config", "--bool", "--default=false", "--get", "core.ignoreCase")
+			cmd.Dir = directory
+			if value, err := cmd.Output(); err == nil {
+				return strings.TrimSpace(string(value)) == "true"
+			}
+		}
+	}
+	return reader.caseInsensitive(directory, ".git")
 }
 
 func (reader *Reader) newRoot(directory string) Cursor {
@@ -93,7 +118,7 @@ func (reader *Reader) caseInsensitive(directory, name string) bool {
 		}
 		return false
 	}
-	if native, ok := reader.fs.(utils.StoredEntryNamer); ok {
+	if native, ok := reader.fs.(StoredEntryNamer); ok {
 		left, _ := native.StoredEntryName(path)
 		right, _ := native.StoredEntryName(alternate)
 		if left != "" && right != "" {

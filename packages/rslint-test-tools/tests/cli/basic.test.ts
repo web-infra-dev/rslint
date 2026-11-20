@@ -434,6 +434,43 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
+  test('preserves source and counts when a config redirects a selected directory', async () => {
+    const source = 'export function f() { var x = 1; return x; }';
+    const baseline = '{"current/file.js":{"no-var":{"count":1}}}';
+    const cwd = await createTempDir({
+      'current/file.js': source,
+      'ignored/file.js': source,
+      '.gitignore': '/ignored/\n',
+      'rslint-suppressions.json': baseline,
+      'rslint.config.mjs': `
+        import fs from 'node:fs';
+        import path from 'node:path';
+        const at = name => path.join(import.meta.dirname, name);
+        if (!fs.existsSync(at('saved'))) {
+          fs.renameSync(at('current'), at('saved'));
+          fs.symlinkSync(at('ignored'), at('current'), 'junction');
+        }
+        export default [{ rules: { 'no-var': 'error' } }];
+      `,
+    });
+    try {
+      const result = await runRslint(
+        ['--fix', '--prune-suppressions', 'current/file.js'],
+        cwd,
+      );
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('changed after lint generation');
+      expect(await fs.readFile(path.join(cwd, 'ignored/file.js'), 'utf8')).toBe(
+        source,
+      );
+      expect(
+        await fs.readFile(path.join(cwd, 'rslint-suppressions.json'), 'utf8'),
+      ).toBe(baseline);
+    } finally {
+      await cleanupTempDir(cwd);
+    }
+  });
+
   test('keeps plugin failures visible and preserves the baseline on an incomplete update', async () => {
     const saved = JSON.stringify({
       'a.js': {

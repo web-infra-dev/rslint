@@ -10,7 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 )
@@ -34,29 +34,41 @@ func NewInputPathNames(fsys vfs.FS) *InputPathNames {
 }
 
 func (names *InputPathNames) storedName(parent, actualParent, base string, directory bool) (name string, hardLinkNameUnknown bool) {
+	if names.listings == nil {
+		// A live document can read one entry without listing its siblings.
+		if native, ok := names.fs.(gitignore.StoredEntryNamer); ok {
+			return nativeEntryName(native, parent, base)
+		}
+	}
 	key := inputListing{actualParent, directory}
 	entries, ok := names.listings[key]
 	if !ok {
 		entries = InputEntryNames(names.fs, actualParent, directory)
-		names.listings[key] = entries
+		if names.listings != nil {
+			names.listings[key] = entries
+		}
 	}
 	stored := StoredEntryName(entries, base)
 	if stored == base {
 		return base, false
 	}
-	path := tspath.CombinePaths(parent, base)
-	if native, ok := names.fs.(utils.StoredEntryNamer); ok {
+	if native, ok := names.fs.(gitignore.StoredEntryNamer); ok {
 		// A searchable directory may hide its listing. Query the entry itself
 		// without substituting another symlink or hard link to the same file.
-		if name, err := native.StoredEntryName(path); name != "" {
-			return name, false
-		} else if errors.Is(err, fs.ErrPermission) {
-			return base, true
-		}
-	} else if stored != "" && SamePhysicalPath(names.fs, path, tspath.CombinePaths(actualParent, stored)) {
+		return nativeEntryName(native, parent, base)
+	}
+	if stored != "" && SamePhysicalPath(names.fs, tspath.CombinePaths(parent, base), tspath.CombinePaths(actualParent, stored)) {
 		return stored, false
 	}
 	return base, false
+}
+
+func nativeEntryName(native gitignore.StoredEntryNamer, parent, base string) (string, bool) {
+	name, err := native.StoredEntryName(tspath.CombinePaths(parent, base))
+	if name != "" {
+		return name, false
+	}
+	return base, errors.Is(err, fs.ErrPermission)
 }
 
 // Directory returns the stored spelling of a frozen physical directory.
@@ -82,7 +94,17 @@ func (names *InputPathNames) Directory(path string) string {
 
 // File preserves the invocation path and freezes its physical target and Git entry.
 func (names *InputPathNames) File(file PathIdentity, enumerated bool) PathIdentity {
-	if names.fs == nil {
+	return names.file(file, enumerated, names)
+}
+
+// LiveFile shares directory observations but reads the document's leaf entry
+// and any symlink target's leaf again, including after an unannounced rename.
+func (names *InputPathNames) LiveFile(file PathIdentity, fsys vfs.FS) PathIdentity {
+	return names.file(file, false, &InputPathNames{fs: fsys})
+}
+
+func (names *InputPathNames) file(file PathIdentity, enumerated bool, leaves *InputPathNames) PathIdentity {
+	if names.fs == nil || leaves.fs == nil {
 		return file
 	}
 	parent := file.CanonicalParentPath
@@ -97,11 +119,17 @@ func (names *InputPathNames) File(file PathIdentity, enumerated bool) PathIdenti
 	actual := base
 	if !enumerated {
 		var unknown bool
-		actual, unknown = names.storedName(parent, actualParent, base, false)
+		actual, unknown = leaves.storedName(parent, actualParent, base, false)
 		if unknown {
 			file.entryNameStatus = entryNameUnlisted
-			if native, ok := names.fs.(interface{ PreservesASCIILookupAnchors(path string) bool }); ok && native.PreservesASCIILookupAnchors(file.Path) {
-				file.entryNameStatus = entryNameUnlistedWithASCIIAnchors
+			if native, ok := leaves.fs.(interface {
+				ASCIILookupAnchors(path string) (preserved, exactCase bool)
+			}); ok {
+				if preserved, exact := native.ASCIILookupAnchors(file.Path); exact {
+					file.entryNameStatus = entryNameUnlistedExactASCII
+				} else if preserved {
+					file.entryNameStatus = entryNameUnlistedFoldedASCII
+				}
 			}
 		}
 		if actual != base {
@@ -118,7 +146,7 @@ func (names *InputPathNames) File(file PathIdentity, enumerated bool) PathIdenti
 		// A leaf symlink has a separate physical target and Git entry.
 		original := tspath.GetDirectoryPath(file.CanonicalPath)
 		targetParent := names.Directory(original)
-		targetName, _ := names.storedName(original, targetParent, tspath.GetBaseFileName(file.CanonicalPath), false)
+		targetName, _ := leaves.storedName(original, targetParent, tspath.GetBaseFileName(file.CanonicalPath), false)
 		file.CanonicalPath = tspath.CombinePaths(targetParent, targetName)
 	}
 	return file

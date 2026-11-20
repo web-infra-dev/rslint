@@ -322,7 +322,7 @@ func (resolver *configTargetResolver) resolveTargetWithGitEntryBlock(discovered 
 	}
 	decision.gitEntryUnverified = discovered.entryNameStatus != entryNameUsable &&
 		resolver.globallyIgnores(target, matches, true) &&
-		resolver.gitPolicy.mayIgnoreUnlistedFile(target.gitPath, discovered.entryNameStatus == entryNameUnlistedWithASCIIAnchors)
+		resolver.gitPolicy.mayIgnoreUnlistedFile(target.gitPath, discovered.entryNameStatus)
 
 	var tail []byte
 	if tailEntryCount := len(resolver.config) - 64; tailEntryCount > 0 {

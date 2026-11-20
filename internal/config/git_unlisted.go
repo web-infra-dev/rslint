@@ -1,17 +1,19 @@
 package config
 
 import (
+	"path"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // mayIgnoreUnlistedFile asks whether any allowed spelling of an admitted
 // file could instead be ignored. Only its leaf is unknown. Complete literal
 // names can be checked by the same matcher used for ordinary inputs.
-func (policy *GitPolicy) mayIgnoreUnlistedFile(path string, asciiAnchors bool) bool {
+func (policy *GitPolicy) mayIgnoreUnlistedFile(path string, status entryNameStatus) bool {
 	root, directory := policy.repository(path, false)
 	if root == "" {
 		return false
@@ -25,38 +27,26 @@ func (policy *GitPolicy) mayIgnoreUnlistedFile(path string, asciiAnchors bool) b
 			if p.Negated || p.GitDirectoryOnly {
 				continue
 			}
-			glob := gitIgnoreNodeGlob(p)
-			if name, ok := gitIgnoreRootBasenameGlob(p); ok {
-				glob = name
-			}
-			if !strings.ContainsAny(glob, "*?[{") {
-				name := tspath.GetBaseFileName(glob)
-				if asciiAnchors && (distinctASCIIAnchors(base, name, false) || distinctASCIIAnchors(base, name, true)) {
-					continue
-				}
-				candidate := tspath.CombinePaths(directory, name)
-				relative := tspath.CombinePaths(parent, name)
-				if p.CaseInsensitive {
-					relative = strings.ToLower(relative)
-				}
-				if gitIgnorePatternMatchesNode(p, relative) && policy.matchFile(candidate, &unlistedGitMatch{positive: p, literal: true}) {
-					return true
-				}
+			leaf, possible := gitLeafInDirectory(p, parent)
+			if !possible {
 				continue
 			}
-
-			prefix, dir := literalSegmentPrefix(glob), parent
-			if p.CaseInsensitive {
-				dir = strings.ToLower(dir)
+			prefix := leaf
+			wildcard := strings.IndexAny(leaf, "*?")
+			if wildcard >= 0 {
+				prefix = leaf[:wildcard]
 			}
-			if prefix != "" && !segPrefix(prefix, dir) {
+			suffix := gitLiteralSuffix(gitIgnoreNodeGlob(p))
+			if status.distinctASCIIAnchors(base, prefix, p, false) || status.distinctASCIIAnchors(base, suffix, p, true) {
 				continue
 			}
-			suffix := gitLiteralSuffix(glob)
-			if asciiAnchors && distinctASCIIAnchors(base, suffix, true) {
-				continue
+			candidate := path
+			match := unlistedGitMatch{positive: p, suffix: suffix}
+			if leaf != "" && wildcard < 0 {
+				candidate = tspath.CombinePaths(directory, leaf)
+				match.literal = true
 			}
-			if policy.matchFile(path, &unlistedGitMatch{positive: p, suffix: suffix}) {
+			if policy.matchFile(candidate, &match) {
 				return true
 			}
 		}
@@ -64,6 +54,29 @@ func (policy *GitPolicy) mayIgnoreUnlistedFile(path string, asciiAnchors bool) b
 			return false
 		}
 	}
+}
+
+// gitLeafInDirectory returns the filename pattern under the known parent.
+// An empty result with possible set means the rule cannot be split that far.
+func gitLeafInDirectory(p *IgnorePattern, parent string) (leaf string, possible bool) {
+	glob := gitIgnoreNodeGlob(p)
+	directory, leaf := path.Split(glob)
+	if p.CaseInsensitive {
+		parent = gitignore.FoldCase(parent)
+	}
+	if strings.ContainsAny(leaf, "[]{}") {
+		// A class can consume a slash, including the one Split found. If the
+		// known parent lies deeper, this leaf's prefix could name a directory.
+		directory, leaf = path.Split(glob[:strings.IndexAny(glob, "[]{}")])
+		if utils.MatchGlob(directory+"**/*", parent) {
+			return "", true
+		}
+		leaf += "*"
+	}
+	if leaf == "**" {
+		return "", utils.MatchGlob(directory+"**", parent)
+	}
+	return leaf, utils.MatchGlob(strings.TrimSuffix(directory, "/"), parent)
 }
 
 // A wildcard admits more names than we can enumerate. Its original positive
@@ -115,7 +128,13 @@ func gitLiteralSuffix(glob string) string {
 
 // Compare only contiguous ASCII bytes at the same end. A Unicode spelling
 // can expand or compose, so the first non-ASCII byte ends this proof.
-func distinctASCIIAnchors(left, right string, suffix bool) bool {
+func (status entryNameStatus) distinctASCIIAnchors(left, right string, p *IgnorePattern, suffix bool) bool {
+	if status != entryNameUnlistedExactASCII && status != entryNameUnlistedFoldedASCII {
+		return false
+	}
+	if status == entryNameUnlistedFoldedASCII || p.CaseInsensitive {
+		left, right = gitignore.FoldCase(left), gitignore.FoldCase(right)
+	}
 	for i := range min(len(left), len(right)) {
 		a, b := left[i], right[i]
 		if suffix {
@@ -123,12 +142,6 @@ func distinctASCIIAnchors(left, right string, suffix bool) bool {
 		}
 		if a >= utf8.RuneSelf || b >= utf8.RuneSelf {
 			return false
-		}
-		if a >= 'A' && a <= 'Z' {
-			a += 'a' - 'A'
-		}
-		if b >= 'A' && b <= 'Z' {
-			b += 'a' - 'A'
 		}
 		if a != b {
 			return true

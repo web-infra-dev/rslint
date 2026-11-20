@@ -3,6 +3,7 @@ package config
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -64,6 +65,49 @@ func TestGitPolicyUsesRepositoryFilesystemCase(t *testing.T) {
 		}
 		if !policy.blocksDirectoryEntry("/repo/SRC") || policy.blocksDirectoryEntry("/repo/src") {
 			t.Fatalf("marker=%v, distinct directory entries shared Git admission", marker)
+		}
+	}
+}
+
+func TestGitPolicyUsesLinkedWorktreeConfigAndASCIICase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("requires git")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	root := gitPolicyFixture(t, nil)
+	repo := tspath.CombinePaths(root, "primary")
+	worktree := tspath.CombinePaths(root, "linked")
+	git := func(directory string, args ...string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd.Dir = directory
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s: %v", args, out, err)
+		}
+	}
+	git(root, "init", "-q", repo)
+	git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "initial", "--allow-empty")
+	git(repo, "worktree", "add", "-q", "--detach", worktree, "HEAD")
+	if err := os.WriteFile(tspath.CombinePaths(worktree, ".gitignore"), []byte("/SRC/\n/é.js\n/é/\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	git(repo, "config", "core.ignoreCase", "true")
+	for _, ignoreCase := range []bool{true, false} {
+		if !ignoreCase {
+			git(repo, "config", "--unset", "core.ignoreCase")
+		}
+		reader := gitignore.NewReader(osvfs.FS())
+		cursor := reader.Observe(reader.Ancestors(worktree), worktree)
+		policy := NewGitPolicy(reader.Snapshot())
+		for path, want := range map[string]bool{"src": ignoreCase, "é": true, "É": false} {
+			_, blocked := cursor.Enter(tspath.CombinePaths(worktree, path))
+			if blocked != want || policy.ignored(tspath.CombinePaths(worktree, path, "f.js")) != want {
+				t.Errorf("ignoreCase=%t, directory %q: want ignored=%t", ignoreCase, path, want)
+			}
+		}
+		if !policy.ignored(tspath.CombinePaths(worktree, "é.js")) || policy.ignored(tspath.CombinePaths(worktree, "É.js")) {
+			t.Errorf("ignoreCase=%t: Git must distinguish non-ASCII file names", ignoreCase)
 		}
 	}
 }
@@ -677,6 +721,7 @@ func TestGitPolicyUnlistedLeaf(t *testing.T) {
 		{"/locked/Straße.js\n!/locked/Straße.js", false},
 		{"/else/Straße.js", false},
 		{"/else/*.js", false},
+		{"**/__tests__/*.js", false},
 		{"other.js", false},
 		{"*.log", false},
 		{"node_modules/", false},
@@ -689,7 +734,7 @@ func TestGitPolicyUnlistedLeaf(t *testing.T) {
 		policy := NewGitPolicy(gitignore.Snapshot{
 			Roots: []string{root}, Sources: []gitignore.Source{{Directory: root, CaseInsensitive: true, Patterns: patterns}},
 		})
-		if got := policy.mayIgnoreUnlistedFile(leaf, true); got != test.unsafe {
+		if got := policy.mayIgnoreUnlistedFile(leaf, entryNameUnlistedFoldedASCII); got != test.unsafe {
 			t.Errorf("unlisted file with %q: possible Git exclusion = %t, want %t", test.ignore, got, test.unsafe)
 		}
 	}
@@ -699,7 +744,25 @@ func TestGitPolicyUnlistedLeaf(t *testing.T) {
 		{Directory: root, Patterns: positive, CaseInsensitive: true},
 		{Directory: root + "/locked", Patterns: negation},
 	}})
-	if !mixed.mayIgnoreUnlistedFile(leaf, true) {
+	if !mixed.mayIgnoreUnlistedFile(leaf, entryNameUnlistedFoldedASCII) {
 		t.Error("a case-sensitive negation admitted every spelling of a case-insensitive literal")
+	}
+
+	_, literal := gitignore.NewCursor(root, true).AppendSourcePatterns(root, "/locked/Plain.js\n/locked/private-*.js")
+	sensitive := NewGitPolicy(gitignore.Snapshot{
+		Roots: []string{root}, Sources: []gitignore.Source{{Directory: root, Patterns: literal}},
+	})
+	for _, check := range []struct {
+		name   string
+		status entryNameStatus
+		unsafe bool
+	}{
+		{"plain.js", entryNameUnlistedExactASCII, false},
+		{"plain.js", entryNameUnlistedFoldedASCII, true},
+		{"PUBLIC.js", entryNameUnlistedFoldedASCII, false},
+	} {
+		if got := sensitive.mayIgnoreUnlistedFile(root+"/locked/"+check.name, check.status); got != check.unsafe {
+			t.Errorf("unlisted %s with name status %d: possible Git exclusion = %t, want %t", check.name, check.status, got, check.unsafe)
+		}
 	}
 }

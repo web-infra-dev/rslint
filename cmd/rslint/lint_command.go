@@ -656,6 +656,14 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		if err := ctx.Err(); err != nil {
 			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 		}
+		if args.Suppressions.Mode != suppressions.Check {
+			for i := range targetPlan.Files {
+				file := &targetPlan.Files[i]
+				if err := verifyLintDestination(file); err != nil {
+					baseline.PreserveCounts(file.Path, err)
+				}
+			}
+		}
 		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args, commitSources)
 		if sourceWriteErr != nil {
 			return abortRun(1, "applying fixes: "+sourceWriteErr.Error(), fmt.Sprintf("error applying fixes: %v", sourceWriteErr))

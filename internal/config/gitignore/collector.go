@@ -21,10 +21,29 @@ func normalizeGlobPath(path string) string {
 	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
+// FoldCase applies Git's ASCII-only case folding to an ignore pattern or path.
+func FoldCase(s string) string {
+	start := strings.IndexAny(s, "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	if start < 0 {
+		return s
+	}
+	var result strings.Builder
+	result.Grow(len(s))
+	result.WriteString(s[:start])
+	for i := start; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		result.WriteByte(c)
+	}
+	return result.String()
+}
+
 func matchGitignoreGlob(pattern string, path string, useCaseSensitive bool) bool {
 	if !useCaseSensitive {
-		pattern = strings.ToLower(pattern)
-		path = strings.ToLower(path)
+		pattern = FoldCase(pattern)
+		path = FoldCase(path)
 	}
 	return utils.MatchGlob(pattern, path)
 }
