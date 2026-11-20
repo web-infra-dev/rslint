@@ -39,6 +39,7 @@ type File struct {
 	options       Options
 	entries       entries
 	targetAliases []targetAlias
+	pending       *stagedUpdate
 }
 
 // NoteTargetAlias records two selected filenames for which lint will run only once.
@@ -52,6 +53,12 @@ func (f *File) NoteTargetAlias(selected, other string) {
 // CheckTargetAliases reports when recording or verifying counts requires both filenames.
 func (f *File) CheckTargetAliases() error {
 	return f.checkTargetAliases(f.entries)
+}
+
+// NeedsUpdateBeforeFixes reports whether another writer could add an alias
+// count between this run's source changes and its baseline update.
+func (f *File) NeedsUpdateBeforeFixes() bool {
+	return f.options.Mode != Check && len(f.targetAliases) > 0
 }
 
 func (f *File) checkTargetAliases(data entries) error {

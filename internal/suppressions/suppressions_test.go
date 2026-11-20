@@ -203,7 +203,20 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 		})
 		return err
 	}
+	if err := first.BeginUpdate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.BeginUpdate(); err == nil {
+		t.Fatal("another writer acquired a reserved update")
+	}
 	if err := update(t.Context(), first, "first"); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.BeginUpdate(); err != nil {
+		t.Fatal(err)
+	}
+	first.DiscardUpdate() // A completed run cannot release the next writer's lock.
+	if _, err := os.Stat(DefaultFilename + ".tmp"); err != nil {
 		t.Fatal(err)
 	}
 	if err := update(t.Context(), second, "second"); err != nil {

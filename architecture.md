@@ -1495,11 +1495,16 @@ files, skipped rules and diagnostics to `internal/suppressions`. The final
 lint result's filename identifies its diagnostics and its baseline entry.
 Recording, checking and pruning use that filename relative to the physical
 working directory. This keeps the base directory for the JSON keys stable
-when a shell enters the same project through a symlink. At physical file
+when a shell enters the same project through a symlink. The CLI resolves native
+file identities before config discovery. On macOS the physical path uses the
+spelling stored on disk. Directory and glob selections retain their requested
+names through config discovery, including at nested configs. At physical file
 deduplication, target selection can report two distinct names that would
 share one lint result. The file CLI uses this fact to reject recording or
 verifying counts for those names together. Updates repeat this check against
-the latest baseline under the write lock.
+the latest baseline under the write lock. If an autofix run selects such a
+pair and also updates the baseline, it acquires the lock after the in-memory
+fix rounds and holds it from the final source write through baseline publication.
 
 Files with syntax errors and rules skipped for lack of type information keep
 their entries. The plugin dispatcher identifies incomplete rule results.

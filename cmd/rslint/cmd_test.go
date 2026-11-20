@@ -2544,6 +2544,69 @@ func TestCLIFinalChangeCommitterCommitsCompleteFinalDelta(t *testing.T) {
 	}
 }
 
+func TestCLIFinalChangeCommitterChecksSelectedHardLinks(t *testing.T) {
+	root := tspath.NormalizePath(t.TempDir())
+	first, second := tspath.ResolvePath(root, "first.js"), tspath.ResolvePath(root, "second.js")
+	if err := os.WriteFile(first, []byte("before"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(first, second); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name         string
+		selectSecond bool
+		secondAfter  string
+		conflict     bool
+	}{
+		{name: "different fixes", selectSecond: true, secondAfter: "other", conflict: true},
+		{name: "unchanged selected link", selectSecond: true, conflict: true},
+		{name: "same fix", selectSecond: true, secondAfter: "fixed"},
+		{name: "single selected link"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := os.WriteFile(first, []byte("before"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			files := []target.File{{PathIdentity: rslintconfig.FreezeFileIdentity(first, nil)}}
+			if test.selectSecond {
+				files = append(files, target.File{PathIdentity: rslintconfig.FreezeFileIdentity(second, nil)})
+			}
+			if test.conflict && test.secondAfter != "" {
+				// Three incompatible names must consistently report the first pair.
+				third := tspath.ResolvePath(root, "third.js")
+				if err := os.Link(first, third); err != nil {
+					t.Fatal(err)
+				}
+				files = append(files, target.File{PathIdentity: rslintconfig.FreezeFileIdentity(third, nil)})
+			}
+			changes := []linter.FileChange{{Path: first, Before: "before", After: "fixed"}}
+			if test.secondAfter != "" {
+				changes = append(changes, linter.FileChange{Path: second, Before: "before", After: test.secondAfter})
+			}
+			result, err := newCLIFinalChangeCommitter(files).CommitFinalChanges(t.Context(), changes)
+			want := "fixed"
+			if test.conflict {
+				if err == nil || !strings.Contains(err.Error(), first) || !strings.Contains(err.Error(), second) || len(result.ConfirmedPaths) != 0 {
+					t.Fatalf("hard-link conflict: result=%+v error=%v", result, err)
+				}
+				want = "before"
+			} else {
+				wantPaths := []string{first}
+				if test.secondAfter != "" {
+					wantPaths = append(wantPaths, second)
+				}
+				if err != nil || !slices.Equal(result.ConfirmedPaths, wantPaths) {
+					t.Fatalf("commit: result=%+v error=%v", result, err)
+				}
+			}
+			if text, err := os.ReadFile(second); err != nil || string(text) != want {
+				t.Fatalf("linked file = %q, %v; want %q", text, err, want)
+			}
+		})
+	}
+}
+
 func TestCLIFinalChangeCommitterKeepsFrozenAliasTarget(t *testing.T) {
 	const before = utils.BOM + "var value = 1;\n"
 	const after = utils.BOM + "let value = 1;\n"

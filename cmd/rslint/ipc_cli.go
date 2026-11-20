@@ -43,9 +43,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/microsoft/TypeScript/tsc/shim/bundled"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
-	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/api/plugin"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
@@ -291,7 +288,7 @@ func runIPCCommand(ch *ipc.Channel, args []string) int {
 			fmt.Fprintln(os.Stderr, "error: CLI host did not provide config discovery intent")
 			return 2
 		}
-		baseArgs.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+		baseArgs.FS = newCLIFileSystem()
 		prepareErr := prepareCLIInputs(ctx, &baseArgs, payload.Files)
 		if prepareErr == nil {
 			prepareErr = discoverCLIConfigCatalog(ctx, &baseArgs, payload, ch)
