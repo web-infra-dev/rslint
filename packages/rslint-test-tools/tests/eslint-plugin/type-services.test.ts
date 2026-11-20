@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, relative } from 'node:path';
+import { inspect } from 'node:util';
 import { Worker } from 'node:worker_threads';
 import { Linter } from 'eslint';
 import tsParser from '@typescript-eslint/parser';
@@ -1899,6 +1900,14 @@ test('public checker, Program and source reads match TypeScript', async () => {
     const literal = checker.getStringLiteralType('abc');
     expect(Reflect.set(literal, 'value', 'changed')).toBe(false);
     expect(checker.typeToString(literal)).toBe('"abc"');
+    Object.defineProperty(literal, Symbol.toStringTag, {
+      get() {
+        return this === literal ? 'RuleLiteral' : undefined;
+      },
+    });
+    const printed = inspect(literal, { depth: 0 });
+    expect(printed).toContain('[RuleLiteral]');
+    expect(printed).not.toContain('types:');
     expect(() =>
       checker.typeToString(Object.create(literal) as object),
     ).toThrow('foreign type handle');
