@@ -36,7 +36,7 @@ const introducedInByRule = ruleVersionById;
 type RuleStateDescribe = {
   name: string;
   count: number;
-  style: 'full' | 'partial-impl' | 'partial-test' | 'total';
+  style: 'full' | 'partial-impl' | 'total';
 };
 
 function getRuleUrl(rule: Rule): { url: string; isInternal: boolean } {
@@ -84,7 +84,6 @@ const StatCard: React.FC<{ item: RuleStateDescribe }> = ({ item }) => {
     const colorMap: Record<RuleStateDescribe['style'], string> = {
       total: 'text-gray-900 dark:text-gray-100',
       'partial-impl': 'text-orange-600 dark:text-orange-400',
-      'partial-test': 'text-yellow-600 dark:text-yellow-400',
       full: 'text-green-600 dark:text-green-400',
     };
     return colorMap[style] || colorMap.total;
@@ -157,7 +156,6 @@ const RuleImplementationStatus: React.FC = () => {
   const availableStatuses = [
     { value: 'full', label: 'Full' },
     { value: 'partial-impl', label: 'Partial Implemented' },
-    { value: 'partial-test', label: 'Partial Tested' },
   ];
 
   // Build preset filter options from levels that have at least one rule
@@ -181,12 +179,6 @@ const RuleImplementationStatus: React.FC = () => {
       style: 'partial-impl',
     },
     {
-      name: 'Partial Tested',
-      count: filteredRules.filter((item) => item.status === 'partial-test')
-        .length,
-      style: 'partial-test',
-    },
-    {
       name: 'Total Rules',
       count: filteredRules.length,
       style: 'total',
@@ -201,7 +193,7 @@ const RuleImplementationStatus: React.FC = () => {
           <Heading>Implementation Overview</Heading>
         </CardHeader>
         <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {statusCount.map((item, index) => (
               <StatCard key={index} item={item} />
             ))}

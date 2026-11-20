@@ -35,7 +35,6 @@ The `rule-manifest.json` file provides a machine-readable manifest of all implem
 - `status`:
   - `full`: Implementation and tests are complete (Go/JS side all pass, no skipped cases)
   - `partial-impl`: Implementation or test is incomplete, or there are skipped/known failing cases (see `failing_case`)
-  - `partial-test`: Only Go-side tests exist, or the rule is not included in the JS test config
   - `none`: Not implemented, no tests
 - `failing_case`: For `partial-impl` rules, an array of objects with:
   - `name`: The name/description of the skipped or failing test case
@@ -44,7 +43,6 @@ The `rule-manifest.json` file provides a machine-readable manifest of all implem
 
 ## Status Determination Logic
 
-- If a rule is not included in the `include` list of `rstack.config.mts`, its status is `partial-test`.
 - If a rule is included but has any skipped test cases (e.g., `describe.skip`, `it.skip`, or `{ skip: true, name: ... }`), its status is `partial-impl`, and all such cases are listed in `failing_case`.
 - If a rule is included and has no skipped cases, its status is `full`.
 - If a rule is not implemented or has no tests, its status is `none`.
