@@ -147,7 +147,8 @@ func TestStaticPrimitiveCaptureScope(t *testing.T) {
 		{"local fresh object", `function visit(){const opts={current:"some"}; const key=opts.current; array[key](()=>unknown(opts));}`, true},
 		{"alias of outer object", `const shared={current:"some"}; function visit(){const alias=shared; const key=alias.current; array[key](()=>unknown(alias));}`, false},
 		{"literal primitive", `const opts={current:"some"}; function visit(){const key="some"; array[key](()=>unknown(opts));}`, true},
-		{"single top-level IIFE", `const opts={current:"some"}; (()=>{const key=opts.current; array[key](()=>unknown(opts));})();`, true},
+		// No execution-order recovery for outer objects, even in a direct IIFE.
+		{"single top-level IIFE", `const opts={current:"some"}; (()=>{const key=opts.current; array[key](()=>unknown(opts));})();`, false},
 		{"IIFE inside loop", `const opts={current:"some"}; for(let i=0;i<2;i++){(()=>{const key=opts.current; array[key](()=>unknown(opts));})();}`, false},
 		{"IIFE inside repeated function", `const opts={current:"some"}; function visit(){(()=>{const key=opts.current; array[key](()=>unknown(opts));})();}`, false},
 		{"asynchronous IIFE", `const opts={current:"some"}; (async()=>{await unknown(); const key=opts.current; array[key](()=>unknown(opts));})();`, false},

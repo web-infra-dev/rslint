@@ -395,7 +395,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 				// (2) array predicate: inspect the predicate function's return
 				// type against the same VariantType matrix.
 				if utils.IsArrayMethodCallWithPredicate(tc, callExpr, staticEvaluator) && len(callExpr.Arguments.Nodes) > 0 {
-					predicate, predicateType := firstArrayPredicateArgument(ctx, staticEvaluator, callExpr.Arguments.Nodes)
+					predicate, predicateType := firstArrayPredicateArgument(ctx, callExpr.Arguments.Nodes)
 					if predicate != nil {
 						checkArrayMethodPredicate(ctx, sf, tc, predicate, predicateType, opts)
 					}
@@ -901,9 +901,9 @@ func getSuggestionsForConditionError(
 
 // ----- Array predicate checking ----------------------------------------
 
-// Inspect only authored outer assertions. The checker already knows whether
-// their operands, including conditional expressions and aliases, can be nullish;
-// no expression evaluator or whole-tree scan is needed.
+// Inspect local result-producing expressions for erased nullish values.
+// Follow conditional branches and logical results, without evaluating calls,
+// resolving aliases or treating a nullable receiver as a nullable result.
 func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
 	for node = ast.SkipParentheses(node); node != nil; node = ast.SkipParentheses(node.Expression()) {
 		awaited := false
@@ -911,6 +911,21 @@ func assertionCanBeNullish(tc *checker.Checker, node *ast.Node) bool {
 		case ast.KindNonNullExpression, ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindSatisfiesExpression:
 		case ast.KindAwaitExpression:
 			awaited = true
+		case ast.KindConditionalExpression:
+			conditional := node.AsConditionalExpression()
+			return assertionCanBeNullish(tc, conditional.WhenTrue) || hasOptionalChain(conditional.WhenTrue) ||
+				assertionCanBeNullish(tc, conditional.WhenFalse) || hasOptionalChain(conditional.WhenFalse)
+		case ast.KindBinaryExpression:
+			binary := node.AsBinaryExpression()
+			switch binary.OperatorToken.Kind {
+			case ast.KindAmpersandAmpersandToken:
+				return assertionCanBeNullish(tc, binary.Left) || hasOptionalChain(binary.Left) ||
+					assertionCanBeNullish(tc, binary.Right) || hasOptionalChain(binary.Right)
+			case ast.KindBarBarToken, ast.KindQuestionQuestionToken, ast.KindCommaToken:
+				// A nullish left operand cannot be the result of || or ??.
+				return assertionCanBeNullish(tc, binary.Right) || hasOptionalChain(binary.Right)
+			}
+			return false
 		default:
 			return false
 		}
@@ -957,11 +972,11 @@ func hasOptionalChain(node *ast.Node) bool {
 	return false
 }
 
-// firstArrayPredicateArgument selects the actual first argument after spreads.
+// firstArrayPredicateArgument selects possible first arguments from static spread types.
 // A possibly empty spread also admits the next argument. Keep the authored
 // spread as the diagnostic node: its element types do not identify a safe
 // inline function to edit.
-func firstArrayPredicateArgument(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, arguments []*ast.Node) (*ast.Node, *checker.Type) {
+func firstArrayPredicateArgument(ctx rule.RuleContext, arguments []*ast.Node) (*ast.Node, *checker.Type) {
 	tc := ctx.TypeChecker
 	var firstTypes []*checker.Type
 	var reportNode *ast.Node
@@ -972,18 +987,6 @@ func firstArrayPredicateArgument(ctx rule.RuleContext, evaluator *utils.StaticSt
 			}
 			firstTypes = append(firstTypes, utils.GetConstrainedTypeAtLocation(tc, argument))
 			break
-		}
-		if element, handled := assignedArrayIteratorElement(ctx, evaluator, argument.Expression()); handled {
-			if element == nil {
-				return nil, nil
-			}
-			if !utils.IsTypeFlagSet(element, checker.TypeFlagsNever) {
-				if reportNode == nil {
-					reportNode = argument
-				}
-				firstTypes = append(firstTypes, element)
-			}
-			continue
 		}
 		spreadType := utils.GetConstrainedTypeAtLocation(tc, argument.Expression())
 		types, mayBeEmpty, known := firstSpreadElementTypes(ctx, spreadType, map[*checker.Type]bool{})
@@ -1014,90 +1017,6 @@ func firstArrayPredicateArgument(ctx rule.RuleContext, evaluator *utils.StaticSt
 		return nil, nil
 	}
 	return reportNode, tc.GetUnionType(firstTypes)
-}
-
-// Object.assign's intersection type retains overwritten iterator signatures.
-// Resolve only the direct builtin, a fresh array target and plain literal
-// sources, selecting the last own iterator. Unknown sources/mutations stay
-// opaque rather than combining runtime-incompatible signatures.
-func assignedArrayIteratorElement(ctx rule.RuleContext, evaluator *utils.StaticStringEvaluator, expression *ast.Node) (*checker.Type, bool) {
-	node := utils.SkipAssertionsAndParens(expression)
-	unmodified := true
-	seen := map[*ast.Node]bool{}
-	for ast.IsIdentifier(node) {
-		if seen[node] {
-			return nil, false
-		}
-		seen[node] = true
-		initializer, ok := evaluator.ResolveIdentifierInitializer(node)
-		if !ok {
-			return nil, false
-		}
-		if _, stable := evaluator.ResolveUnmodifiedInitializerAtLocation(node); !stable {
-			unmodified = false
-		}
-		node = utils.SkipAssertionsAndParens(initializer)
-	}
-	if !ast.IsCallExpression(node) || !ast.IsPropertyAccessExpression(node.Expression()) {
-		return nil, false
-	}
-	callee := node.Expression().AsPropertyAccessExpression()
-	if callee.Name().Text() != "assign" || !ast.IsIdentifier(callee.Expression) || callee.Expression.Text() != "Object" ||
-		!ctx.Refs.IsGlobalNameReference(callee.Expression, "Object", ast.SymbolFlagsValue) {
-		return nil, false
-	}
-	arguments := node.Arguments()
-	if len(arguments) < 2 || !ast.IsArrayLiteralExpression(utils.SkipAssertionsAndParens(arguments[0])) {
-		return nil, false
-	}
-	// Ordinary metadata assignments retain the existing type path. Activate
-	// source precedence only when a literal actually declares an own iterator.
-	hasIterator := false
-	for _, source := range arguments[1:] {
-		source = utils.SkipAssertionsAndParens(source)
-		if ast.IsObjectLiteralExpression(source) {
-			if iterator := utils.GetWellKnownSymbolPropertyOfType(ctx.TypeChecker.GetTypeAtLocation(source), "iterator", ctx.TypeChecker); iterator != nil {
-				for _, declaration := range iterator.Declarations {
-					if declaration.Parent == source {
-						hasIterator = true
-					}
-				}
-			}
-		}
-	}
-	if !hasIterator {
-		return nil, false
-	}
-	if !unmodified || !evaluator.IsUnmodifiedBuiltinMethod(node.Expression(), "Object", "assign") || !evaluator.HasUnmodifiedArrayPrototype() {
-		return nil, true
-	}
-	var last *checker.Type
-	for _, source := range arguments[1:] {
-		source = utils.SkipAssertionsAndParens(source)
-		if !ast.IsObjectLiteralExpression(source) {
-			return nil, true
-		}
-		for _, property := range source.AsObjectLiteralExpression().Properties.Nodes {
-			if property.Kind != ast.KindPropertyAssignment && property.Kind != ast.KindShorthandPropertyAssignment && property.Kind != ast.KindMethodDeclaration {
-				return nil, true
-			}
-		}
-		t := ctx.TypeChecker.GetTypeAtLocation(source)
-		if utils.GetWellKnownSymbolPropertyOfType(t, "iterator", ctx.TypeChecker) != nil {
-			last = t
-		}
-	}
-	if last == nil {
-		return nil, false
-	}
-	first, _, known := iterableElementTypes(ctx.TypeChecker, last)
-	if !known {
-		return nil, true
-	}
-	if len(first) == 0 {
-		return ctx.TypeChecker.GetNeverType(), true
-	}
-	return first[0], true
 }
 
 // Read tuple elements in order and stop at the first guaranteed argument. For
@@ -1186,9 +1105,9 @@ func firstSpreadElementTypes(ctx rule.RuleContext, t *checker.Type, visiting map
 	return types, true, true
 }
 
-// A matching ambient method signature does not replace the runtime iterator.
-// Compare instantiated return types with the library signatures, and accept
-// only declarations with no implementation. Different signatures remain opaque.
+// Matching ambient signatures preserve the standard static tuple model.
+// This does not prove that the runtime iterator has not been replaced.
+// Different signatures use the declared yield type instead.
 func hasStandardIteratorSignature(ctx rule.RuleContext, iterator *ast.Symbol) bool {
 	tc := ctx.TypeChecker
 	if len(iterator.Declarations) == 0 {

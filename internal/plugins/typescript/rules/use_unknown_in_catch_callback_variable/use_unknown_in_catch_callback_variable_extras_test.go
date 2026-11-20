@@ -1,7 +1,6 @@
 package use_unknown_in_catch_callback_variable
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
@@ -162,7 +161,6 @@ func TestUseUnknownInCatchCallbackVariableTopLevelCapture(t *testing.T) {
 	const declarations = `const methods:{current:'catch'|'then'}={current:'catch'}; function change(o:{current:string}){o.current='then'} `
 	const body = `(()=>{const key=methods.current; Promise.resolve(1)[key]((error: any)=>change(methods));})();`
 	code := declarations + body
-	parameter := "error: any"
-	column := strings.Index(code, parameter) + 1
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{{Code: declarations + `change(methods); ` + body}}, []rule_tester.InvalidTestCase{{Code: code, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "useUnknown", Message: "Prefer the safe `: unknown` for a `catch` callback variable.", Line: 1, Column: column, EndLine: 1, EndColumn: column + len(parameter), Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "wrongTypeAnnotationSuggestion", Output: strings.Replace(code, parameter, "error: unknown", 1)}}}}}})
+	// Resolving outer-object captures by executing an IIFE is outside the shared evaluator's scope.
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{{Code: declarations + `change(methods); ` + body}, {Code: code}, {Code: `const methods:{current:'catch'|'finally'}={current:'catch'}; function change(o:{current:string}){o.current='finally'} ((_: void)=>{const key=methods.current; Promise.resolve(1)[key]((error: any)=>{});})(change(methods));`}}, nil)
 }

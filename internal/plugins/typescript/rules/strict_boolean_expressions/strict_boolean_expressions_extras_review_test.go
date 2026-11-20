@@ -249,7 +249,17 @@ func TestStrictBooleanExpressionsReviewAssertionLengths(t *testing.T) {
 				{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, target, compare, 1)},
 				{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, target, cast, 1)},
 			}
-			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}})
+			errors := []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}
+			if strings.Contains(test.expression, "value! &&") || strings.Contains(test.expression, "value! ||") {
+				// The logical left operand is also an independently checked condition.
+				innerSuggestions := []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, "value!", `((value! ?? "").length > 0)`, 1)},
+					{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, "value!", `((value! ?? "") !== "")`, 1)},
+					{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, "value!", `(Boolean(value!))`, 1)},
+				}
+				errors = append(errors, reviewError(t, code, "value!", "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", innerSuggestions))
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: errors})
 		}
 	}
 	// A non-nullish literal does not need a default merely because an
@@ -399,7 +409,17 @@ func TestStrictBooleanExpressionsReviewAwaitAssertions(t *testing.T) {
 				{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, target, compare, 1)},
 				{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, target, cast, 1)},
 			}
-			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}})
+			errors := []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}
+			if strings.Contains(test.expression, "value! &&") || strings.Contains(test.expression, "value! ||") {
+				// The logical left operand is also an independently checked condition.
+				innerSuggestions := []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, "value!", `((value! ?? "").length > 0)`, 1)},
+					{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, "value!", `((value! ?? "") !== "")`, 1)},
+					{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, "value!", `(Boolean(value!))`, 1)},
+				}
+				errors = append(errors, reviewError(t, code, "value!", "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", innerSuggestions))
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: errors})
 		}
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
@@ -434,8 +454,10 @@ func TestStrictBooleanExpressionsReviewAmbientIterator(t *testing.T) {
 	const augment = `export {}; declare global { interface ReadonlyArray<T> { [Symbol.iterator](): ArrayIterator<T>; } }
 `
 	valid := augment + `const args=[(n: number)=>n>0,{}] as const; [-1,1].filter(...args);`
+	// Runtime iterator mutation does not change the declared tuple model.
+	mutated := `export {}; declare global { interface Array<T> { [Symbol.iterator](): ArrayIterator<T>; } } const args: [()=>boolean, ()=>void]=[()=>true,()=>{}]; args[Symbol.iterator]=()=>[args[1]].values(); [1].filter(...args);`
 	invalid := augment + `const args=[(n: number)=>{},{}] as const; [-1,1].filter(...args);`
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, []rule_tester.ValidTestCase{{Code: valid}}, []rule_tester.InvalidTestCase{{Code: invalid, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, invalid, "...args", "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", nil)}}})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, []rule_tester.ValidTestCase{{Code: valid}, {Code: mutated}}, []rule_tester.InvalidTestCase{{Code: invalid, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, invalid, "...args", "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", nil)}}})
 }
 
 func TestStrictBooleanExpressionsReviewTopLevelIIFE(t *testing.T) {
@@ -443,17 +465,14 @@ func TestStrictBooleanExpressionsReviewTopLevelIIFE(t *testing.T) {
 	const body = `(()=>{const method=opts.method; [1][method](()=>change(opts));})();`
 	valid := []rule_tester.ValidTestCase{
 		{Code: declarations + `change(opts); ` + body},
+		{Code: declarations + `((_: void)=>{const method=opts.method; return [1][method](()=>{});})(change(opts));`},
 		{Code: declarations + `for(let i=0;i<2;i++){` + body + `}`},
 		{Code: declarations + `function visit(){` + body + `} visit(); visit();`},
 		{Code: declarations + `void (async()=>{await Promise.resolve(); const method=opts.method; [1][method](()=>change(opts));})();`},
 	}
-	var invalid []rule_tester.InvalidTestCase
-	for _, code := range []string{declarations + body, declarations + body + ` change(opts);`} {
-		callback := `()=>change(opts)`
-		output := strings.Replace(code, callback, `(): boolean=>change(opts)`, 1)
-		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, callback, "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", []rule_tester.InvalidTestCaseSuggestion{{MessageId: "explicitBooleanReturnType", Output: output}})}})
-	}
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
+	// Outer-object captures remain unknown; the rule does not interpret IIFEs.
+	valid = append(valid, rule_tester.ValidTestCase{Code: declarations + body}, rule_tester.ValidTestCase{Code: declarations + body + ` change(opts);`})
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, nil)
 }
 
 func TestStrictBooleanExpressionsReviewEmptyIterators(t *testing.T) {
@@ -498,20 +517,90 @@ func TestStrictBooleanExpressionsReviewSatisfiesValues(t *testing.T) {
 
 func TestStrictBooleanExpressionsReviewAssignedIterator(t *testing.T) {
 	const prefix = `const xs:number[] & {filter(...args: unknown[]):number[]}=[-1,1]; `
-	valid := []rule_tester.ValidTestCase{
-		{Code: prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}}); xs.filter(...args);`},
-		{Code: prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield()=>{}}},{*[Symbol.iterator](){yield(n:number)=>n>0}}); xs.filter(...args);`},
-		{Code: prefix + `declare const source:object; const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}},source); xs.filter(...args);`},
-		{Code: prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}}); declare function alter(value:unknown):void; alter(args); xs.filter(...args);`},
-	}
+	// Object.assign runtime replacement is outside the rule's scope. Keep every
+	// original input, asserting static intersection/yield types rather than
+	// source precedence or escape timing. These types can report overwritten
+	// callbacks or miss a replacement callback that differs at runtime.
+	valid := []rule_tester.ValidTestCase{{Code: prefix + `const args=Object.assign([()=>true] as const,{*[Symbol.iterator](){yield(n:number)=>console.log(n)}}); xs.filter(...args);`}}
+	// Explicit tuple declarations remain authoritative even when source keys,
+	// this-dependent generators or later mutations imply a different runtime value.
+	const callbacks = `const isPositive=(n:number)=>n>0; const returnsVoid=()=>{}; `
+	valid = append(valid,
+		rule_tester.ValidTestCase{Code: callbacks + `const key=Symbol.iterator; const args:readonly [typeof isPositive]=Object.assign([isPositive] as const,{*[Symbol.iterator](){yield returnsVoid}},{*[key](){yield isPositive}}); [-1,1].filter(...args);`},
+		rule_tester.ValidTestCase{Code: callbacks + `const args:readonly [typeof isPositive]=Object.assign([isPositive] as const,{pred:returnsVoid,*[Symbol.iterator](){yield this.pred}},{pred:isPositive}); [-1,1].filter(...args);`},
+		rule_tester.ValidTestCase{Code: callbacks + `const args=Object.assign([isPositive] as const,{*[Symbol.iterator](){yield returnsVoid}}); const alias:readonly [typeof isPositive]=args; function repair(x:object){Object.assign(x,{*[Symbol.iterator](){yield isPositive}})} repair(args); [-1,1].filter(...alias);`},
+	)
 	var invalid []rule_tester.InvalidTestCase
 	for _, code := range []string{
-		prefix + `const args=Object.assign([()=>true] as const,{*[Symbol.iterator](){yield(n:number)=>console.log(n)}}); xs.filter(...args);`,
+		prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}}); xs.filter(...args);`,
+		prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield()=>{}}},{*[Symbol.iterator](){yield(n:number)=>n>0}}); xs.filter(...args);`,
+		prefix + `declare const source:object; const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}},source); xs.filter(...args);`,
+		prefix + `const args=Object.assign([()=>{}] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}}); declare function alter(value:unknown):void; alter(args); xs.filter(...args);`,
 		prefix + `const args=Object.assign([()=>true] as const,{*[Symbol.iterator](){yield(n:number)=>n>0}},{*[Symbol.iterator](){yield(n:number)=>console.log(n)}}); xs.filter(...args);`,
+	} {
+		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, `...args`, "conditionErrorNullableBoolean", "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.", nil)}})
+	}
+	for _, code := range []string{
 		prefix + `const args=Object.assign([()=>{}] as const,{tag:'metadata'}); xs.filter(...args);`,
 		prefix + `declare const meta:{tag:string}; const args=Object.assign([()=>{}] as const,meta); xs.filter(...args);`,
+		`const skip=()=>{}; const metadata={tag:'v1'}; const args:readonly [typeof skip]=Object.assign([skip] as const,metadata,{*[Symbol.iterator](){yield skip}}); [1].filter(...args);`,
 	} {
 		invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Errors: []rule_tester.InvalidTestCaseError{reviewError(t, code, `...args`, "conditionErrorNullish", "Unexpected nullish value in conditional. The condition is always false.", nil)}})
 	}
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, valid, invalid)
+}
+
+func TestStrictBooleanExpressionsLocalResultSafety(t *testing.T) {
+	var invalid []rule_tester.InvalidTestCase
+	for _, test := range []struct {
+		parameter, expression string
+		guard                 bool
+	}{
+		{`flag: boolean, value?: string`, `flag ? value! : 'ok'`, true},
+		{`flag: boolean, value?: string`, `flag ? 'ok' : value!`, true},
+		{`flag: boolean, value?: string`, `flag ? (flag ? value! : 'ok') : 'ok'`, true},
+		{`flag: boolean, value?: string`, `flag ? (value! && 'ok') : 'ok'`, true},
+		{`flag: boolean, value?: string`, `flag ? (value! || 'ok') : 'ok'`, false},
+		{`flag: boolean, value?: string`, `flag ? (value! ?? value!) : 'ok'`, true},
+		{`flag: boolean, value?: Promise<string>`, `await (flag ? value! : Promise.resolve('ok'))`, true},
+		{`flag: boolean, user?: {name: string}`, `flag ? user?.name! : 'ok'`, true},
+		// Nullish receivers and discarded/completed values are not the result.
+		{`flag: boolean, value?: string`, `flag ? value!.trim() : 'ok'`, false},
+		{`flag: boolean, value?: string`, `flag ? (value! ?? 'ok') : 'ok'`, false},
+		{`flag: boolean, value?: string`, `flag ? (value!, 'ok') : 'ok'`, false},
+	} {
+		for _, negated := range []bool{false, true} {
+			target := test.expression
+			if negated {
+				target = "!(" + target + ")"
+			}
+			code := "async function check(" + test.parameter + "){if(" + target + ")return true;return false;}"
+			inner := "(" + test.expression + ")"
+			value := inner
+			if test.guard {
+				value = "(" + inner + ` ?? "")`
+			}
+			length, compare, cast := value+".length > 0", value+` !== ""`, "Boolean("+inner+")"
+			if negated {
+				length, compare, cast = value+".length === 0", value+` === ""`, "!Boolean("+inner+")"
+			}
+			suggestions := []rule_tester.InvalidTestCaseSuggestion{
+				{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, target, length, 1)},
+				{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, target, compare, 1)},
+				{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, target, cast, 1)},
+			}
+			errors := []rule_tester.InvalidTestCaseError{reviewError(t, code, test.expression, "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", suggestions)}
+			if strings.Contains(test.expression, "value! &&") || strings.Contains(test.expression, "value! ||") {
+				// The logical left operand is also an independently checked condition.
+				innerSuggestions := []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "conditionFixCompareStringLength", Output: strings.Replace(code, "value!", `((value! ?? "").length > 0)`, 1)},
+					{MessageId: "conditionFixCompareEmptyString", Output: strings.Replace(code, "value!", `((value! ?? "") !== "")`, 1)},
+					{MessageId: "conditionFixCastBoolean", Output: strings.Replace(code, "value!", `(Boolean(value!))`, 1)},
+				}
+				errors = append(errors, reviewError(t, code, "value!", "conditionErrorString", "Unexpected string value in conditional. An explicit empty string check is required.", innerSuggestions))
+			}
+			invalid = append(invalid, rule_tester.InvalidTestCase{Code: code, Options: map[string]any{"allowString": false}, Errors: errors})
+		}
+	}
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &StrictBooleanExpressionsRule, nil, invalid)
 }
