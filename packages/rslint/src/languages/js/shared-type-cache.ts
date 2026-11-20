@@ -49,10 +49,18 @@ export class SharedTypeCacheReader {
   get descriptor(): SharedTypeCacheDescriptor {
     return this.open().descriptor;
   }
-  private open(): Storage {
+  private activeStorage(): Storage | undefined {
     const current = this.storage;
-    if (!current || Atomics.load(current.control, 0) !== 1)
-      throw new Error('shared type cache is closed');
+    return current && Atomics.load(current.control, 0) === 1
+      ? current
+      : undefined;
+  }
+  get isOpen(): boolean {
+    return this.activeStorage() !== undefined;
+  }
+  private open(): Storage {
+    const current = this.activeStorage();
+    if (!current) throw new Error('shared type cache is closed');
     return current;
   }
   assertOpen(): void {

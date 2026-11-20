@@ -477,6 +477,20 @@ const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
 const inspectionReceivers = new WeakSet<object>();
 const rejectTypeEdit = () => false;
 
+const typeInspection = {
+  configurable: true,
+  writable: true,
+  value(this: object, _depth: number, options: { getters?: boolean | string }) {
+    if (!options?.getters || inspectionReceivers.has(this)) return this;
+    // With getters enabled, Node calls each accessor on the proxy's target.
+    // Give it the rule's actual receiver. Returning this on the second pass
+    // keeps cycle detection and formatting inside the original inspection.
+    const receiver = new Proxy(this, {});
+    inspectionReceivers.add(receiver);
+    return receiver;
+  },
+} satisfies PropertyDescriptor;
+
 export function guarded<T extends object>(object: T, ensure: () => void): T {
   const proxy: T = new Proxy(object, {
     get(target, key, receiver) {
@@ -617,23 +631,6 @@ function makeTypePrototype(
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
-  Object.defineProperty(prototype, inspectCustom, {
-    configurable: true,
-    writable: true,
-    value(
-      this: object,
-      _depth: number,
-      options: { getters?: boolean | string },
-    ) {
-      if (!options?.getters || inspectionReceivers.has(this)) return this;
-      // With getters enabled, Node calls each accessor on the proxy's target.
-      // Give it the rule's actual receiver. Returning this on the second pass
-      // keeps cycle detection and formatting inside the original inspection.
-      const receiver = new Proxy(this, {});
-      inspectionReceivers.add(receiver);
-      return receiver;
-    },
-  });
   return prototype;
 }
 
@@ -1776,12 +1773,8 @@ export class TypeServiceClient {
   }
   private typeFieldNames?: ReadonlySet<PropertyKey>;
   private canInspectType(): boolean {
-    try {
-      this.ensure();
-      return true;
-    } catch {
-      return false;
-    }
+    this.cancellation?.throwIfCancellationRequested();
+    return !this.closed && (this.shared?.isOpen ?? true);
   }
   private wrapType(
     fields: TypeView,
@@ -1798,18 +1791,28 @@ export class TypeServiceClient {
       checker: { writable: false },
     });
     const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
+    // A getter returning this can make Node unwrap more than one proxy. The
+    // ordinary target holds descriptors for reflection, never the rule's state.
+    const target: TypeView = Object.create(this.typePrototype);
+    Object.defineProperty(fields, inspectCustom, typeInspection);
     let pluginFields: Set<PropertyKey> | undefined;
     const managed = (key: PropertyKey) =>
       native.has(key) && !pluginFields?.has(key);
+    const nativeDescriptor = (key: PropertyKey) => {
+      const previous = Reflect.getOwnPropertyDescriptor(target, key);
+      if (previous && !previous.configurable) return previous;
+      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!;
+      descriptor.configurable = false;
+      Object.defineProperty(target, key, descriptor);
+      return descriptor;
+    };
     const own = (key: PropertyKey, live = true) => {
       const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
-      return descriptor &&
-        (!descriptor.configurable ||
-          !Object.isExtensible(fields) ||
-          !managed(key) ||
-          key === 'id' ||
-          (live && hasField(key)))
-        ? descriptor
+      if (!descriptor || !managed(key)) return descriptor;
+      const fixed = Reflect.getOwnPropertyDescriptor(target, key);
+      if (fixed && !fixed.configurable) return fixed;
+      return key === 'id' || (live && hasField(key))
+        ? nativeDescriptor(key)
         : undefined;
     };
     const keys = (live = true) => {
@@ -1818,40 +1821,56 @@ export class TypeServiceClient {
       if (!live) return all.filter((key) => own(key, false));
       const declared = hasDeclaredMembers(),
         mapped = mappedFields();
-      return all.filter(
-        (key) =>
-          !managed(key) ||
-          (declaredMemberKeys.has(key)
+      return all.filter((key) => {
+        if (!managed(key)) return true;
+        if (
+          !(declaredMemberKeys.has(key)
             ? declared
-            : hasField(key, false, mapped)),
-      );
+            : hasField(key, false, mapped))
+        )
+          return false;
+        nativeDescriptor(key);
+        return true;
+      });
     };
-    // Node's raw inspector unwraps the public proxy and may run a plugin
-    // getter on this target. It can inspect the type but cannot change it.
-    const backing: TypeView = new Proxy(fields, {
+    const definePluginField = (
+      key: PropertyKey,
+      attributes: PropertyDescriptor,
+    ) => {
+      if (!Reflect.defineProperty(fields, key, attributes)) return false;
+      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!;
+      if (!descriptor.configurable || !Object.isExtensible(target))
+        Object.defineProperty(target, key, descriptor);
+      return true;
+    };
+    const backing: TypeView = new Proxy(target, {
       set: rejectTypeEdit,
       defineProperty: rejectTypeEdit,
       deleteProperty: rejectTypeEdit,
       preventExtensions: rejectTypeEdit,
       setPrototypeOf: rejectTypeEdit,
-      get: (object, key, receiver: object) => {
-        const self = receiver === backing ? view : receiver;
+      get: (_target, key, receiver: object) => {
+        const self =
+          receiver === backing &&
+          (key === Symbol.toStringTag || key === inspectCustom)
+            ? view
+            : receiver;
         if (key === serviceView) return view;
         if (key === Symbol.toStringTag && !this.canInspectType())
-          return Reflect.getOwnPropertyDescriptor(object, key)?.value;
-        if (receiver !== backing && managed(key)) this.ensure();
-        const value: unknown = Reflect.get(object, key, self);
+          return Reflect.getOwnPropertyDescriptor(fields, key)?.value;
+        if (receiver !== backing && managed(key) && key !== 'id') this.ensure();
+        const value: unknown = Reflect.get(fields, key, self);
         if (value === undefined && managed(key)) {
-          const proto = Reflect.getPrototypeOf(object);
+          const proto = Reflect.getPrototypeOf(fields);
           if (proto && Reflect.has(proto, key) && !hasField(key))
             return Reflect.get(proto, key, self);
         }
         return value;
       },
-      has: (object, key) => {
-        if (!managed(key) || !Object.hasOwn(object, key))
-          return Reflect.has(object, key);
-        const proto = Reflect.getPrototypeOf(object);
+      has: (_target, key) => {
+        if (!managed(key) || !Object.hasOwn(fields, key))
+          return Reflect.has(fields, key);
+        const proto = Reflect.getPrototypeOf(fields);
         return (
           !!own(key, this.canInspectType()) ||
           (proto !== null && Reflect.has(proto, key))
@@ -1864,7 +1883,10 @@ export class TypeServiceClient {
     const view = new Proxy(backing, {
       setPrototypeOf: (_target, proto) => {
         this.ensure();
-        return Reflect.setPrototypeOf(fields, proto);
+        return (
+          Reflect.setPrototypeOf(target, proto) &&
+          Reflect.setPrototypeOf(fields, proto)
+        );
       },
       set: (_target, key, value, receiver) => {
         this.ensure();
@@ -1880,41 +1902,40 @@ export class TypeServiceClient {
       defineProperty: (_target, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
-        if (!managed(key))
-          return Reflect.defineProperty(fields, key, attributes);
-        if (hasField(key, true)) {
-          const current = own(key);
-          if (!current) return false;
-          for (const name of Object.keys(attributes)) {
-            if (
-              name !== 'configurable' &&
-              (!Object.hasOwn(current, name) ||
-                !Object.is(
-                  Reflect.get(attributes, name),
-                  Reflect.get(current, name),
-                ))
-            )
-              return false;
-          }
-        } else {
-          // Discard the absent placeholder so new plugin properties receive
-          // the ordinary defaults of Object.defineProperty or assignment.
-          if (!Object.isExtensible(fields)) return false;
-          Reflect.deleteProperty(fields, key);
-          (pluginFields ??= new Set()).add(key);
-        }
-        return Reflect.defineProperty(fields, key, attributes);
+        if (!managed(key)) return definePluginField(key, attributes);
+        if (hasField(key, true))
+          return !!own(key) && Reflect.defineProperty(target, key, attributes);
+        // An absent placeholder must not supply the descriptor defaults for
+        // a new plugin property.
+        if (!Object.isExtensible(fields)) return false;
+        Reflect.deleteProperty(fields, key);
+        (pluginFields ??= new Set()).add(key);
+        return definePluginField(key, attributes);
       },
       deleteProperty: (_target, key) => {
         this.ensure();
-        return managed(key) ? !own(key) : Reflect.deleteProperty(fields, key);
+        return managed(key)
+          ? !own(key)
+          : Reflect.deleteProperty(target, key) &&
+              Reflect.deleteProperty(fields, key);
       },
       preventExtensions: () => {
         this.ensure();
         if (Object.isExtensible(fields)) {
           const keep = new Set(keys());
-          for (const key of Reflect.ownKeys(fields))
+          for (const key of Reflect.ownKeys(target))
+            if (!keep.has(key) && !Reflect.deleteProperty(target, key))
+              return false;
+          for (const key of Reflect.ownKeys(fields)) {
             if (!keep.has(key)) Reflect.deleteProperty(fields, key);
+            else if (!managed(key))
+              Object.defineProperty(
+                target,
+                key,
+                Reflect.getOwnPropertyDescriptor(fields, key)!,
+              );
+          }
+          Reflect.preventExtensions(target);
         }
         return Reflect.preventExtensions(fields);
       },
