@@ -1,8 +1,23 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoRenderReturnError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noRenderReturn',
+    message: 'Your render method should have a return statement',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('require-render-return', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('require-render-return', {
   valid: [
     // ---- Upstream: ES6 class ----
     {
@@ -133,7 +148,7 @@ ruleTester.run('require-render-return', {} as never, {
           render: function() {}
         });
       `,
-      errors: [{ messageId: 'noRenderReturn' }],
+      errors: [expectNoRenderReturnError([4, 11, 4, 32])],
     },
     // ---- Upstream: Missing return in ES6 class ----
     {
@@ -142,7 +157,7 @@ ruleTester.run('require-render-return', {} as never, {
           render() {}
         }
       `,
-      errors: [{ messageId: 'noRenderReturn' }],
+      errors: [expectNoRenderReturnError([3, 11, 3, 22])],
     },
     // ---- Upstream: Missing return (but one is present in a sub-function) ----
     {
@@ -155,7 +170,7 @@ ruleTester.run('require-render-return', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noRenderReturn' }],
+      errors: [expectNoRenderReturnError([3, 11, 7, 12])],
     },
     // ---- Upstream: Missing return ES6 class render property ----
     {
@@ -166,7 +181,7 @@ ruleTester.run('require-render-return', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noRenderReturn' }],
+      errors: [expectNoRenderReturnError([3, 11, 5, 12])],
     },
   ],
 });

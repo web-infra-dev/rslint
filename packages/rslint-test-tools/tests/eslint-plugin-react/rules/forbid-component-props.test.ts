@@ -1,8 +1,66 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
 
-const ruleTester = new RuleTester();
+function expectPropIsForbiddenError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "className" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('forbid-component-props', {} as never, {
+function expectPropIsForbiddenError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "style" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectPropIsForbiddenError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'propIsForbidden',
+    message: 'Prop "kebab-case-prop" is forbidden on Components',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: '',
+    message:
+      'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('forbid-component-props', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -323,6 +381,29 @@ ruleTester.run('forbid-component-props', {} as never, {
         <a><Foo bar="ok"><span>text</span></Foo></a>
       `,
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 9 (7.37.5)',
+      code: `
+        const item = (<AntdLayout.Content className="antdFoo" />);
+      `,
+      options: [
+        {
+          forbid: [
+            { propName: 'className', allowedFor: ['AntdLayout.Content'] },
+          ],
+        },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 12 (7.37.5)',
+      code: `
+        <fbt:param name="Total number of files" number={true} />
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Upstream invalid cases ----
@@ -335,11 +416,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           }
         });
       `,
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([5, 25, 5, 40])],
     },
     {
       code: `
@@ -350,11 +427,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           }
         });
       `,
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError2([5, 25, 5, 47])],
     },
     {
       code: `
@@ -366,11 +439,7 @@ ruleTester.run('forbid-component-props', {} as never, {
         });
       `,
       options: [{ forbid: ['className', 'style'] }],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([5, 25, 5, 40])],
     },
     {
       code: `
@@ -382,11 +451,7 @@ ruleTester.run('forbid-component-props', {} as never, {
         });
       `,
       options: [{ forbid: ['className', 'style'] }],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError2([5, 25, 5, 47])],
     },
     {
       code: `
@@ -407,11 +472,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError2([5, 25, 5, 47])],
     },
     {
       code: `
@@ -427,11 +488,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([2, 28, 2, 43])],
     },
     {
       code: `
@@ -447,11 +504,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([2, 40, 2, 55])],
     },
     {
       code: `
@@ -467,11 +520,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([2, 40, 2, 55])],
     },
     {
       code: `
@@ -487,11 +536,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([2, 35, 2, 50])],
     },
     {
       code: `
@@ -507,11 +552,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError1([2, 41, 2, 62])],
     },
     {
       code: `
@@ -529,7 +570,12 @@ ruleTester.run('forbid-component-props', {} as never, {
       ],
       errors: [
         {
+          messageId: '',
           message: 'Please use ourCoolClassName instead of ClassName',
+          line: 2,
+          column: 28,
+          endLine: 2,
+          endColumn: 43,
         },
       ],
     },
@@ -556,8 +602,22 @@ ruleTester.run('forbid-component-props', {} as never, {
         },
       ],
       errors: [
-        { message: 'Please use ourCoolClassName instead of ClassName' },
-        { message: 'Avoid using option' },
+        {
+          messageId: '',
+          message: 'Please use ourCoolClassName instead of ClassName',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 31,
+        },
+        {
+          messageId: '',
+          message: 'Avoid using option',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 31,
+        },
       ],
     },
     {
@@ -580,8 +640,15 @@ ruleTester.run('forbid-component-props', {} as never, {
         },
       ],
       errors: [
-        { messageId: 'propIsForbidden' },
-        { message: 'Avoid using option' },
+        expectPropIsForbiddenError1([3, 16, 3, 31]),
+        {
+          messageId: '',
+          message: 'Avoid using option',
+          line: 4,
+          column: 18,
+          endLine: 4,
+          endColumn: 31,
+        },
       ],
     },
     {
@@ -599,11 +666,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError3([3, 16, 3, 37])],
     },
     {
       code: `
@@ -623,7 +686,12 @@ ruleTester.run('forbid-component-props', {} as never, {
       ],
       errors: [
         {
+          messageId: '',
           message: 'Avoid using kebab-case',
+          line: 3,
+          column: 16,
+          endLine: 3,
+          endColumn: 37,
         },
       ],
     },
@@ -646,11 +714,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError3([5, 18, 5, 39])],
     },
     {
       code: `
@@ -672,11 +736,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [
-        {
-          messageId: 'propIsForbidden',
-        },
-      ],
+      errors: [expectPropIsForbiddenError3([6, 18, 6, 39])],
     },
     {
       code: `
@@ -700,7 +760,12 @@ ruleTester.run('forbid-component-props', {} as never, {
       ],
       errors: [
         {
+          messageId: '',
           message: 'className available only for icons',
+          line: 5,
+          column: 22,
+          endLine: 5,
+          endColumn: 41,
         },
       ],
     },
@@ -731,8 +796,22 @@ ruleTester.run('forbid-component-props', {} as never, {
         },
       ],
       errors: [
-        { message: 'style available only for SVGs' },
-        { message: 'className available only for icons' },
+        {
+          messageId: '',
+          message: 'style available only for SVGs',
+          line: 4,
+          column: 21,
+          endLine: 4,
+          endColumn: 53,
+        },
+        {
+          messageId: '',
+          message: 'className available only for icons',
+          line: 6,
+          column: 22,
+          endLine: 6,
+          endColumn: 41,
+        },
       ],
     },
     {
@@ -761,22 +840,10 @@ ruleTester.run('forbid-component-props', {} as never, {
         },
       ],
       errors: [
-        {
-          message:
-            'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
-        },
-        {
-          message:
-            'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
-        },
-        {
-          message:
-            'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
-        },
-        {
-          message:
-            'Avoid using className for SomeSvg and components that match the `UI*` and `*Icon` patterns',
-        },
+        expectError4([4, 23, 4, 42]),
+        expectError4([5, 26, 5, 45]),
+        expectError4([6, 22, 6, 41]),
+        expectError4([7, 21, 7, 40]),
       ],
     },
 
@@ -795,14 +862,14 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError1([1, 14, 1, 27])],
     },
     // JSX namespaced name with default forbid: namespaced tags bypass the
     // DOM lowercase-skip path and are treated as Components, so className
     // is reported.
     {
       code: `<fbt:param className="x" />;`,
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError1([1, 12, 1, 25])],
     },
     // Multi-level Component nesting — every JsxAttribute on a Component is
     // checked, regardless of depth. DOM `<div>` between Components is skipped.
@@ -817,9 +884,9 @@ ruleTester.run('forbid-component-props', {} as never, {
         </Outer>
       `,
       errors: [
-        { messageId: 'propIsForbidden' },
-        { messageId: 'propIsForbidden' },
-        { messageId: 'propIsForbidden' },
+        expectPropIsForbiddenError1([2, 16, 2, 30]),
+        expectPropIsForbiddenError1([4, 20, 4, 34]),
+        expectPropIsForbiddenError1([5, 21, 5, 35]),
       ],
     },
     // Spread + multiple named attributes: each forbidden named attr fires
@@ -827,8 +894,8 @@ ruleTester.run('forbid-component-props', {} as never, {
     {
       code: `<Foo {...rest} className="x" style={{}} />;`,
       errors: [
-        { messageId: 'propIsForbidden' },
-        { messageId: 'propIsForbidden' },
+        expectPropIsForbiddenError1([1, 16, 1, 29]),
+        expectPropIsForbiddenError2([1, 30, 1, 40]),
       ],
     },
     // Direct propName lookup beats a propNamePattern that would also match.
@@ -845,7 +912,7 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError1([1, 6, 1, 19])],
     },
     // Two pattern entries match the same prop — first-in-insertion-order wins.
     {
@@ -861,7 +928,16 @@ ruleTester.run('forbid-component-props', {} as never, {
           ],
         },
       ],
-      errors: [{ message: 'First pattern' }],
+      errors: [
+        {
+          messageId: '',
+          message: 'First pattern',
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     // 2-segment member expression `<Foo.Bar>`: tag is canonical "Foo.Bar".
     {
@@ -871,7 +947,57 @@ ruleTester.run('forbid-component-props', {} as never, {
           forbid: [{ propName: 'style', disallowedFor: ['Foo.Bar'] }],
         },
       ],
-      errors: [{ messageId: 'propIsForbidden' }],
+      errors: [expectPropIsForbiddenError2([1, 10, 1, 20])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 9 (7.37.5)',
+      code: `
+        const item = (<AntdLayout.Content className="antdFoo" />);
+      `,
+      options: [
+        {
+          forbid: [
+            { propName: 'className', disallowedFor: ['AntdLayout.Content'] },
+          ],
+        },
+      ],
+      errors: [expectPropIsForbiddenError1([2, 43, 2, 62])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 15 (7.37.5)',
+      code: `
+        const MyComponent = () => (
+          <div>
+            <div aria-label="Hello Akul" />
+            <Foo kebab-case-prop={123} />
+          </div>
+        );
+      `,
+      options: [
+        { forbid: [{ propNamePattern: '**-**', allowedFor: ['div'] }] },
+      ],
+      errors: [expectPropIsForbiddenError3([5, 18, 5, 39])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 16 (7.37.5)',
+      code: `
+        const MyComponent = () => (
+          <div>
+            <div aria-label="Hello Akul" />
+            <h1 data-id="my-heading" />
+            <Foo kebab-case-prop={123} />
+          </div>
+        );
+      `,
+      options: [
+        { forbid: [{ propNamePattern: '**-**', disallowedFor: ['Foo'] }] },
+      ],
+      errors: [expectPropIsForbiddenError3([6, 18, 6, 39])],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

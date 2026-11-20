@@ -1,10 +1,26 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/jsx-no-constructed-context-values.js
 // All upstream cases and documentation examples; parser variants share cases.
 // The React wrapper checks counts and messages; Go tests assert IDs and ranges.
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
-ruleTester.run('jsx-no-constructed-context-values', {} as never, {
+function expectWithIdentifierMsgError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'withIdentifierMsg',
+    message:
+      "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+ruleTester.run('jsx-no-constructed-context-values', {
   valid: [
     // Upstream valid 1.
     {
@@ -96,17 +112,7 @@ ruleTester.run('jsx-no-constructed-context-values', {} as never, {
     // Upstream invalid 1.
     {
       code: 'function Component() { const foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 36,
-          endLine: 1,
-          endColumn: 38,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 36, 1, 38])],
     },
     // Upstream invalid 2.
     {
@@ -201,92 +207,32 @@ ruleTester.run('jsx-no-constructed-context-values', {} as never, {
     // Upstream invalid 8.
     {
       code: 'function Component() { const foo = true ? {} : "fine"; return (<Context.Provider value={foo}></Context.Provider>)}',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 43,
-          endLine: 1,
-          endColumn: 45,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 43, 1, 45])],
     },
     // Upstream invalid 9.
     {
       code: 'function Component() { const foo = bar || {}; return (<Context.Provider value={foo}></Context.Provider>)}',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 43,
-          endLine: 1,
-          endColumn: 45,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 43, 1, 45])],
     },
     // Upstream invalid 10.
     {
       code: 'function Component() { const foo = bar && {}; return (<Context.Provider value={foo}></Context.Provider>)}',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 43,
-          endLine: 1,
-          endColumn: 45,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 43, 1, 45])],
     },
     // Upstream invalid 11.
     {
       code: 'function Component() { const foo = bar ? baz ? {} : null : null; return (<Context.Provider value={foo}></Context.Provider>)}',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 48,
-          endLine: 1,
-          endColumn: 50,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 48, 1, 50])],
     },
     // Upstream invalid 12.
     {
       code: 'function Component() { let foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 34,
-          endLine: 1,
-          endColumn: 36,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 34, 1, 36])],
     },
     // Upstream invalid 13.
     {
       code: 'function Component() { var foo = {}; return (<Context.Provider value={foo}></Context.Provider>)}',
-      errors: [
-        {
-          messageId: 'withIdentifierMsg',
-          message:
-            "The 'foo' object (at line 1) passed as the value prop to the Context provider (at line 1) changes every render. To fix this consider wrapping it in a useMemo hook.",
-          line: 1,
-          column: 34,
-          endLine: 1,
-          endColumn: 36,
-        },
-      ],
+      errors: [expectWithIdentifierMsgError([1, 34, 1, 36])],
     },
     // Upstream invalid 14.
     {

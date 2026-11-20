@@ -1,8 +1,55 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import {
+  fixtureConfig,
+  upstreamScriptOptions,
+  upstreamModuleOptions,
+} from '../config';
 
-const ruleTester = new RuleTester();
+function expectUndefinedError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'App' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-no-undef', {} as never, {
+function expectUndefinedError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'appp' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectUndefinedError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'undefined',
+    message: "'Foo' is not defined.",
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-no-undef', {
   valid: [
     // ---- Upstream valid cases ----
     { code: `var React, App; React.render(<App />);` },
@@ -85,24 +132,101 @@ ruleTester.run('jsx-no-undef', {} as never, {
     },
     { code: `const f: any = null; const A: any = null; f(<A />);` },
     { code: `const A: any = null; var x = { k: <A /> };` },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 0 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React, App; React.render(<App />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 1 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<img />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 2 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<x-gif />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 3 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React, app; React.render(<app.Foo />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 4 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React, app; React.render(<app.foo.Bar />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 5 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<Apppp:Foo />);`,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 6 (7.37.5)',
+      code: `
+        /*eslint no-undef:1*/
+        var React;
+        class Hello extends React.Component {
+          render() {
+            return <this.props.tag />
+          }
+        }
+      `,
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream valid 7 (7.37.5)',
+      code: `var React; React.render(<Text />);`,
+      languageOptions: {
+        ecmaVersion: 2018,
+        sourceType: 'script',
+        parserOptions: { ecmaFeatures: { jsx: true } },
+        globals: { Text: true },
+      },
+    },
+    {
+      name: 'Upstream valid 8 (7.37.5)',
+      code: `
+        import Text from "cool-module";
+        const TextWrapper = function (props) {
+          return (
+            <Text />
+          );
+        };
+      `,
+      options: [{ allowGlobals: false }],
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Upstream invalid cases ----
     {
       code: `var React: any; React.render(<App />);`,
-      errors: [{ message: `'App' is not defined.` }],
+      errors: [expectUndefinedError1([1, 31, 1, 34])],
     },
     {
       code: `var React: any; React.render(<Appp.Foo />);`,
-      errors: [{ message: `'Appp' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Appp' is not defined.",
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 35,
+        },
+      ],
     },
     {
       code: `var React: any; React.render(<appp.Foo />);`,
-      errors: [{ message: `'appp' is not defined.` }],
+      errors: [expectUndefinedError2([1, 31, 1, 35])],
     },
     {
       code: `var React: any; React.render(<appp.foo.Bar />);`,
-      errors: [{ message: `'appp' is not defined.` }],
+      errors: [expectUndefinedError2([1, 31, 1, 35])],
     },
     {
       code: `
@@ -114,57 +238,220 @@ ruleTester.run('jsx-no-undef', {} as never, {
         export default TextWrapper;
       `,
       options: [{ allowGlobals: false }],
-      errors: [{ message: `'Text' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Text' is not defined.",
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
     },
     {
       code: `var React: any; React.render(<Foo />);`,
-      errors: [{ message: `'Foo' is not defined.` }],
+      errors: [expectUndefinedError3([1, 31, 1, 34])],
     },
 
     // ---- Additional edge cases ----
-    { code: `<Bar></Bar>;`, errors: [{ message: `'Bar' is not defined.` }] },
+    {
+      code: `<Bar></Bar>;`,
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Bar' is not defined.",
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
     {
       code: `var x = <Outer.Inner />;`,
-      errors: [{ message: `'Outer' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Outer' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 15,
+        },
+      ],
     },
     {
       code: `var x = <_Undeclared />;`,
-      errors: [{ message: `'_Undeclared' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'_Undeclared' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
     },
     {
       code: `var x = <Undeclared />;`,
       options: [{ allowGlobals: true }],
-      errors: [{ message: `'Undeclared' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Undeclared' is not defined.",
+          line: 1,
+          column: 10,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
     },
     {
       code: `const Outer: any = null; var x = <Outer attr={<InnerBad />}><ChildBad /></Outer>;`,
       errors: [
-        { message: `'InnerBad' is not defined.` },
-        { message: `'ChildBad' is not defined.` },
+        {
+          messageId: 'undefined',
+          message: "'InnerBad' is not defined.",
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 56,
+        },
+        {
+          messageId: 'undefined',
+          message: "'ChildBad' is not defined.",
+          line: 1,
+          column: 62,
+          endLine: 1,
+          endColumn: 70,
+        },
       ],
     },
     {
       code: `var x = true ? <A /> : <B />;`,
       errors: [
-        { message: `'A' is not defined.` },
-        { message: `'B' is not defined.` },
+        {
+          messageId: 'undefined',
+          message: "'A' is not defined.",
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'undefined',
+          message: "'B' is not defined.",
+          line: 1,
+          column: 25,
+          endLine: 1,
+          endColumn: 26,
+        },
       ],
     },
     {
       code: `var x = <><Undef /></>;`,
-      errors: [{ message: `'Undef' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Undef' is not defined.",
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
     },
     {
       code: `function other() { const App: any = null; } function render() { return <App />; }`,
-      errors: [{ message: `'App' is not defined.` }],
+      errors: [expectUndefinedError1([1, 73, 1, 76])],
     },
     {
       code: `try {} catch (e: any) {} var x = <e.Foo />;`,
-      errors: [{ message: `'e' is not defined.` }],
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'e' is not defined.",
+          line: 1,
+          column: 35,
+          endLine: 1,
+          endColumn: 36,
+        },
+      ],
     },
     {
       code: `for (let Foo: any; false; ) {} var x = <Foo />;`,
-      errors: [{ message: `'Foo' is not defined.` }],
+      errors: [expectUndefinedError3([1, 41, 1, 44])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 0 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<App />);`,
+      errors: [expectUndefinedError1([1, 48, 1, 51])],
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream invalid 1 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<Appp.Foo />);`,
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Appp' is not defined.",
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 52,
+        },
+      ],
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream invalid 2 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<appp.Foo />);`,
+      errors: [expectUndefinedError2([1, 48, 1, 52])],
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream invalid 3 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<appp.foo.Bar />);`,
+      errors: [expectUndefinedError2([1, 48, 1, 52])],
+      languageOptions: upstreamScriptOptions,
+    },
+    {
+      name: 'Upstream invalid 4 (7.37.5)',
+      code: `
+        const TextWrapper = function (props) {
+          return (
+            <Text />
+          );
+        };
+        export default TextWrapper;
+      `,
+      options: [{ allowGlobals: false }],
+      languageOptions: {
+        ecmaVersion: 2018,
+        sourceType: 'module',
+        parserOptions: { ecmaFeatures: { jsx: true } },
+        globals: { Text: true },
+      },
+      errors: [
+        {
+          messageId: 'undefined',
+          message: "'Text' is not defined.",
+          line: 4,
+          column: 14,
+          endLine: 4,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      name: 'Upstream invalid 5 (7.37.5)',
+      code: `/*eslint no-undef:1*/ var React; React.render(<Foo />);`,
+      errors: [expectUndefinedError3([1, 48, 1, 51])],
+      languageOptions: upstreamScriptOptions,
     },
   ],
 });

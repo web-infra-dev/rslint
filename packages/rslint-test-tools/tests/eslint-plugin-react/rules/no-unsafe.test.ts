@@ -1,8 +1,69 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectUnsafeMethodError1(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('no-unsafe', {} as never, {
+function expectUnsafeMethodError2(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'componentWillMount is unsafe for use in async rendering. Update the component to use componentDidMount instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectUnsafeMethodError3(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectUnsafeMethodError4(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'unsafeMethod',
+    message:
+      'UNSAFE_componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-unsafe', {
   valid: [
     // ---- Upstream valid: React.Component with safe lifecycle methods ----
     {
@@ -235,7 +296,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.4.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Upstream invalid #1: React.Component + checkAliases: true ----
     {
@@ -249,9 +310,25 @@ ruleTester.run('no-unsafe', {} as never, {
       options: [{ checkAliases: true }],
       settings: { react: { version: '16.4.0' } },
       errors: [
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
+        expectUnsafeMethodError2([3, 11, 3, 34]),
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 41,
+        },
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 35,
+        },
       ],
     },
     // ---- Upstream invalid #2: React.Component + UNSAFE_ at 16.3.0 ----
@@ -265,9 +342,9 @@ ruleTester.run('no-unsafe', {} as never, {
       `,
       settings: { react: { version: '16.3.0' } },
       errors: [
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
+        expectUnsafeMethodError1([3, 11, 3, 41]),
+        expectUnsafeMethodError3([4, 11, 4, 48]),
+        expectUnsafeMethodError4([5, 11, 5, 42]),
       ],
     },
     // ---- Upstream invalid #3: createReactClass + checkAliases: true ----
@@ -282,9 +359,25 @@ ruleTester.run('no-unsafe', {} as never, {
       options: [{ checkAliases: true }],
       settings: { react: { version: '16.3.0' } },
       errors: [
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
+        expectUnsafeMethodError2([3, 11, 3, 44]),
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillReceiveProps is unsafe for use in async rendering. Update the component to use getDerivedStateFromProps instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 4,
+          column: 11,
+          endLine: 4,
+          endColumn: 51,
+        },
+        {
+          messageId: 'unsafeMethod',
+          message:
+            'componentWillUpdate is unsafe for use in async rendering. Update the component to use componentDidUpdate instead. See https://reactjs.org/blog/2018/03/27/update-on-async-rendering.html.',
+          line: 5,
+          column: 11,
+          endLine: 5,
+          endColumn: 45,
+        },
       ],
     },
     // ---- Upstream invalid #4: createReactClass + UNSAFE_ at 16.3.0 ----
@@ -298,9 +391,9 @@ ruleTester.run('no-unsafe', {} as never, {
       `,
       settings: { react: { version: '16.3.0' } },
       errors: [
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
-        { messageId: 'unsafeMethod' },
+        expectUnsafeMethodError1([3, 11, 3, 51]),
+        expectUnsafeMethodError3([4, 11, 4, 58]),
+        expectUnsafeMethodError4([5, 11, 5, 52]),
       ],
     },
     // ---- Edge: ClassExpression — same listener as ClassDeclaration ----
@@ -311,7 +404,7 @@ ruleTester.run('no-unsafe', {} as never, {
         };
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: bare `extends Component` (no pragma qualifier) ----
     {
@@ -321,7 +414,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: PureComponent extends — same flag set as Component ----
     {
@@ -331,7 +424,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: default version = "latest" → rule active ----
     {
@@ -340,7 +433,7 @@ ruleTester.run('no-unsafe', {} as never, {
           UNSAFE_componentWillMount() {}
         }
       `,
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: nested classes — only inner is React component, only Inner reports ----
     {
@@ -354,7 +447,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([5, 15, 5, 45])],
     },
     // ---- Edge: class field with arrow function ----
     {
@@ -364,7 +457,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 48])],
     },
     // ---- Edge: HOC-wrapped class expression ----
     {
@@ -374,7 +467,7 @@ ruleTester.run('no-unsafe', {} as never, {
         });
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: TypeScript generic class ----
     {
@@ -384,7 +477,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: source-order vs alphabetical-order ----
     {
@@ -395,7 +488,10 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }, { messageId: 'unsafeMethod' }],
+      errors: [
+        expectUnsafeMethodError4([3, 11, 3, 42]),
+        expectUnsafeMethodError1([4, 11, 4, 41]),
+      ],
     },
     // ---- Edge: React.memo wrapping ----
     {
@@ -405,7 +501,7 @@ ruleTester.run('no-unsafe', {} as never, {
         });
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: Default export anonymous class ----
     {
@@ -415,7 +511,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: async unsafe method ----
     {
@@ -425,7 +521,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 47])],
     },
     // ---- Edge: setter named like unsafe lifecycle ----
     {
@@ -435,7 +531,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 46])],
     },
     // ---- Edge: TS abstract method ----
     {
@@ -445,7 +541,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 54])],
     },
     // ---- Edge: TS declare class ----
     {
@@ -455,7 +551,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 45])],
     },
     // ---- Edge: createReactClass with method shorthand ----
     {
@@ -466,7 +562,7 @@ ruleTester.run('no-unsafe', {} as never, {
         });
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: Mixed UNSAFE_ + unprefixed names with checkAliases:true ----
     {
@@ -478,7 +574,10 @@ ruleTester.run('no-unsafe', {} as never, {
       `,
       options: [{ checkAliases: true }],
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }, { messageId: 'unsafeMethod' }],
+      errors: [
+        expectUnsafeMethodError2([3, 11, 3, 34]),
+        expectUnsafeMethodError3([4, 11, 4, 48]),
+      ],
     },
     // ---- Edge: parens around extends + parens around pragma ----
     {
@@ -488,7 +587,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 41])],
     },
     // ---- Edge: ES5 component nested in ES6 component (only ES5 has unsafe) ----
     {
@@ -503,7 +602,7 @@ ruleTester.run('no-unsafe', {} as never, {
         }
       `,
       settings: { react: { version: '16.3.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([5, 15, 5, 55])],
     },
     // ---- Edge: ObjectExpression at non-first arg of createReactClass ----
     // upstream's `componentUtil.isES5Component` accepts any arg position;
@@ -515,7 +614,7 @@ ruleTester.run('no-unsafe', {} as never, {
         });
       `,
       settings: { react: { version: '16.4.0' } },
-      errors: [{ messageId: 'unsafeMethod' }],
+      errors: [expectUnsafeMethodError1([3, 11, 3, 51])],
     },
   ],
 });

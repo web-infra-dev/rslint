@@ -1,9 +1,38 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/state-in-constructor.js
 // The Go upstream suite also asserts message IDs, full ranges, and absence of edits.
-const ruleTester = new RuleTester();
-ruleTester.run('state-in-constructor', {} as never, {
+function expectStateInitClassPropError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'stateInitClassProp',
+    message: 'State initialization should be in a class property',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+function expectStateInitConstructorError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'stateInitConstructor',
+    message: 'State initialization should be in a constructor',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+ruleTester.run('state-in-constructor', {
   valid: [
     {
       code: `
@@ -234,17 +263,7 @@ ruleTester.run('state-in-constructor', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [
-        {
-          messageId: 'stateInitClassProp',
-          message: 'State initialization should be in a class property',
-          line: 5,
-          column: 13,
-          endLine: 5,
-          endColumn: 36,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitClassPropError([5, 13, 5, 36])],
     },
     {
       code: `
@@ -260,17 +279,7 @@ ruleTester.run('state-in-constructor', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [
-        {
-          messageId: 'stateInitClassProp',
-          message: 'State initialization should be in a class property',
-          line: 5,
-          column: 13,
-          endLine: 5,
-          endColumn: 36,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitClassPropError([5, 13, 5, 36])],
     },
     {
       code: `
@@ -281,17 +290,7 @@ ruleTester.run('state-in-constructor', {} as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'stateInitConstructor',
-          message: 'State initialization should be in a constructor',
-          line: 3,
-          column: 11,
-          endLine: 3,
-          endColumn: 29,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitConstructorError([3, 11, 3, 29])],
     },
     {
       code: `
@@ -303,17 +302,7 @@ ruleTester.run('state-in-constructor', {} as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'stateInitConstructor',
-          message: 'State initialization should be in a constructor',
-          line: 3,
-          column: 11,
-          endLine: 3,
-          endColumn: 29,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitConstructorError([3, 11, 3, 29])],
     },
     {
       code: `
@@ -328,17 +317,7 @@ ruleTester.run('state-in-constructor', {} as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'stateInitConstructor',
-          message: 'State initialization should be in a constructor',
-          line: 7,
-          column: 11,
-          endLine: 7,
-          endColumn: 29,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitConstructorError([7, 11, 7, 29])],
     },
     {
       code: `
@@ -353,17 +332,7 @@ ruleTester.run('state-in-constructor', {} as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'stateInitConstructor',
-          message: 'State initialization should be in a constructor',
-          line: 7,
-          column: 11,
-          endLine: 7,
-          endColumn: 29,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitConstructorError([7, 11, 7, 29])],
     },
     {
       code: `
@@ -379,17 +348,7 @@ ruleTester.run('state-in-constructor', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [
-        {
-          messageId: 'stateInitClassProp',
-          message: 'State initialization should be in a class property',
-          line: 5,
-          column: 13,
-          endLine: 5,
-          endColumn: 36,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitClassPropError([5, 13, 5, 36])],
     },
     {
       code: `
@@ -406,17 +365,7 @@ ruleTester.run('state-in-constructor', {} as never, {
         }
       `,
       options: ['never'],
-      errors: [
-        {
-          messageId: 'stateInitClassProp',
-          message: 'State initialization should be in a class property',
-          line: 6,
-          column: 15,
-          endLine: 6,
-          endColumn: 38,
-        },
-      ],
-      output: null,
+      errors: [expectStateInitClassPropError([6, 15, 6, 38])],
     },
   ],
 });

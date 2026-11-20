@@ -1,8 +1,23 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNoMultiSpreadingError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'noMultiSpreading',
+    message: 'Spreading the same expression multiple times is forbidden',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-props-no-spread-multi', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-props-no-spread-multi', {
   valid: [
     {
       code: `
@@ -24,22 +39,14 @@ ruleTester.run('jsx-props-no-spread-multi', {} as never, {
         const props = {};
         <App {...props} {...props} />
       `,
-      errors: [
-        {
-          message: 'Spreading the same expression multiple times is forbidden',
-        },
-      ],
+      errors: [expectNoMultiSpreadingError([3, 25, 3, 35])],
     },
     {
       code: `
         const props = {};
         <div {...props} a="a" {...props} />
       `,
-      errors: [
-        {
-          message: 'Spreading the same expression multiple times is forbidden',
-        },
-      ],
+      errors: [expectNoMultiSpreadingError([3, 31, 3, 41])],
     },
     {
       code: `
@@ -47,12 +54,8 @@ ruleTester.run('jsx-props-no-spread-multi', {} as never, {
         <div {...props} {...props} {...props} />
       `,
       errors: [
-        {
-          message: 'Spreading the same expression multiple times is forbidden',
-        },
-        {
-          message: 'Spreading the same expression multiple times is forbidden',
-        },
+        expectNoMultiSpreadingError([3, 25, 3, 35]),
+        expectNoMultiSpreadingError([3, 36, 3, 46]),
       ],
     },
   ],

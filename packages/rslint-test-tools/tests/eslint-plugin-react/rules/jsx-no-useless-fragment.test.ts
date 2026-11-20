@@ -1,8 +1,38 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
 
-const ruleTester = new RuleTester();
+function expectNeedsMoreChildrenError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'NeedsMoreChildren',
+    message:
+      'Fragments should contain more than one child - otherwise, there’s no need for a Fragment at all.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
 
-ruleTester.run('jsx-no-useless-fragment', {} as never, {
+function expectChildOfHtmlElementError(
+  range: [line: number, column: number, endLine: number, endColumn: number],
+) {
+  const [line, column, endLine, endColumn] = range;
+  return {
+    messageId: 'ChildOfHtmlElement',
+    message: 'Passing a fragment to an HTML element is useless.',
+    line,
+    column,
+    endLine,
+    endColumn,
+  };
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-no-useless-fragment', {
   valid: [
     { code: '<><Foo /><Bar /></>' },
     { code: '<>foo<div /></>' },
@@ -32,33 +62,36 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
   invalid: [
     {
       code: '<></>',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 6])],
     },
     {
       code: '<>{}</>',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 8])],
     },
     {
       code: '<p>moo<>foo</></p>',
       errors: [
-        { messageId: 'NeedsMoreChildren' },
-        { messageId: 'ChildOfHtmlElement' },
+        expectNeedsMoreChildrenError([1, 7, 1, 15]),
+        expectChildOfHtmlElementError([1, 7, 1, 15]),
       ],
+      output: `<p>moofoo</p>`,
     },
     {
       code: '<>{meow}</>',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 12])],
     },
     {
       code: '<p><>{meow}</></p>',
       errors: [
-        { messageId: 'NeedsMoreChildren' },
-        { messageId: 'ChildOfHtmlElement' },
+        expectNeedsMoreChildrenError([1, 4, 1, 15]),
+        expectChildOfHtmlElementError([1, 4, 1, 15]),
       ],
+      output: `<p>{meow}</p>`,
     },
     {
       code: '<><div/></>',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 12])],
+      output: `<div/>`,
     },
     {
       code: `
@@ -66,11 +99,14 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
           <div/>
         </>
       `,
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([2, 9, 4, 12])],
+      output: `
+        <div/>
+      `,
     },
     {
       code: '<Fragment />',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 13])],
     },
     {
       code: `
@@ -78,7 +114,10 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
           <Foo />
         </React.Fragment>
       `,
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([2, 9, 4, 26])],
+      output: `
+        <Foo />
+      `,
     },
     {
       code: `
@@ -92,23 +131,25 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
           fragment: 'SomeFragment',
         },
       },
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([2, 9, 4, 34])],
     },
     {
       // Not safe to fix this case because `Eeee` might require child be ReactElement
       code: '<Eeee><>foo</></Eeee>',
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 7, 1, 15])],
     },
     {
       code: '<div><>foo</></div>',
       errors: [
-        { messageId: 'NeedsMoreChildren' },
-        { messageId: 'ChildOfHtmlElement' },
+        expectNeedsMoreChildrenError([1, 6, 1, 14]),
+        expectChildOfHtmlElementError([1, 6, 1, 14]),
       ],
+      output: `<div>foo</div>`,
     },
     {
       code: '<div><>{"a"}{"b"}</></div>',
-      errors: [{ messageId: 'ChildOfHtmlElement' }],
+      errors: [expectChildOfHtmlElementError([1, 6, 1, 21])],
+      output: `<div>{"a"}{"b"}</div>`,
     },
     {
       code: `
@@ -117,11 +158,18 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
           <Eeee />
           <>{"a"}{"b"}</>
         </section>`,
-      errors: [{ messageId: 'ChildOfHtmlElement' }],
+      errors: [expectChildOfHtmlElementError([5, 11, 5, 26])],
+      output: `
+        <section>
+          <Eeee />
+          <Eeee />
+          {"a"}{"b"}
+        </section>`,
     },
     {
       code: '<div><Fragment>{"a"}{"b"}</Fragment></div>',
-      errors: [{ messageId: 'ChildOfHtmlElement' }],
+      errors: [expectChildOfHtmlElementError([1, 6, 1, 37])],
+      output: `<div>{"a"}{"b"}</div>`,
     },
     {
       // whitespace tricky case
@@ -134,13 +182,20 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
           git<> <b>hub</b></>
         </section>`,
       errors: [
-        { messageId: 'ChildOfHtmlElement', line: 3 },
-        { messageId: 'ChildOfHtmlElement', line: 7 },
+        expectChildOfHtmlElementError([3, 14, 5, 14]),
+        expectChildOfHtmlElementError([7, 14, 7, 30]),
       ],
+      output: `
+        <section>
+          git<b>hub</b>.
+
+          git <b>hub</b>
+        </section>`,
     },
     {
       code: '<div>a <>{""}{""}</> a</div>',
-      errors: [{ messageId: 'ChildOfHtmlElement' }],
+      errors: [expectChildOfHtmlElementError([1, 8, 1, 21])],
+      output: `<div>a {""}{""} a</div>`,
     },
     {
       code: `
@@ -151,15 +206,23 @@ ruleTester.run('jsx-no-useless-fragment', {} as never, {
         );
       `,
       errors: [
-        { messageId: 'NeedsMoreChildren', line: 4 },
-        { messageId: 'ChildOfHtmlElement', line: 4 },
+        expectNeedsMoreChildrenError([4, 13, 4, 31]),
+        expectChildOfHtmlElementError([4, 13, 4, 31]),
       ],
+      output: `
+        const Comp = () => (
+          <html>
+\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20
+          </html>
+        );
+      `,
     },
     {
       // Ensure allowExpressions still catches expected violations
       code: '<><Foo>{moo}</Foo></>',
       options: [{ allowExpressions: true }],
-      errors: [{ messageId: 'NeedsMoreChildren' }],
+      errors: [expectNeedsMoreChildrenError([1, 1, 1, 22])],
+      output: `<Foo>{moo}</Foo>`,
     },
   ],
 });
