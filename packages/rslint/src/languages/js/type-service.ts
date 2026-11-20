@@ -463,7 +463,14 @@ const declaredMemberKeys = new Set<PropertyKey>([
 
 const serviceView = Symbol();
 function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
-  return view[serviceView] ?? view;
+  const original = view[serviceView];
+  // A transparent proxy forwards its target's prototype. A derived object
+  // inherits the marker but has its own identity and cannot name a Go type.
+  return original &&
+    (original === view ||
+      Object.getPrototypeOf(view) === Object.getPrototypeOf(original))
+    ? original
+    : view;
 }
 
 export function guarded<T extends object>(object: T, ensure: () => void): T {
@@ -522,7 +529,7 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   }
   const typeArguments = cached((t) =>
     (t.objectFlags ?? 0) & of.Reference
-      ? checker.getTypeArguments(t)
+      ? Object.freeze(checker.getTypeArguments(t))
       : undefined,
   );
   const prototype = {
@@ -591,6 +598,17 @@ function makeTypePrototype(checker: CheckerView, typescript: TypeScriptEnums) {
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
+  // Node normally inspects a proxy's target directly, bypassing its ownKeys.
+  Object.defineProperty(prototype, Symbol.for('nodejs.util.inspect.custom'), {
+    configurable: true,
+    writable: true,
+    value(this: TypeView) {
+      return Object.defineProperties(
+        {},
+        Object.getOwnPropertyDescriptors(this),
+      );
+    },
+  });
   return prototype;
 }
 
@@ -1686,7 +1704,6 @@ export class TypeServiceClient {
     kind: ObjectKind,
     id: number,
     create: (client: this, brand: ObjectBrand) => T,
-    wrap?: (fields: T) => T,
   ): T | undefined {
     this.ensure();
     if (!id) return undefined;
@@ -1694,11 +1711,12 @@ export class TypeServiceClient {
     if (old) return old;
     const brand = { kind, id };
     const fields = create(this, brand);
-    const object = wrap
-      ? wrap(fields)
-      : guarded(fields, () => {
-          this.ensure();
-        });
+    const object =
+      kind === 'type'
+        ? fields
+        : guarded(fields, () => {
+            this.ensure();
+          });
     this.brands.set(object, brand);
     map.set(id, object);
     return object;
@@ -1728,151 +1746,34 @@ export class TypeServiceClient {
     if (fact.id) this.indexInfos.set(fact.id, info);
     return info;
   }
-  private readonly mappedValues = new WeakMap<object, readonly number[]>();
-  private mappedFields(view: object, id: number, index?: number) {
-    const known = this.mappedValues.get(view);
-    if (known && (index === undefined ? known.every(Boolean) : known[index]))
-      return known;
-    const current = this.query({ op: 'mappedFields', args: { id } });
-    this.mappedValues.set(view, current);
-    return current;
-  }
-  // Some compiler fields are present even when their value is undefined.
-  private hasTypeField(
-    view: TypeView,
-    key: PropertyKey,
-    mapped?: readonly number[],
-  ): boolean {
-    const tf = this.typescript.TypeFlags;
-    const of = this.typescript.ObjectFlags;
-    switch (key) {
-      case 'types':
-        return !!(view.flags & (tf.UnionOrIntersection | tf.TemplateLiteral));
-      case 'type':
-        return !!(view.flags & (tf.Index | tf.StringMapping));
-      case 'objectType':
-      case 'indexType':
-        return !!(view.flags & tf.IndexedAccess);
-      case 'root':
-      case 'checkType':
-      case 'extendsType':
-        return !!(view.flags & tf.Conditional);
-      case 'target':
-        return view.target !== undefined;
-      case 'typeParameters':
-      case 'localTypeParameters':
-      case 'outerTypeParameters':
-      case 'thisType':
-        return (
-          !!((view.objectFlags ?? 0) & (of.ClassOrInterface | of.Tuple)) &&
-          view.target?.id === view.id
-        );
-      case 'symbol':
-        return (
-          !!(
-            view.flags &
-            (tf.Object |
-              tf.TypeParameter |
-              tf.StringLiteral |
-              tf.NumberLiteral |
-              tf.BigIntLiteral |
-              tf.StringMapping)
-          ) || view.symbol !== undefined
-        );
-      case 'aliasSymbol':
-      case 'aliasTypeArguments':
-        return (
-          view.aliasSymbol !== undefined ||
-          !!(
-            view.flags &
-            (tf.UnionOrIntersection | tf.Conditional | tf.IndexedAccess)
-          ) ||
-          !!((view.objectFlags ?? 0) & (of.Mapped | of.Instantiated)) ||
-          (!!((view.objectFlags ?? 0) & of.Anonymous) &&
-            view.symbol?.flags === this.typescript.SymbolFlags.TypeLiteral) ||
-          (!!((view.objectFlags ?? 0) & of.Reference) &&
-            view.node !== undefined)
-        );
-      case 'elementFlags':
-      case 'combinedFlags':
-      case 'readonly':
-      case 'minLength':
-      case 'fixedLength':
-      case 'hasRestElement':
-      case 'labeledElementDeclarations':
-        return view.combinedFlags !== undefined;
-      case 'typeParameter':
-      case 'constraintType':
-      case 'templateType':
-      case 'modifiersType':
-        return (
-          !!((view.objectFlags ?? 0) & of.Mapped) &&
-          (mapped ? !!mapped[mappedFieldIndex[key]] : view[key] !== undefined)
-        );
-      case 'objectFlags':
-        return view.objectFlags !== undefined;
-      case 'freshType':
-        return (
-          !!(view.flags & (tf.Literal | tf.Enum)) &&
-          view.freshType !== undefined
-        );
-      case 'regularType':
-        return (
-          !!(view.flags & (tf.Literal | tf.Enum | tf.Union | tf.Object)) &&
-          view.regularType !== undefined
-        );
-      case 'simplifiedForReading':
-      case 'simplifiedForWriting':
-        return !!(view.flags & tf.IndexedAccess) && view[key] !== undefined;
-      case 'resolvedTrueType':
-      case 'resolvedFalseType':
-        return !!(view.flags & tf.Conditional) && view[key] !== undefined;
-      case 'elementType':
-      case 'finalArrayType':
-        return (
-          !!((view.objectFlags ?? 0) & of.EvolvingArray) &&
-          view[key] !== undefined
-        );
-      case 'constraint':
-        return (
-          !!(view.flags & (tf.TypeParameter | tf.Substitution)) &&
-          view.constraint !== undefined
-        );
-      default: {
-        const descriptor = Reflect.getOwnPropertyDescriptor(view, key);
-        return descriptor?.get
-          ? Reflect.get(view, key) !== undefined
-          : Reflect.has(view, key);
-      }
-    }
-  }
-  private readonly wrapType = (fields: TypeView): TypeView => {
-    // Plugins own the ordinary JS object. Compiler getters are private and
-    // supply its fields lazily, so reflection never calls a plugin getter.
+  private wrapType(
+    fields: TypeView,
+    hasField: (
+      key: PropertyKey,
+      includePending?: boolean,
+      mapped?: readonly number[],
+    ) => boolean,
+    mappedFields: () => readonly number[] | undefined,
+    hasDeclaredMembers: () => boolean,
+  ): TypeView {
     const target: TypeView = Object.create(this.typePrototype);
-    let deleted: Set<PropertyKey> | undefined;
     const available = (key: PropertyKey) =>
-      Object.hasOwn(fields, key) &&
-      !deleted?.has(key) &&
-      Object.isExtensible(target);
-    const descriptor = (key: PropertyKey): PropertyDescriptor => ({
-      value: Reflect.get(fields, key),
-      configurable: true,
-      enumerable: true,
-      writable: true,
-    });
+      Object.hasOwn(fields, key) && Object.isExtensible(target);
+    const descriptor = (key: PropertyKey): PropertyDescriptor => {
+      const desc = Object.getOwnPropertyDescriptor(fields, key)!;
+      if ('value' in desc) desc.writable = false;
+      return desc;
+    };
+    const install = (key: PropertyKey) =>
+      Object.defineProperty(target, key, {
+        ...descriptor(key),
+        configurable: false,
+      });
     const fieldKeys = () => {
-      const declared = fields.declaredProperties !== undefined;
-      const mapped =
-        (fields.objectFlags ?? 0) & this.typescript.ObjectFlags.Mapped
-          ? this.mappedFields(fields, fields.id)
-          : undefined;
-      return Reflect.ownKeys(fields).filter(
-        (key) =>
-          !deleted?.has(key) &&
-          (declaredMemberKeys.has(key)
-            ? declared
-            : this.hasTypeField(fields, key, mapped)),
+      const declared = hasDeclaredMembers();
+      const mapped = mappedFields();
+      return Reflect.ownKeys(fields).filter((key) =>
+        declaredMemberKeys.has(key) ? declared : hasField(key, false, mapped),
       );
     };
     const proxy: TypeView = new Proxy(target, {
@@ -1882,18 +1783,13 @@ export class TypeServiceClient {
         if (Object.hasOwn(object, key) || !available(key))
           return Reflect.get(object, key, receiver);
         const value: unknown = Reflect.get(fields, key);
-        return value === undefined &&
-          Reflect.has(object, key) &&
-          !this.hasTypeField(fields, key)
+        return value === undefined && Reflect.has(object, key) && !hasField(key)
           ? Reflect.get(object, key, receiver)
           : value;
       },
       has: (object, key) => {
         this.ensure();
-        return (
-          Reflect.has(object, key) ||
-          (available(key) && this.hasTypeField(fields, key))
-        );
+        return Reflect.has(object, key) || (available(key) && hasField(key));
       },
       ownKeys: (object) => {
         this.ensure();
@@ -1901,7 +1797,6 @@ export class TypeServiceClient {
         if (!Object.isExtensible(object)) return own;
         const keys = fieldKeys();
         if (!own.length) return keys;
-        // Let JS order integer, string and symbol keys, including overridden fields.
         return Reflect.ownKeys(
           Object.fromEntries([...keys, ...own].map((key) => [key, true])),
         );
@@ -1910,41 +1805,53 @@ export class TypeServiceClient {
         this.ensure();
         return (
           Reflect.getOwnPropertyDescriptor(object, key) ??
-          (available(key) && this.hasTypeField(fields, key)
-            ? descriptor(key)
-            : undefined)
+          (available(key) && hasField(key) ? descriptor(key) : undefined)
         );
       },
       defineProperty: (object, key, attributes) => {
         this.ensure();
+        if (key === 'typeArguments') return false;
         if (
           !Object.hasOwn(object, key) &&
           available(key) &&
-          this.hasTypeField(fields, key)
-        )
-          Object.defineProperty(object, key, descriptor(key));
+          hasField(key, true)
+        ) {
+          if (!hasField(key)) return false;
+          const current = descriptor(key);
+          for (const name of Object.keys(attributes)) {
+            if (
+              name !== 'configurable' &&
+              (!Object.hasOwn(current, name) ||
+                !Object.is(
+                  Reflect.get(attributes, name),
+                  Reflect.get(current, name),
+                ))
+            )
+              return false;
+          }
+          if (attributes.configurable === false) install(key);
+          return true;
+        }
         return Reflect.defineProperty(object, key, attributes);
       },
       deleteProperty: (object, key) => {
         this.ensure();
-        if (!Reflect.deleteProperty(object, key)) return false;
-        if (available(key) && this.hasTypeField(fields, key))
-          (deleted ??= new Set()).add(key);
-        return true;
+        return Object.hasOwn(object, key)
+          ? Reflect.deleteProperty(object, key)
+          : !available(key) || !hasField(key);
       },
       preventExtensions: (object) => {
         this.ensure();
         if (Object.isExtensible(object)) {
           for (const key of fieldKeys()) {
-            if (!Object.hasOwn(object, key))
-              Object.defineProperty(object, key, descriptor(key));
+            if (!Object.hasOwn(object, key)) install(key);
           }
         }
         return Reflect.preventExtensions(object);
       },
     });
     return proxy;
-  };
+  }
   private type(id: number): TypeView | undefined {
     const create = (client: this): TypeView => {
       const ensure = () => {
@@ -1960,6 +1867,8 @@ export class TypeServiceClient {
       const details = memo(ensure, () =>
         this.query({ op: 'typeDetails', args: { id } }),
       );
+      const typeList = (ids: readonly number[] | undefined) =>
+        ids && Object.freeze(this.typesFor(ids));
       const conditionalRoot = memo(ensure, () => {
         const d = details();
         const node = this.syntax.nodeRef(d.root);
@@ -1971,10 +1880,10 @@ export class TypeServiceClient {
           checkType: this.type(d.rootCheck)!,
           extendsType: this.type(d.rootExtends)!,
           isDistributive: d.distributive,
-          inferTypeParameters: d.infer && this.typesFor(d.infer),
-          outerTypeParameters: d.rootOuter && this.typesFor(d.rootOuter),
+          inferTypeParameters: typeList(d.infer),
+          outerTypeParameters: typeList(d.rootOuter),
           aliasSymbol: this.symbol(d.rootAlias),
-          aliasTypeArguments: d.rootArguments && this.typesFor(d.rootArguments),
+          aliasTypeArguments: typeList(d.rootArguments),
           instantiations: d.rootOuter?.length
             ? new LiveTypeMap(
                 () =>
@@ -1987,6 +1896,7 @@ export class TypeServiceClient {
               )
             : undefined,
         };
+        Object.freeze(root);
         this.conditionalRoots.set(node, root);
         return root;
       });
@@ -1997,59 +1907,217 @@ export class TypeServiceClient {
           return value | flag;
         }, 0),
       );
-      const symbol = memo(ensure, () =>
-          this.symbol(this.typeField(id, 'symbol')),
-        ),
-        alias = memo(ensure, () =>
-          this.symbol(this.typeField(id, 'aliasSymbol')),
-        );
+      const symbolId = memo(ensure, () => this.typeField(id, 'symbol'));
+      const aliasId = memo(ensure, () => this.typeField(id, 'aliasSymbol'));
+      const symbol = memo(ensure, () => this.symbol(symbolId()));
+      const alias = memo(ensure, () => this.symbol(aliasId()));
       const intrinsic = memo(ensure, () => this.typeField(id, 'intrinsicName')),
         escapedName = memo(ensure, () => this.typeField(id, 'escapedName')),
-        value = memo(ensure, () => this.typeField(id, 'value'));
-      const typeOperands = memo(ensure, () => {
-        const ids = this.typeField(id, 'typeOperands');
-        return ids ? this.typesFor(ids) : undefined;
-      });
-      const target = memo(ensure, () =>
-          this.type(this.typeField(id, 'target')),
+        value = memo(ensure, () => {
+          const literal = this.typeField(id, 'value');
+          return typeof literal === 'object' ? Object.freeze(literal) : literal;
+        });
+      const typeOperands = memo(ensure, () =>
+        typeList(this.typeField(id, 'typeOperands')),
+      );
+      const targetId = memo(ensure, () => this.typeField(id, 'target'));
+      const target = memo(ensure, () => this.type(targetId())),
+        aliasTypeArguments = memo(ensure, () =>
+          typeList(this.typeField(id, 'aliasTypeArguments')),
         ),
-        aliasTypeArguments = memo(ensure, () => {
-          const ids = this.typeField(id, 'aliasTypeArguments');
-          return ids ? this.typesFor(ids) : undefined;
-        }),
-        typeParameters = memo(ensure, () => {
-          const ids = this.typeField(id, 'typeParameters');
-          return ids ? this.typesFor(ids) : undefined;
-        }),
+        typeParameters = memo(ensure, () =>
+          typeList(this.typeField(id, 'typeParameters')),
+        ),
         tuple = memo(ensure, () => this.typeField(id, 'tuple'));
       const flag = (mask: number) => Boolean(flags() & mask),
         objectFlag = (mask: number) => Boolean((objectFlags() ?? 0) & mask),
         tf = this.typescript.TypeFlags,
         of = this.typescript.ObjectFlags;
-      const mapped = (
-        key: keyof typeof mappedFieldIndex,
-      ): TypeView | undefined => {
+      let mappedIds: readonly number[] | undefined;
+      const mappedFields = (index?: number) => {
         if (!objectFlag(of.Mapped)) return undefined;
-        const index = mappedFieldIndex[key];
-        return this.type(this.mappedFields(fields, id, index)[index]);
+        if (
+          !mappedIds ||
+          !(index === undefined ? mappedIds.every(Boolean) : mappedIds[index])
+        )
+          mappedIds = this.query({ op: 'mappedFields', args: { id } });
+        return mappedIds;
       };
-      let regular: TypeView | undefined;
+      const mapped = (key: keyof typeof mappedFieldIndex) => {
+        const index = mappedFieldIndex[key];
+        return this.type(mappedFields(index)?.[index] ?? 0);
+      };
+      let fresh = 0,
+        regular = 0;
+      const freshId = () =>
+        flag(tf.Literal | tf.Enum)
+          ? (fresh ||= this.query({ op: 'freshLiteral', args: { id } }))
+          : 0;
+      const regularId = () => {
+        if (flag(tf.Literal | tf.Enum)) return details().regular;
+        if (flag(tf.Union) || objectFlag(of.FreshLiteral))
+          return (regular ||= this.query({ op: 'regularType', args: { id } }));
+        return 0;
+      };
+      let memberFact: QueryResults['declaredMembers'];
+      const declared = () =>
+        objectFlag(of.ClassOrInterface | of.Tuple)
+          ? (memberFact ??= this.query({ op: 'declaredMembers', args: { id } }))
+          : undefined;
       let resolvedMembers: DeclaredMemberViews | undefined;
       const declaredMembers = () => {
-        if (!resolvedMembers && objectFlag(of.ClassOrInterface | of.Tuple)) {
-          const fact = this.query({ op: 'declaredMembers', args: { id } });
-          if (fact) {
-            resolvedMembers = {
-              declaredProperties: this.symbolsFor(fact.properties),
-              declaredCallSignatures: this.signaturesFor(fact.calls),
-              declaredConstructSignatures: this.signaturesFor(fact.constructs),
-              declaredIndexInfos: fact.indices.map((info) =>
-                this.indexInfo(info),
-              ),
-            };
-          }
+        const fact = declared();
+        if (fact && !resolvedMembers) {
+          resolvedMembers = {
+            declaredProperties: Object.freeze(this.symbolsFor(fact.properties)),
+            declaredCallSignatures: Object.freeze(
+              this.signaturesFor(fact.calls),
+            ),
+            declaredConstructSignatures: Object.freeze(
+              this.signaturesFor(fact.constructs),
+            ),
+            declaredIndexInfos: Object.freeze(
+              fact.indices.map((info) => this.indexInfo(info)),
+            ),
+          };
         }
         return resolvedMembers;
+      };
+      // Presence reads flags, handles and facts. Only a field getter constructs
+      // member views. A writable plugin property may use an inapplicable name,
+      // but cannot shadow a compiler slot that another client can populate.
+      const hasField = (
+        key: PropertyKey,
+        includePending = false,
+        mappedIds?: readonly number[],
+      ): boolean => {
+        switch (key) {
+          case 'id':
+          case 'checker':
+          case 'flags':
+            return true;
+          case 'types':
+            return flag(tf.UnionOrIntersection | tf.TemplateLiteral);
+          case 'type':
+            return flag(tf.Index | tf.StringMapping);
+          case 'objectType':
+          case 'indexType':
+            return flag(tf.IndexedAccess);
+          case 'root':
+          case 'checkType':
+          case 'extendsType':
+            return flag(tf.Conditional);
+          case 'target':
+            return !!targetId();
+          case 'typeParameters':
+          case 'localTypeParameters':
+          case 'outerTypeParameters':
+          case 'thisType':
+            return (
+              objectFlag(of.ClassOrInterface | of.Tuple) && targetId() === id
+            );
+          case 'symbol':
+            return (
+              flag(
+                tf.Object |
+                  tf.TypeParameter |
+                  tf.StringLiteral |
+                  tf.NumberLiteral |
+                  tf.BigIntLiteral |
+                  tf.StringMapping,
+              ) || !!symbolId()
+            );
+          case 'aliasSymbol':
+          case 'aliasTypeArguments':
+            return (
+              !!aliasId() ||
+              flag(
+                tf.UnionOrIntersection | tf.Conditional | tf.IndexedAccess,
+              ) ||
+              objectFlag(of.Mapped | of.Instantiated) ||
+              (objectFlag(of.Anonymous) &&
+                !!symbolId() &&
+                (this.symbolField(symbolId(), 'flags') as ts.SymbolFlags) ===
+                  this.typescript.SymbolFlags.TypeLiteral) ||
+              (objectFlag(of.Reference) && details().node !== undefined)
+            );
+          case 'elementFlags':
+          case 'combinedFlags':
+          case 'readonly':
+          case 'minLength':
+          case 'fixedLength':
+          case 'hasRestElement':
+          case 'labeledElementDeclarations':
+            return tuple() !== undefined;
+          case 'typeParameter':
+          case 'constraintType':
+          case 'templateType':
+          case 'modifiersType': {
+            const index = mappedFieldIndex[key];
+            return (
+              objectFlag(of.Mapped) &&
+              (includePending || !!(mappedIds ?? mappedFields(index))?.[index])
+            );
+          }
+          case 'objectFlags':
+            return objectFlags() !== undefined;
+          case 'freshType':
+            return (
+              flag(tf.Literal | tf.Enum) && (includePending || !!freshId())
+            );
+          case 'regularType':
+            return (
+              (includePending &&
+                (flag(tf.Literal | tf.Enum | tf.Union) ||
+                  objectFlag(of.FreshLiteral))) ||
+              !!regularId()
+            );
+          case 'simplifiedForReading':
+          case 'simplifiedForWriting':
+            return (
+              flag(tf.IndexedAccess) &&
+              (includePending || !!this.query({ op: key, args: { id } }))
+            );
+          case 'resolvedTrueType':
+          case 'resolvedFalseType':
+            return (
+              flag(tf.Conditional) &&
+              (includePending || !!this.query({ op: key, args: { id } }))
+            );
+          case 'elementType':
+          case 'finalArrayType':
+            return (
+              objectFlag(of.EvolvingArray) &&
+              (includePending ||
+                !!this.query({
+                  op: key === 'elementType' ? 'evolvingElement' : 'finalArray',
+                  args: { id },
+                }))
+            );
+          case 'constraint':
+            return flag(tf.TypeParameter)
+              ? includePending ||
+                  !!this.query({ op: 'typeParameterConstraint', args: { id } })
+              : flag(tf.Substitution) && !!details().constraint;
+          case 'intrinsicName':
+            return intrinsic() !== undefined;
+          case 'escapedName':
+            return escapedName() !== undefined;
+          case 'value':
+            return value() !== undefined;
+          case 'pattern':
+          case 'node':
+          case 'texts':
+            return details()[key] !== undefined;
+          case 'baseType':
+            return !!details().base;
+          default:
+            return (
+              declaredMemberKeys.has(key) &&
+              objectFlag(of.ClassOrInterface | of.Tuple) &&
+              (includePending || !!declared())
+            );
+        }
       };
       const fields = {
         id,
@@ -2118,9 +2186,7 @@ export class TypeServiceClient {
           return client.syntax.nodeRef(d.node);
         },
         get freshType() {
-          return client.type(
-            client.query({ op: 'freshLiteral', args: { id } }),
-          );
+          return client.type(freshId());
         },
         get elementType() {
           return client.type(
@@ -2141,12 +2207,7 @@ export class TypeServiceClient {
           );
         },
         get regularType() {
-          if (flag(tf.Literal | tf.Enum)) return client.type(details().regular);
-          if (flag(tf.Union) || objectFlag(of.FreshLiteral))
-            return (regular ??= client.type(
-              client.query({ op: 'regularType', args: { id } }),
-            ));
-          return undefined;
+          return client.type(regularId());
         },
         get baseType() {
           const d = details();
@@ -2161,15 +2222,15 @@ export class TypeServiceClient {
         },
         get outerTypeParameters() {
           const d = details();
-          return d.outer && client.typesFor(d.outer);
+          return typeList(d.outer);
         },
         get localTypeParameters() {
           const d = details();
-          return d.local && client.typesFor(d.local);
+          return typeList(d.local);
         },
         get elementFlags() {
           const d = details();
-          return d.elements;
+          return d.elements && Object.freeze(d.elements);
         },
         get minLength() {
           const d = details();
@@ -2185,11 +2246,14 @@ export class TypeServiceClient {
         },
         get labeledElementDeclarations() {
           const d = details();
-          return d.labels?.map((ref) => client.syntax.nodeRef(ref));
+          return (
+            d.labels &&
+            Object.freeze(d.labels.map((ref) => client.syntax.nodeRef(ref)))
+          );
         },
         get texts() {
           const d = details();
-          return d.texts;
+          return d.texts && Object.freeze(d.texts);
         },
         get root() {
           return conditionalRoot();
@@ -2239,9 +2303,9 @@ export class TypeServiceClient {
         },
       };
       inheritTypePrototype(fields, client.typePrototype);
-      return fields;
+      return this.wrapType(fields, hasField, mappedFields, () => !!declared());
     };
-    return this.intern(this.types, 'type', id, create, this.wrapType);
+    return this.intern(this.types, 'type', id, create);
   }
   private symbol(id: number, knownName?: string): SymbolView | undefined {
     const view = this.intern(this.symbols, 'symbol', id, (client, brand) => {
