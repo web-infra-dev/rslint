@@ -2,6 +2,7 @@
 package no_canvas_to_image
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -75,11 +76,22 @@ func directExpressionOrOneUseConst(ctx rule.RuleContext, node *ast.Node) *ast.No
 	}
 	// RefStore excludes the declaration's initializing write. Upstream counts
 	// that write and the single use as two references.
-	references := ctx.Refs.References(symbol)
+	// JSDoc casts add synthesized type references that ESLint does not visit.
+	// Keep RefStore's cached slice intact and retain authored TypeScript uses.
+	references := slices.DeleteFunc(slices.Clone(ctx.Refs.References(symbol)), isJSDocReference)
 	if len(references) != 1 || references[0] != node {
 		return nil
 	}
 	return withoutAwait(declaration.AsVariableDeclaration().Initializer)
+}
+
+func isJSDocReference(node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if utils.IsJSDocSyntaxNode(current) {
+			return true
+		}
+	}
+	return false
 }
 
 func isCanvasImage(node *ast.Node) bool {
