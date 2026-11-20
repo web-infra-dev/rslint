@@ -204,6 +204,9 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	entries := coordinator.fs.GetAccessibleEntries(node.canonicalDirectory)
 	directories := append([]string(nil), entries.Directories...)
 	sort.Strings(directories)
+	if walkTargets != nil {
+		walkTargets.resolveChildNames(node.canonicalDirectory, directories, coordinator.fs)
+	}
 	parentRealPath := ""
 	if entries.Symlinks == nil && len(directories) > 0 {
 		parentRealPath = node.canonicalDirectory
@@ -212,7 +215,7 @@ func (coordinator *discoveryCoordinator) processWalkNode(node discoveryWalkNode,
 	for _, name := range directories {
 		var childTargets *discoveryTargetTrie
 		if walkTargets != nil {
-			childTargets = walkTargets.child(name, coordinator.fs.UseCaseSensitiveFileNames())
+			childTargets = walkTargets.children[name]
 			if childTargets == nil && !node.recursive {
 				continue
 			}

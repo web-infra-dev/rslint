@@ -126,7 +126,7 @@ func lspFilesystemPathID(filePath string, fs vfs.FS) string {
 
 func lspTargetIdentity(filePath string, fs vfs.FS) target.File {
 	return target.File{
-		PathIdentity: config.FreezeFileIdentity(filePath, fs),
+		PathIdentity: config.NewInputPathNames(fs).File(config.FreezeFileIdentity(filePath, fs), false),
 	}
 }
 

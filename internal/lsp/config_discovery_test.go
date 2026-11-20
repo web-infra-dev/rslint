@@ -1995,8 +1995,15 @@ func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing
 	}
 	previousID := s.gitPolicyWatcherID
 
-	external := tspath.NormalizePath(t.TempDir())
-	physicalExternal := tspath.NormalizePath(fsys.Realpath(external))
+	externalParent := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
+	physicalExternal := tspath.ResolvePath(externalParent, "open-docs")
+	if err := os.Mkdir(physicalExternal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	external := physicalExternal
+	if alias := tspath.ResolvePath(externalParent, "OPEN-DOCS"); fsys.DirectoryExists(alias) {
+		external = alias
+	}
 	uri := documentURIFromPath(tspath.ResolvePath(external, "source.ts"))
 	s.documents[uri] = "debugger;"
 	previousObservations := fsys.observations

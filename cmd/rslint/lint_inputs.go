@@ -5,17 +5,33 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 )
 
-func cliWorkingDirectory() (string, error) {
+func (args *lintArgs) storedWorkingDirectory(path string) string {
+	if args.workingDirectoryNames == nil {
+		args.workingDirectoryNames = rslintconfig.NewInputPathNames(osvfs.FS())
+	}
+	return args.workingDirectoryNames.Directory(path)
+}
+
+func (args *lintArgs) cliWorkingDirectory() (string, error) {
 	cwd, err := getCLIWorkingDirectory()
 	if err != nil {
 		return "", err
 	}
-	return target.NormalizeNativePath(cwd), nil
+	cwd = target.NormalizeNativePath(cwd)
+	// Darwin's cwd lookup already asks the kernel for stored names, including
+	// hard-linked directory symlinks. Preserve intentional PWD links elsewhere.
+	if runtime.GOOS != "darwin" {
+		cwd = args.storedWorkingDirectory(cwd)
+	}
+	return cwd, nil
 }
 
 // IPC-supplied files are exact names. Only raw CLI arguments expand as globs.
@@ -23,7 +39,7 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs, exactPaths []string) 
 	if len(exactPaths) == 0 && len(args.Positional) == 0 {
 		return nil
 	}
-	cwd, err := cliWorkingDirectory()
+	cwd, err := args.cliWorkingDirectory()
 	if err != nil {
 		return err
 	}

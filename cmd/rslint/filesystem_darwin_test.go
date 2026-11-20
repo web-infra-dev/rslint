@@ -1,4 +1,4 @@
-// cspell:ignore FSOPT FULLPATH Linkat STRASSE Straße
+// cspell:ignore APFS FSOPT FULLPATH Linkat STRASSE Straße
 
 package main
 
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
@@ -45,16 +46,62 @@ func TestWorkingDirectoryWithHardLinksToSymlink(t *testing.T) {
 			t.Errorf("cwd via %q = %q, %v, want %q", input, got, err, want)
 		}
 	}
+
+	same, ok := newCLIFileSystem().(interface{ SameDirectoryEntry(left, right string) bool })
+	if !ok {
+		t.Fatal("CLI filesystem does not provide directory entry comparison")
+	}
+	linkName := func(path string) (alreadyExists bool) {
+		t.Helper()
+		err := unix.Linkat(unix.AT_FDCWD, work, unix.AT_FDCWD, path, 0)
+		if err != nil && !errors.Is(err, os.ErrExist) {
+			t.Fatal(err)
+		}
+		return err != nil
+	}
+	checks := make(map[[2]string]bool)
+	for _, pair := range [][2]string{
+		{"other", "OTHER"},
+		{"Straße", "STRASSE"},
+		{"Café", "Cafe\u0301"},
+		{"\ufb03", "ffi"},
+		{"\u13a0", "\uab70"},
+	} {
+		left, right := filepath.Join(root, pair[0]), filepath.Join(root, pair[1])
+		linkName(left)
+		checks[[2]string{left, right}] = linkName(right)
+	}
+	if err := os.Chmod(root, 0o111); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chmod(root, 0o755); err != nil {
+			t.Error(err)
+		}
+	})
+	for pair, want := range checks {
+		if got := same.SameDirectoryEntry(pair[0], pair[1]); got != want {
+			t.Errorf("SameDirectoryEntry(%q, %q) in a search-only parent = %t, want %t", pair[0], pair[1], got, want)
+		}
+	}
+	if same.SameDirectoryEntry(work, other) {
+		t.Error("separate hard links in a search-only parent compare equal")
+	}
+	// Standard normalization and folding can collide for separate APFS entries.
+	for _, pair := range [][2]string{
+		{"a" + strings.Repeat("\u0345", 9), "a" + strings.Repeat("\u03b9", 9)},
+		{"a" + strings.Repeat("\u0301", 31), "a" + strings.Repeat("\u0301", 30) + "\u034f\u0301"},
+	} {
+		if darwinEqualLookupNames(root, pair[0], pair[1]) {
+			t.Errorf("hard link names %q and %q collide", pair[0], pair[1])
+		}
+	}
 }
 
 func TestCLIDarwinDirectoryEntryName(t *testing.T) {
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
-	}
-	lookup, ok := newCLIFileSystem().(interface{ DirectoryEntryName(path string) string })
-	if !ok {
-		t.Fatal("CLI filesystem does not provide directory entry names")
 	}
 	writeLintTargetContractFiles(t, root, map[string]string{"Straße/file": "", "Café/file": "", "Other/file": ""})
 	path := func(name string) string { return filepath.Join(root, name) }
@@ -71,7 +118,7 @@ func TestCLIDarwinDirectoryEntryName(t *testing.T) {
 	}
 	check := func(input, want string) {
 		t.Helper()
-		if got := lookup.DirectoryEntryName(input); got != want {
+		if got := darwinDirectoryEntryName(input); got != want {
 			t.Errorf("DirectoryEntryName(%q) = %q, want %q", input, got, want)
 		}
 	}

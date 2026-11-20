@@ -1,8 +1,6 @@
 package discovery
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
@@ -149,7 +147,7 @@ func (coordinator *discoveryCoordinator) advanceDirectorySeedGit(
 	useCaseSensitive := coordinator.fs.UseCaseSensitiveFileNames()
 	destination = tspath.NormalizePath(destination)
 	var reverse []string
-	for directory := destination; directory != ""; directory = configDiscoveryParent(directory) {
+	for directory := destination; directory != ""; directory = rslintconfig.FilesystemParentDirectory(directory) {
 		reverse = append(reverse, directory)
 		if resolution.currentDirectory == "" || discoveryPathsEqual(directory, resolution.currentDirectory, useCaseSensitive) {
 			break
@@ -178,32 +176,13 @@ func (coordinator *discoveryCoordinator) advanceDirectorySeedGit(
 	return reachable, false
 }
 
-// configDiscoveryParent returns the lexical filesystem parent without walking
-// above a UNC share. tspath's generic root parser treats only the server as the
-// root, which is appropriate for URLs but not for filesystem config discovery.
-func configDiscoveryParent(directory string) string {
-	directory = tspath.NormalizePath(directory)
-	if strings.HasPrefix(directory, "//") {
-		serverAndRest := strings.Trim(directory[2:], "/")
-		serverEnd := strings.IndexByte(serverAndRest, '/')
-		if serverEnd < 0 || !strings.Contains(serverAndRest[serverEnd+1:], "/") {
-			return ""
-		}
-	}
-	parent := tspath.GetDirectoryPath(directory)
-	if parent == directory {
-		return ""
-	}
-	return parent
-}
-
 func (coordinator *discoveryCoordinator) findCandidateChain(startDirectory string) []configCandidate {
 	var reverse []configCandidate
 	for directory := tspath.NormalizePath(startDirectory); directory != ""; {
 		if candidate, ok := coordinator.findCandidate(directory); ok {
 			reverse = append(reverse, candidate)
 		}
-		directory = configDiscoveryParent(directory)
+		directory = rslintconfig.FilesystemParentDirectory(directory)
 	}
 	candidates := make([]configCandidate, len(reverse))
 	for index := range reverse {
@@ -273,7 +252,7 @@ func (coordinator *discoveryCoordinator) resolveSeedOwners(seeds []*discoverySee
 				seed.done = true
 				continue
 			}
-			seed.searchDir = configDiscoveryParent(candidate.directory)
+			seed.searchDir = rslintconfig.FilesystemParentDirectory(candidate.directory)
 			if seed.searchDir == "" {
 				seed.done = true
 			}
@@ -286,7 +265,7 @@ func (coordinator *discoveryCoordinator) findCandidateUp(startDirectory string) 
 		if candidate, ok := coordinator.findCandidate(directory); ok {
 			return candidate, true
 		}
-		directory = configDiscoveryParent(directory)
+		directory = rslintconfig.FilesystemParentDirectory(directory)
 	}
 	return configCandidate{}, false
 }

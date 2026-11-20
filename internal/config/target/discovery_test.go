@@ -1431,6 +1431,26 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
+func TestChildConfigBoundaryPreservesCaseDistinctSibling(t *testing.T) {
+	const root, child, sibling = "/repo", "/repo/SRC", "/repo/src"
+	fsys := &discoveryMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			root:    {Directories: []string{"SRC", "src"}},
+			child:   {Files: []string{"good.js"}},
+			sibling: {Files: []string{"bad.js"}},
+		},
+		caseSensitiveFS: false,
+	}
+	configs := map[string]rslintconfig.RslintConfig{root: nil, child: nil}
+	targets := discoverLintTargetsMultiConfig(configs, nil, fsys, nil, []string{root}, true)
+	owners := make(map[string]string)
+	for _, target := range targets {
+		owners[target.Path] = target.ConfigDirectory
+	}
+	assert.DeepEqual(t, owners, map[string]string{child + "/good.js": child, sibling + "/bad.js": root})
+}
+
 func TestConfigDirectoryIndex_UsesImmediateBoundariesAndNearestOwner(t *testing.T) {
 	configMap := map[string]rslintconfig.RslintConfig{
 		"/repo":          nil,

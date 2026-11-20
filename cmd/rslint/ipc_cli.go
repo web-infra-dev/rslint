@@ -402,7 +402,7 @@ func discoverCLIConfigCatalog(
 	if args == nil || payload == nil || payload.ConfigDiscovery == nil {
 		return nil
 	}
-	cwd, err := cliWorkingDirectory()
+	cwd, err := args.cliWorkingDirectory()
 	if err != nil {
 		return fmt.Errorf("get working directory for config discovery: %w", err)
 	}

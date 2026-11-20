@@ -62,7 +62,7 @@ func (matcher GlobalIgnoreMatcher) MayReopenGitDescendants(directory string, can
 		return false
 	}
 	resolver := matcher.resolver
-	target, matches := resolver.resolvePathSpaces(directory, canonicalDirectory, true)
+	target, matches := resolver.resolvePathSpaces(PathIdentity{Path: directory, CanonicalPath: canonicalDirectory}, true)
 	for _, index := range resolver.globalEntryIndexes {
 		entry := resolver.entries[index]
 		if entry.configArrayBaseIndex >= 0 {
@@ -99,7 +99,7 @@ func (matcher GlobalIgnoreMatcher) IgnoresFile(file PathIdentity) bool {
 	if matcher.resolver == nil {
 		return false
 	}
-	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
+	target, matches := matcher.resolver.resolvePathSpaces(file, false)
 	return matcher.resolver.globallyIgnores(target, matches, false)
 }
 
@@ -109,7 +109,7 @@ func (matcher GlobalIgnoreMatcher) ReopensGitignoredFile(file PathIdentity) bool
 	if matcher.resolver == nil {
 		return false
 	}
-	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
+	target, matches := matcher.resolver.resolvePathSpaces(file, false)
 	return !matcher.resolver.globallyIgnores(target, matches, true)
 }
 
