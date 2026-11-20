@@ -31,7 +31,8 @@
     "eslint-plugin-simple-import-sort": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",
     "eslint-plugin-unicorn": "catalog:",
-    "espree": "catalog:"
+    "espree": "catalog:",
+    "globals": "catalog:"
   },
   "publishConfig": {
     "access": "public"

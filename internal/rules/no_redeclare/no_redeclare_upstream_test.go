@@ -1,8 +1,7 @@
 // TestNoRedeclareUpstream migrates the full valid/invalid suite from ESLint
 // v10.7.0 tests/lib/rules/no-redeclare.js 1:1. Position assertions cover
-// line/column/endLine/endColumn for every invalid case that rslint can execute.
-// Unsupported parser/scope configuration cases remain in place with Skip and
-// an explicit reason. rslint-specific lock-ins live in no_redeclare_extras_test.go.
+// line/column/endLine/endColumn for every invalid case. No case is skipped.
+// rslint-specific lock-ins live in no_redeclare_extras_test.go.
 package no_redeclare
 
 import (
@@ -41,13 +40,10 @@ func TestNoRedeclareUpstream(t *testing.T) {
 			// ---- upstream valid: builtinGlobals option ----
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": false}},
 			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"}},
-			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
-			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
+			{Code: "var Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{GlobalReturn: true}},
 			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
-			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
-			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"top": "readonly"}, Skip: true},
-			// SKIP: rslint does not support ESLint's sourceType override plus browser globals.
-			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Skip: true},
+			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"top": "readonly"}, LanguageOptions: rule.LanguageOptions{GlobalReturn: true}},
+			{Code: "var top = 0;", Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]any{"top": "readonly"}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, SourceType: "module"}},
 			{Code: "var self = 1", Options: map[string]interface{}{"builtinGlobals": true}},
 			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015}},
 			{Code: "var globalThis = foo", Options: map[string]interface{}{"builtinGlobals": true}, LanguageOptions: rule.LanguageOptions{ECMAVersion: 2017}},
@@ -111,14 +107,13 @@ func TestNoRedeclareUpstream(t *testing.T) {
 					redeclaredError("a", 1, 13),
 				},
 			},
-			// SKIP: rslint does not support ESLint's parserOptions.ecmaFeatures.globalReturn.
 			{
-				Code:    "var a; var {a = 0, b: Object = 0} = {};",
-				Options: map[string]interface{}{"builtinGlobals": true},
+				Code:            "var a; var {a = 0, b: Object = 0} = {};",
+				Options:         map[string]interface{}{"builtinGlobals": true},
+				LanguageOptions: rule.LanguageOptions{ECMAVersion: 2015, GlobalReturn: true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					redeclaredError("a", 1, 13),
 				},
-				Skip: true,
 			},
 			{
 				Code:    "var a; var {a = 0, b: Object = 0} = {};",
