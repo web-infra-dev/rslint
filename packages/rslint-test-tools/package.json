@@ -18,6 +18,8 @@
     "@rslint/rule-tester": "workspace:*",
     "@stylistic/eslint-plugin": "catalog:",
     "@types/node": "catalog:",
+    "@types/node24": "npm:@types/node@24.19.0",
+    "@types/react18": "npm:@types/react@18.3.31",
     "@typescript-eslint/parser": "catalog:",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
