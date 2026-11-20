@@ -475,6 +475,7 @@ function canonicalView<T extends object>(view: T & { [serviceView]?: T }): T {
 
 const inspectCustom = Symbol.for('nodejs.util.inspect.custom');
 const inspectionReceivers = new WeakSet<object>();
+const rejectTypeEdit = () => false;
 
 export function guarded<T extends object>(object: T, ensure: () => void): T {
   const proxy: T = new Proxy(object, {
@@ -625,11 +626,6 @@ function makeTypePrototype(
       options: { getters?: boolean | string },
     ) {
       if (!options?.getters || inspectionReceivers.has(this)) return this;
-      try {
-        ensure();
-      } catch {
-        return this;
-      }
       // With getters enabled, Node calls each accessor on the proxy's target.
       // Give it the rule's actual receiver. Returning this on the second pass
       // keeps cycle detection and formatting inside the original inspection.
@@ -728,7 +724,6 @@ export class TypeServiceClient {
   private readonly maxFactsBytes: number;
   private readonly syntax: GenerationSyntaxViews;
   private readonly typePrototype: TypePrototype;
-  private readonly typeGuard: ProxyHandler<TypeView>;
   private readonly files = new Set<TypeServiceFile>();
   private batchTransport: BatchTransport | undefined;
   private factBytes = 0;
@@ -1384,18 +1379,6 @@ export class TypeServiceClient {
     );
     const ensure = this.ensure.bind(this);
     this.typePrototype = makeTypePrototype(this.checker, typescript, ensure);
-    // Node inspects a proxy's immediate target, even when console.dir skips
-    // custom inspection. Public reflection checks the lifetime and leaves the
-    // trap absent so it delegates to that same target without a second query.
-    const live = { get: ensure };
-    this.typeGuard = Object.defineProperties(
-      {},
-      {
-        has: live,
-        ownKeys: live,
-        getOwnPropertyDescriptor: live,
-      },
-    );
     this.program = guarded<ProgramView>(
       {
         getTypeChecker: () => this.checker,
@@ -1843,13 +1826,20 @@ export class TypeServiceClient {
             : hasField(key, false, mapped)),
       );
     };
+    // Node's raw inspector unwraps the public proxy and may run a plugin
+    // getter on this target. It can inspect the type but cannot change it.
     const backing: TypeView = new Proxy(fields, {
+      set: rejectTypeEdit,
+      defineProperty: rejectTypeEdit,
+      deleteProperty: rejectTypeEdit,
+      preventExtensions: rejectTypeEdit,
+      setPrototypeOf: rejectTypeEdit,
       get: (object, key, receiver: object) => {
         const self = receiver === backing ? view : receiver;
         if (key === serviceView) return view;
-        if (receiver !== backing) this.ensure();
-        else if (key === Symbol.toStringTag && !this.canInspectType())
+        if (key === Symbol.toStringTag && !this.canInspectType())
           return Reflect.getOwnPropertyDescriptor(object, key)?.value;
+        if (receiver !== backing && managed(key)) this.ensure();
         const value: unknown = Reflect.get(object, key, self);
         if (value === undefined && managed(key)) {
           const proto = Reflect.getPrototypeOf(object);
@@ -1870,22 +1860,28 @@ export class TypeServiceClient {
       ownKeys: () => keys(this.canInspectType()),
       getOwnPropertyDescriptor: (_object, key) =>
         own(key, this.canInspectType()),
-      set: (object, key, value, receiver) => {
+    });
+    const view = new Proxy(backing, {
+      setPrototypeOf: (_target, proto) => {
+        this.ensure();
+        return Reflect.setPrototypeOf(fields, proto);
+      },
+      set: (_target, key, value, receiver) => {
         this.ensure();
         if (managed(key) && !hasField(key, true))
           return Reflect.set(
-            Reflect.getPrototypeOf(object) ?? Object.create(null),
+            Reflect.getPrototypeOf(fields) ?? Object.create(null),
             key,
             value,
             receiver,
           );
-        return Reflect.set(object, key, value, receiver);
+        return Reflect.set(fields, key, value, receiver);
       },
-      defineProperty: (object, key, attributes) => {
+      defineProperty: (_target, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
         if (!managed(key))
-          return Reflect.defineProperty(object, key, attributes);
+          return Reflect.defineProperty(fields, key, attributes);
         if (hasField(key, true)) {
           const current = own(key);
           if (!current) return false;
@@ -1903,27 +1899,26 @@ export class TypeServiceClient {
         } else {
           // Discard the absent placeholder so new plugin properties receive
           // the ordinary defaults of Object.defineProperty or assignment.
-          if (!Object.isExtensible(object)) return false;
-          Reflect.deleteProperty(object, key);
+          if (!Object.isExtensible(fields)) return false;
+          Reflect.deleteProperty(fields, key);
           (pluginFields ??= new Set()).add(key);
         }
-        return Reflect.defineProperty(object, key, attributes);
+        return Reflect.defineProperty(fields, key, attributes);
       },
-      deleteProperty: (object, key) => {
+      deleteProperty: (_target, key) => {
         this.ensure();
-        return managed(key) ? !own(key) : Reflect.deleteProperty(object, key);
+        return managed(key) ? !own(key) : Reflect.deleteProperty(fields, key);
       },
-      preventExtensions: (object) => {
+      preventExtensions: () => {
         this.ensure();
-        if (Object.isExtensible(object)) {
+        if (Object.isExtensible(fields)) {
           const keep = new Set(keys());
-          for (const key of Reflect.ownKeys(object))
-            if (!keep.has(key)) Reflect.deleteProperty(object, key);
+          for (const key of Reflect.ownKeys(fields))
+            if (!keep.has(key)) Reflect.deleteProperty(fields, key);
         }
-        return Reflect.preventExtensions(object);
+        return Reflect.preventExtensions(fields);
       },
     });
-    const view = new Proxy(backing, this.typeGuard);
     return view;
   }
   private type(id: number): TypeView | undefined {

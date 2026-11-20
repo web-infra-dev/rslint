@@ -1890,8 +1890,9 @@ binary syntax reader.
 `file(binding)` handle is closed in `finally`; file completion releases ESTree
 maps while preserving generation-scoped native, type, symbol and signature
 identities while a plugin can observe them. Weak interning releases unreachable
-wrappers and their keys. Closing the owner invalidates all those objects and
-releases its transports and caches.
+wrappers and their keys. Closing the owner invalidates compiler queries and
+releases its transports and caches. Inspecting a retained type can still
+display its local ID and plugin metadata.
 
 An injected synchronous transport uses a finite request/fact protocol and
 offset-addressed binary records. Property/name arguments and packet strings
@@ -1915,7 +1916,11 @@ and their member lists are read-only. Checking a field's presence or listing
 keys reads its metadata and leaves member objects lazy. Plugins can add their
 own properties with ordinary JavaScript descriptors. Transparent proxies
 preserve the original handle. Objects derived from a type have no checker
-handle of their own. Explicit signature queries pass the apparent
+handle of their own. For plugin getters that use the type as a `WeakMap`
+key, use `util.inspect(type, { getters: true })` or pass `customInspect: true`
+to `console.dir`. With custom inspection disabled, Node calls getters on the
+proxy target. That target is read-only and has its own identity.
+Explicit signature queries pass the apparent
 argument count and candidate output through normal overload resolution. They
 can change the checker's cached answers for every client. Node-dependent
 semantic reads therefore go directly to the checker. A variable declaration's
