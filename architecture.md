@@ -718,7 +718,9 @@ the original frames until source identity checks and fix text freezing finish.
 Producer finalization waits for actual generation borrowers; detached plugin
 work continues with frozen inputs. Frames are shared by source object identity,
 not by file path, and compute ECMAScript line maps lazily. `LintedFiles` requests
-selected target paths; `SourceFiles` additionally retains their original ASTs.
+selected target paths. `SkippedErrorRules` also returns the error-level rule IDs
+excluded from each target because it lacks a type checker. `SourceFiles`
+retains the original ASTs for selected targets.
 The API requests ASTs only for its encoded-source response. Diagnostic
 projection does not invalidate those explicitly retained artifacts.
 
@@ -1044,11 +1046,12 @@ Automatic discovery uses these rules:
    directory; the lexical directory remains the owner and selector coordinate.
    The catalog passes its frozen authored path spaces to target planning and
    LSP activation, so neither reconstructs them through a moved directory alias.
-   Before sending a batch, Go coalesces verified native case aliases to one
-   stable candidate ID and representative directory across all frontiers. The
-   check requires both lexical case equivalence and matching resolved file and
-   directory paths; arbitrary symlink owners are not deduplicated by physical
-   target.
+   Before sending a batch, discovery assigns one owner directory and candidate
+   ID to native spellings of the same config, including Unicode variants.
+   It verifies the directory entries along the path and the config file itself
+   before reusing that ID across discovery frontiers. If two distinct symlinks
+   lead to the same directory and both become effective config owners, the
+   catalog reports the ambiguity before activation.
    After ownership is resolved, `activateConfigs` names only effective IDs;
    Node rechecks fingerprints, prepares plugin state only for that set, then
    rechecks the same effective sources before publishing the activation. This
@@ -1367,12 +1370,16 @@ Its pure cursors keep raw source reachability separate from authored
 config admission. `config.GitPolicy` compiles that snapshot once and retains
 physical repository roots, source-directory groups and precise covered
 containing directories; it owns no VFS, module loader or owner lookup.
-A file's Git coordinate is its frozen canonical parent plus original basename,
-so a leaf symlink cannot switch Git repositories. Directory aliases use their
-frozen physical roots. Requests hand those typed identities from discovery to
-target planning rather than resolving them again. Distinct explicit directory
-roots remain independent even when one contains another; final selected files
-are deduplicated as before.
+Git matches a file using its physical parent and the name stored in that
+directory. A leaf symlink therefore uses its own name and its containing
+repository's ignore rules. Directory aliases use their physical roots.
+In a native repository, Git's `core.ignoreCase` setting determines whether
+patterns fold ASCII letters. A linked worktree inherits the repository setting.
+When Git is unavailable or the metadata is virtual, the reader observes the
+marker directory. Outside a repository it observes the directory of each source.
+Physical source and coverage keys retain their exact directory names.
+Discovery passes these identities to target planning. Each explicit directory
+root is scanned independently, including when one root contains another.
 
 `target.Request` receives the policy and `target.Plan.GitPolicy()` carries it to
 `config/lint` and file config resolvers alongside `PathSpaces()`. Matching uses
@@ -1395,15 +1402,15 @@ when assembling overlay content, so the selected document overrides other open
 aliases of the same target. Before loading config modules,
 discovery chooses one raw owner-directory spelling for drive-equivalent
 candidates, so candidate priority and plugin routing share one owner.
-Ownership lookup never compares depth across lexical and physical path spaces:
-the nearest exact lexical config wins, a native case alias is accepted only
-after filesystem identity verification, and realpath ancestry is consulted only
-when no lexical owner exists. Directory-walk handoff boundaries are likewise
-built only from the lexical config hierarchy. Canonical paths remain file and
-Program identities, not a second config inheritance tree. Before activation,
-two distinct lexical config directories resolving to one physical directory are
-rejected; verified alternate native casing of the same directory is the only
-allowed alias.
+Ownership lookup tries the nearest exact lexical config first, verifies native
+spelling variants against the filesystem, then falls back to realpath ancestry.
+A parent config's walk stops at the directory entries assigned to child configs.
+On a case-sensitive volume this lets `SRC` own a nested config while its sibling
+`src` still uses the parent config. Canonical paths identify files and Programs.
+When the filesystem returns several spellings for one verified config directory,
+the catalog uses one physical spelling for target selection and Git ignore rules.
+Before activation, discovery rejects two independently named config owners
+that resolve to the same physical directory.
 
 Additional current behaviors:
 
@@ -1420,6 +1427,9 @@ Additional current behaviors:
   unavailable for diagnostics, quick fixes and fix-all. Content edits do not
   repeat a failed refresh for the same physical directory. Config/watch events
   can retry it, and a successful commit clears the failed-directory set.
+  Open documents share ancestor directory names from the current config snapshot.
+  Each request checks the document's current entry name and physical target so
+  a rename or a new symlink destination takes effect before a file notification.
 - Dynamic Git watches cover workspace lexical/physical trees and open-document
   ancestor chains for `.gitignore` and `.git` marker creation/deletion, never
   `.git` contents. Watch ranges are registered before source observation and
@@ -1486,6 +1496,29 @@ selection remains in `internal/config/target`, source-to-config rule resolution
 in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
+
+The file CLI opens the optional suppressions file after config evaluation and
+before lint or autofix. After the final observation, it passes completed
+files, skipped rules and diagnostics to `internal/suppressions`. The final
+lint result's filename identifies its diagnostics and its baseline entry.
+Recording, checking and pruning use that filename relative to the physical
+working directory. This keeps the base directory for the JSON keys stable
+when a shell enters the same project through a symlink. The CLI resolves native
+file identities before config discovery. On macOS the physical path uses the
+spelling stored on disk. Directory and glob selections retain their requested
+names through config discovery, including at nested configs. At physical file
+deduplication, target selection can report two distinct names that would
+share one lint result. The file CLI uses this fact to reject recording or
+verifying counts for those names together. Updates repeat this check against
+the latest baseline under the write lock. When one command fixes source and
+updates the baseline, the CLI computes both changes in memory. Under the lock
+it validates the counts, stages the JSON, applies the source edits and then
+publishes the baseline. Both writes verify that the physical paths used during
+lint still lead to the selected destinations after config and plugin execution.
+
+Files with syntax errors and rules skipped for lack of type information keep
+their entries. The plugin dispatcher identifies incomplete rule results.
+Configuration and plugin failures block baseline writes.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

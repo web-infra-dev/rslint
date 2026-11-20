@@ -48,7 +48,7 @@ func projectGenerationTargets(
 	}
 	fileCount := plan.fileCount()
 	sources := make(map[string]ast.SourceFileLike, fileCount)
-	collectLintedFiles := demand.LintedFiles || demand.SourceFiles
+	collectLintedFiles := demand.LintedFiles || demand.SkippedErrorRules || demand.SourceFiles
 	var lintedFiles []LintedFile
 	if collectLintedFiles {
 		lintedFiles = make([]LintedFile, 0, fileCount)
@@ -71,7 +71,10 @@ func projectGenerationTargets(
 			}
 			sources[path] = source
 			if collectLintedFiles {
-				file := LintedFile{Path: path}
+				file := LintedFile{Path: path, SyntaxError: filePlan.syntaxError}
+				if demand.SkippedErrorRules && filePlan.rules != nil {
+					file.SkippedErrorRules = filePlan.rules.skippedErrorRules
+				}
 				if demand.SourceFiles {
 					file.SourceFile = source
 				}

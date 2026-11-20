@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/program"
 	"github.com/web-infra-dev/rslint/internal/program/loader"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
 	"github.com/web-infra-dev/rslint/internal/testutil/txtarfs"
 )
 
@@ -83,6 +84,41 @@ func writeLintTargetContractFiles(t *testing.T, root string, files map[string]st
 		if err := os.WriteFile(fileName, []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", fileName, err)
 		}
+	}
+}
+
+func TestCLIFixRechecksAliasCountsBeforeWritingSources(t *testing.T) {
+	fsys := newCLIFileSystem()
+	root := fsys.Realpath(tspath.NormalizePath(t.TempDir()))
+	const before = "var x = 1;\nexport { x };\n"
+	writeLintTargetContractFiles(t, root, map[string]string{"src/app.js": before})
+	createWorkingDirectoryAlias(t, filepath.Join(root, "src"), filepath.Join(root, "linked"))
+	path := tspath.ResolvePath(root, "linked/app.js")
+	const latest = `{"src/app.js":{"no-var":{"count":1}}}`
+	code, _, stderr := runLintCommandForTest(t, root, lintArgs{
+		FS:           fsys,
+		Fix:          true,
+		Format:       "jsonline",
+		AllowFiles:   []string{path, tspath.ResolvePath(root, "src/app.js")},
+		Suppressions: suppressions.Options{Mode: suppressions.Prune},
+		ConfigCatalog: explicitConfigCatalogForTest(root, rslintconfig.RslintConfig{{
+			Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-var": "error"},
+		}}),
+		// Another invocation records a count after this run selected its targets.
+		CompleteConfigActivation: func() error {
+			return os.WriteFile(suppressions.DefaultFilename, []byte(latest), 0o644)
+		},
+	})
+	if code != 2 || !strings.Contains(stderr, "same file") {
+		t.Fatalf("exit code %d, stderr %q", code, stderr)
+	}
+	for name, want := range map[string]string{path: before, suppressions.DefaultFilename: latest} {
+		if got, err := os.ReadFile(name); err != nil || string(got) != want {
+			t.Errorf("%s after rejected fixes = %q, %v, want %q", name, got, err, want)
+		}
+	}
+	if _, err := os.Stat(suppressions.DefaultFilename + ".tmp"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("expected the failed update to release its stage, got %v", err)
 	}
 }
 
@@ -205,7 +241,7 @@ func TestCLITypeCheckKeepsLintTargetsAndChecksWholeProject(t *testing.T) {
 		}
 		t.Chdir(dir)
 		args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-		if err := prepareCLIInputs(context.Background(), &args); err != nil {
+		if err := prepareCLIInputs(context.Background(), &args, nil); err != nil {
 			t.Fatal(err)
 		}
 		code, stdout, stderr := runLintCommandForTest(t, dir, args)
@@ -271,7 +307,7 @@ func TestCLIFixOnlyWritesSelectedTargets(t *testing.T) {
 	}
 	t.Chdir(dir)
 	args.FS = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	if err := prepareCLIInputs(context.Background(), &args); err != nil {
+	if err := prepareCLIInputs(context.Background(), &args, nil); err != nil {
 		t.Fatal(err)
 	}
 	code, stdout, stderr := runLintCommandForTest(t, dir, args)

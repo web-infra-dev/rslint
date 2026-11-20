@@ -1,10 +1,11 @@
-// cspell:ignore gitdir
+// cspell:ignore gitdir Straße STRASSE
 
 package discovery
 
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,6 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
@@ -47,7 +49,8 @@ type configDiscoveryRealpathFS struct {
 
 type configDiscoveryCaseSensitivityFS struct {
 	vfs.FS
-	caseSensitive bool
+	caseSensitive  bool
+	directoryNames map[string][]string
 }
 
 type configDiscoveryNoSymlinkMetadataFS struct {
@@ -111,6 +114,14 @@ func (fs *configDiscoveryReadSpyFS) GetAccessibleEntries(path string) vfs.Entrie
 
 func (fs *configDiscoveryCaseSensitivityFS) UseCaseSensitiveFileNames() bool {
 	return fs.caseSensitive
+}
+
+func (fs *configDiscoveryCaseSensitivityFS) GetAccessibleEntries(path string) vfs.Entries {
+	entries := fs.FS.GetAccessibleEntries(path)
+	if names, ok := fs.directoryNames[path]; ok {
+		entries.Directories = names
+	}
+	return entries
 }
 
 func (fs *configDiscoveryNoSymlinkMetadataFS) GetAccessibleEntries(path string) vfs.Entries {
@@ -763,6 +774,25 @@ func TestConfigDiscoveryFreezesGitignoreBytesAcrossOverlappingRoutes(t *testing.
 	}
 }
 
+func TestIsSymlinkDirectoryChildUsesExactEnumeratedEntry(t *testing.T) {
+	fsys := &configDiscoveryCaseSensitivityFS{
+		FS: &configDiscoveryRealpathFS{realPaths: map[string]string{"/repo/src": "/repo/Src"}},
+	}
+	entries := vfs.Entries{
+		Directories: []string{"src", "SRC"},
+		Symlinks:    map[string]struct{}{"SRC": {}},
+	}
+	for _, name := range entries.Directories {
+		if got, want := isSymlinkDirectoryChild(fsys, "/repo", "/repo", name, entries), name == "SRC"; got != want {
+			t.Errorf("directory entry %q: symlink = %t, want %t", name, got, want)
+		}
+	}
+	entries.Symlinks = nil
+	if isSymlinkDirectoryChild(fsys, "/repo", "/repo", "src", entries) {
+		t.Error("a case alias for the same directory was classified as a symlink without entry metadata")
+	}
+}
+
 func TestConfigDiscoverySkipsDescendantSymlinkWithoutMetadata(t *testing.T) {
 	root := discoveryTempDir(t)
 	external := discoveryTempDir(t)
@@ -1222,6 +1252,56 @@ func TestConfigDiscoveryDefaultExcludedDirectoryRootOnlyLoadsReachableAncestor(t
 }
 
 func TestConfigDiscoveryBoundsExpandedTargetWalkToAncestorTrie(t *testing.T) {
+	t.Run("a case-distinct sibling cannot govern a glob match", func(t *testing.T) {
+		root := discoveryTempDir(t)
+		config := tspath.CombinePaths(root, "rslint.config.js")
+		unrelated := tspath.CombinePaths(root, "SRC/rslint.config.js")
+		fsys := &configDiscoveryCaseSensitivityFS{
+			FS:             &configDiscoveryCandidateFS{FS: discoveryTestFS(), files: map[string]struct{}{config: {}, unrelated: {}}},
+			directoryNames: map[string][]string{root: {"SRC", "src"}},
+		}
+		loader := newFixtureConfigLoader()
+		loader.configs[config] = namedConfig("root")
+		loader.failures[unrelated] = ConfigModuleError{Code: "ERR", Message: "must not load"}
+		file := tspath.CombinePaths(root, "src/bad.js")
+		catalog, err := discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{
+			CWD: root, Directories: discoveryDirectoryInputs([]string{root}), LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{Path: file}, ScanDirectories: []string{root}}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := requestedConfigPaths(loader); !slices.Equal(got, []string{config}) || len(catalog.TargetFiles) != 1 || catalog.TargetFiles[0].Path != file {
+			t.Fatalf("loaded configs = %v, selected files = %v", got, catalog.TargetFiles)
+		}
+		if len(catalog.TargetDirectories) != 0 {
+			t.Fatalf("glob-only inputs published recursive roots: %v", catalog.TargetDirectories)
+		}
+	})
+
+	t.Run("caller spellings of one stored branch retain all targets", func(t *testing.T) {
+		root := discoveryTempDir(t)
+		config := writeConfigCandidate(t, root, "Project/rslint.config.js")
+		fsys := discoveryTestFS()
+		if !fsys.DirectoryExists(tspath.CombinePaths(root, "project")) {
+			t.Skip("fixture requires native case-insensitive path lookup")
+		}
+		exact := writeDiscoveryFixture(t, root, "Project/nested/exact.js", "")
+		alias := writeDiscoveryFixture(t, root, "project/nested/alias.js", "")
+		loader := newFixtureConfigLoader()
+		loader.configs[config] = namedConfig("project")
+		catalog, err := discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{
+			CWD: root, Directories: discoveryDirectoryInputs([]string{root}), LimitDirectoryWalkToFiles: true,
+			Files: []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{Path: exact}}, {PathIdentity: rslintconfig.PathIdentity{Path: alias}}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := requestedConfigPaths(loader); !slices.Equal(got, []string{config}) || len(catalog.TargetFiles) != 2 {
+			t.Fatalf("loaded configs = %v, selected files = %v", got, catalog.TargetFiles)
+		}
+	})
+
 	t.Run("loads only branches that can govern supplied targets", func(t *testing.T) {
 		root := discoveryTempDir(t)
 		rootA := filepath.Join(root, "packages/a")
@@ -2605,36 +2685,119 @@ func TestConfigDiscoveryUsesCanonicalOwnerOnlyAfterLexicalAncestryIsEmpty(t *tes
 	})
 }
 
-func TestConfigDiscoveryCaseInsensitiveRootsChooseStableRepresentative(t *testing.T) {
+func TestConfigDiscoveryPreservesRequestedDirectoryCasing(t *testing.T) {
 	fsys := &configDiscoveryCaseSensitivityFS{
 		FS:            discoveryTestFS(),
 		caseSensitive: false,
 	}
+	coordinator := discoveryCoordinator{fs: fsys, request: ConfigDiscoveryRequest{CWD: "C:/repo"}}
 	build := func(directories []string) []string {
-		coordinator := discoveryCoordinator{
-			fs: fsys,
-			request: ConfigDiscoveryRequest{
-				CWD:         "C:/repo",
-				Directories: discoveryDirectoryInputs(directories),
-			},
-		}
+		coordinator.request.Directories = discoveryDirectoryInputs(directories)
 		var paths []string
 		for _, directory := range coordinator.normalizedDirectoryRoots() {
 			paths = append(paths, directory.LexicalPath)
 		}
 		return paths
 	}
-	first := build([]string{"c:/repo", "C:/Repo"})
-	second := build([]string{"C:/Repo", "c:/repo"})
-	want := []string{"C:/Repo"}
-	if !reflect.DeepEqual(first, want) || !reflect.DeepEqual(second, want) {
-		t.Fatalf("case-insensitive roots depend on input order: first=%v second=%v", first, second)
+	directories := []string{"c:/Repo", "C:/repo", "C:/Repo"}
+	first := build(directories)
+	slices.Reverse(directories)
+	second := build(directories)
+	want := []string{"C:/Repo", "C:/repo"}
+	if !slices.Equal(first, want) || !slices.Equal(second, want) {
+		t.Fatalf("directory roots = %v and %v, want %v", first, second, want)
+	}
+	files := []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{Path: "C:/repo/file.js"}, ScanDirectories: []string{"c:/repo"}}}
+	tries := coordinator.targetAncestorTries(coordinator.normalizedDirectoryRoots(), files)
+	if len(tries) != 1 || tries["C:/repo"] == nil {
+		t.Fatalf("glob file should be associated only with its input root: %v", tries)
+	}
+}
+
+func TestConfigDiscoveryCaseAliasDirectoryAndGlobReachNestedOwner(t *testing.T) {
+	root := discoveryTempDir(t)
+	parentConfig := writeConfigCandidate(t, root, "rslint.config.js")
+	nestedConfig := writeConfigCandidate(t, root, "real/nested/rslint.config.js")
+	writeDiscoveryFixture(t, root, "real/nested/all.js", "")
+	matched := writeDiscoveryFixture(t, root, "real/nested/matched.js", "")
+	physical := tspath.CombinePaths(root, "real")
+	upper := tspath.CombinePaths(root, "Link")
+	lower := tspath.CombinePaths(root, "link")
+	directories := []rslintconfig.DirectoryIdentity{
+		{LexicalPath: upper, CanonicalPath: physical},
+		{LexicalPath: lower, CanonicalPath: physical},
+	}
+	globFile := tspath.CombinePaths(lower, "nested/matched.js")
+	file := DiscoveryFile{
+		PathIdentity:    rslintconfig.PathIdentity{Path: globFile, CanonicalPath: matched, CanonicalParentPath: tspath.GetDirectoryPath(matched)},
+		ScanDirectories: []string{lower},
+	}
+	fsys := &configDiscoveryCaseSensitivityFS{
+		FS: discoveryTestFS(), directoryNames: map[string][]string{root: {"Link", "real"}},
+	}
+	loader := newFixtureConfigLoader()
+	loader.configs[parentConfig] = namedConfig("parent")
+	loader.configs[nestedConfig] = namedConfig("nested")
+	catalog, err := DiscoverAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
+		CWD: root, Directories: directories, Files: []DiscoveryFile{file},
+		RecursiveDirectories: directories[:1], LimitDirectoryWalkToFiles: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.Stats.ConfigsLoaded != 2 {
+		t.Fatalf("configs loaded = %d, want parent and one nested config", catalog.Stats.ConfigsLoaded)
+	}
+	upperNested := tspath.CombinePaths(upper, "nested")
+	lowerNested := tspath.CombinePaths(lower, "nested")
+	scope := catalog.Scopes[upperNested]
+	if len(scope.Directories) != 2 || scope.Directories[1].LexicalPath != lowerNested ||
+		len(scope.RecursiveDirectories) != 1 || scope.RecursiveDirectories[0].LexicalPath != upperNested {
+		t.Fatalf("unexpected nested directory scope: %+v", scope)
+	}
+	var selected []string
+	plan, err := target.Resolve(target.Request{
+		ConfigMap:       catalog.Configs,
+		OwnerScopes:     catalog.Scopes,
+		PathSpaces:      catalog.PathSpaces,
+		GitPolicy:       catalog.GitPolicy,
+		FS:              fsys,
+		Files:           catalog.TargetFiles,
+		Directories:     directories[:1],
+		ScanDirectories: map[string][]string{globFile: file.ScanDirectories},
+		OnFileAlias:     func(_, discarded string) { selected = append(selected, discarded) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range plan.Files {
+		selected = append(selected, source.Path)
+	}
+	selected = slices.DeleteFunc(selected, func(path string) bool { return tspath.GetBaseFileName(path) == "rslint.config.js" })
+	sort.Strings(selected)
+	want := []string{tspath.CombinePaths(upper, "nested/all.js"), tspath.CombinePaths(upper, "nested/matched.js"), globFile}
+	if !slices.Equal(selected, want) {
+		t.Fatalf("selected paths = %v, want %v", selected, want)
 	}
 }
 
 func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
 	shareConfig := "//server/share/rslint.config.js"
 	serverConfig := "//server/rslint.config.js"
+
+	t.Run("owner comparison stops at the share", func(t *testing.T) {
+		fsys := &configDiscoveryReadSpyFS{FS: discoveryTestFS()}
+		modules := newModuleLoadCoordinator(t.Context(), fsys, nil, "unc-roots", false, false)
+		physical := "//server/share/workspace"
+		for _, directory := range []string{physical, "//SERVER/SHARE/workspace"} {
+			if owner := modules.configOwner(configCandidate{directory: directory, physicalDirectory: physical}); owner != physical {
+				t.Fatalf("owner for %q = %q, want %q", directory, owner, physical)
+			}
+		}
+		if len(fsys.accessedDirs) != 0 {
+			t.Fatalf("owner lookup enumerated UNC roots: %v", fsys.accessedDirs)
+		}
+	})
 
 	t.Run("parent traversal", func(t *testing.T) {
 		for _, test := range []struct {
@@ -2650,8 +2813,8 @@ func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
 			{directory: "//server/share/", parent: ""},
 			{directory: "//server", parent: ""},
 		} {
-			if got := configDiscoveryParent(test.directory); got != test.parent {
-				t.Fatalf("configDiscoveryParent(%q) = %q, want %q", test.directory, got, test.parent)
+			if got := rslintconfig.FilesystemParentDirectory(test.directory); got != test.parent {
+				t.Fatalf("rslintconfig.FilesystemParentDirectory(%q) = %q, want %q", test.directory, got, test.parent)
 			}
 		}
 	})
@@ -2722,6 +2885,25 @@ func TestConfigDiscoveryCandidateSearchStopsAtUNCShareRoot(t *testing.T) {
 }
 
 func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation(t *testing.T) {
+	t.Run("hard-linked modules keep their owning directories", func(t *testing.T) {
+		root := discoveryTempDir(t)
+		configA := writeConfigCandidate(t, root, "a/rslint.config.js")
+		configB := tspath.CombinePaths(root, "b/rslint.config.js")
+		directories := []string{tspath.GetDirectoryPath(configA), tspath.GetDirectoryPath(configB)}
+		if err := os.Mkdir(directories[1], 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Link(configA, configB); err != nil {
+			t.Skipf("hard link fixture unavailable: %v", err)
+		}
+		loader := newFixtureConfigLoader()
+		loader.configs[configA], loader.configs[configB] = namedConfig("shared"), namedConfig("shared")
+		catalog := buildFixtureCatalog(t, root, loader, ConfigDiscoveryRequest{Directories: discoveryDirectoryInputs(directories)})
+		if got := catalog.ConfigDirectories(); !slices.Equal(got, directories) {
+			t.Fatalf("hard-linked module owners = %v, want %v", got, directories)
+		}
+	})
+
 	t.Run("distinct symlink aliases are rejected", func(t *testing.T) {
 		root := discoveryTempDir(t)
 		physicalRoot := filepath.Join(root, "shared")
@@ -2794,7 +2976,7 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 		upperRoot := filepath.Join(root, "Project")
 		lowerRoot := filepath.Join(root, "project")
 		upperConfig := writeConfigCandidate(t, upperRoot, "rslint.config.js")
-		lowerConfig := writeConfigCandidate(t, lowerRoot, "rslint.config.js")
+		lowerConfig := tspath.CombinePaths(lowerRoot, "rslint.config.js")
 		loader := newFixtureConfigLoader()
 		loader.configs[upperConfig] = namedConfig("upper")
 		loader.configs[lowerConfig] = namedConfig("lower")
@@ -2836,51 +3018,153 @@ func TestConfigDiscoveryValidatesPhysicalConfigDirectoryIdentityBeforeActivation
 	})
 }
 
+func TestConfigDiscoveryUsesStoredOwnerNames(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		left, right  string
+		entries      []string
+		wantConflict bool
+	}{
+		{"full case fold", "Straße", "STRASSE", []string{"Straße"}, false},
+		{"canonical normalization", "Café", "Cafe\u0301", []string{"Café", "café"}, false},
+		{"separate directory links", "Straße", "STRASSE", []string{"Straße", "STRASSE"}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := discoveryTempDir(t)
+			physical := tspath.CombinePaths(root, "physical")
+			module := writeConfigCandidate(t, physical, "rslint.config.js")
+			left, right := tspath.CombinePaths(root, test.left), tspath.CombinePaths(root, test.right)
+			fsys := &configDiscoveryCaseSensitivityFS{
+				FS:             &configDiscoveryRealpathFS{FS: discoveryTestFS(), realPaths: map[string]string{left: physical, right: physical}},
+				directoryNames: map[string][]string{root: test.entries},
+			}
+			loader := newFixtureConfigLoader()
+			loader.configs[module] = namedConfig("owner")
+			catalog, err := discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{
+				CWD: root, Directories: discoveryDirectoryInputs([]string{left, right}),
+			})
+			if test.wantConflict {
+				if err == nil || !strings.Contains(err.Error(), "resolve to the same filesystem location") || len(loader.activations) != 0 {
+					t.Fatalf("distinct owner entries: catalog=%v, activations=%v, error=%v", catalog, loader.activations, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(catalog.Configs) != 1 || catalog.Stats.ConfigsLoaded != 1 || len(catalog.Scopes[min(left, right)].Directories) != 2 {
+				t.Fatalf("one owner with both requested directories: catalog=%+v", catalog)
+			}
+		})
+	}
+}
+
+// Model a case-insensitive mount whose Realpath preserves the caller's spelling
+// on a case-sensitive host. Stat and directory enumeration use native entries.
+type discoveryMountFS struct {
+	fs.FS
+	stored *strings.Replacer
+}
+
+func (mount discoveryMountFS) Open(name string) (fs.File, error) {
+	return mount.FS.Open(mount.stored.Replace(name))
+}
+
 func TestConfigDiscoveryCoalescesNativeCaseAliasesWithoutRealpathCaseNormalization(t *testing.T) {
 	root := discoveryTempDir(t)
-	upperRoot := tspath.NormalizePath(filepath.Join(root, "Project"))
-	lowerRoot := tspath.NormalizePath(filepath.Join(root, "project"))
-	upperConfig := writeConfigCandidate(t, upperRoot, "rslint.config.js")
-	lowerConfig := tspath.CombinePaths(lowerRoot, "rslint.config.js")
-	if _, err := os.Stat(lowerConfig); err != nil {
-		if os.IsNotExist(err) {
-			t.Skip("fixture requires native case-insensitive path lookup")
-		}
+	writeConfigCandidate(t, root, "Scope/Project/rslint.config.js")
+	writeDiscoveryFixture(t, root, "Scope/Project/a.ts", "")
+	writeDiscoveryFixture(t, root, "Scope/Project/deep/b.ts", "")
+	writeDiscoveryFixture(t, root, "Scope/Project/deep/.gitignore", "b.ts\n")
+	writeDiscoveryFixture(t, root, "Scope/Project/blocked/c.ts", "")
+	writeDiscoveryFixture(t, root, "Scope/Project/ignored.ts", "")
+	writeDiscoveryFixture(t, root, "Scope/.gitignore", "blocked/\n/Project/ignored.ts\n")
+	writeDiscoveryFixture(t, root, "Scope/.git/HEAD", "")
+	const owner = "/Scope/Project"
+	fsys := &configDiscoveryCaseSensitivityFS{
+		FS:            iovfs.From(discoveryMountFS{os.DirFS(root), strings.NewReplacer("scope", "Scope", "project", "Project", "A.ts", "a.ts", "IGNORED.ts", "ignored.ts")}, true),
+		caseSensitive: true,
+		// A cached listing can be empty on a case-insensitive shared mount.
+		directoryNames: map[string][]string{"/Scope": {}, "/scope": {}},
+	}
+	loader := newFixtureConfigLoader()
+	loader.configs[owner+"/rslint.config.js"] = namedConfig("owner")
+	paths := []string{owner + "/A.ts", owner + "/a.ts", "/scope/project/a.ts", "/scope/project/deep/b.ts", "/scope/project/blocked/c.ts"}
+	var files []DiscoveryFile
+	for _, path := range paths {
+		files = append(files, DiscoveryFile{PathIdentity: rslintconfig.PathIdentity{Path: path}, Explicit: true})
+	}
+	catalog, err := discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{CWD: "/", Files: files})
+	if err != nil {
 		t.Fatal(err)
 	}
-	upperFile := writeDiscoveryFixture(t, upperRoot, "a.ts", "debugger;\n")
-	lowerFile := writeDiscoveryFixture(t, lowerRoot, "b.ts", "debugger;\n")
-	loader := newFixtureConfigLoader()
-	loader.configs[upperConfig] = namedConfig("owner")
-	// EvalSymlinks, now used by upstream on macOS, preserves the caller's
-	// spelling. Make that behavior explicit on every case-insensitive host.
-	fsys := &configDiscoveryCaseSensitivityFS{
-		FS: &configDiscoveryRealpathFS{
-			FS: discoveryTestFS(),
-			realPaths: map[string]string{
-				upperRoot:   upperRoot,
-				lowerRoot:   lowerRoot,
-				upperConfig: upperConfig,
-				lowerConfig: lowerConfig,
-			},
-		},
-		caseSensitive: false,
+	if got := requestedConfigPaths(loader); !slices.Equal(got, []string{owner + "/rslint.config.js"}) {
+		t.Fatalf("requested configs = %v, want one representative", got)
 	}
-	catalog, err := discoverTestAutomatic(context.Background(), fsys, loader, ConfigDiscoveryRequest{
-		CWD: root,
-		Files: []DiscoveryFile{
-			{PathIdentity: rslintconfig.PathIdentity{Path: upperFile}, Explicit: true},
-			{PathIdentity: rslintconfig.PathIdentity{Path: lowerFile}, Explicit: true},
-		},
+	var aliases []string
+	plan, err := target.Resolve(target.Request{
+		ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
+		Files: catalog.TargetFiles, GitPolicy: catalog.GitPolicy, FS: fsys,
+		OnFileAlias: func(kept, discarded string) { aliases = append(aliases, kept, discarded) },
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog.Configs) != 1 || len(catalog.Scopes) != 1 {
-		t.Fatalf("native case aliases: configs=%v scopes=%v, want one owner", catalog.Configs, catalog.Scopes)
+	slices.Sort(aliases)
+	if !slices.Equal(slices.Compact(aliases), paths[:3]) || len(plan.Files) != 1 || plan.Files[0].CanonicalPath != owner+"/a.ts" {
+		t.Fatalf("selected files = %+v, aliases = %v, want the three requested names of a.ts only", plan.Files, aliases)
 	}
-	if got := requestedConfigPaths(loader); !reflect.DeepEqual(got, []string{upperConfig}) {
-		t.Fatalf("requested configs = %v, want one representative", got)
+	const ignored = "/scope/project/IGNORED.ts"
+	catalog, err = discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{
+		CWD: "/", Files: []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{Path: ignored}, Explicit: true}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.TargetFiles) != 1 || catalog.TargetFiles[0].Path != ignored || rslintconfig.GitPath(catalog.TargetFiles[0]) != owner+"/ignored.ts" {
+		t.Fatalf("single input did not preserve its spelling and stored Git entry: %+v", catalog.TargetFiles)
+	}
+}
+
+func TestConfigDiscoveryPreservesRequestedDirectorySpellingUnderRecursiveRoot(t *testing.T) {
+	root := discoveryTempDir(t)
+	writeConfigCandidate(t, root, "rslint.config.js")
+	writeDiscoveryFixture(t, root, "src/t.ts", "")
+	fsys := iovfs.From(discoveryMountFS{os.DirFS(root), strings.NewReplacer("SRC", "src")}, true)
+	loader := newFixtureConfigLoader()
+	loader.configs["/rslint.config.js"] = namedConfig("root")
+	catalog, err := discoverTestAutomatic(t.Context(), fsys, loader, ConfigDiscoveryRequest{
+		CWD: "/", Directories: discoveryDirectoryInputs([]string{"/", "/SRC"}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	_, err = target.Resolve(target.Request{
+		ConfigMap: catalog.Configs, OwnerScopes: catalog.Scopes, PathSpaces: catalog.PathSpaces,
+		Directories: catalog.TargetDirectories, GitPolicy: catalog.GitPolicy, FS: fsys,
+		OnFileAlias: func(kept, discarded string) { names = append(names, kept, discarded) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"/SRC/t.ts", "/src/t.ts"}) {
+		t.Fatalf("selected directory spellings = %v, want the explicit and enumerated paths", names)
+	}
+
+	roots := discoveryDirectoryInputs([]string{"/SRC", "/src"})
+	mixed, err := loadTestExplicit(t.Context(), fsys, nil, ExplicitConfigRequest{
+		CWD: "/", Config: namedConfig("inline"), ConfigDirectory: "/",
+		TargetDirectories: roots, RecursiveDirectories: roots[:1], LimitDirectoryWalkToFiles: true,
+		TargetFiles: []DiscoveryFile{{PathIdentity: rslintconfig.PathIdentity{Path: "/src/t.ts"}, ScanDirectories: []string{"/src"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []rslintconfig.DirectoryIdentity{{LexicalPath: "/SRC", CanonicalPath: "/src"}}
+	if !slices.Equal(mixed.TargetDirectories, want) {
+		t.Fatalf("mixed recursive roots = %+v, want %+v", mixed.TargetDirectories, want)
 	}
 }
 
@@ -2889,7 +3173,7 @@ func TestConfigDiscoveryReusesNativeCaseAliasAcrossLoadFrontiers(t *testing.T) {
 	upperRoot := filepath.Join(root, "Project")
 	lowerRoot := filepath.Join(root, "project")
 	upperConfig := writeConfigCandidate(t, upperRoot, "rslint.config.js")
-	lowerConfig := writeConfigCandidate(t, lowerRoot, "rslint.config.js")
+	lowerConfig := tspath.CombinePaths(lowerRoot, "rslint.config.js")
 	loader := newFixtureConfigLoader()
 	loader.configs[upperConfig] = namedConfig("upper")
 	loader.configs[lowerConfig] = namedConfig("lower")

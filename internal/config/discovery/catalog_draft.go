@@ -3,9 +3,9 @@ package discovery
 import (
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
 )
@@ -111,14 +111,14 @@ func appendUniqueSortedDirectory(directories []rslintconfig.DirectoryIdentity, d
 // effective IDs. Node activation happens only after this method succeeds.
 func (draft *catalogDraft) finalize(
 	physicalDirectory func(string) string,
-	useCaseSensitive bool,
+	fsys vfs.FS,
 ) (
 	map[string]rslintconfig.RslintConfig,
 	map[string]target.OwnerScope,
 	[]string,
 	error,
 ) {
-	if err := draft.validateDirectoryIdentities(physicalDirectory, useCaseSensitive); err != nil {
+	if err := draft.validateDirectoryIdentities(physicalDirectory, fsys); err != nil {
 		return nil, nil, nil, err
 	}
 	for directory, source := range draft.selectedSources {
@@ -138,33 +138,32 @@ func (draft *catalogDraft) finalize(
 }
 
 // validateDirectoryIdentities rejects ambiguous ownership before Node
-// activates the effective candidate set. Alternate native casing is safe only
-// after Realpath verifies one exact physical directory.
-func (draft *catalogDraft) validateDirectoryIdentities(physicalDirectory func(string) string, useCaseSensitive bool) error {
+// activates the effective candidate set. Native spellings already share an owner.
+func (draft *catalogDraft) validateDirectoryIdentities(physicalDirectory func(string) string, fsys vfs.FS) error {
+	if len(draft.configs) < 2 {
+		return nil
+	}
 	directories := make([]string, 0, len(draft.configs))
 	for directory := range draft.configs {
 		directories = append(directories, tspath.NormalizePath(directory))
 	}
 	sort.Strings(directories)
 
-	lexicalByPhysical := make(map[tspath.Path]string, len(directories))
+	ownersByPhysical := make(map[string][]rslintconfig.DirectoryIdentity, len(directories))
 	for _, directory := range directories {
 		physicalPath := physicalDirectory(directory)
-		physicalID := tspath.ToPath(physicalPath, "", true)
-		existing, collision := lexicalByPhysical[physicalID]
-		if !collision {
-			lexicalByPhysical[physicalID] = directory
-			continue
+		key := rslintconfig.PathSpellingKey(physicalPath)
+		for _, existing := range ownersByPhysical[key] {
+			if rslintconfig.SamePhysicalPath(fsys, existing.CanonicalPath, physicalPath) {
+				return fmt.Errorf( //nolint:staticcheck // Preserve the established user-facing JS API error contract.
+					"Config directories %q and %q resolve to the same filesystem location %q",
+					existing.LexicalPath, directory, physicalPath,
+				)
+			}
 		}
-		if !useCaseSensitive && strings.EqualFold(existing, directory) {
-			continue
-		}
-		return fmt.Errorf( //nolint:staticcheck // Preserve the established user-facing JS API error contract.
-			"Config directories %q and %q resolve to the same filesystem location %q",
-			existing,
-			directory,
-			physicalPath,
-		)
+		ownersByPhysical[key] = append(ownersByPhysical[key], rslintconfig.DirectoryIdentity{
+			LexicalPath: directory, CanonicalPath: physicalPath,
+		})
 	}
 	return nil
 }

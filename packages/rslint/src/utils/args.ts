@@ -36,6 +36,8 @@ export function parseArgs(argv: string[]) {
       format: { type: 'string' },
       'max-warnings': { type: 'string' },
       rule: { type: 'string', multiple: true },
+      'suppress-rule': { type: 'string', multiple: true },
+      'suppressions-location': { type: 'string' },
       trace: { type: 'string' },
       cpuprof: { type: 'string' },
       // Consumed by the JS entry point; must not reach Go from user input.
@@ -76,6 +78,33 @@ export function parseArgs(argv: string[]) {
         } else {
           flags.push(token.rawName, 'all');
         }
+        continue;
+      }
+      if (
+        token.name === 'suppress-rule' ||
+        token.name === 'suppressions-location'
+      ) {
+        // Bind the value before reordering. An omitted argument must reach
+        // Go as empty instead of consuming a positional lint target.
+        // ESLint treats a separate empty string as an empty rule list.
+        const value =
+          token.name === 'suppress-rule' &&
+          token.value === '' &&
+          !token.inlineValue
+            ? '[]'
+            : (token.value ?? '');
+        const looksLikeOption =
+          !token.inlineValue && value.length > 1 && value.startsWith('-');
+        flags.push(`${token.rawName}=${looksLikeOption ? '' : value}`);
+        continue;
+      }
+      if (
+        token.inlineValue &&
+        (token.name === 'suppress-all' ||
+          token.name === 'prune-suppressions' ||
+          token.name === 'pass-on-unpruned-suppressions')
+      ) {
+        flags.push(argv[token.index]);
         continue;
       }
       flags.push(token.rawName);

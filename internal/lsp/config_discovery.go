@@ -308,6 +308,7 @@ type preparedLSPConfigSnapshot struct {
 	transactionID            string
 	usableLastGood           bool
 	gitPolicy                *config.GitPolicy
+	inputNames               *config.InputPathNames
 	gitWatchDirectories      []string
 }
 
@@ -421,7 +422,9 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 	snapshotFS := newConfigSnapshotFS(bundled.WrapFS(cachedvfs.From(s.fs)))
 	loader := &lspConfigModuleLoader{server: s}
 	cwd := tspath.NormalizePath(s.cwd)
+	names := config.NewInputPathNames(snapshotFS)
 	directories := config.ResolveDirectoryIdentities([]string{cwd}, snapshotFS)
+	directories[0].CanonicalPath = names.Directory(directories[0].CanonicalPath)
 	documentURIs := make([]string, 0, len(s.documents))
 	for uri := range s.documents {
 		if isLintableScriptFile(uri) {
@@ -431,7 +434,9 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 	sort.Strings(documentURIs)
 	gitFiles := make([]config.PathIdentity, 0, len(documentURIs))
 	for _, uri := range documentURIs {
-		gitFiles = append(gitFiles, config.FreezeFileIdentity(uriToPath(lsproto.DocumentUri(uri)), s.fs))
+		file := config.FreezeFileIdentity(uriToPath(lsproto.DocumentUri(uri)), s.fs)
+		file.CanonicalParentPath = names.Directory(file.CanonicalParentPath)
+		gitFiles = append(gitFiles, file)
 	}
 	gitWatchDirectories := gitPolicyWatchDirectories(directories, gitFiles)
 	if err := s.updateGitPolicyWatchers(ctx, directories, gitWatchDirectories); err != nil {
@@ -484,6 +489,7 @@ func (s *Server) refreshConfig(ctx context.Context) (configRefreshResponse, erro
 		)
 	}
 	preparedSnapshot.gitWatchDirectories = gitWatchDirectories
+	preparedSnapshot.inputNames = names
 	// The candidate already contains an immutable Git policy. A later
 	// filesystem mutation belongs to the next transaction and cannot alter this
 	// catalog while Node activation and commit complete.
@@ -825,6 +831,7 @@ func (s *Server) commitDiscoveredConfigSnapshot(ctx context.Context, snapshot *l
 	s.ruleCatalog = snapshot.ruleCatalog
 	s.configDiscoveryHasLastGood = snapshot.usableLastGood
 	s.gitPolicy = snapshot.gitPolicy
+	s.documentPathNames = snapshot.inputNames
 	s.failedGitPolicyDirectories = nil
 	s.committedGitWatchDirectories = snapshot.gitWatchDirectories
 	for _, ruleName := range snapshot.shadowedPluginRules {

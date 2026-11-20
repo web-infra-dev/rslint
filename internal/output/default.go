@@ -73,7 +73,7 @@ func (f *defaultFormatter) finish(w *bufio.Writer, report Report) error {
 }
 
 func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors colorScheme) {
-	if report.outcome.Kind == OutcomePassed && report.summary.Files == 0 && report.counts.Errors == 0 && report.counts.Warnings == 0 {
+	if !report.outcome.Failed() && report.summary.Files == 0 && report.counts.Errors == 0 && report.counts.Warnings == 0 {
 		message := fmt.Sprintf("%s in %s", emptyMessage(report.mode), formatElapsed(elapsed))
 		_ = renderStatusLine(w, "success", colors.SuccessText, message, "")
 		return
@@ -112,6 +112,12 @@ func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors
 			report.outcome.WarningLimit,
 		)
 	default:
+		if report.outcome.SuppressionError != "" {
+			label = "error"
+			labelColor = colors.ErrorText
+			message = fmt.Sprintf("%s failed%s in %s", subject, fixes, formatElapsed(elapsed))
+			break
+		}
 		label = "success"
 		labelColor = colors.SuccessText
 		warningSummary := ""
@@ -129,6 +135,9 @@ func renderSummary(w *bufio.Writer, report Report, elapsed time.Duration, colors
 		)
 	}
 
+	if report.outcome.SuppressionError != "" {
+		message += ". " + report.outcome.SuppressionError
+	}
 	_ = renderStatusLine(w, label, labelColor, message, colors.DimText("%s", summaryDetails(report)))
 }
 

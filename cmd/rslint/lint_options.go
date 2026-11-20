@@ -1,16 +1,21 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/discovery"
+	"github.com/web-infra-dev/rslint/internal/suppressions"
+	"github.com/web-infra-dev/rslint/internal/utils/ecmascript"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -31,13 +36,15 @@ type lintArgs struct {
 	// by the Node host via the IPC init payload (the Go process's own stdout
 	// is an IPC pipe and says nothing about the user's terminal). False when
 	// unavailable (for example in the wasm build).
-	StdoutIsTTY bool
-	Quiet       bool
-	Timing      bool
-	TimingLimit int
-	MaxWarnings int
-	StartTimeMs int64
-	RuleFlags   []string
+	StdoutIsTTY    bool
+	Quiet          bool
+	Timing         bool
+	TimingLimit    int
+	MaxWarnings    int
+	StartTimeMs    int64
+	RuleFlags      []string
+	Suppressions   suppressions.Options
+	PassOnUnpruned bool
 	// AllowFiles and AllowDirs are prepared target paths. Positional retains raw
 	// arguments until the run-scoped filesystem is available.
 	AllowFiles      []string
@@ -67,6 +74,8 @@ type lintArgs struct {
 	// after read-only target/Program preparation and before any lint or fixes.
 	// The command also joins it on early failure. Nil means already activated.
 	CompleteConfigActivation func() error
+
+	workingDirectoryNames *rslintconfig.InputPathNames
 }
 
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
@@ -74,6 +83,57 @@ type repeatedFlag []string
 
 func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
+
+// ESLint accepts bare IDs and single- or double-quoted strings in a flat list.
+// A comma or closing bracket inside a quoted rule ID belongs to the ID.
+var suppressRuleID = regexp.MustCompile(`(?s)^(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\[\]({,'"][^,\]]*)`)
+var quotedRuleEscape = regexp.MustCompile(`(?:\\u[0-9a-fA-F]{4})+|\\[^u]`)
+
+func decodeRuleEscape(escape string) string {
+	// ESLint's string-list parser accepts JSON escapes and drops the
+	// backslash before other characters, including a single quote.
+	switch escape[1] {
+	case 'b', 'f', 'n', 'r', 't', 'u', '\\':
+		var decoded string
+		_ = json.Unmarshal([]byte(`"`+escape+`"`), &decoded)
+		return decoded
+	default:
+		return escape[1:]
+	}
+}
+
+func appendSuppressRules(rules []string, value string) ([]string, error) {
+	if value == "" {
+		return nil, errors.New("expected a rule ID")
+	}
+	list, bracketed := strings.CutPrefix(ecmascript.StringTrim(value), "[")
+	if bracketed {
+		var closed bool
+		list, closed = strings.CutSuffix(list, "]")
+		if !closed {
+			return nil, errors.New("expected ']' after rule IDs")
+		}
+	}
+	if rules == nil {
+		rules = []string{} // An explicit empty selection records no rules.
+	}
+	for list = ecmascript.StringTrim(list); list != ""; list = ecmascript.StringTrim(list) {
+		id := suppressRuleID.FindString(list)
+		list = ecmascript.StringTrim(list[len(id):])
+		if list != "" {
+			if list[0] != ',' {
+				return nil, errors.New("expected a comma between rule IDs")
+			}
+			list = list[1:]
+		}
+		id = ecmascript.StringTrim(id)
+		if id != "" && (id[0] == '\'' || id[0] == '"') {
+			id = quotedRuleEscape.ReplaceAllStringFunc(id[1:len(id)-1], decodeRuleEscape)
+		}
+		rules = append(rules, id)
+	}
+	return rules, nil
+}
 
 const usage = `🚀 Rslint - Rocket Speed Linter
 
@@ -93,6 +153,11 @@ Options:
   --timing [all|N]      Print a per-rule timing table (all rules, or top N)
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
+  --suppress-all        Record all current lint errors
+  --suppress-rule RULE  Record errors for selected rules (repeatable, a,b or "[a,b]")
+  --suppressions-location PATH  Use a different suppressions file or directory
+  --prune-suppressions  Remove unused suppressions
+  --pass-on-unpruned-suppressions  Allow unused suppressions
   -h, --help            Show help
 `
 
@@ -126,6 +191,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var ruleFlags repeatedFlag
+	var suppressAll, prune bool
 
 	fs.StringVar(&args.Format, "format", "default", "output format")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
@@ -146,12 +212,41 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
 	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
 	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
+	fs.BoolVar(&suppressAll, "suppress-all", false, "record all lint errors")
+	fs.BoolVar(&prune, "prune-suppressions", false, "remove unused suppressions")
+	fs.BoolVar(&args.PassOnUnpruned, "pass-on-unpruned-suppressions", false, "allow unused suppressions")
+	fs.Func("suppressions-location", "suppressions file or directory", func(value string) error {
+		if value == "" {
+			return errors.New("expected a file or directory")
+		}
+		args.Suppressions.Location = value
+		return nil
+	})
+	fs.Func("suppress-rule", "rule IDs to record", func(value string) error {
+		var err error
+		args.Suppressions.Rules, err = appendSuppressRules(args.Suppressions.Rules, value)
+		return err
+	})
 
 	if err := fs.Parse(argv); err != nil {
 		// ContinueOnError: fs already printed the diagnostic to stderr.
 		return args, help, 2
 	}
 	args.RuleFlags = []string(ruleFlags)
+	suppressRuleSet := args.Suppressions.Rules != nil
+	switch {
+	case suppressAll && suppressRuleSet || prune && (suppressAll || suppressRuleSet):
+		fmt.Fprintln(os.Stderr, "error: choose only one of --suppress-all, --suppress-rule and --prune-suppressions")
+		return args, help, 2
+	case suppressAll || suppressRuleSet:
+		args.Suppressions.Mode = suppressions.Record
+	case prune:
+		args.Suppressions.Mode = suppressions.Prune
+	}
+	if args.TypeCheckOnly && args.Suppressions.Mode != suppressions.Check {
+		fmt.Fprintln(os.Stderr, "error: --type-check-only cannot record or prune lint suppressions")
+		return args, help, 2
+	}
 
 	// The Node.js entry point fills in the default "all" when the user
 	// passes a bare --timing, so the value is always present here.

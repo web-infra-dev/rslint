@@ -1,7 +1,9 @@
 package config
 
 import (
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -9,12 +11,106 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/microsoft/TypeScript/tsc/shim/vfs/iovfs"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 )
+
+type gitVolumeTestFS struct{ entries fstest.MapFS }
+
+func (fixture gitVolumeTestFS) Open(name string) (fs.File, error) {
+	if strings.HasPrefix(name, "repo/nested/") || strings.HasPrefix(name, "outside/") {
+		name = strings.ToLower(name)
+	}
+	return fixture.entries.Open(name)
+}
+
+func TestGitPolicyUsesRepositoryFilesystemCase(t *testing.T) {
+	for _, marker := range []bool{true, false} {
+		contents := fstest.MapFS{
+			"repo/.gitignore":        {Data: []byte("/SRC/\n")},
+			"repo/src/.gitignore":    {Data: []byte("/local.js\n")},
+			"repo/nested/.git/HEAD":  {},
+			"repo/nested/.gitignore": {Data: []byte("/BLOCK/\n")},
+			"outside/.gitignore":     {Data: []byte("/BLOCK/\n")},
+		}
+		if marker {
+			contents["repo/.git/HEAD"] = &fstest.MapFile{}
+			contents["repo/.GIT/other"] = &fstest.MapFile{}
+		}
+		// The VFS default describes another volume. The nested repository and
+		// the markerless outside directory perform case-insensitive lookups.
+		reader := gitignore.NewReader(iovfs.From(gitVolumeTestFS{contents}, false))
+		root := reader.Observe(reader.Ancestors("/repo"), "/repo")
+		for _, directory := range []string{"/repo/SRC", "/repo/src", "/repo/nested"} {
+			cursor, blocked := reader.Enter(root, directory)
+			if blocked != (directory == "/repo/SRC") {
+				t.Fatalf("marker=%v, %s blocked=%v", marker, directory, blocked)
+			}
+			reader.Observe(cursor, directory)
+		}
+		reader.Observe(reader.Ancestors("/outside"), "/outside")
+		policy := NewGitPolicy(reader.Snapshot())
+		for file, want := range map[string]bool{
+			"/repo/SRC/f.js": true, "/repo/src/f.js": false, "/repo/src/local.js": true,
+			"/repo/nested/block/f.js": true, "/outside/block/f.js": true,
+		} {
+			if got := policy.ignored(file); got != want {
+				t.Errorf("marker=%v, %s ignored=%v, want %v", marker, file, got, want)
+			}
+		}
+		if !policy.blocksDirectoryEntry("/repo/SRC") || policy.blocksDirectoryEntry("/repo/src") {
+			t.Fatalf("marker=%v, distinct directory entries shared Git admission", marker)
+		}
+	}
+}
+
+func TestGitPolicyUsesLinkedWorktreeConfigAndASCIICase(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("requires git")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	root := gitPolicyFixture(t, nil)
+	repo := tspath.CombinePaths(root, "primary")
+	worktree := tspath.CombinePaths(root, "linked")
+	git := func(directory string, args ...string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "git", args...)
+		cmd.Dir = directory
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s: %v", args, out, err)
+		}
+	}
+	git(root, "init", "-q", repo)
+	git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-qm", "initial", "--allow-empty")
+	git(repo, "worktree", "add", "-q", "--detach", worktree, "HEAD")
+	if err := os.WriteFile(tspath.CombinePaths(worktree, ".gitignore"), []byte("/SRC/\n/é.js\n/é/\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	git(repo, "config", "core.ignoreCase", "true")
+	for _, ignoreCase := range []bool{true, false} {
+		if !ignoreCase {
+			git(repo, "config", "--unset", "core.ignoreCase")
+		}
+		reader := gitignore.NewReader(osvfs.FS())
+		cursor := reader.Observe(reader.Ancestors(worktree), worktree)
+		policy := NewGitPolicy(reader.Snapshot())
+		for path, want := range map[string]bool{"src": ignoreCase, "é": true, "É": false} {
+			_, blocked := cursor.Enter(tspath.CombinePaths(worktree, path))
+			if blocked != want || policy.ignored(tspath.CombinePaths(worktree, path, "f.js")) != want {
+				t.Errorf("ignoreCase=%t, directory %q: want ignored=%t", ignoreCase, path, want)
+			}
+		}
+		if !policy.ignored(tspath.CombinePaths(worktree, "é.js")) || policy.ignored(tspath.CombinePaths(worktree, "É.js")) {
+			t.Errorf("ignoreCase=%t: Git must distinguish non-ASCII file names", ignoreCase)
+		}
+	}
+}
 
 type gitignoreReadSpyFS struct {
 	vfs.FS
@@ -317,6 +413,29 @@ func TestGitPolicyUsesPhysicalParentAndOriginalLeafName(t *testing.T) {
 	}
 }
 
+func TestGitPolicyUsesFrozenEntryName(t *testing.T) {
+	const root = "/repo"
+	_, patterns := gitignore.NewCursor(root, true).AppendSourcePatterns(root, "/src/alias.ts\n")
+	policy := NewGitPolicy(gitignore.Snapshot{
+		Roots:   []string{root},
+		Sources: []gitignore.Source{{Directory: root, Patterns: patterns}},
+	})
+	entries := RslintConfig{{Files: []string{"**/*.ts"}}}
+	spaces := NewPathSpaceSnapshot(map[string]RslintConfig{root: entries}, nil)
+	resolver, err := NewFileConfigResolverWithPathSpaces(entries, root, nil, spaces, baseRuleCatalog(), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := PathIdentity{Path: "/repo/src/ALIAS.ts", CanonicalPath: "/elsewhere/source.ts", CanonicalParentPath: "/repo/src"}
+	if resolver.ResolveTarget(file).GloballyIgnored {
+		t.Fatal("the caller's leaf spelling matched a case-sensitive Git pattern")
+	}
+	file.EntryName = "alias.ts"
+	if !resolver.ResolveTarget(file).GloballyIgnored {
+		t.Fatal("the stored symlink name did not match the Git pattern")
+	}
+}
+
 func TestGitPolicySnapshotAndInputConfigurationAreImmutable(t *testing.T) {
 	root := gitPolicyFixture(t, map[string]string{".git": "", ".gitignore": "dist/\n", "dist/file.ts": "", "src/file.ts": ""})
 	reader := gitignore.NewReader(osvfs.FS())
@@ -482,10 +601,20 @@ func TestGitPolicyOnlyWalksSuppliedDirectoryRootsAndExactChains(t *testing.T) {
 	files := ResolveFileIdentities([]string{tspath.CombinePaths(root, "exact/deep/file.ts")}, spy)
 	directories := ResolveDirectoryIdentities([]string{tspath.CombinePaths(root, "target")}, spy)
 	CollectGitPolicy(nil, root, spy, files, directories)
+	metadataLookups := 0
 	for _, path := range spy.directories {
+		if path == root {
+			// A VFS without stored entry names can inspect the two possible
+			// spellings of the observed .git marker once.
+			metadataLookups++
+			continue
+		}
 		if _, within := RelativePathWithinConfigRoot(path, tspath.CombinePaths(root, "target"), true); !within {
 			t.Fatalf("walked outside the supplied recursive root: %s", path)
 		}
+	}
+	if metadataLookups > 1 {
+		t.Fatalf("listed the repository marker directory %d times", metadataLookups)
 	}
 	if !slices.Contains(spy.reads, tspath.CombinePaths(root, "exact/deep/.gitignore")) {
 		t.Fatal("exact target ancestor source was not observed")
@@ -536,7 +665,6 @@ func (fsys gitPolicyVolumeRootFS) ReadFile(path string) (string, bool) {
 func TestGitPolicyDriveSpellingPreservesDirectoryCase(t *testing.T) {
 	_, patterns := gitignore.NewCursor("C:/Repo", true).AppendSourcePatterns("C:/Repo", "*.ts\n")
 	policy := NewGitPolicy(gitignore.Snapshot{
-		UseCaseSensitive:   true,
 		Roots:              []string{"C:/Repo"},
 		Sources:            []gitignore.Source{{Directory: "C:/Repo", Patterns: patterns}},
 		CoveredDirectories: []string{"C:/Repo"},
@@ -578,5 +706,63 @@ func TestGitPolicyVolumeRootRulesApplyToFilesAndDirectories(t *testing.T) {
 				t.Fatal("exact directory coverage was lost")
 			}
 		})
+	}
+}
+
+func TestGitPolicyUnlistedLeaf(t *testing.T) {
+	const root = "/repo"
+	const leaf = "/repo/locked/STRASSE.js" // cspell:ignore STRASSE Straße
+	for _, test := range []struct {
+		ignore string
+		unsafe bool
+	}{
+		{"/locked/Straße.js", true},
+		{"/locked/Straß[e/].js", true},
+		{"/locked/Straße.js\n!/locked/Straße.js", false},
+		{"/else/Straße.js", false},
+		{"/else/*.js", false},
+		{"**/__tests__/*.js", false},
+		{"other.js", false},
+		{"*.log", false},
+		{"node_modules/", false},
+		{"/locked/Stra*.js\n!/locked/*.js", false},
+		{"!/locked/*.js\n/locked/Stra*.js", true},
+		{"/locked/Stra*.js\n!/else/*.js", true},
+		{"/locked/Straß[e/].js\n!/locked/**", false},
+	} {
+		_, patterns := gitignore.NewCursor(root, false).AppendSourcePatterns(root, test.ignore)
+		policy := NewGitPolicy(gitignore.Snapshot{
+			Roots: []string{root}, Sources: []gitignore.Source{{Directory: root, CaseInsensitive: true, Patterns: patterns}},
+		})
+		if got := policy.mayIgnoreUnlistedFile(leaf, entryNameUnlistedFoldedASCII); got != test.unsafe {
+			t.Errorf("unlisted file with %q: possible Git exclusion = %t, want %t", test.ignore, got, test.unsafe)
+		}
+	}
+	_, positive := gitignore.NewCursor(root, false).AppendSourcePatterns(root, "/locked/Straße.js")
+	_, negation := gitignore.NewCursor(root, true).AppendSourcePatterns(root+"/locked", "!straße.js")
+	mixed := NewGitPolicy(gitignore.Snapshot{Roots: []string{root}, Sources: []gitignore.Source{
+		{Directory: root, Patterns: positive, CaseInsensitive: true},
+		{Directory: root + "/locked", Patterns: negation},
+	}})
+	if !mixed.mayIgnoreUnlistedFile(leaf, entryNameUnlistedFoldedASCII) {
+		t.Error("a case-sensitive negation admitted every spelling of a case-insensitive literal")
+	}
+
+	_, literal := gitignore.NewCursor(root, true).AppendSourcePatterns(root, "/locked/Plain.js\n/locked/private-*.js")
+	sensitive := NewGitPolicy(gitignore.Snapshot{
+		Roots: []string{root}, Sources: []gitignore.Source{{Directory: root, Patterns: literal}},
+	})
+	for _, check := range []struct {
+		name   string
+		status entryNameStatus
+		unsafe bool
+	}{
+		{"plain.js", entryNameUnlistedExactASCII, false},
+		{"plain.js", entryNameUnlistedFoldedASCII, true},
+		{"PUBLIC.js", entryNameUnlistedFoldedASCII, false},
+	} {
+		if got := sensitive.mayIgnoreUnlistedFile(root+"/locked/"+check.name, check.status); got != check.unsafe {
+			t.Errorf("unlisted %s with name status %d: possible Git exclusion = %t, want %t", check.name, check.status, got, check.unsafe)
+		}
 	}
 }

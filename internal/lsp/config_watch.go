@@ -206,9 +206,10 @@ func validateRuleOptionsForConfig(
 
 // handleDidChangeWatchedFiles handles file change notifications from the client.
 func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsproto.DidChangeWatchedFilesParams) error {
-	if params == nil {
+	if params == nil || len(params.Changes) == 0 {
 		return nil
 	}
+	s.documentPathNames = nil
 	if s.lintPrograms != nil &&
 		s.lintPrograms.DidChangeWatchedFiles(params.Changes) {
 		s.invalidateOpenDocumentDiagnostics()

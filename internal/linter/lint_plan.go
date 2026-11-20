@@ -42,6 +42,7 @@ type lintFilePlan struct {
 	file           *ast.SourceFile
 	rules          *preparedRuleSet
 	hasTypeChecker bool
+	syntaxError    bool
 }
 
 type lintPlanFileRef struct {
@@ -135,7 +136,7 @@ func PrepareLintPlanContext(ctx context.Context, opts PrepareLintPlanOptions) (*
 		}
 	}
 
-	var ruleSets ruleSetBuilder
+	ruleSets := ruleSetBuilder{collectSkippedErrorRules: opts.collectSkippedErrorRules}
 	resolve := func(resolveCtx context.Context, ref lintPlanFileRef) []rule.RuleDiagnostic {
 		if resolveCtx.Err() != nil {
 			return nil
@@ -280,6 +281,7 @@ func resolveProgramLintPlanFile(
 	if !opts.SkipSyntaxCheck {
 		diagnostics := CollectFileSyntacticDiagnostics(ctx, opts.Program, file)
 		if len(diagnostics) > 0 {
+			filePlan.syntaxError = true
 			return diagnostics
 		}
 	}
@@ -341,7 +343,7 @@ func (p *LintPlan) Targets() []LintTarget {
 	var targets []LintTarget
 	for _, programPlan := range p.programs {
 		for _, filePlan := range programPlan.files {
-			if filePlan.rules == nil {
+			if filePlan.rules == nil || len(filePlan.rules.all) == 0 {
 				continue
 			}
 			targets = append(targets, LintTarget{File: filePlan.file, Rules: filePlan.rules.all})

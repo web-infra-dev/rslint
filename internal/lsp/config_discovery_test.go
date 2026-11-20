@@ -1740,6 +1740,83 @@ func TestDocumentGitPolicyCoverageRejectsRetargetedAliasesAndCodeActions(t *test
 	}
 }
 
+type documentListingFS struct {
+	vfs.FS
+	leafParent     string
+	parentListings int
+	leafListings   int
+}
+
+func (fs *documentListingFS) GetAccessibleEntries(path string) vfs.Entries {
+	if path == fs.leafParent {
+		fs.leafListings++
+	} else {
+		fs.parentListings++
+	}
+	return fs.FS.GetAccessibleEntries(path)
+}
+
+func TestDocumentPathNamesShareListingsUntilFileChangeOrConfigRefresh(t *testing.T) {
+	s, outgoing, root := newConfigRefreshTestServer(t)
+	writeConfigCandidate(t, root)
+	fsys := &documentListingFS{FS: s.fs}
+	s.fs = fsys
+	directory := tspath.ResolvePath(root, "src")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fsys.leafParent = tspath.NormalizePath(fsys.Realpath(directory))
+	open := func(name string) lsproto.DocumentUri {
+		path := tspath.ResolvePath(directory, name)
+		if err := os.WriteFile(path, nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		uri := documentURIFromPath(path)
+		if err := s.handleDidOpen(t.Context(), &lsproto.DidOpenTextDocumentParams{TextDocument: &lsproto.TextDocumentItem{Uri: uri}}); err != nil {
+			t.Fatal(err)
+		}
+		return uri
+	}
+	first, second := open("first.ts"), open("second.ts")
+	original := s.documentTargetIdentity(first)
+	reads := fsys.parentListings
+	leafReads := fsys.leafListings
+	if reads == 0 {
+		t.Fatal("first document did not observe its directory")
+	}
+	if again := s.documentTargetIdentity(first); again != original {
+		t.Fatalf("repeated observation changed from %+v to %+v", original, again)
+	}
+	s.documentTargetIdentity(second)
+	if fsys.parentListings != reads || fsys.leafListings != leafReads+2 {
+		t.Fatalf("repeated and sibling requests read %d ancestors and %d leaf parents", fsys.parentListings-reads, fsys.leafListings-leafReads)
+	}
+	renamed := tspath.ResolvePath(directory, "FIRST.ts")
+	if err := os.Rename(uriToPath(first), renamed); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.handleDidChangeWatchedFiles(t.Context(), &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{{Uri: documentURIFromPath(renamed), Type: lsproto.FileChangeTypeCreated}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	updated := s.documentTargetIdentity(first)
+	if fsys.parentListings == reads || fsys.FileExists(uriToPath(first)) && tspath.GetBaseFileName(updated.CanonicalPath) != "FIRST.ts" {
+		t.Fatalf("file notification retained an old observation: %+v, %d -> %d directory reads", updated, reads, fsys.parentListings)
+	}
+	if err := os.Rename(renamed, uriToPath(first)); err != nil {
+		t.Fatal(err)
+	}
+	refresh := startConfigRefreshForTest(s, "initial")
+	completeSuccessfulConfigRefreshForTest(t, s, outgoing, config.RslintConfig{{}})
+	if result := awaitConfigRefreshResult(t, refresh); result.err != nil {
+		t.Fatal(result.err)
+	}
+	if again := s.documentTargetIdentity(first); again != original {
+		t.Fatalf("config refresh retained obsolete names: %+v, want %+v", again, original)
+	}
+}
+
 func TestHandleDidOpenCollectsGitChainWithoutRetryingEveryEdit(t *testing.T) {
 	s, outgoing, root := newConfigRefreshTestServer(t)
 	writeConfigCandidate(t, root)
@@ -1995,8 +2072,15 @@ func TestConfigRefreshRegistersPhysicalGitWatchesBeforeReadingSources(t *testing
 	}
 	previousID := s.gitPolicyWatcherID
 
-	external := tspath.NormalizePath(t.TempDir())
-	physicalExternal := tspath.NormalizePath(fsys.Realpath(external))
+	externalParent := tspath.NormalizePath(fsys.Realpath(t.TempDir()))
+	physicalExternal := tspath.ResolvePath(externalParent, "open-docs")
+	if err := os.Mkdir(physicalExternal, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	external := physicalExternal
+	if alias := tspath.ResolvePath(externalParent, "OPEN-DOCS"); fsys.DirectoryExists(alias) {
+		external = alias
+	}
 	uri := documentURIFromPath(tspath.ResolvePath(external, "source.ts"))
 	s.documents[uri] = "debugger;"
 	previousObservations := fsys.observations

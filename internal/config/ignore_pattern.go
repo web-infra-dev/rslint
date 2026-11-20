@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
+	"github.com/web-infra-dev/rslint/internal/config/gitignore"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -62,7 +63,7 @@ func (matcher GlobalIgnoreMatcher) MayReopenGitDescendants(directory string, can
 		return false
 	}
 	resolver := matcher.resolver
-	target, matches := resolver.resolvePathSpaces(directory, canonicalDirectory, true)
+	target, matches := resolver.resolvePathSpaces(PathIdentity{Path: directory, CanonicalPath: canonicalDirectory}, true)
 	for _, index := range resolver.globalEntryIndexes {
 		entry := resolver.entries[index]
 		if entry.configArrayBaseIndex >= 0 {
@@ -99,7 +100,7 @@ func (matcher GlobalIgnoreMatcher) IgnoresFile(file PathIdentity) bool {
 	if matcher.resolver == nil {
 		return false
 	}
-	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
+	target, matches := matcher.resolver.resolvePathSpaces(file, false)
 	return matcher.resolver.globallyIgnores(target, matches, false)
 }
 
@@ -109,7 +110,7 @@ func (matcher GlobalIgnoreMatcher) ReopensGitignoredFile(file PathIdentity) bool
 	if matcher.resolver == nil {
 		return false
 	}
-	target, matches := matcher.resolver.resolvePathSpacesWithCanonicalParent(file.Path, file.CanonicalPath, file.CanonicalParentPath, false)
+	target, matches := matcher.resolver.resolvePathSpaces(file, false)
 	return !matcher.resolver.globallyIgnores(target, matches, true)
 }
 
@@ -315,8 +316,8 @@ func hasCaseInsensitivePattern(patterns []IgnorePattern) bool {
 func ignorePatternMatches(pattern IgnorePattern, path string) bool {
 	glob := pattern.Glob
 	if pattern.CaseInsensitive {
-		glob = strings.ToLower(glob)
-		path = strings.ToLower(path)
+		glob = gitignore.FoldCase(glob)
+		path = gitignore.FoldCase(path)
 	}
 	return utils.MatchGlob(glob, path)
 }
@@ -368,6 +369,7 @@ func applyFileIgnorePatternsNormalized(path string, unixPath string, patterns []
 // Authored config patterns are evaluated after the complete Git group and may
 // still intentionally override its final decision as a separate config layer.
 type gitIgnorePathState struct {
+	unlisted               *unlistedGitMatch
 	path                   string
 	lowerPath              string
 	fileDepth              int
@@ -428,9 +430,16 @@ func (state *gitIgnorePathState) apply(pattern *IgnorePattern) bool {
 	path := state.path
 	if pattern.CaseInsensitive {
 		if state.lowerPath == "" {
-			state.lowerPath = strings.ToLower(path)
+			state.lowerPath = gitignore.FoldCase(path)
 		}
 		path = state.lowerPath
+	}
+
+	if state.unlisted != nil {
+		// The parent nodes have already admitted this path. Only the unknown
+		// leaf can change that decision. Keep the normal node precedence.
+		return !pattern.GitDirectoryOnly && !state.depthResolved(state.fileDepth) &&
+			state.unlisted.matches(pattern, path) && state.applyDepth(state.fileDepth, pattern.Negated)
 	}
 
 	if basenameGlob, ok := gitIgnoreRootBasenameGlob(pattern); ok {
@@ -777,8 +786,8 @@ func (n negReach) overlaps(dirPath string) bool {
 		literal := np.literal
 		candidate := dirPath
 		if np.caseInsensitive {
-			literal = strings.ToLower(literal)
-			candidate = strings.ToLower(candidate)
+			literal = gitignore.FoldCase(literal)
+			candidate = gitignore.FoldCase(candidate)
 		}
 		if np.unrooted || segPrefixEither(literal, candidate) {
 			return true

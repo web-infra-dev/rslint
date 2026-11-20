@@ -1,8 +1,6 @@
 package discovery
 
 import (
-	"strings"
-
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/microsoft/TypeScript/tsc/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -18,8 +16,11 @@ func (coordinator *discoveryCoordinator) physicalDirectory(directory string) str
 	if physical, exists := coordinator.physicalDirectories[directory]; exists {
 		return physical
 	}
+	if physical, observed := coordinator.inputNames.KnownDirectory(directory); observed && physical != directory {
+		return physical
+	}
 	physical := directory
-	for ancestor := configDiscoveryParent(directory); ancestor != ""; ancestor = configDiscoveryParent(ancestor) {
+	for ancestor := rslintconfig.FilesystemParentDirectory(directory); ancestor != ""; ancestor = rslintconfig.FilesystemParentDirectory(ancestor) {
 		if parentPhysical, exists := coordinator.physicalDirectories[ancestor]; exists {
 			relative, within := rslintconfig.RelativePathWithinConfigRoot(directory, ancestor, true)
 			if within {
@@ -68,12 +69,8 @@ func isSymlinkDirectoryChild(
 	entries vfs.Entries,
 ) bool {
 	if entries.Symlinks != nil {
-		for symlink := range entries.Symlinks {
-			if symlink == name || (!fsys.UseCaseSensitiveFileNames() && strings.EqualFold(symlink, name)) {
-				return true
-			}
-		}
-		return false
+		_, isSymlink := entries.Symlinks[name]
+		return isSymlink
 	}
 	childDirectory := tspath.CombinePaths(parentDirectory, name)
 	childRealPath := fsys.Realpath(childDirectory)
