@@ -858,6 +858,9 @@ test('type and declaration identity survive closing one file', async () => {
       second.handle.close();
       owner.close();
       expect(getProperties).toThrow('closed');
+      expect(inspect(new Proxy(firstType, {}), { depth: 0 })).toBe(
+        inspect(firstType, { depth: 0 }),
+      );
       expect(() => declaration.kind).toThrow('closed');
       expect(() => firstType.flags).toThrow('closed');
     } finally {
