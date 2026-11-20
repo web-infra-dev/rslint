@@ -631,6 +631,7 @@ function makeTypePrototype(
   for (const key of Object.keys(prototype)) {
     Object.defineProperty(prototype, key, { enumerable: false });
   }
+  Object.defineProperty(prototype, inspectCustom, typeInspection);
   return prototype;
 }
 
@@ -1787,59 +1788,95 @@ export class TypeServiceClient {
     hasDeclaredMembers: () => boolean,
   ): TypeView {
     Object.defineProperties(fields, {
-      id: { writable: false },
-      checker: { writable: false },
+      id: { writable: false, configurable: false },
+      checker: { writable: false, configurable: false },
     });
     const native = (this.typeFieldNames ??= new Set(Reflect.ownKeys(fields)));
-    // A getter returning this can make Node unwrap more than one proxy. The
-    // ordinary target holds descriptors for reflection, never the rule's state.
+    // Node can unwrap again when a getter returns this. Keep compiler reads
+    // and configurable plugin metadata independent of the inspection target.
     const target: TypeView = Object.create(this.typePrototype);
-    Object.defineProperty(fields, inspectCustom, typeInspection);
     let pluginFields: Set<PropertyKey> | undefined;
     const managed = (key: PropertyKey) =>
       native.has(key) && !pluginFields?.has(key);
-    const nativeDescriptor = (key: PropertyKey) => {
-      const previous = Reflect.getOwnPropertyDescriptor(target, key);
-      if (previous && !previous.configurable) return previous;
-      const descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!;
-      descriptor.configurable = false;
+    const nativeDescriptor = (
+      key: PropertyKey,
+      descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!,
+    ) => {
+      // The local handle and checker are data properties. Their public
+      // descriptors can be sealed or frozen independently of compiler getters.
+      descriptor.configurable = 'value' in descriptor;
       Object.defineProperty(target, key, descriptor);
       return descriptor;
     };
+    // Non-configurable properties must remain visible even if a raw debugger
+    // getter defined them directly. A non-extensible target fixes all its keys.
+    const required = (key: PropertyKey) => {
+      const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
+      return descriptor &&
+        (!descriptor.configurable || !Object.isExtensible(target))
+        ? descriptor
+        : undefined;
+    };
     const own = (key: PropertyKey, live = true) => {
+      const fixed = required(key);
+      if (fixed || !Object.isExtensible(target)) return fixed;
       const descriptor = Reflect.getOwnPropertyDescriptor(fields, key);
       if (!descriptor || !managed(key)) return descriptor;
-      const fixed = Reflect.getOwnPropertyDescriptor(target, key);
-      if (fixed && !fixed.configurable) return fixed;
       return key === 'id' || (live && hasField(key))
-        ? nativeDescriptor(key)
+        ? nativeDescriptor(key, descriptor)
         : undefined;
     };
     const keys = (live = true) => {
-      const all = Reflect.ownKeys(fields);
-      if (!Object.isExtensible(fields)) return all;
-      if (!live) return all.filter((key) => own(key, false));
-      const declared = hasDeclaredMembers(),
-        mapped = mappedFields();
-      return all.filter((key) => {
+      const extensible = Object.isExtensible(target);
+      const fixed = new Set(
+        Reflect.ownKeys(target).filter((key) => !extensible || required(key)),
+      );
+      const declared = live && extensible && hasDeclaredMembers();
+      const mapped = live && extensible ? mappedFields() : undefined;
+      const publicKeys = Reflect.ownKeys(fields).filter((key) => {
+        if (fixed.delete(key)) return true;
+        if (!extensible) return false;
         if (!managed(key)) return true;
         if (
-          !(declaredMemberKeys.has(key)
-            ? declared
-            : hasField(key, false, mapped))
+          key !== 'id' &&
+          !(
+            live &&
+            (declaredMemberKeys.has(key)
+              ? declared
+              : hasField(key, false, mapped))
+          )
         )
           return false;
         nativeDescriptor(key);
         return true;
       });
+      if (!fixed.size) return publicKeys;
+      return Reflect.ownKeys(
+        Object.fromEntries([...publicKeys, ...fixed].map((key) => [key, true])),
+      );
     };
     const definePluginField = (
       key: PropertyKey,
       attributes: PropertyDescriptor,
     ) => {
-      if (!Reflect.defineProperty(fields, key, attributes)) return false;
+      if (required(key)) {
+        if (!Reflect.defineProperty(target, key, attributes)) return false;
+        return (
+          !Object.hasOwn(fields, key) ||
+          Reflect.defineProperty(
+            fields,
+            key,
+            Reflect.getOwnPropertyDescriptor(target, key)!,
+          )
+        );
+      }
+      if (
+        !Object.isExtensible(target) ||
+        !Reflect.defineProperty(fields, key, attributes)
+      )
+        return false;
       const descriptor = Reflect.getOwnPropertyDescriptor(fields, key)!;
-      if (!descriptor.configurable || !Object.isExtensible(target))
+      if (!descriptor.configurable)
         Object.defineProperty(target, key, descriptor);
       return true;
     };
@@ -1857,10 +1894,13 @@ export class TypeServiceClient {
             : receiver;
         if (key === serviceView) return view;
         if (key === Symbol.toStringTag && !this.canInspectType())
-          return Reflect.getOwnPropertyDescriptor(fields, key)?.value;
+          return (
+            required(key) ?? Reflect.getOwnPropertyDescriptor(fields, key)
+          )?.value;
         if (receiver !== backing && managed(key) && key !== 'id') this.ensure();
-        const value: unknown = Reflect.get(fields, key, self);
-        if (value === undefined && managed(key)) {
+        const fixed = required(key);
+        const value: unknown = Reflect.get(fixed ? target : fields, key, self);
+        if (value === undefined && !fixed && managed(key)) {
           const proto = Reflect.getPrototypeOf(fields);
           if (proto && Reflect.has(proto, key) && !hasField(key))
             return Reflect.get(proto, key, self);
@@ -1869,7 +1909,7 @@ export class TypeServiceClient {
       },
       has: (_target, key) => {
         if (!managed(key) || !Object.hasOwn(fields, key))
-          return Reflect.has(fields, key);
+          return !!required(key) || Reflect.has(fields, key);
         const proto = Reflect.getPrototypeOf(fields);
         return (
           !!own(key, this.canInspectType()) ||
@@ -1897,14 +1937,30 @@ export class TypeServiceClient {
             value,
             receiver,
           );
-        return Reflect.set(fields, key, value, receiver);
+        return Reflect.set(
+          required(key) ? target : fields,
+          key,
+          value,
+          receiver,
+        );
       },
       defineProperty: (_target, key, attributes) => {
         this.ensure();
         if (key === 'typeArguments') return false;
         if (!managed(key)) return definePluginField(key, attributes);
-        if (hasField(key, true))
-          return !!own(key) && Reflect.defineProperty(target, key, attributes);
+        if (hasField(key, true)) {
+          const current = own(key);
+          if (!current) return false;
+          if (
+            'value' in current &&
+            !Reflect.defineProperty(fields, key, {
+              ...attributes,
+              configurable: false,
+            })
+          )
+            return false;
+          return Reflect.defineProperty(target, key, attributes);
+        }
         // An absent placeholder must not supply the descriptor defaults for
         // a new plugin property.
         if (!Object.isExtensible(fields)) return false;
@@ -1928,7 +1984,7 @@ export class TypeServiceClient {
               return false;
           for (const key of Reflect.ownKeys(fields)) {
             if (!keep.has(key)) Reflect.deleteProperty(fields, key);
-            else if (!managed(key))
+            else if (!managed(key) && !required(key))
               Object.defineProperty(
                 target,
                 key,
