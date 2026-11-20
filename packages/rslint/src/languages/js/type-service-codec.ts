@@ -417,7 +417,6 @@ export class TypePacketReader {
         value = {
           pattern: this.node(this.word(8)),
           node: this.node(this.word(12)),
-          fresh: this.word(16),
           regular: this.word(20),
           base: this.word(24),
           constraint: this.word(28),

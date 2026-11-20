@@ -140,8 +140,11 @@ export class GenerationSyntaxViews {
   locationOrUndefined(node: object): NodeRef | undefined {
     return this.identities.get(node);
   }
-  isVariableDeclarationName(ref: NodeRef): boolean {
+  isStableNodeQuery(op: 'type' | 'constantValue', ref: NodeRef): boolean {
     const node = this.sources.get(ref.file)?.getOrCreateNodeAtIndex(ref.index);
+    // Enum declarations have fixed values. Other constant-value queries can
+    // depend on a property access. Identifier uses can likewise have flow types.
+    if (op === 'constantValue') return node?.kind === SyntaxKind.EnumMember;
     return (
       node?.kind === SyntaxKind.Identifier &&
       node.parent?.kind === SyntaxKind.VariableDeclaration &&

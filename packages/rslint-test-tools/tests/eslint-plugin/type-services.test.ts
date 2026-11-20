@@ -1602,7 +1602,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
     config = resolve(dir, 'tsconfig.json');
   const code =
     [
-      "export enum Values { N = 3, S = 'three' }",
+      "export enum Values { N = 3, S = 'three', C = id(3) }",
       'export type Pair = readonly [first: string, second?: number];',
       'export function id<T>(input: T): T { return input; }',
       'export const result = id(42);',
@@ -1615,6 +1615,7 @@ test('public checker, Program and source reads match TypeScript', async () => {
       'export const record = { n: 1 }; export const {n} = record;',
       "import type { External } from './external'; export type Used = External;",
       'export const grow = () => 1; grow.item = 1;',
+      'declare const condition: boolean; condition;',
     ].join('\r\n') + '\r\n';
   writeFileSync(file, code);
   writeFileSync(resolve(dir, 'external.ts'), 'export type External = string;');
@@ -1683,6 +1684,22 @@ test('public checker, Program and source reads match TypeScript', async () => {
         c.getUndefinedType(),
       ];
       const literal = c.getStringLiteralType('abc');
+      const metadata = Symbol();
+      let getterCalls = 0;
+      Object.defineProperty(literal, metadata, {
+        get() {
+          getterCalls++;
+        },
+      });
+      const wrapped = new Proxy(t, {});
+      const computed = c.getTypeAtLocation(
+        (enm as ts.EnumDeclaration).members[2].name,
+      ) as ts.EnumType;
+      const boolean = c.getBooleanType();
+      const regularBefore = Reflect.get(boolean, 'regularType') === boolean;
+      c.getTypeAtLocation(
+        (src.statements.at(-1) as ts.ExpressionStatement).expression,
+      );
       return {
         additional: (() => {
           const fnSymbol = c.getSymbolAtLocation(decl.name!)!;
@@ -1762,6 +1779,11 @@ test('public checker, Program and source reads match TypeScript', async () => {
           };
         })(),
         shape: [
+          [Object.hasOwn(literal, metadata), metadata in literal, getterCalls],
+          wrapped.getProperties() === t.getProperties(),
+          wrapped.typeArguments?.map(format),
+          computed.regularType?.freshType === computed,
+          [regularBefore, Reflect.get(boolean, 'regularType') === boolean],
           'types' in literal,
           'target' in c.getStringType(),
           'target' in literal,

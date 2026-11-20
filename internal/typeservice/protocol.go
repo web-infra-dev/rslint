@@ -253,7 +253,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	}
 	var request Request
 	switch wire.Op {
-	case "conditionalInstantiations", "freshLiteral", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
+	case "conditionalInstantiations", "freshLiteral", "regularType", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
 		request = &TypeRequest{Op: wire.Op}
 	case "typeDetails", "resolvedTrueType", "resolvedFalseType", "declaredMembers":
 		request = &TypeRequest{Op: wire.Op}
@@ -302,7 +302,7 @@ func (q *Query) UnmarshalJSON(data []byte) error {
 	case "resolvedSignatureWithOptions":
 		request = &ResolvedSignatureRequest{}
 	case "constraint", "apparent", "baseLiteral", "nonNullable", "properties", "typeArguments", "isArray", "isArrayLike", "isTuple", "numberIndexType", "stringIndexType", "typeRecord",
-		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos", "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType", "classThisType":
+		"awaited", "widened", "baseTypes", "defaultType", "apparentProperties", "indexInfos", "mappedFields", "classThisType":
 		request = &TypeRequest{Op: wire.Op}
 	case "aliasedSymbol", "declaredType", "symbolRecord", "typeOfSymbol", "exportsOfModule", "exportSymbol", "immediateAliasedSymbol", "isUnknownSymbol", "fullyQualifiedName", "symbolMembers", "symbolLinkType":
 		request = &SymbolRequest{Op: wire.Op}

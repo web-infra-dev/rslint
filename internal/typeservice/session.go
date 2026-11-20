@@ -444,7 +444,7 @@ func (s *Session) directRecords(ctx context.Context, c *checker.Checker, op Oper
 	switch op {
 	case "type", "fromTypeNode", "context", "constraint", "apparent", "baseLiteral", "nonNullable", "void", "declaredType", "symbolType", "returnType", "numberIndexType", "typeArguments",
 		"stringIndexType", "awaited", "widened", "baseTypes", "defaultType", "typeOfSymbol", "indexInfo", "indexInfos", "typePredicate", "parameterType", "propertyType",
-		"mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType", "classThisType", "contextualArgument", "symbolLinkType":
+		"mappedFields", "classThisType", "contextualArgument", "symbolLinkType":
 		kind = "typeRecord"
 	case "symbol", "aliasedSymbol", "property", "properties", "resolveName",
 		"apparentProperties", "exportSymbol", "immediateAliasedSymbol", "shorthandValueSymbol":
@@ -831,13 +831,20 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 			}
 			slices.SortFunc(entries, func(a, b NamedSymbol) int { return strings.Compare(a.Name, b.Name) })
 			return entries, nil
-		case "freshLiteral", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
+		case "freshLiteral", "regularType", "evolvingElement", "finalArray", "simplifiedForReading", "simplifiedForWriting", "typeParameterConstraint":
 			t := s.typeByID(r.ID)
 			var value *checker.Type
 			switch r.Op {
 			case "freshLiteral":
-				if t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsBigIntLiteral|checker.TypeFlagsEnumLiteral) != 0 && t.Flags()&checker.TypeFlagsUnion == 0 {
+				if t.Flags()&(checker.TypeFlagsLiteral|checker.TypeFlagsEnum) != 0 {
 					value = t.AsLiteralType().FreshType()
+				}
+			case "regularType":
+				switch {
+				case t.Flags()&checker.TypeFlagsUnion != 0:
+					value = checker.UnionType_regularType(t.AsUnionType())
+				case t.ObjectFlags()&checker.ObjectFlagsFreshLiteral != 0:
+					value = cachedType(c, t, checker.CachedTypeKindRegularObjectLiteral)
 				}
 			case "evolvingElement", "finalArray":
 				if t.ObjectFlags()&checker.ObjectFlagsEvolvingArray != 0 {
@@ -850,7 +857,11 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				}
 			case "simplifiedForReading", "simplifiedForWriting":
 				if t.Flags()&checker.TypeFlagsIndexedAccess != 0 {
-					value = cachedIndexedAccess(c, t, r.Op == "simplifiedForWriting")
+					kind := checker.CachedTypeKindIndexedAccessForReading
+					if r.Op == "simplifiedForWriting" {
+						kind = checker.CachedTypeKindIndexedAccessForWriting
+					}
+					value = cachedType(c, t, kind)
 				}
 			case "typeParameterConstraint":
 				if t.Flags()&checker.TypeFlagsTypeParameter != 0 {
@@ -878,24 +889,18 @@ func (s *Session) execute(ctx context.Context, c *checker.Checker, request Reque
 				return Handle(0), nil
 			}
 			return Handle(s.typeID(checker.InterfaceType_thisType(t))), nil
-		case "mappedTypeParameter", "mappedConstraintType", "mappedTemplateType", "mappedModifiersType":
+		case "mappedFields":
 			t := s.typeByID(r.ID)
 			if t.ObjectFlags()&checker.ObjectFlagsMapped == 0 {
-				return Handle(0), nil
+				return Handles(nil), nil
 			}
 			mapped := t.AsMappedType()
-			var operand *checker.Type
-			switch r.Op {
-			case "mappedTypeParameter":
-				operand = checker.MappedType_typeParameter(mapped)
-			case "mappedConstraintType":
-				operand = checker.MappedType_constraintType(mapped)
-			case "mappedTemplateType":
-				operand = checker.MappedType_templateType(mapped)
-			case "mappedModifiersType":
-				operand = checker.MappedType_modifiersType(mapped)
-			}
-			return Handle(s.typeID(operand)), nil
+			return Handles{
+				s.typeID(checker.MappedType_typeParameter(mapped)),
+				s.typeID(checker.MappedType_constraintType(mapped)),
+				s.typeID(checker.MappedType_templateType(mapped)),
+				s.typeID(checker.MappedType_modifiersType(mapped)),
+			}, nil
 		case "properties":
 			return s.symbolIDs(c.GetPropertiesOfType(s.typeByID(r.ID))), nil
 		case "apparentProperties":
