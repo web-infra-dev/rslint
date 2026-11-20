@@ -1,8 +1,28 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectMissingPropertyError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'missingProperty',
+    '`checked` should be used with either `onChange` or `readOnly`.',
+    range,
+  );
+}
 
-ruleTester.run('checked-requires-onchange-or-readonly', {} as never, {
+function expectExclusiveCheckedAttributeError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'exclusiveCheckedAttribute',
+    'Use either `checked` or `defaultChecked`, but not both.',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('checked-requires-onchange-or-readonly', {
   valid: [
     { code: `<input type="checkbox" />` },
     { code: `<input type="checkbox" onChange={noop} />` },
@@ -58,51 +78,51 @@ ruleTester.run('checked-requires-onchange-or-readonly', {} as never, {
   invalid: [
     {
       code: `<input type="radio" checked />`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 31])],
     },
     {
       code: `<input type="radio" checked={true} />`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 38])],
     },
     {
       code: `<input type="checkbox" checked />`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 34])],
     },
     {
       code: `<input type="checkbox" checked={true} />`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 41])],
     },
     {
       code: `<input type="checkbox" checked={condition ? true : false} />`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 61])],
     },
     {
       code: `<input type="checkbox" checked defaultChecked />`,
       errors: [
-        { messageId: 'exclusiveCheckedAttribute' },
-        { messageId: 'missingProperty' },
+        expectExclusiveCheckedAttributeError([1, 1, 1, 49]),
+        expectMissingPropertyError([1, 1, 1, 49]),
       ],
     },
     {
       code: `React.createElement("input", { checked: false })`,
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 49])],
     },
     {
       code: `React.createElement("input", { checked: true, defaultChecked: true })`,
       errors: [
-        { messageId: 'exclusiveCheckedAttribute' },
-        { messageId: 'missingProperty' },
+        expectExclusiveCheckedAttributeError([1, 1, 1, 70]),
+        expectMissingPropertyError([1, 1, 1, 70]),
       ],
     },
     {
       code: `<input type="checkbox" checked defaultChecked />`,
       options: [{ ignoreMissingProperties: true }],
-      errors: [{ messageId: 'exclusiveCheckedAttribute' }],
+      errors: [expectExclusiveCheckedAttributeError([1, 1, 1, 49])],
     },
     {
       code: `<input type="checkbox" checked defaultChecked />`,
       options: [{ ignoreExclusiveCheckedAttribute: true }],
-      errors: [{ messageId: 'missingProperty' }],
+      errors: [expectMissingPropertyError([1, 1, 1, 49])],
     },
     {
       code: `<input type="checkbox" checked defaultChecked />`,
@@ -113,8 +133,8 @@ ruleTester.run('checked-requires-onchange-or-readonly', {} as never, {
         },
       ],
       errors: [
-        { messageId: 'exclusiveCheckedAttribute' },
-        { messageId: 'missingProperty' },
+        expectExclusiveCheckedAttributeError([1, 1, 1, 49]),
+        expectMissingPropertyError([1, 1, 1, 49]),
       ],
     },
   ],

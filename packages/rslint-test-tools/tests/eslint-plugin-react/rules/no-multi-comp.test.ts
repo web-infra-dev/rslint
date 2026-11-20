@@ -1,11 +1,21 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectOnlyOneComponentError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'onlyOneComponent',
+    'Declare only one React component per file',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 
 // Mirrors upstream's `code.split('\n').join('\r')` line-terminator transform.
 const cr = (s: string) => s.replace(/\n/g, '\r');
 
-ruleTester.run('no-multi-comp', {} as never, {
+ruleTester.run('no-multi-comp', {
   valid: [
     // ---- Single component declarations ----
     {
@@ -350,7 +360,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           }
         });
       `),
-      errors: [{ messageId: 'onlyOneComponent', line: 7 }],
+      errors: [expectOnlyOneComponentError([7, 42, 11, 10])],
     },
     {
       code: cr(`
@@ -371,8 +381,8 @@ ruleTester.run('no-multi-comp', {} as never, {
         }
       `),
       errors: [
-        { messageId: 'onlyOneComponent', line: 7 },
-        { messageId: 'onlyOneComponent', line: 12 },
+        expectOnlyOneComponentError([7, 9, 11, 10]),
+        expectOnlyOneComponentError([12, 9, 16, 10]),
       ],
     },
     {
@@ -384,7 +394,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           return <div>Hello again {props.name}</div>;
         }
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 5 }],
+      errors: [expectOnlyOneComponentError([5, 9, 7, 10])],
     },
     {
       code: `
@@ -397,7 +407,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 5 }],
+      errors: [expectOnlyOneComponentError([5, 9, 9, 10])],
     },
     {
       code: `
@@ -412,7 +422,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 7 }],
+      errors: [expectOnlyOneComponentError([7, 11, 10, 12])],
     },
     {
       code: `
@@ -426,7 +436,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 7 }],
+      errors: [expectOnlyOneComponentError([7, 18, 9, 12])],
     },
     {
       code: `
@@ -436,7 +446,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         export default React.forwardRef((props, ref) => <div><StoreListItem {...props} forwardRef={ref} /></div>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 5 }],
+      errors: [expectOnlyOneComponentError([5, 24, 5, 114])],
     },
     {
       code: `
@@ -446,7 +456,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = React.forwardRef((props, ref) => <div></div>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 5 }],
+      errors: [expectOnlyOneComponentError([5, 33, 5, 78])],
     },
     {
       code: `
@@ -456,7 +466,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = React.forwardRef((props, ref) => <><HelloComponent></HelloComponent></>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 5 }],
+      errors: [expectOnlyOneComponentError([5, 33, 5, 105])],
     },
     {
       code: `
@@ -467,7 +477,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = forwardRef((props, ref) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 94])],
     },
     {
       code: `
@@ -478,7 +488,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = memo((props) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 83])],
     },
     {
       code: `
@@ -489,7 +499,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = forwardRef((props, ref) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 94])],
     },
     {
       code: `
@@ -500,7 +510,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = memo((props) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 83])],
     },
     {
       code: `
@@ -511,7 +521,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = memo((props) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 83])],
     },
     {
       code: `
@@ -522,7 +532,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = forwardRef((props, ref) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 94])],
     },
     {
       code: `
@@ -533,7 +543,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = memo((props) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 83])],
     },
     {
       code: `
@@ -544,7 +554,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = forwardRef((props, ref) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 94])],
     },
     {
       code: `
@@ -555,7 +565,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = forwardRef((props, ref) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 94])],
     },
     {
       code: `
@@ -566,7 +576,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const HelloComponent2 = memo((props) => <HelloComponent></HelloComponent>);
       `,
       options: [{ ignoreStateless: false }],
-      errors: [{ messageId: 'onlyOneComponent', line: 6 }],
+      errors: [expectOnlyOneComponentError([6, 33, 6, 83])],
     },
     {
       code: `
@@ -577,7 +587,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const Label = memo(() => <Text />);
       `,
       settings: { react: { pragma: 'Foo' } },
-      errors: [{ messageId: 'onlyOneComponent' }],
+      errors: [expectOnlyOneComponentError([6, 23, 6, 43])],
     },
 
     // ---- Real-world extras (parity with Go suite) ----
@@ -587,14 +597,14 @@ ruleTester.run('no-multi-comp', {} as never, {
         class Hello extends React.Component<Props> { render() { return <div>{this.props.name}</div>; } }
         const Bye: React.FC<Props> = (props) => <div>Bye {props.name}</div>;
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 4 }],
+      errors: [expectOnlyOneComponentError([4, 38, 4, 76])],
     },
     {
       code: `
         const A = (props) => props.cond ? <div /> : <span />;
         const B = (props) => <div>{props.x}</div>;
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 3 }],
+      errors: [expectOnlyOneComponentError([3, 19, 3, 50])],
     },
     {
       code: `
@@ -605,8 +615,8 @@ ruleTester.run('no-multi-comp', {} as never, {
         function Sibling(props) { return <div>{props.y}</div>; }
       `,
       errors: [
-        { messageId: 'onlyOneComponent', line: 3 },
-        { messageId: 'onlyOneComponent', line: 6 },
+        expectOnlyOneComponentError([3, 19, 3, 62]),
+        expectOnlyOneComponentError([6, 9, 6, 65]),
       ],
     },
     {
@@ -614,7 +624,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         const A = (0, 0, (props) => <div>{props.x}</div>);
         const B = (0, (props) => <span>{props.y}</span>);
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 3 }],
+      errors: [expectOnlyOneComponentError([3, 23, 3, 56])],
     },
     {
       code: `
@@ -622,14 +632,14 @@ ruleTester.run('no-multi-comp', {} as never, {
         const B = myObserver((props) => <div>{props.y}</div>);
       `,
       settings: { componentWrapperFunctions: ['myObserver'] },
-      errors: [{ messageId: 'onlyOneComponent', line: 3 }],
+      errors: [expectOnlyOneComponentError([3, 19, 3, 62])],
     },
     {
       code: `
         function Hello(props) { return <div>{props.name}</div>; }
         class HelloAgain extends React.Component { render() { return <div /> } }
       `,
-      errors: [{ messageId: 'onlyOneComponent', line: 3 }],
+      errors: [expectOnlyOneComponentError([3, 9, 3, 81])],
     },
     {
       code: `
@@ -638,8 +648,8 @@ ruleTester.run('no-multi-comp', {} as never, {
         function C() { return <div /> }
       `,
       errors: [
-        { messageId: 'onlyOneComponent', line: 3 },
-        { messageId: 'onlyOneComponent', line: 4 },
+        expectOnlyOneComponentError([3, 9, 3, 40]),
+        expectOnlyOneComponentError([4, 9, 4, 40]),
       ],
     },
 
@@ -649,16 +659,7 @@ ruleTester.run('no-multi-comp', {} as never, {
         function Hello(props) { return <div /> }
         function HelloAgain(props) { return <div /> }
       `,
-      errors: [
-        {
-          messageId: 'onlyOneComponent',
-          message: 'Declare only one React component per file',
-          line: 3,
-          column: 9,
-          endLine: 3,
-          endColumn: 54,
-        },
-      ],
+      errors: [expectOnlyOneComponentError([3, 9, 3, 54])],
     },
     {
       code: `
@@ -669,15 +670,7 @@ ruleTester.run('no-multi-comp', {} as never, {
           render() { return <div /> }
         }
       `,
-      errors: [
-        {
-          messageId: 'onlyOneComponent',
-          line: 5,
-          column: 9,
-          endLine: 7,
-          endColumn: 10,
-        },
-      ],
+      errors: [expectOnlyOneComponentError([5, 9, 7, 10])],
     },
   ],
 });

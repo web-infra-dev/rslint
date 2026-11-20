@@ -1,8 +1,36 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectInvalidCombinationError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'invalidCombination',
+    'An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid',
+    range,
+  );
+}
 
-ruleTester.run('iframe-missing-sandbox', {} as never, {
+function expectAttributeMissingError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'attributeMissing',
+    'An iframe element is missing a sandbox attribute',
+    range,
+  );
+}
+
+function expectInvalidValueError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'invalidValue',
+    'An iframe element defines a sandbox attribute with invalid value "__unknown__"',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('iframe-missing-sandbox', {
   valid: [
     {
       code: `React.createElement("iframe", /** @type {any} */ ({ sandbox: "allow-forms" }));`,
@@ -84,85 +112,78 @@ ruleTester.run('iframe-missing-sandbox', {} as never, {
     {
       code: `React.createElement("iframe", { sandbox: /** @type {string} */ ("allow-scripts allow-same-origin") });`,
       filename: 'files/iframe-sandbox.jsx',
-      errors: [
-        {
-          messageId: 'invalidCombination',
-          message:
-            'An iframe element defines a sandbox attribute with both allow-scripts and allow-same-origin which is invalid',
-        },
-      ],
+      errors: [expectInvalidCombinationError([1, 1, 1, 102])],
     },
     {
       code: `React.createElement(/** @satisfies {string} */ ("iframe"));`,
       filename: 'files/iframe-sandbox.jsx',
-      errors: [
-        {
-          messageId: 'attributeMissing',
-          message: 'An iframe element is missing a sandbox attribute',
-        },
-      ],
+      errors: [expectAttributeMissingError([1, 1, 1, 59])],
     },
     {
       code: `const sandbox = "sandbox"; React.createElement("iframe", { [/** @type {string} */ (sandbox)]: "unknown" });`,
       filename: 'files/iframe-sandbox.jsx',
       errors: [
-        {
-          messageId: 'invalidValue',
-          message:
-            'An iframe element defines a sandbox attribute with invalid value "unknown"',
-        },
+        diagnostic(
+          'invalidValue',
+          'An iframe element defines a sandbox attribute with invalid value "unknown"',
+          [1, 28, 1, 107],
+        ),
       ],
     },
     {
       code: `React.createElement("iframe", ({ sandbox: "allow-forms" } as any));`,
-      errors: [
-        {
-          messageId: 'attributeMissing',
-          message: 'An iframe element is missing a sandbox attribute',
-        },
-      ],
+      errors: [expectAttributeMissingError([1, 1, 1, 67])],
     },
-    { code: `<iframe></iframe>;`, errors: [{ messageId: 'attributeMissing' }] },
-    { code: `<iframe/>;`, errors: [{ messageId: 'attributeMissing' }] },
+    {
+      code: `<iframe></iframe>;`,
+      errors: [expectAttributeMissingError([1, 1, 1, 9])],
+    },
+    {
+      code: `<iframe/>;`,
+      errors: [expectAttributeMissingError([1, 1, 1, 10])],
+    },
     {
       code: `React.createElement("iframe");`,
-      errors: [{ messageId: 'attributeMissing' }],
+      errors: [expectAttributeMissingError([1, 1, 1, 30])],
     },
     {
       code: `React.createElement("iframe", {});`,
-      errors: [{ messageId: 'attributeMissing' }],
+      errors: [expectAttributeMissingError([1, 1, 1, 34])],
     },
     {
       code: `React.createElement("iframe", null);`,
-      errors: [{ messageId: 'attributeMissing' }],
+      errors: [expectAttributeMissingError([1, 1, 1, 36])],
     },
     {
       code: `<iframe sandbox="__unknown__"></iframe>`,
-      errors: [{ messageId: 'invalidValue' }],
+      errors: [expectInvalidValueError([1, 1, 1, 31])],
     },
     {
       code: `React.createElement("iframe", { sandbox: "__unknown__" })`,
-      errors: [{ messageId: 'invalidValue' }],
+      errors: [expectInvalidValueError([1, 1, 1, 58])],
     },
     {
       code: `<iframe sandbox="allow-popups __unknown__"/>`,
-      errors: [{ messageId: 'invalidValue' }],
+      errors: [expectInvalidValueError([1, 1, 1, 45])],
     },
     {
       code: `<iframe sandbox="__unknown__ allow-popups"/>`,
-      errors: [{ messageId: 'invalidValue' }],
+      errors: [expectInvalidValueError([1, 1, 1, 45])],
     },
     {
       code: `<iframe sandbox=" allow-forms __unknown__ allow-popups __unknown__  "/>`,
-      errors: [{ messageId: 'invalidValue' }, { messageId: 'invalidValue' }],
+      errors: [
+        expectInvalidValueError([1, 1, 1, 72]),
+        expectInvalidValueError([1, 1, 1, 72]),
+      ],
     },
     {
       code: `<iframe sandbox="allow-scripts allow-same-origin"></iframe>;`,
-      errors: [{ messageId: 'invalidCombination' }],
+      errors: [expectInvalidCombinationError([1, 1, 1, 51])],
     },
     {
       code: `<iframe sandbox="allow-same-origin allow-scripts"/>;`,
-      errors: [{ messageId: 'invalidCombination' }],
+      errors: [expectInvalidCombinationError([1, 1, 1, 52])],
     },
   ],
 });

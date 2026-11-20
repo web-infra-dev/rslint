@@ -1,8 +1,18 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectInlineElementError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'inlineElement',
+    'Child elements which render as inline HTML elements should be separated by a space or wrapped in block level elements.',
+    range,
+  );
+}
 
-ruleTester.run('no-adjacent-inline-elements', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-adjacent-inline-elements', {
   valid: [
     { code: '<div />;' },
     { code: '<div><div></div><div></div></div>;' },
@@ -26,15 +36,15 @@ ruleTester.run('no-adjacent-inline-elements', {} as never, {
   invalid: [
     {
       code: '<div><a></a><a></a></div>;',
-      errors: [{ messageId: 'inlineElement' }],
+      errors: [expectInlineElementError([1, 1, 1, 26])],
     },
     {
       code: '<div><a></a><span></span></div>;',
-      errors: [{ messageId: 'inlineElement' }],
+      errors: [expectInlineElementError([1, 1, 1, 32])],
     },
     {
       code: 'React.createElement("div", undefined, [React.createElement("a"), React.createElement("span")]);',
-      errors: [{ messageId: 'inlineElement' }],
+      errors: [expectInlineElementError([1, 1, 1, 95])],
     },
   ],
 });

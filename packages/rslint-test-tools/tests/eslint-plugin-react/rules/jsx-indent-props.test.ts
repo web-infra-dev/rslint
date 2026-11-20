@@ -1,8 +1,18 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectWrongIndentError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'wrongIndent',
+    'Expected indentation of 14 space characters but found 12.',
+    range,
+  );
+}
 
-ruleTester.run('jsx-indent-props', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-indent-props', {
   valid: [
     // ---- Default 4-space indent ----
     { code: `\n        <App foo\n        />\n      ` },
@@ -127,7 +137,13 @@ ruleTester.run('jsx-indent-props', {} as never, {
     {
       code: `\n        <App\n          foo\n        />\n      `,
       output: `\n        <App\n            foo\n        />\n      `,
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 12 space characters but found 10.',
+          [3, 11, 3, 14],
+        ),
+      ],
     },
 
     // ---- 2-space indent — child at 12 must be 10. ----
@@ -135,7 +151,13 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        <App\n            foo\n        />\n      `,
       output: `\n        <App\n          foo\n        />\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 10 space characters but found 12.',
+          [3, 13, 3, 16],
+        ),
+      ],
     },
 
     // ---- Conditional with JSX in both branches — bump applies. ----
@@ -143,7 +165,10 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        const test = true\n          ? <span\n            attr="value"\n            />\n          : <span\n            attr="otherValue"\n            />\n      `,
       output: `\n        const test = true\n          ? <span\n              attr="value"\n            />\n          : <span\n              attr="otherValue"\n            />\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }, { messageId: 'wrongIndent' }],
+      errors: [
+        expectWrongIndentError([4, 13, 4, 25]),
+        expectWrongIndentError([7, 13, 7, 30]),
+      ],
     },
 
     // ---- Alternate wrapped in its own parens — no ternary bump. ----
@@ -151,7 +176,13 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        const test = true\n          ? <span attr="value" />\n          : (\n            <span\n                attr="otherValue"\n            />\n          )\n      `,
       output: `\n        const test = true\n          ? <span attr="value" />\n          : (\n            <span\n              attr="otherValue"\n            />\n          )\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 14 space characters but found 16.',
+          [6, 17, 6, 34],
+        ),
+      ],
     },
 
     // ---- Ternary alternate, single prop. ----
@@ -159,7 +190,7 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        {test.isLoading\n          ? <Value/>\n          : <OtherValue\n            some={aaa}/>\n        }\n      `,
       output: `\n        {test.isLoading\n          ? <Value/>\n          : <OtherValue\n              some={aaa}/>\n        }\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [expectWrongIndentError([5, 13, 5, 23])],
     },
 
     // ---- Ternary alternate, two props bumped. ----
@@ -167,7 +198,10 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        {test.isLoading\n          ? <Value/>\n          : <OtherValue\n            some={aaa}\n            other={bbb}/>\n        }\n      `,
       output: `\n        {test.isLoading\n          ? <Value/>\n          : <OtherValue\n              some={aaa}\n              other={bbb}/>\n        }\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }, { messageId: 'wrongIndent' }],
+      errors: [
+        expectWrongIndentError([5, 13, 5, 23]),
+        expectWrongIndentError([6, 13, 6, 24]),
+      ],
     },
 
     // ---- Ternary consequent inside JSXExpressionContainer. ----
@@ -175,7 +209,10 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        {this.props.test\n          ? <span\n            className="value"\n            some={{aaa}}\n            />\n          : null}\n      `,
       output: `\n        {this.props.test\n          ? <span\n              className="value"\n              some={{aaa}}\n            />\n          : null}\n      `,
       options: [2],
-      errors: [{ messageId: 'wrongIndent' }, { messageId: 'wrongIndent' }],
+      errors: [
+        expectWrongIndentError([4, 13, 4, 30]),
+        expectWrongIndentError([5, 13, 5, 25]),
+      ],
     },
 
     // ---- Tab option, prop has no leading tab. ----
@@ -183,7 +220,13 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        <App1\n            foo\n        />\n      `,
       output: `\n        <App1\n\tfoo\n        />\n      `,
       options: ['tab'],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 1 tab character but found 0.',
+          [3, 13, 3, 16],
+        ),
+      ],
     },
 
     // ---- Tab option, too many tabs. ----
@@ -191,7 +234,13 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n\t\t\t\t<App\n\t\t\t\t\t\t\tfoo\n\t\t\t\t/>\n\t\t\t`,
       output: `\n\t\t\t\t<App\n\t\t\t\t\tfoo\n\t\t\t\t/>\n\t\t\t`,
       options: ['tab'],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 5 tab characters but found 7.',
+          [3, 8, 3, 11],
+        ),
+      ],
     },
 
     // ---- 'first' alignment failures. ----
@@ -199,25 +248,54 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        <App a\n          b\n        />\n      `,
       output: `\n        <App a\n             b\n        />\n      `,
       options: ['first'],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 13 space characters but found 10.',
+          [3, 11, 3, 12],
+        ),
+      ],
     },
     {
       code: `\n        <App  a\n           b\n        />\n      `,
       output: `\n        <App  a\n              b\n        />\n      `,
       options: ['first'],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 14 space characters but found 11.',
+          [3, 12, 3, 13],
+        ),
+      ],
     },
     {
       code: `\n        <App\n              a\n           b\n        />\n      `,
       output: `\n        <App\n              a\n              b\n        />\n      `,
       options: ['first'],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 14 space characters but found 11.',
+          [4, 12, 4, 13],
+        ),
+      ],
     },
     {
       code: `\n        <App\n          a\n         b\n           c\n        />\n      `,
       output: `\n        <App\n          a\n          b\n          c\n        />\n      `,
       options: ['first'],
-      errors: [{ messageId: 'wrongIndent' }, { messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 10 space characters but found 9.',
+          [4, 10, 4, 11],
+        ),
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 10 space characters but found 11.',
+          [5, 12, 5, 13],
+        ),
+      ],
     },
 
     // ---- Return JSX off by one indent unit, both ignoreTernaryOperator
@@ -226,13 +304,25 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n              id="id"\n          >\n            test\n          </div>\n        }\n      `,
       output: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n            id="id"\n          >\n            test\n          </div>\n        }\n      `,
       options: [{ indentMode: 2, ignoreTernaryOperator: false }],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 12 space characters but found 14.',
+          [8, 15, 8, 22],
+        ),
+      ],
     },
     {
       code: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n              id="id"\n          >\n            test\n          </div>\n        }\n      `,
       output: `\n        const F = () => {\n          const foo = true\n            ? <div id="id">test</div>\n            : false;\n\n          return <div\n            id="id"\n          >\n            test\n          </div>\n        }\n      `,
       options: [{ indentMode: 2, ignoreTernaryOperator: true }],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 12 space characters but found 14.',
+          [8, 15, 8, 22],
+        ),
+      ],
     },
 
     // ---- Tab indent + return JSX off by one. ----
@@ -240,13 +330,25 @@ ruleTester.run('jsx-indent-props', {} as never, {
       code: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       output: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       options: [{ indentMode: 'tab', ignoreTernaryOperator: false }],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 6 tab characters but found 7.',
+          [8, 8, 8, 15],
+        ),
+      ],
     },
     {
       code: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       output: `\n\t\t\t\tconst F = () => {\n\t\t\t\t\tconst foo = true\n\t\t\t\t\t\t? <div id="id">test</div>\n\t\t\t\t\t\t: false;\n\n\t\t\t\t\treturn <div\n\t\t\t\t\t\tid="id"\n\t\t\t\t\t>\n\t\t\t\t\t\ttest\n\t\t\t\t\t</div>\n\t\t\t\t}\n`,
       options: [{ indentMode: 'tab', ignoreTernaryOperator: true }],
-      errors: [{ messageId: 'wrongIndent' }],
+      errors: [
+        diagnostic(
+          'wrongIndent',
+          'Expected indentation of 6 tab characters but found 7.',
+          [8, 8, 8, 15],
+        ),
+      ],
     },
   ],
 });

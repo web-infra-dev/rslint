@@ -1,11 +1,39 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoNamespaceError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'noNamespace',
+    'React component ns:Panel must not be in a namespace, as React does not support them',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+function namespaceCallError(code: string) {
+  const call = 'React.createElement("ns:B")';
+  const start = code.lastIndexOf(call);
+  if (start < 0)
+    throw new Error('Missing namespace call in fixed source template');
+  const before = code.slice(0, start);
+  const line = before.split('\n').length;
+  const column = start - before.lastIndexOf('\n');
+  return {
+    messageId: 'noNamespace',
+    message: message('ns:B'),
+    line,
+    column,
+    endLine: line,
+    endColumn: column + call.length,
+  };
+}
 
 const message = (name: string) =>
   `React component ${name} must not be in a namespace, as React does not support them`;
 
-ruleTester.run('no-namespace', {} as never, {
+ruleTester.run('no-namespace', {
   valid: [
     {
       code: 'import { createElement } from "react"; function f() { type createElement = {}; createElement("ns:Panel"); }',
@@ -47,25 +75,31 @@ ruleTester.run('no-namespace', {} as never, {
   invalid: [
     {
       code: 'function child() { const createElement = React.createElement; } createElement("ns:Panel");',
-      errors: [{ message: message('ns:Panel') }],
+      errors: [expectNoNamespaceError([1, 65, 1, 90])],
     },
     {
       code: 'namespace A.B.C { const createElement = React.createElement; } createElement("ns:Panel");',
-      errors: [{ message: message('ns:Panel') }],
+      errors: [expectNoNamespaceError([1, 64, 1, 89])],
     },
     {
       code: 'class C { #createElement; f(React) { React.#createElement("ns:Panel"); } }',
-      errors: [{ message: message('ns:Panel') }],
+      errors: [expectNoNamespaceError([1, 38, 1, 70])],
     },
     ...[
       '/* eslint-disable react/no-namespace */ React.createElement("ns:A"); /* eslint-enable react/no-namespace */ React.createElement("ns:B");',
       '/* eslint-disable */ React.createElement("ns:A"); /* eslint-enable react/no-namespace */ React.createElement("ns:B");',
       '/* eslint-disable react/no-namespace */ React.createElement("ns:A"); /* eslint-enable */ React.createElement("ns:B");',
       '/* eslint-disable react/no-namespace */\nReact.createElement("ns:A");\n/* eslint-enable react/no-namespace */\nReact.createElement("ns:B");',
-    ].map((code) => ({ code, errors: [{ message: message('ns:B') }] })),
+    ].map((code) => ({ code, errors: [namespaceCallError(code)] })),
     {
       code: 'React.createElement("ns:A"); /* eslint-disable react/no-namespace */ React.createElement("ns:B");',
-      errors: [{ message: message('ns:A') }],
+      errors: [
+        diagnostic(
+          'noNamespace',
+          'React component ns:A must not be in a namespace, as React does not support them',
+          [1, 1, 1, 28],
+        ),
+      ],
     },
     // ---- Upstream invalid: lower-case namespace ----
     ...[
@@ -74,10 +108,17 @@ ruleTester.run('no-namespace', {} as never, {
       'ns:test_component',
       'ns:TestComponent',
     ].flatMap((name) => [
-      { code: `<${name} />`, errors: [{ message: message(name) }] },
+      {
+        code: `<${name} />`,
+        errors: [
+          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 5]),
+        ],
+      },
       {
         code: `React.createElement("${name}")`,
-        errors: [{ message: message(name) }],
+        errors: [
+          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 24]),
+        ],
       },
     ]),
     // ---- Upstream invalid: upper-case namespace ----
@@ -87,10 +128,17 @@ ruleTester.run('no-namespace', {} as never, {
       'Ns:test_component',
       'Ns:TestComponent',
     ].flatMap((name) => [
-      { code: `<${name} />`, errors: [{ message: message(name) }] },
+      {
+        code: `<${name} />`,
+        errors: [
+          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 5]),
+        ],
+      },
       {
         code: `React.createElement("${name}")`,
-        errors: [{ message: message(name) }],
+        errors: [
+          diagnostic('noNamespace', message(name), [1, 1, 1, name.length + 24]),
+        ],
       },
     ]),
   ],

@@ -1,6 +1,26 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectFragmentsNotSupportedError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'fragmentsNotSupported',
+    'Fragments are only supported starting from React v16.2. Please disable the `react/jsx-fragments` rule in `eslint` settings or upgrade your version of React.',
+    range,
+  );
+}
+
+function expectPreferFragmentError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'preferFragment',
+    'Prefer fragment shorthand over Act.Frag',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 
 const settings = {
   react: {
@@ -18,7 +38,7 @@ const settingsOld = {
   },
 };
 
-ruleTester.run('jsx-fragments', {} as never, {
+ruleTester.run('jsx-fragments', {
   valid: [
     {
       code: '<><Foo /></>',
@@ -101,41 +121,56 @@ ruleTester.run('jsx-fragments', {} as never, {
     {
       code: '<><Foo /></>',
       settings: settingsOld,
-      errors: [{ messageId: 'fragmentsNotSupported' }],
+      errors: [expectFragmentsNotSupportedError([1, 1, 1, 13])],
     },
     {
       code: '<Act.Frag><Foo /></Act.Frag>',
       settings: settingsOld,
-      errors: [{ messageId: 'fragmentsNotSupported' }],
+      errors: [expectFragmentsNotSupportedError([1, 1, 1, 29])],
     },
     {
       code: '<Act.Frag />',
       settings: settingsOld,
-      errors: [{ messageId: 'fragmentsNotSupported' }],
+      errors: [expectFragmentsNotSupportedError([1, 1, 1, 13])],
     },
     {
       code: '<><Foo /></>',
       options: ['element'],
       settings,
-      errors: [{ messageId: 'preferPragma' }],
+      errors: [
+        diagnostic(
+          'preferPragma',
+          'Prefer Act.Frag over fragment shorthand',
+          [1, 1, 1, 13],
+        ),
+      ],
+      output: `<Act.Frag><Foo /></Act.Frag>`,
     },
     {
       code: '<Act.Frag><Foo /></Act.Frag>',
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([1, 1, 1, 29])],
+      output: `<><Foo /></>`,
     },
     {
       code: '<Act.Frag />',
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([1, 1, 1, 13])],
+      output: `<></>`,
     },
     {
       code: '/** @jsx Preact.h */ <Preact.Frag/>',
       output: '/** @jsx Preact.h */ <></>',
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [
+        diagnostic(
+          'preferFragment',
+          'Prefer fragment shorthand over Preact.Frag',
+          [1, 22, 1, 36],
+        ),
+      ],
     },
     {
       code: `
@@ -144,7 +179,11 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 14])],
+      output: `
+        import Act, { Frag as F } from 'react';
+        <></>;
+      `,
     },
     {
       code: `
@@ -153,7 +192,11 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 23])],
+      output: `
+        import Act, { Frag as F } from 'react';
+        <><Foo /></>;
+      `,
     },
     {
       code: `
@@ -162,7 +205,11 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 29])],
+      output: `
+        import Act, { Frag } from 'react';
+        <><Foo /></>;
+      `,
     },
     {
       code: `
@@ -171,7 +218,11 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 23])],
+      output: `
+        const F = Act.Frag;
+        <><Foo /></>;
+      `,
     },
     {
       code: `
@@ -180,7 +231,11 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 29])],
+      output: `
+        const { Frag } = Act;
+        <><Foo /></>;
+      `,
     },
     {
       code: `
@@ -189,21 +244,25 @@ ruleTester.run('jsx-fragments', {} as never, {
       `,
       options: ['syntax'],
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([3, 9, 3, 29])],
+      output: `
+        const { Frag } = require('react');
+        <><Foo /></>;
+      `,
     },
     {
       code: 'function render(){ var F=Act.Frag; function F(){} return <F/>; }',
       output:
         'function render(){ var F=Act.Frag; function F(){} return <></>; }',
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([1, 58, 1, 62])],
     },
     {
       code: 'function render(){ var F=Act.Frag; var F=Widget; return <F/>; }',
       output:
         'function render(){ var F=Act.Frag; var F=Widget; return <></>; }',
       settings,
-      errors: [{ messageId: 'preferFragment' }],
+      errors: [expectPreferFragmentError([1, 57, 1, 61])],
     },
   ],
 });

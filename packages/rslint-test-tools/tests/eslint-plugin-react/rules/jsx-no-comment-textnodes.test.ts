@@ -1,8 +1,20 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectPutCommentInBracesError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'putCommentInBraces',
+    'Comments inside children section of tag should be placed inside braces',
+    range,
+  );
+}
 
-ruleTester.run('jsx-no-comment-textnodes', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-no-comment-textnodes', {
   valid: [
     // ---- Upstream: expression-container comment inside JsxElement ----
     {
@@ -108,6 +120,84 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
     {
       code: `const list = items.map((i) => <li key={i}>{i}</li>);`,
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 3 (7.37.5)',
+      code: `
+        class Comp1 extends Component {
+          render() {
+            const bar = (<div>{/* valid */}</div>);
+            return bar;
+          }
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 5 (7.37.5)',
+      code: `
+        class Comp1 extends Component {
+          render() {
+            return (
+              <div>
+                {/* valid */}
+                {/* valid 2 */}
+                {/* valid 3 */}
+              </div>
+            );
+          }
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 7 (7.37.5)',
+      code: `
+        var foo = require('foo');
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 8 (7.37.5)',
+      code: `
+        <Foo bar='test'>
+          {/* valid */}
+        </Foo>
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 11 (7.37.5)',
+      code: `
+        </* valid */></>
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 12 (7.37.5)',
+      skip: 'The native TypeScript parser rejects this JSX form (Expected corresponding closing tag for JSX fragment.); upstream uses a different parser.',
+      code: `
+        <></* valid *//>
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 13 (7.37.5)',
+      code: `
+        <Foo title={'foo' /* valid */}/>
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 16 (7.37.5)',
+      code: `
+        <div>
+          <span className="pl-c"><span className="pl-c">&#47;&#47;</span> ...</span><br />
+        </div>
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- Upstream: inline `// invalid` in JsxElement ----
@@ -119,7 +209,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([4, 26, 4, 36])],
     },
     // ---- Upstream: inline `// invalid` in JsxFragment ----
     {
@@ -130,7 +220,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([4, 23, 4, 33])],
     },
     // ---- Upstream: inline `/* invalid */` in JsxElement ----
     {
@@ -141,7 +231,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([4, 26, 4, 39])],
     },
     // ---- Upstream: multi-line `// invalid` ----
     {
@@ -156,7 +246,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([5, 20, 7, 15])],
     },
     // ---- Upstream: `/* invalid */` surrounded by text lines ----
     {
@@ -173,7 +263,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([5, 20, 9, 15])],
     },
     // ---- Upstream: arrow function returning JSX with `/*` text ----
     {
@@ -182,7 +272,7 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           return <span>/*</span>;
         };
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([3, 24, 3, 26])],
     },
     // ---- Edge: two sibling JsxElements, each with its own comment-like text ----
     {
@@ -195,8 +285,8 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
         );
       `,
       errors: [
-        { messageId: 'putCommentInBraces' },
-        { messageId: 'putCommentInBraces' },
+        expectPutCommentInBracesError([4, 19, 4, 23]),
+        expectPutCommentInBracesError([5, 19, 5, 23]),
       ],
     },
     // ---- Edge: deeply-nested JSX with bad text at innermost ----
@@ -214,22 +304,22 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           </section>
         );
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([7, 25, 7, 32])],
     },
     // ---- Edge: JSX in conditional expression — bad text in one branch ----
     {
       code: `const render = (ok) => ok ? <div>// bad</div> : <div>ok</div>;`,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([1, 34, 1, 40])],
     },
     // ---- Edge: JSX in .map callback with bad text ----
     {
       code: `const list = items.map((i) => <li key={i}>// {i}</li>);`,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([1, 43, 1, 46])],
     },
     // ---- Edge: member-expression tag with bad text ----
     {
       code: `<Foo.Bar>// bad</Foo.Bar>`,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([1, 10, 1, 16])],
     },
     // ---- Edge: same JsxText carries BOTH `//` and `/*` → single diagnostic ----
     {
@@ -241,7 +331,27 @@ ruleTester.run('jsx-no-comment-textnodes', {} as never, {
           </div>
         );
       `,
-      errors: [{ messageId: 'putCommentInBraces' }],
+      errors: [expectPutCommentInBracesError([3, 16, 6, 11])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 5 (7.37.5)',
+      code: `
+        class Comp1 extends Component {
+          render() {
+            return (
+              <div>
+                {'asdjfl'}
+                // invalid
+                {'foo'}
+              </div>
+            );
+          }
+        }
+      `,
+      errors: [expectPutCommentInBracesError([6, 27, 8, 17])],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

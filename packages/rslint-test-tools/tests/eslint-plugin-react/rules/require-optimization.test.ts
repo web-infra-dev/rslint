@@ -1,8 +1,20 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoShouldComponentUpdateError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'noShouldComponentUpdate',
+    'Component is not optimized. Please add a shouldComponentUpdate method.',
+    range,
+  );
+}
 
-ruleTester.run('require-optimization', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('require-optimization', {
   valid: [
     // ---- Upstream valid: plain class without React extension is not a component ----
     {
@@ -426,7 +438,7 @@ ruleTester.run('require-optimization', {} as never, {
         import React from "react";
         class YourComponent extends React.Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 9, 3, 55])],
     },
     // ---- Upstream invalid: methods without shouldComponentUpdate ----
     {
@@ -439,7 +451,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 9, 8, 10])],
     },
     // ---- Upstream invalid: class field arrow handler, no SCU ----
     {
@@ -452,7 +464,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 9, 8, 10])],
     },
     // ---- Upstream invalid: bare Component, empty body ----
     {
@@ -460,7 +472,7 @@ ruleTester.run('require-optimization', {} as never, {
         import React, {Component} from "react";
         class YourComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 9, 3, 49])],
     },
     // ---- Upstream invalid: empty createReactClass ----
     {
@@ -468,7 +480,7 @@ ruleTester.run('require-optimization', {} as never, {
         import React from "react";
         createReactClass({})
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 26, 3, 28])],
     },
     // ---- Upstream invalid: createReactClass with non-PureRender mixin ----
     {
@@ -478,7 +490,7 @@ ruleTester.run('require-optimization', {} as never, {
           mixins: [RandomMixin]
         })
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 26, 5, 10])],
     },
     // ---- Upstream invalid: decorator with non-PureRender mixin argument ----
     {
@@ -486,7 +498,7 @@ ruleTester.run('require-optimization', {} as never, {
         @reactMixin.decorate(SomeOtherMixin)
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Upstream invalid: decorators not in allow-list ----
     {
@@ -497,14 +509,14 @@ ruleTester.run('require-optimization', {} as never, {
         class DecoratedComponent extends Component {}
       `,
       options: [{ allowDecorators: ['renderPure', 'pureRender'] }],
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 5, 54])],
     },
     // ---- Edge: anonymous ClassExpression — no name, still reported ----
     {
       code: `
         module.exports = class extends React.Component {};
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 2, 58])],
     },
     // ---- Edge: shouldComponentUpdate as class field (not a method) — still reported ----
     {
@@ -513,7 +525,7 @@ ruleTester.run('require-optimization', {} as never, {
           shouldComponentUpdate = () => true;
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 4, 10])],
     },
     // ---- Edge: shouldComponentUpdate as STRING-LITERAL key — non-Identifier never matches ----
     {
@@ -522,7 +534,7 @@ ruleTester.run('require-optimization', {} as never, {
           "shouldComponentUpdate"() {}
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 4, 10])],
     },
     // ---- Edge: optional chain in decorator — does NOT match the PureRender shape ----
     {
@@ -530,7 +542,7 @@ ruleTester.run('require-optimization', {} as never, {
         @reactMixin?.decorate(PureRenderMixin)
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: deeper member access in decorator — does NOT match ----
     {
@@ -538,7 +550,7 @@ ruleTester.run('require-optimization', {} as never, {
         @outer.reactMixin.decorate(PureRenderMixin)
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: zero-arg decorate() — does NOT match ----
     {
@@ -546,7 +558,7 @@ ruleTester.run('require-optimization', {} as never, {
         @reactMixin.decorate()
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: non-Identifier first arg — does NOT match ----
     {
@@ -554,7 +566,7 @@ ruleTester.run('require-optimization', {} as never, {
         @reactMixin.decorate(getMixin())
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: wrong wrapper name — does NOT match ----
     {
@@ -562,7 +574,7 @@ ruleTester.run('require-optimization', {} as never, {
         @otherWrapper.decorate(PureRenderMixin)
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: wrong method name — does NOT match ----
     {
@@ -570,7 +582,7 @@ ruleTester.run('require-optimization', {} as never, {
         @reactMixin.combine(PureRenderMixin)
         class DecoratedComponent extends Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: CallExpression form decorator with allowDecorators — does NOT match ----
     {
@@ -579,7 +591,7 @@ ruleTester.run('require-optimization', {} as never, {
         class DecoratedComponent extends Component {}
       `,
       options: [{ allowDecorators: ['pureRender'] }],
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 3, 54])],
     },
     // ---- Edge: createReactClass mixins is NOT an ArrayExpression ----
     {
@@ -588,7 +600,7 @@ ruleTester.run('require-optimization', {} as never, {
           mixins: PureRenderMixin
         })
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 4, 10])],
     },
     // ---- Edge: createReactClass mixins element is a CallExpression ----
     {
@@ -597,7 +609,7 @@ ruleTester.run('require-optimization', {} as never, {
           mixins: [resolveMixin()]
         })
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 4, 10])],
     },
     // ---- Edge: settings.react.pragma="Preact" + Preact.Component without SCU ----
     {
@@ -605,7 +617,7 @@ ruleTester.run('require-optimization', {} as never, {
         class YourComponent extends Preact.Component {}
       `,
       settings: { react: { pragma: 'Preact' } },
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 2, 56])],
     },
     // ---- Edge: nested ClassDeclaration inside non-component class body ----
     {
@@ -617,14 +629,14 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([4, 13, 4, 51])],
     },
     // ---- Edge: createReactClass with paren-wrapped object arg, empty body ----
     {
       code: `
         createReactClass(({}))
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 27, 2, 29])],
     },
     // ---- Edge: createReactClass with elision-only mixins array ----
     {
@@ -633,49 +645,49 @@ ruleTester.run('require-optimization', {} as never, {
           mixins: [,,,]
         })
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 4, 10])],
     },
     // ---- Edge: anonymous ClassExpression in CallExpression arg position ----
     {
       code: `
         register(class extends React.Component {});
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 18, 2, 50])],
     },
     // ---- Real user: export default class without SCU ----
     {
       code: `
         export default class extends React.Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 24, 2, 56])],
     },
     // ---- Real user: export class without SCU ----
     {
       code: `
         export class YourComponent extends React.Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 16, 2, 62])],
     },
     // ---- Real user: export default abstract class without SCU ----
     {
       code: `
         export default abstract class extends React.Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 24, 2, 65])],
     },
     // ---- Real user: connect HOC wrapping inline ClassExpression without SCU ----
     {
       code: `
         const Connected = connect(mapStateToProps)(class extends React.Component {});
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 52, 2, 84])],
     },
     // ---- Real user: ClassExpression in expression statement ----
     {
       code: `
         (class extends React.Component {});
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 10, 2, 42])],
     },
     // ---- Real user: multiple createReactClass calls — only the missing
     // ones report. ----
@@ -686,8 +698,8 @@ ruleTester.run('require-optimization', {} as never, {
         const C = createReactClass({ mixins: [RandomMixin] });
       `,
       errors: [
-        { messageId: 'noShouldComponentUpdate' },
-        { messageId: 'noShouldComponentUpdate' },
+        expectNoShouldComponentUpdateError([2, 36, 2, 38]),
+        expectNoShouldComponentUpdateError([4, 36, 4, 61]),
       ],
     },
     // ---- Real user: TS access modifier on a non-SCU method — class still
@@ -698,14 +710,14 @@ ruleTester.run('require-optimization', {} as never, {
           private otherMethod() {}
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 4, 10])],
     },
     // ---- Real user: const C = class extends React.Component {} without SCU ----
     {
       code: `
         const C = class extends React.Component {};
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 19, 2, 51])],
     },
     // ---- Real user: nested sibling components, both missing SCU ----
     {
@@ -718,8 +730,8 @@ ruleTester.run('require-optimization', {} as never, {
         }
       `,
       errors: [
-        { messageId: 'noShouldComponentUpdate' },
-        { messageId: 'noShouldComponentUpdate' },
+        expectNoShouldComponentUpdateError([3, 11, 3, 45]),
+        expectNoShouldComponentUpdateError([5, 13, 5, 47]),
       ],
     },
     // ---- Locks in upstream: ClassExpression PureComponent variants are
@@ -729,31 +741,31 @@ ruleTester.run('require-optimization', {} as never, {
       code: `
         const X = class extends React.PureComponent {};
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 19, 2, 55])],
     },
     {
       code: `
         register(class extends React.PureComponent {});
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 18, 2, 54])],
     },
     {
       code: `
         module.exports = class extends React.PureComponent {};
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 2, 62])],
     },
     {
       code: `
         const obj = { Comp: class extends React.PureComponent {} };
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 29, 2, 65])],
     },
     {
       code: `
         const Connected = connect(mapStateToProps)(class extends React.PureComponent {});
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 52, 2, 88])],
     },
     // ---- Walk-up: nested class scu absorbs SCU on inner; outer reports ----
     {
@@ -766,7 +778,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 8, 10])],
     },
     // ---- Walk-up: createReactClass with nested ClassExpression that has
     // SCU. Inner ClassExpression absorbs SCU; outer createReactClass empty,
@@ -779,7 +791,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         })
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 26, 6, 10])],
     },
     // ---- Walk-up: top-level obj-with-SCU does NOT walk up to a class
     // declared in module scope. ----
@@ -788,7 +800,7 @@ ruleTester.run('require-optimization', {} as never, {
         const cfg = { shouldComponentUpdate() {} };
         class A extends React.Component {}
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([3, 9, 3, 43])],
     },
     // ---- SFC inside ClassDeclaration method body is reported (not auto-
     // silenced because `isFunctionInClass` blocks markSCU(self)). ----
@@ -802,7 +814,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([5, 13, 5, 50])],
     },
     {
       code: `
@@ -814,7 +826,7 @@ ruleTester.run('require-optimization', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([5, 27, 5, 41])],
     },
     // ---- Settings: pragma=Preact + Preact.Component without SCU ----
     {
@@ -822,7 +834,7 @@ ruleTester.run('require-optimization', {} as never, {
         class C extends Preact.Component {}
       `,
       settings: { react: { pragma: 'Preact' } },
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 9, 2, 44])],
     },
     // ---- Settings: createClass=myCreateClass empty obj ----
     {
@@ -830,7 +842,7 @@ ruleTester.run('require-optimization', {} as never, {
         myCreateClass({});
       `,
       settings: { react: { createClass: 'myCreateClass' } },
-      errors: [{ messageId: 'noShouldComponentUpdate' }],
+      errors: [expectNoShouldComponentUpdateError([2, 23, 2, 25])],
     },
   ],
 });

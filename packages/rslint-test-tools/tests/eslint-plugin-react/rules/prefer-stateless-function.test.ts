@@ -1,8 +1,20 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectComponentShouldBePureError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'componentShouldBePure',
+    'Component should be written as a pure function',
+    range,
+  );
+}
 
-ruleTester.run('prefer-stateless-function', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('prefer-stateless-function', {
   valid: [
     // ---- Already a stateless function ----
     {
@@ -223,6 +235,176 @@ ruleTester.run('prefer-stateless-function', {} as never, {
       `,
       options: [{ ignorePureComponents: true }],
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 11 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          constructor() {
+            foo;
+          }
+          render() {
+            return <div>{this.props.foo}</div>;
+          }
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 12 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          constructor(props)
+
+          render() {
+            return <div>{this.props.foo}</div>;
+          }
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 17 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          render() {
+            if (!this.props.foo) {
+              return null;
+            }
+            return <div>{this.props.foo}</div>;
+          }
+        }
+      `,
+      settings: { react: { version: '0.14.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 18 (7.37.5)',
+      code: `
+        var Foo = createReactClass({
+          render: function() {
+            if (!this.props.foo) {
+              return null;
+            }
+            return <div>{this.props.foo}</div>;
+          }
+        });
+      `,
+      settings: { react: { version: '0.14.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 19 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          render() {
+            return true ? <div /> : null;
+          }
+        }
+      `,
+      settings: { react: { version: '0.14.0' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 23 (7.37.5)',
+      code: `
+        @foo("bar")
+        class Foo extends React.Component {
+          render() {
+            return <div>{this.props.foo}</div>;
+          }
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 26 (7.37.5)',
+      code: `
+        import React, {PureComponent, PropTypes} from 'react'
+
+        export default function errorDecorator (options) {
+          return WrappedComponent => {
+            class Wrapper extends PureComponent {
+              static propTypes = {
+                error: PropTypes.string
+              }
+              render () {
+                const {error, ...props} = this.props
+                if (error) {
+                  return <div>Error! {error}</div>
+                } else {
+                  return <WrappedComponent {...props} />
+                }
+              }
+            }
+            return Wrapper
+          }
+        }
+      `,
+      options: [{ ignorePureComponents: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 27 (7.37.5)',
+      code: `
+        import React, {PureComponent, PropTypes} from 'react'
+
+        export default function errorDecorator (options) {
+          return WrappedComponent =>
+            class Wrapper extends PureComponent {
+              static propTypes = {
+                error: PropTypes.string
+              }
+              render () {
+                const {error, ...props} = this.props
+                if (error) {
+                  return <div>Error! {error}</div>
+                } else {
+                  return <WrappedComponent {...props} />
+                }
+              }
+            }
+        }
+      `,
+      options: [{ ignorePureComponents: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 28 (7.37.5)',
+      code: `
+        export default function errorDecorator (options) {
+          return WrappedComponent =>
+            class Wrapper extends React.PureComponent {
+              static propTypes = {
+                error: PropTypes.string
+              }
+              render () {
+                const {error, ...props} = this.props
+                if (error) {
+                  return <div>Error! {error}</div>
+                } else {
+                  return <WrappedComponent {...props} />
+                }
+              }
+            }
+        }
+      `,
+      options: [{ ignorePureComponents: true }],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 29 (7.37.5)',
+      code: `
+        /**
+         * @param a.
+         */
+        function Comp() {
+          return <a></a>
+        }
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     // ---- only uses this.props ----
@@ -234,7 +416,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- this['props'] ----
     {
@@ -245,7 +427,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- PureComponent without ignorePureComponents ----
     {
@@ -256,7 +438,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- PureComponent + props (default ignorePureComponents=false) ----
     {
@@ -267,7 +449,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- static get displayName ----
     {
@@ -281,7 +463,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- static displayName field ----
     {
@@ -293,7 +475,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 7, 10])],
     },
     // ---- static get propTypes ----
     {
@@ -309,7 +491,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 11, 10])],
     },
     // ---- static propTypes field ----
     {
@@ -323,7 +505,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- props with type annotation ----
     {
@@ -337,7 +519,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- useless constructor ----
     {
@@ -351,7 +533,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- destructures only props/context ----
     {
@@ -363,7 +545,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 7, 10])],
     },
     // ---- render returns null on default (>= 15) ----
     {
@@ -377,7 +559,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- createReactClass with null return ----
     {
@@ -391,7 +573,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 36, 9, 10])],
     },
     // ---- shorthand-if returning null at default (>= 15) ----
     {
@@ -402,7 +584,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- defaultProps as class field ----
     {
@@ -417,7 +599,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 10, 10])],
     },
     // ---- external Foo.defaultProps ----
     {
@@ -432,7 +614,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           foo: true
         };
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 7, 10])],
     },
     // ---- contextTypes static field ----
     {
@@ -447,7 +629,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 10, 10])],
     },
     // ---- bare Component (not React.Component) ----
     {
@@ -458,7 +640,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
     },
     // ---- ClassExpression assigned to var ----
     {
@@ -469,7 +651,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 19, 6, 10])],
     },
     // ---- useless constructor with super(...arguments) ----
     {
@@ -483,7 +665,7 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 9, 10])],
     },
     // ---- bare PureComponent without ignorePureComponents ----
     {
@@ -494,7 +676,61 @@ ruleTester.run('prefer-stateless-function', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'componentShouldBePure' }],
+      errors: [expectComponentShouldBePureError([2, 9, 6, 10])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 15 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          static get defaultProps() {
+            return {
+              foo: true
+            };
+          }
+          render() {
+            const { foo } = this.props;
+            return foo ? <div /> : null;
+          }
+        }
+      `,
+      errors: [expectComponentShouldBePureError([2, 9, 12, 10])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 18 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          static get contextTypes() {
+            return {
+              foo: PropTypes.boolean
+            };
+          }
+          render() {
+            const { foo } = this.context;
+            return foo ? <div /> : null;
+          }
+        }
+      `,
+      errors: [expectComponentShouldBePureError([2, 9, 12, 10])],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 19 (7.37.5)',
+      code: `
+        class Foo extends React.Component {
+          render() {
+            const { foo } = this.context;
+            return foo ? <div /> : null;
+          }
+        }
+        Foo.contextTypes = {
+          foo: PropTypes.boolean
+        };
+      `,
+      errors: [expectComponentShouldBePureError([2, 9, 7, 10])],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

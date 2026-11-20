@@ -1,8 +1,18 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectDangerousPropError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'dangerousProp',
+    "Dangerous property 'dangerouslySetInnerHTML' found",
+    range,
+  );
+}
 
-ruleTester.run('no-danger', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-danger', {
   valid: [
     // ---- Upstream valid cases ----
     { code: `<App />;` },
@@ -75,16 +85,12 @@ ruleTester.run('no-danger', {} as never, {
     // ---- Upstream invalid cases ----
     {
       code: `<div dangerouslySetInnerHTML={{ __html: "" }}></div>;`,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 6, 1, 46])],
     },
     {
       code: `<App dangerouslySetInnerHTML={{ __html: "<span>hello</span>" }} />;`,
       options: [{ customComponentNames: ['*'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 6, 1, 64])],
     },
     {
       code: `
@@ -93,9 +99,7 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['Title'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([3, 25, 3, 83])],
     },
     {
       code: `
@@ -104,9 +108,7 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['*Foo'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([3, 27, 3, 85])],
     },
     {
       code: `
@@ -115,9 +117,7 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['Foo*'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([3, 27, 3, 85])],
     },
     {
       code: `
@@ -126,9 +126,7 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['*MUI'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([3, 27, 3, 85])],
     },
     {
       code: `
@@ -149,9 +147,9 @@ ruleTester.run('no-danger', {} as never, {
       `,
       options: [{ customComponentNames: ['*'] }],
       errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
+        expectDangerousPropError([7, 20, 7, 74]),
+        expectDangerousPropError([8, 21, 8, 75]),
+        expectDangerousPropError([11, 17, 11, 71]),
       ],
     },
 
@@ -160,16 +158,12 @@ ruleTester.run('no-danger', {} as never, {
     // Boolean-shorthand dangerous prop still reports.
     {
       code: `<div dangerouslySetInnerHTML />;`,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 6, 1, 29])],
     },
     // Attribute on its own line.
     {
       code: `<div\n\tdangerouslySetInnerHTML={{ __html: '' }}\n/>;`,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([2, 2, 2, 42])],
     },
     // Deeply-nested member tag matched via '*'.
     {
@@ -181,40 +175,30 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['*'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([5, 25, 5, 65])],
     },
     // One matching pattern is enough in a multi-pattern list.
     {
       code: `<Widget dangerouslySetInnerHTML={{ __html: "" }} />;`,
       options: [{ customComponentNames: ['Foo*', 'Widget', 'Bar*'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 9, 1, 49])],
     },
     // Spread attribute co-located with the dangerous prop — still detects.
     {
       code: `const props: any = {}; const x = <div {...props} dangerouslySetInnerHTML={{ __html: "" }} />;`,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 50, 1, 90])],
     },
     // `?` glob wildcard.
     {
       code: `<TextMUI dangerouslySetInnerHTML={{ __html: "" }} />;`,
       options: [{ customComponentNames: ['Text???'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 10, 1, 50])],
     },
     // Literal `.` — exact-dot match on a member tag.
     {
       code: `<Foo.Bar dangerouslySetInnerHTML={{ __html: "" }} />;`,
       options: [{ customComponentNames: ['Foo.Bar'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 10, 1, 50])],
     },
     // Generic component `<Foo<T> ...>`.
     {
@@ -225,16 +209,12 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['Foo'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([4, 31, 4, 71])],
     },
     // JSX namespaced element `<svg:path>` — intrinsic DOM.
     {
       code: `<svg:path dangerouslySetInnerHTML={{ __html: "" }} />;`,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([1, 11, 1, 51])],
     },
     // LOWERCASE-base member tag `<foo.bar>` — `isDOMComponent` matches on
     // the first character of elementType, so it's DOM-classified and fires
@@ -247,9 +227,7 @@ ruleTester.run('no-danger', {} as never, {
           return <foo.bar dangerouslySetInnerHTML={{ __html: "" }} />;
         }
       `,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([5, 27, 5, 67])],
     },
     // `<this.Foo>` — elementType returns "this.Foo", first char lowercase →
     // DOM-classified.
@@ -261,9 +239,7 @@ ruleTester.run('no-danger', {} as never, {
           }
         }
       `,
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([4, 34, 4, 74])],
     },
     // Locks "Differences from ESLint" #1: deep-member tag matched by its
     // full dotted name. eslint-plugin-react would compute "undefined.C" and
@@ -277,9 +253,7 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['A.B.C'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([5, 25, 5, 65])],
     },
     {
       code: `
@@ -290,18 +264,49 @@ ruleTester.run('no-danger', {} as never, {
         }
       `,
       options: [{ customComponentNames: ['A.*'] }],
-      errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
-      ],
+      errors: [expectDangerousPropError([5, 25, 5, 65])],
     },
     // Locks "Differences from ESLint" #2: namespaced tag matched by a
     // literal `"ns:name"` pattern via the customComponentNames branch.
     {
       code: `<svg:path dangerouslySetInnerHTML={{ __html: "" }} />;`,
       options: [{ customComponentNames: ['svg:path'] }],
+      errors: [expectDangerousPropError([1, 11, 1, 51])],
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 6 (7.37.5)',
+      code: `
+        import type { ComponentProps } from "react";
+
+        const Comp = "div";
+        const Component = () => <></>;
+
+        const NestedComponent = (_props: ComponentProps<"div">) => <></>;
+
+        Component.NestedComponent = NestedComponent;
+
+        function App() {
+          return (
+            <>
+              <div dangerouslySetInnerHTML={{ __html: "<div>aaa</div>" }} />
+              <Comp dangerouslySetInnerHTML={{ __html: "<div>aaa</div>" }} />
+
+              <Component.NestedComponent
+                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}
+              />
+            </>
+          );
+        }
+      `,
+      options: [{ customComponentNames: ['*'] }],
       errors: [
-        { message: "Dangerous property 'dangerouslySetInnerHTML' found" },
+        expectDangerousPropError([14, 20, 14, 74]),
+        expectDangerousPropError([15, 21, 15, 75]),
+        expectDangerousPropError([18, 17, 18, 71]),
       ],
+      languageOptions: upstreamModuleOptions,
     },
   ],
 });

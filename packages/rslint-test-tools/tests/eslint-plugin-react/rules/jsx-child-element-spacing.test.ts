@@ -1,8 +1,26 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamES2015Options } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectSpacingBeforeNextError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'spacingBeforeNext',
+    'Ambiguous spacing before next element a',
+    range,
+  );
+}
 
-ruleTester.run('jsx-child-element-spacing', {} as never, {
+function expectSpacingAfterPrevError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'spacingAfterPrev',
+    'Ambiguous spacing after previous element a',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-child-element-spacing', {
   valid: [
     // ---- Upstream: text-only child ----
     {
@@ -239,6 +257,47 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
         </App>
       `,
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 15 (7.37.5)',
+      code: `
+        <App>
+          <a>
+            <b>nested1</b>
+            <b>nested2</b>
+          </a>
+        </App>
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 16 (7.37.5)',
+      code: `
+        <App>
+          A
+          B
+        </App>
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 18 (7.37.5)',
+      code: `
+        <App>
+          A<br/>
+          B
+        </App>
+      `,
+      languageOptions: upstreamES2015Options,
+    },
+    {
+      name: 'Upstream valid 20 (7.37.5)',
+      code: `
+        <App>A<br/>B</App>
+      `,
+      languageOptions: upstreamES2015Options,
+    },
   ],
   invalid: [
     // ---- Upstream: text before inline element on a new line ----
@@ -249,7 +308,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <a>bar</a>
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [expectSpacingBeforeNextError([4, 11, 4, 11])],
     },
     // ---- Upstream: same as above but inside a fragment ----
     {
@@ -259,7 +318,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <a>bar</a>
         </>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [expectSpacingBeforeNextError([4, 11, 4, 11])],
     },
     // ---- Upstream: inline element followed by text on a new line ----
     {
@@ -269,7 +328,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           baz
         </App>
       `,
-      errors: [{ messageId: 'spacingAfterPrev' }],
+      errors: [expectSpacingAfterPrevError([3, 21, 3, 21])],
     },
     // ---- Upstream: explicit {' '} before inline element doesn't suppress
     // the spacingAfterPrev report when the next text starts with newline ----
@@ -280,7 +339,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           baz
         </App>
       `,
-      errors: [{ messageId: 'spacingAfterPrev' }],
+      errors: [expectSpacingAfterPrevError([3, 26, 3, 26])],
     },
     // ---- Upstream: sentence split before inline link ----
     {
@@ -290,7 +349,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <a href="https://js.org">this link</a>.
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [expectSpacingBeforeNextError([4, 11, 4, 11])],
     },
     // ---- Upstream: text between two inline <code> elements anchors on the
     // SECOND element via spacingBeforeNext ----
@@ -301,7 +360,13 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <code>if</code> statements.
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [
+        diagnostic(
+          'spacingBeforeNext',
+          'Ambiguous spacing before next element code',
+          [4, 11, 4, 11],
+        ),
+      ],
     },
     // ---- Upstream: two separate spacingBeforeNext reports in a row ----
     {
@@ -313,8 +378,8 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
         </App>
       `,
       errors: [
-        { messageId: 'spacingBeforeNext' },
-        { messageId: 'spacingBeforeNext' },
+        expectSpacingBeforeNextError([4, 11, 4, 11]),
+        expectSpacingBeforeNextError([5, 11, 5, 11]),
       ],
     },
     // ---- Edge: spacingAfterPrev inside a JsxFragment ----
@@ -325,7 +390,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           baz
         </>
       `,
-      errors: [{ messageId: 'spacingAfterPrev' }],
+      errors: [expectSpacingAfterPrevError([3, 21, 3, 21])],
     },
     // ---- Edge: text between two inline elements where the text matches the
     // FOLLOWING pattern (starts with newline + content) — anchors on the FIRST
@@ -337,7 +402,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           mid <b>y</b>
         </App>
       `,
-      errors: [{ messageId: 'spacingAfterPrev' }],
+      errors: [expectSpacingAfterPrevError([3, 19, 3, 19])],
     },
     // ---- Edge: self-closing inline element followed by text on a new line ----
     {
@@ -347,7 +412,13 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           baz
         </App>
       `,
-      errors: [{ messageId: 'spacingAfterPrev' }],
+      errors: [
+        diagnostic(
+          'spacingAfterPrev',
+          'Ambiguous spacing after previous element img',
+          [3, 17, 3, 17],
+        ),
+      ],
     },
     // ---- Edge: text before self-closing inline element on a new line ----
     {
@@ -357,7 +428,13 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <input/>
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [
+        diagnostic(
+          'spacingBeforeNext',
+          'Ambiguous spacing before next element input',
+          [4, 11, 4, 11],
+        ),
+      ],
     },
     // ---- Edge: nested element reports independently — only inner <p> matches ----
     {
@@ -369,7 +446,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           </p>
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [expectSpacingBeforeNextError([5, 13, 5, 13])],
     },
     // ---- Edge: real-world arrow component with bad link spacing ----
     {
@@ -381,7 +458,7 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           </p>
         );
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [expectSpacingBeforeNextError([5, 13, 5, 13])],
     },
     // ---- Edge: outer + inner JsxElement BOTH host a bug — two diagnostics ----
     {
@@ -396,8 +473,12 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
         </App>
       `,
       errors: [
-        { messageId: 'spacingAfterPrev' },
-        { messageId: 'spacingBeforeNext' },
+        expectSpacingBeforeNextError([5, 13, 5, 13]),
+        diagnostic(
+          'spacingAfterPrev',
+          'Ambiguous spacing after previous element span',
+          [7, 25, 7, 25],
+        ),
       ],
     },
     // ---- Edge: textarea (uncommon inline tag) before text on a new line ----
@@ -408,7 +489,13 @@ ruleTester.run('jsx-child-element-spacing', {} as never, {
           <textarea/>
         </App>
       `,
-      errors: [{ messageId: 'spacingBeforeNext' }],
+      errors: [
+        diagnostic(
+          'spacingBeforeNext',
+          'Ambiguous spacing before next element textarea',
+          [4, 11, 4, 11],
+        ),
+      ],
     },
   ],
 });

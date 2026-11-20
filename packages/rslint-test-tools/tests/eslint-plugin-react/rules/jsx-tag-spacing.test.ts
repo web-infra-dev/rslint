@@ -1,8 +1,10 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/jsx-tag-spacing.js
 // Retain the upstream parser cases below. tsgo cannot parse `< /Tag>`, so
-// only those inputs are filtered out; the Go suite records the same skips.
+// those inputs are retained with explicit skip reasons, matching the Go suite.
 // Intentional differences for unsafe fixes and proportional spacing are noted below.
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
 
 // generate options object that disables checks other than the tested one
 
@@ -54,8 +56,66 @@ function beforeClosingOptions(option: string) {
 // Tests
 // -----------------------------------------------------------------------------
 
-const ruleTester = new RuleTester();
-ruleTester.run('jsx-tag-spacing', {} as never, {
+function expectBeforeCloseNeedSpaceError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'beforeCloseNeedSpace',
+    'Whitespace is required before closing bracket',
+    range,
+  );
+}
+
+function expectBeforeSelfCloseNeedSpaceError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'beforeSelfCloseNeedSpace',
+    'A space is required before closing bracket',
+    range,
+  );
+}
+
+function expectBeforeSelfCloseNoSpaceError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'beforeSelfCloseNoSpace',
+    'A space is forbidden before closing bracket',
+    range,
+  );
+}
+
+function expectAfterOpenNoSpaceError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'afterOpenNoSpace',
+    'A space is forbidden after opening bracket',
+    range,
+  );
+}
+
+function expectAfterOpenNeedSpaceError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'afterOpenNeedSpace',
+    'A space is required after opening bracket',
+    range,
+  );
+}
+
+function expectBeforeCloseNoSpaceError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'beforeCloseNoSpace',
+    'A space is forbidden before closing bracket',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+ruleTester.run('jsx-tag-spacing', {
   valid: [
     {
       code: '<App />',
@@ -159,11 +219,7 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
       code: '<div className="bar"></ div>;',
       options: closingSlashOptions('never'),
     },
-    {
-      code: '<App prop="foo">< /App>',
-      options: closingSlashOptions('always'),
-      features: ['no-ts'],
-    },
+
     {
       code: '<p/ >',
       options: closingSlashOptions('always'),
@@ -179,7 +235,6 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
     {
       code: '< App></ App>',
       options: afterOpeningOptions('always'),
-      features: ['no-ts'],
     },
     {
       code: '< App/>',
@@ -262,7 +317,23 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
         },
       ],
     },
-  ].filter(({ code }) => !/<\s+\//u.test(code)),
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 22 (7.37.5)',
+      skip: "The native TypeScript parser rejects this JSX form (JSX element 'App' has no corresponding closing tag.); upstream uses a different parser.",
+      code: `<App prop="foo">< /App>`,
+      options: [
+        {
+          closingSlash: 'always',
+          beforeSelfClosing: 'allow',
+          afterOpening: 'allow',
+          beforeClosing: 'allow',
+        },
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+  ],
 
   invalid: [
     {
@@ -277,62 +348,62 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
           hello
         </App>
       `,
-      errors: [{ messageId: 'beforeCloseNeedSpace' }],
+      errors: [expectBeforeCloseNeedSpaceError([2, 23, 2, 23])],
       options: beforeClosingOptions('proportional-always'),
     },
     {
       code: '<App/>',
       output: '<App />',
       options: beforeSelfClosingOptions('always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 5, 1, 5])],
     },
     {
       code: '<App foo/>',
       output: '<App foo />',
       options: beforeSelfClosingOptions('always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 9, 1, 9])],
     },
     {
       code: '<App foo={bar}/>',
       output: '<App foo={bar} />',
       options: beforeSelfClosingOptions('always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 15, 1, 15])],
     },
     {
       code: '<App {...props}/>',
       output: '<App {...props} />',
       options: beforeSelfClosingOptions('always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 16, 1, 16])],
     },
     {
       code: '<App />',
       output: '<App/>',
       options: beforeSelfClosingOptions('never'),
-      errors: [{ messageId: 'beforeSelfCloseNoSpace' }],
+      errors: [expectBeforeSelfCloseNoSpaceError([1, 6, 1, 6])],
     },
     {
       code: '<App foo />',
       output: '<App foo/>',
       options: beforeSelfClosingOptions('never'),
-      errors: [{ messageId: 'beforeSelfCloseNoSpace' }],
+      errors: [expectBeforeSelfCloseNoSpaceError([1, 10, 1, 10])],
     },
     {
       code: '<App foo={bar} />',
       output: '<App foo={bar}/>',
       options: beforeSelfClosingOptions('never'),
-      errors: [{ messageId: 'beforeSelfCloseNoSpace' }],
+      errors: [expectBeforeSelfCloseNoSpaceError([1, 16, 1, 16])],
     },
     {
       code: '<App/>',
       output: '<App />',
       options: beforeSelfClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 5, 1, 5])],
     },
     {
       code: '<App foo/>',
       output: '<App foo />',
       options: beforeSelfClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedSpace' }],
+      errors: [expectBeforeSelfCloseNeedSpaceError([1, 9, 1, 9])],
     },
     {
       code: `
@@ -343,7 +414,13 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
           foo={bar}
 />`,
       options: beforeSelfClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedNewline' }],
+      errors: [
+        diagnostic(
+          'beforeSelfCloseNeedNewline',
+          'A newline is required before closing bracket',
+          [3, 20, 3, 20],
+        ),
+      ],
     },
     {
       code: `
@@ -354,7 +431,13 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
           foo={bar}${' '}
 />`,
       options: beforeSelfClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeSelfCloseNeedNewline' }],
+      errors: [
+        diagnostic(
+          'beforeSelfCloseNeedNewline',
+          'A newline is required before closing bracket',
+          [3, 20, 3, 20],
+        ),
+      ],
     },
     {
       code: `
@@ -373,7 +456,13 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
         </App>
       `,
       options: beforeClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeCloseNeedNewline' }],
+      errors: [
+        diagnostic(
+          'beforeCloseNeedNewline',
+          'A newline is required before closing bracket',
+          [4, 15, 4, 15],
+        ),
+      ],
     },
     {
       code: `
@@ -390,18 +479,30 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
         </App>
       `,
       options: beforeClosingOptions('proportional-always'),
-      errors: [{ messageId: 'beforeCloseNeedNewline' }],
+      errors: [
+        diagnostic(
+          'beforeCloseNeedNewline',
+          'A newline is required before closing bracket',
+          [3, 20, 3, 20],
+        ),
+      ],
     },
     {
       code: '<App {...props} />',
       output: '<App {...props}/>',
       options: beforeSelfClosingOptions('never'),
-      errors: [{ messageId: 'beforeSelfCloseNoSpace' }],
+      errors: [expectBeforeSelfCloseNoSpaceError([1, 17, 1, 17])],
     },
     {
       code: '<App/ >;',
       output: '<App/>;',
-      errors: [{ messageId: 'selfCloseSlashNoSpace' }],
+      errors: [
+        diagnostic(
+          'selfCloseSlashNoSpace',
+          'Whitespace is forbidden between `/` and `>`; write `/>`',
+          [1, 5, 1, 8],
+        ),
+      ],
       options: closingSlashOptions('never'),
     },
     {
@@ -412,66 +513,65 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
       output: `
         <App_selfCloseSlashNoSpace/>
       `,
-      errors: [{ messageId: 'selfCloseSlashNoSpace' }],
+      errors: [
+        diagnostic(
+          'selfCloseSlashNoSpace',
+          'Whitespace is forbidden between `/` and `>`; write `/>`',
+          [2, 35, 3, 10],
+        ),
+      ],
       options: closingSlashOptions('never'),
     },
-    {
-      code: '<div className="bar">< /div>;',
-      output: '<div className="bar"></div>;',
-      errors: [{ messageId: 'closeSlashNoSpace' }],
-      options: closingSlashOptions('never'),
-      features: ['no-ts'],
-    },
-    {
-      code: `
-        <div className="bar"><
-        /div>;
-      `,
-      output: `
-        <div className="bar"></div>;
-      `,
-      errors: [{ messageId: 'closeSlashNoSpace' }],
-      options: closingSlashOptions('never'),
-      features: ['no-ts'],
-    },
+
     {
       code: '<App prop="foo"></App>',
       // Upstream inserts `< /App>`; rslint omits this unparseable fix.
-      output: null,
-      errors: [{ messageId: 'closeSlashNeedSpace' }],
+
+      errors: [
+        diagnostic(
+          'closeSlashNeedSpace',
+          'Whitespace is required between `<` and `/`; write `< /`',
+          [1, 17, 1, 19],
+        ),
+      ],
       options: closingSlashOptions('always'),
-      features: ['no-ts'],
     },
     {
       code: '<p/>',
       output: '<p/ >',
-      errors: [{ messageId: 'selfCloseSlashNeedSpace' }],
+      errors: [
+        diagnostic(
+          'selfCloseSlashNeedSpace',
+          'Whitespace is required between `/` and `>`; write `/ >`',
+          [1, 3, 1, 5],
+        ),
+      ],
       options: closingSlashOptions('always'),
     },
     {
       code: '< App/>',
       output: '<App/>',
-      errors: [{ messageId: 'afterOpenNoSpace' }],
+      errors: [expectAfterOpenNoSpaceError([1, 1, 1, 3])],
       options: afterOpeningOptions('never'),
     },
     {
       code: '< App></App>',
       output: '<App></App>',
-      errors: [{ messageId: 'afterOpenNoSpace' }],
+      errors: [expectAfterOpenNoSpaceError([1, 1, 1, 3])],
       options: afterOpeningOptions('never'),
     },
     {
       code: '<App></ App>',
       output: '<App></App>',
-      errors: [{ messageId: 'afterOpenNoSpace' }],
+      errors: [expectAfterOpenNoSpaceError([1, 7, 1, 9])],
       options: afterOpeningOptions('never'),
     },
     {
       code: '< App></ App>',
       output: '<App></App>',
       errors: [
-        { messageId: 'afterOpenNoSpace' },
-        { messageId: 'afterOpenNoSpace' },
+        expectAfterOpenNoSpaceError([1, 1, 1, 3]),
+        expectAfterOpenNoSpaceError([1, 8, 1, 10]),
       ],
       options: afterOpeningOptions('never'),
     },
@@ -483,52 +583,52 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
       output: `
         <App1/>
       `,
-      errors: [{ messageId: 'afterOpenNoSpace' }],
+      errors: [expectAfterOpenNoSpaceError([2, 9, 3, 9])],
       options: afterOpeningOptions('never'),
     },
     {
       code: '<App2></ App2>',
       output: '< App2></ App2>',
-      errors: [{ messageId: 'afterOpenNeedSpace' }],
+      errors: [expectAfterOpenNeedSpaceError([1, 1, 1, 2])],
       options: afterOpeningOptions('always'),
     },
     {
       code: '< App3></App3>',
       output: '< App3></ App3>',
-      errors: [{ messageId: 'afterOpenNeedSpace' }],
+      errors: [expectAfterOpenNeedSpaceError([1, 9, 1, 10])],
       options: afterOpeningOptions('always'),
     },
     {
       code: '<App4></App4>',
       output: '< App4></ App4>',
       errors: [
-        { messageId: 'afterOpenNeedSpace' },
-        { messageId: 'afterOpenNeedSpace' },
+        expectAfterOpenNeedSpaceError([1, 1, 1, 2]),
+        expectAfterOpenNeedSpaceError([1, 8, 1, 9]),
       ],
       options: afterOpeningOptions('always'),
     },
     {
       code: '<App5/>',
       output: '< App5/>',
-      errors: [{ messageId: 'afterOpenNeedSpace' }],
+      errors: [expectAfterOpenNeedSpaceError([1, 1, 1, 2])],
       options: afterOpeningOptions('always'),
     },
     {
       code: '< App6/>',
       output: '<App6/>',
-      errors: [{ messageId: 'afterOpenNoSpace' }],
+      errors: [expectAfterOpenNoSpaceError([1, 1, 1, 3])],
       options: afterOpeningOptions('allow-multiline'),
     },
     {
       code: '<App7 ></App7>',
       output: '<App7></App7>',
-      errors: [{ messageId: 'beforeCloseNoSpace' }],
+      errors: [expectBeforeCloseNoSpaceError([1, 6, 1, 7])],
       options: beforeClosingOptions('never'),
     },
     {
       code: '<App8></App8 >',
       output: '<App8></App8>',
-      errors: [{ messageId: 'beforeCloseNoSpace' }],
+      errors: [expectBeforeCloseNoSpaceError([1, 13, 1, 14])],
       options: beforeClosingOptions('never'),
     },
     {
@@ -544,19 +644,19 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
         >
         </App9>
       `,
-      errors: [{ messageId: 'beforeCloseNoSpace' }],
+      errors: [expectBeforeCloseNoSpaceError([5, 15, 5, 16])],
       options: beforeClosingOptions('never'),
     },
     {
       code: '<App10></App10 >',
       output: '<App10 ></App10 >',
-      errors: [{ messageId: 'beforeCloseNeedSpace' }],
+      errors: [expectBeforeCloseNeedSpaceError([1, 7, 1, 7])],
       options: beforeClosingOptions('always'),
     },
     {
       code: '<App11 ></App11>',
       output: '<App11 ></App11 >',
-      errors: [{ messageId: 'beforeCloseNeedSpace' }],
+      errors: [expectBeforeCloseNeedSpaceError([1, 16, 1, 16])],
       options: beforeClosingOptions('always'),
     },
     {
@@ -572,8 +672,80 @@ ruleTester.run('jsx-tag-spacing', {} as never, {
         >
         </App12 >
       `,
-      errors: [{ messageId: 'beforeCloseNeedSpace' }],
+      errors: [expectBeforeCloseNeedSpaceError([5, 16, 5, 16])],
       options: beforeClosingOptions('always'),
     },
-  ].filter(({ code }) => !/<\s+\//u.test(code)),
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream invalid 16 (7.37.5)',
+      skip: "The native TypeScript parser rejects this JSX form (JSX element 'div' has no corresponding closing tag.); upstream uses a different parser.",
+      // Preserve the historical fixture without inventing native diagnostics.
+      create: () => {
+        throw new Error(
+          JSON.stringify({
+            code: '<div className="bar">< /div>;',
+            options: [
+              {
+                closingSlash: 'never',
+                beforeSelfClosing: 'allow',
+                afterOpening: 'allow',
+                beforeClosing: 'allow',
+              },
+            ],
+            settings: {},
+            parserOptions: {
+              ecmaVersion: 2018,
+              sourceType: 'module',
+              ecmaFeatures: {
+                jsx: true,
+              },
+            },
+            features: ['no-ts'],
+            upstreamErrors: [
+              {
+                messageId: 'closeSlashNoSpace',
+              },
+            ],
+            upstreamOutput: '<div className="bar"></div>;',
+          }),
+        );
+      },
+    },
+    {
+      name: 'Upstream invalid 17 (7.37.5)',
+      skip: "The native TypeScript parser rejects this JSX form (JSX element 'div' has no corresponding closing tag.); upstream uses a different parser.",
+      // Preserve the historical fixture without inventing native diagnostics.
+      create: () => {
+        throw new Error(
+          JSON.stringify({
+            code: '\n        <div className="bar"><\n        /div>;\n      ',
+            options: [
+              {
+                closingSlash: 'never',
+                beforeSelfClosing: 'allow',
+                afterOpening: 'allow',
+                beforeClosing: 'allow',
+              },
+            ],
+            settings: {},
+            parserOptions: {
+              ecmaVersion: 2018,
+              sourceType: 'module',
+              ecmaFeatures: {
+                jsx: true,
+              },
+            },
+            features: ['no-ts'],
+            upstreamErrors: [
+              {
+                messageId: 'closeSlashNoSpace',
+              },
+            ],
+            upstreamOutput: '\n        <div className="bar"></div>;\n      ',
+          }),
+        );
+      },
+    },
+  ],
 });

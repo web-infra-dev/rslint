@@ -1,4 +1,6 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
 const parserOptions = {
   ecmaVersion: 2018,
@@ -8,9 +10,89 @@ const parserOptions = {
   },
 };
 
-const ruleTester = new RuleTester();
+function expectMoveToNewLineError1(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`{"foo"}` must be placed on a new line',
+    range,
+  );
+}
 
-ruleTester.run('jsx-one-expression-per-line', {} as never, {
+function expectMoveToNewLineError2(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`{"bar"}` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError3(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`Bar` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError4(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    "`{ I18n.t('baz') }` must be placed on a new line",
+    range,
+  );
+}
+
+function expectMoveToNewLineError5(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`Baz` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError6(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`input` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError7(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`Foo` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError8(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '` baz        ` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError9(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`{          foo        }` must be placed on a new line',
+    range,
+  );
+}
+
+function expectMoveToNewLineError10(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'moveToNewLine',
+    '`button` must be placed on a new line',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('jsx-one-expression-per-line', {
   valid: [
     {
       code: '<App />',
@@ -164,7 +246,6 @@ ruleTester.run('jsx-one-expression-per-line', {} as never, {
     },
     {
       code: '<></>',
-      features: ['fragment'],
     },
     {
       code: `
@@ -172,7 +253,7 @@ ruleTester.run('jsx-one-expression-per-line', {} as never, {
           <Foo />
         </>
       `,
-      features: ['fragment', 'no-ts-old'], // TODO: FIXME: remove no-ts-old and fix
+      // TODO: FIXME: remove no-ts-old and fix
     },
     {
       code: `
@@ -181,7 +262,7 @@ ruleTester.run('jsx-one-expression-per-line', {} as never, {
           <Bar />
         </>
       `,
-      features: ['fragment', 'no-ts-old'], // TODO: FIXME: remove no-ts-old and fix
+      // TODO: FIXME: remove no-ts-old and fix
     },
     {
       code: '<App>Hello {name}</App>',
@@ -227,13 +308,8 @@ ruleTester.run('jsx-one-expression-per-line', {} as never, {
 {"foo"}
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"foo"}' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError1([2, 14, 2, 21])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -245,12 +321,13 @@ foo
 </App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'foo' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`foo` must be placed on a new line',
+          [2, 14, 2, 17],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -265,13 +342,8 @@ foo
 {"bar"}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"bar"}' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError2([3, 15, 3, 22])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -287,12 +359,13 @@ bar
 </div>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' bar        ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '` bar        ` must be placed on a new line',
+          [3, 18, 4, 9],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -306,13 +379,8 @@ bar
 <Bar />
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([3, 18, 3, 25])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -327,12 +395,13 @@ foo
 </div>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'foo        ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`foo        ` must be placed on a new line',
+          [3, 19, 4, 9],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -346,13 +415,8 @@ foo
 {"foo"}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"foo"}' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError1([3, 19, 3, 26])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -367,13 +431,8 @@ foo
 { I18n.t('baz') }
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: "{ I18n.t('baz') }" },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError4([3, 19, 3, 36])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -389,20 +448,19 @@ foo
 </Text>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{ bar }' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Text' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: "{ I18n.t('baz') }" },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`{ bar }` must be placed on a new line',
+          [2, 34, 2, 41],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`Text` must be placed on a new line',
+          [2, 42, 2, 49],
+        ),
+        expectMoveToNewLineError4([2, 50, 2, 67]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -417,16 +475,10 @@ foo
 </Text>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Baz' },
-        },
+        expectMoveToNewLineError3([2, 35, 2, 41]),
+        expectMoveToNewLineError5([2, 42, 2, 48]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -446,24 +498,20 @@ foo
  </Text>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Baz' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bunk' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bruno' },
-        },
+        expectMoveToNewLineError3([2, 35, 2, 41]),
+        expectMoveToNewLineError5([2, 42, 2, 48]),
+        diagnostic(
+          'moveToNewLine',
+          '`Bunk` must be placed on a new line',
+          [2, 49, 2, 56],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`Bruno` must be placed on a new line',
+          [2, 57, 2, 65],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -475,13 +523,8 @@ foo
 <Bar />
 </Text>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([2, 35, 2, 42])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -494,13 +537,8 @@ foo
 <Bar />
         </Text>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([2, 35, 2, 42])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -515,13 +553,8 @@ foo
 <Baz />
         </Text>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Baz' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError5([3, 19, 3, 26])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -536,14 +569,9 @@ foo
 <Baz />
         </Text>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Baz' },
-        },
-      ],
+      errors: [expectMoveToNewLineError5([3, 19, 3, 26])],
       options: [{ allow: 'non-jsx' }],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -558,13 +586,8 @@ foo
 { I18n.t('baz') }
         </Text>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: "{ I18n.t('baz') }" },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError4([3, 19, 3, 36])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -578,13 +601,8 @@ foo
 <input />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'input' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError6([3, 14, 3, 23])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -599,12 +617,13 @@ foo
         </div>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'span' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`span` must be placed on a new line',
+          [3, 18, 3, 26],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -619,13 +638,8 @@ foo
 <input />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'input' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError6([3, 15, 3, 24])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -641,12 +655,13 @@ foo
 </div>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' foo        ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '` foo        ` must be placed on a new line',
+          [3, 20, 4, 9],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -661,13 +676,8 @@ foo
 <input />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'input' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError6([3, 20, 3, 29])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -683,13 +693,8 @@ foo
 <input />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'input' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError6([4, 14, 4, 23])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -704,13 +709,8 @@ foo
 <input />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'input' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError6([3, 19, 3, 28])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -725,13 +725,8 @@ foo
 {"foo"}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"foo"}' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError1([3, 21, 3, 28])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -745,13 +740,8 @@ foo
 <Bar></Bar>
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([3, 22, 3, 33])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -763,13 +753,8 @@ foo
         <Foo></Foo>
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 9, 3, 20])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -781,13 +766,8 @@ foo
 <Foo />
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([2, 14, 2, 21])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -799,13 +779,8 @@ foo
         <Foo/>
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 9, 3, 15])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -819,13 +794,8 @@ foo
         />
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([2, 14, 3, 11])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -839,13 +809,8 @@ foo
         <Foo />
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([4, 9, 4, 16])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -861,13 +826,8 @@ foo
         />
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([4, 9, 5, 11])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -881,13 +841,8 @@ foo
 <Foo />
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 10, 3, 17])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -901,13 +856,8 @@ foo
         >
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 11, 4, 10])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -921,13 +871,8 @@ foo
         Foo>
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 11, 4, 13])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -943,13 +888,8 @@ foo
 <Bar />
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([4, 13, 4, 20])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -965,13 +905,8 @@ foo
 </Foo>
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Bar' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError3([4, 13, 4, 20])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -993,12 +928,13 @@ baz
         </App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' baz ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '` baz ` must be placed on a new line',
+          [4, 18, 4, 23],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // Would be nice to handle in one pass, but multipass works fine.
@@ -1007,24 +943,21 @@ baz
           foo {"bar"} baz
         </App>
       `,
+      // Assert the complete output after all autofix rounds.
       output: `
         <App>
-          foo${' ' /* intentional trailing space */}
+          foo\x20
 {' '}
-{"bar"} baz
-        </App>
+{"bar"}
+{' '}
+baz
+</App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"bar"}' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' baz        ' },
-        },
+        expectMoveToNewLineError2([3, 15, 3, 22]),
+        expectMoveToNewLineError8([3, 22, 4, 9]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // Would be nice to handle in one pass, but multipass works fine.
@@ -1040,13 +973,8 @@ baz
 {"bar"}
         </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"bar"}' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError2([3, 15, 3, 22])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // Would be nice to handle in one pass, but multipass works fine.
@@ -1066,13 +994,8 @@ baz
 baz
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' baz        ' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError8([5, 16, 6, 9])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // Would be nice to handle in one pass, but multipass works fine.
@@ -1083,26 +1006,23 @@ baz
 
         </App>
       `,
+      // Assert the complete output after all autofix rounds.
       output: `
         <App>
 
-          foo${' ' /* intentional trailing space */}
+          foo\x20
 {' '}
-{"bar"} baz
+{"bar"}
+{' '}
+baz
 
-        </App>
+</App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"bar"}' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' baz        ' },
-        },
+        expectMoveToNewLineError2([4, 15, 4, 22]),
+        expectMoveToNewLineError8([4, 22, 6, 9]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // Would be nice to handle in one pass, but multipass works fine.
@@ -1126,13 +1046,8 @@ baz
 
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: ' baz        ' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError8([6, 16, 8, 9])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1147,13 +1062,8 @@ baz
         }
 </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{          foo        }' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError9([2, 14, 4, 10])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1170,13 +1080,8 @@ baz
 {' '}
  </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{          foo        }' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError9([2, 15, 4, 10])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1195,13 +1100,8 @@ baz
 {' '}
  </App>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{          foo        }' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError9([4, 9, 6, 10])],
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1213,12 +1113,7 @@ baz
 </App>
       `,
       options: [{ allow: 'none' }],
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
+      errors: [expectMoveToNewLineError7([2, 14, 2, 21])],
     },
     {
       code: `
@@ -1231,10 +1126,11 @@ foo
       `,
       options: [{ allow: 'none' }],
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'foo' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`foo` must be placed on a new line',
+          [2, 14, 2, 17],
+        ),
       ],
     },
     {
@@ -1247,12 +1143,7 @@ foo
 </App>
       `,
       options: [{ allow: 'none' }],
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"foo"}' },
-        },
-      ],
+      errors: [expectMoveToNewLineError1([2, 14, 2, 21])],
     },
     {
       code: `
@@ -1266,10 +1157,11 @@ foo
       `,
       options: [{ allow: 'literal' }],
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'foo        ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`foo        ` must be placed on a new line',
+          [2, 14, 3, 9],
+        ),
       ],
     },
     {
@@ -1282,12 +1174,7 @@ foo
 </App>
       `,
       options: [{ allow: 'literal' }],
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
+      errors: [expectMoveToNewLineError7([2, 14, 2, 21])],
     },
     {
       code: `
@@ -1299,12 +1186,7 @@ foo
 </App>
       `,
       options: [{ allow: 'non-jsx' }],
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
+      errors: [expectMoveToNewLineError7([2, 14, 2, 21])],
     },
     {
       code: `
@@ -1323,10 +1205,11 @@ baz
 </App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'baz' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`baz` must be placed on a new line',
+          [5, 10, 5, 13],
+        ),
       ],
     },
     {
@@ -1343,10 +1226,11 @@ foo
 </App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'foo        bar        ' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`foo        bar        ` must be placed on a new line',
+          [2, 14, 4, 9],
+        ),
       ],
     },
     {
@@ -1358,14 +1242,9 @@ foo
 {"foo"}
 </>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"foo"}' },
-        },
-      ],
-      features: ['fragment', 'no-ts-old'], // TODO: FIXME: remove no-ts-old and fix
-      parserOptions,
+      errors: [expectMoveToNewLineError1([2, 11, 2, 18])],
+      // TODO: FIXME: remove no-ts-old and fix
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1380,13 +1259,14 @@ foo
         </App>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '<></>' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`<></>` must be placed on a new line',
+          [3, 18, 3, 23],
+        ),
       ],
-      features: ['fragment'],
-      parserOptions,
+
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1400,14 +1280,9 @@ foo
 <Foo />
         </>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Foo' },
-        },
-      ],
-      features: ['fragment', 'no-ts-old'],
-      parserOptions,
+      errors: [expectMoveToNewLineError7([3, 10, 3, 17])],
+
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1427,16 +1302,18 @@ a
         </div>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'a' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{a}' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`a` must be placed on a new line',
+          [3, 22, 3, 23],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`{a}` must be placed on a new line',
+          [4, 18, 4, 21],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       // TODO: handle in a single pass
@@ -1445,23 +1322,24 @@ a
           <h1>{"Hi people"}<button/></h1>
         );
       `,
+      // Assert the complete output after all autofix rounds.
       output: `
         const IndexPage = () => (
           <h1>
-{"Hi people"}<button/></h1>
+{"Hi people"}
+<button/>
+</h1>
         );
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: '{"Hi people"}' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'button' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`{"Hi people"}` must be placed on a new line',
+          [3, 15, 3, 28],
+        ),
+        expectMoveToNewLineError10([3, 28, 3, 37]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1478,13 +1356,8 @@ a
 </h1>
         );
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'button' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError10([4, 14, 4, 23])],
+      languageOptions: { parserOptions: parserOptions },
     },
     // TODO: handle in a single pass (see above)
     {
@@ -1495,6 +1368,7 @@ a
         <h1>Hi people<button/></h1>
         </Layout>
       `,
+      // Assert the complete output after all autofix rounds.
       output: `
         <Layout>
         <p>
@@ -1504,28 +1378,30 @@ Welcome to your new Gatsby site.
 Now go build something great.
 </p>
         <h1>
-Hi people<button/></h1>
+Hi people
+<button/>
+</h1>
         </Layout>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Welcome to your new Gatsby site.' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Now go build something great.' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Hi people' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'button' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`Welcome to your new Gatsby site.` must be placed on a new line',
+          [3, 12, 3, 44],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`Now go build something great.` must be placed on a new line',
+          [4, 12, 4, 41],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`Hi people` must be placed on a new line',
+          [5, 13, 5, 22],
+        ),
+        expectMoveToNewLineError10([5, 22, 5, 31]),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1554,13 +1430,8 @@ Hi people
 </h1>
         </Layout>
       `,
-      errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'button' },
-        },
-      ],
-      parserOptions,
+      errors: [expectMoveToNewLineError10([10, 10, 10, 19])],
+      languageOptions: { parserOptions: parserOptions },
     },
     // TODO: handle in a single pass
     {
@@ -1571,25 +1442,30 @@ Hi people
           </div><Link to="/page-2/">Go to page 2</Link>
         </Layout>
       `,
+      // Assert the complete output after all autofix rounds.
       output: `
         <Layout>
           <div style={{ maxWidth: \`300px\`, marginBottom: \`1.45rem\` }}>
             <Image />
           </div>
-<Link to="/page-2/">Go to page 2</Link>
+<Link to="/page-2/">
+Go to page 2
+</Link>
         </Layout>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Link' },
-        },
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Go to page 2' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`Link` must be placed on a new line',
+          [5, 17, 5, 56],
+        ),
+        diagnostic(
+          'moveToNewLine',
+          '`Go to page 2` must be placed on a new line',
+          [5, 37, 5, 49],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
     {
       code: `
@@ -1611,12 +1487,13 @@ Go to page 2
         </Layout>
       `,
       errors: [
-        {
-          messageId: 'moveToNewLine',
-          data: { descriptor: 'Go to page 2' },
-        },
+        diagnostic(
+          'moveToNewLine',
+          '`Go to page 2` must be placed on a new line',
+          [6, 21, 6, 33],
+        ),
       ],
-      parserOptions,
+      languageOptions: { parserOptions: parserOptions },
     },
   ],
 });

@@ -1,8 +1,18 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoThisInSFCError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'noThisInSFC',
+    'Stateless functional components should not use `this`',
+    range,
+  );
+}
 
-ruleTester.run('no-this-in-sfc', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-this-in-sfc', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -149,6 +159,38 @@ ruleTester.run('no-this-in-sfc', {} as never, {
         };
       `,
     },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 4 (7.37.5)',
+      code: `
+        const Foo = React.createClass({
+          render: function() {
+            return <div>{this.props.foo}</div>;
+          }
+        });
+      `,
+      settings: { react: { createClass: 'createClass' } },
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream valid 16 (7.37.5)',
+      code: `
+        export const prepareLogin = new ValidatedMethod({
+          name: "user.prepare",
+          validate: new SimpleSchema({
+          }).validator(),
+          run({ remember }) {
+              if (Meteor.isServer) {
+                  const connectionId = this.connection.id; // react/no-this-in-sfc
+                  return Methods.prepareLogin(connectionId, remember);
+              }
+              return null;
+          },
+        });
+      `,
+      languageOptions: upstreamModuleOptions,
+    },
   ],
   invalid: [
     {
@@ -158,7 +200,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return <div>{foo}</div>;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 27, 3, 37])],
     },
     {
       code: `
@@ -166,7 +208,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return <div>{this.props.foo}</div>;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 24, 3, 34])],
     },
     {
       code: `
@@ -174,7 +216,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return <div>{this.state.foo}</div>;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 24, 3, 34])],
     },
     {
       code: `
@@ -183,7 +225,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return <div>{foo}</div>;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 27, 3, 37])],
     },
     {
       code: `
@@ -191,7 +233,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return props.foo ? <div>{this.props.bar}</div> : null;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 36, 3, 46])],
     },
     {
       code: `
@@ -202,7 +244,7 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return null;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([4, 26, 4, 36])],
     },
     {
       code: `
@@ -213,15 +255,15 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return null;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([3, 15, 3, 25])],
     },
     {
       code: `const Foo = (props) => <span>{this.props.foo}</span>`,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([1, 31, 1, 41])],
     },
     {
       code: `const Foo = (props) => this.props.foo ? <span>{props.bar}</span> : null;`,
-      errors: [{ messageId: 'noThisInSFC' }],
+      errors: [expectNoThisInSFCError([1, 24, 1, 34])],
     },
     {
       code: `
@@ -232,7 +274,10 @@ ruleTester.run('no-this-in-sfc', {} as never, {
           return <div onClick={onClick}>{this.props.foo}</div>;
         }
       `,
-      errors: [{ messageId: 'noThisInSFC' }, { messageId: 'noThisInSFC' }],
+      errors: [
+        expectNoThisInSFCError([4, 13, 4, 23]),
+        expectNoThisInSFCError([6, 42, 6, 52]),
+      ],
     },
   ],
 });

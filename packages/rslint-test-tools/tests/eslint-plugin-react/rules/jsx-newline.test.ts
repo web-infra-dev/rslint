@@ -1,8 +1,30 @@
 // Ported from eslint-plugin-react v7.37.5 (all 31 tests and 10 documentation examples).
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/jsx-newline.js
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-new RuleTester().run('jsx-newline', {} as never, {
+function expectRequireError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic('require', 'JSX element should start in a new line', range);
+}
+
+function expectAllowMultilinesError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'allowMultilines',
+    'Multiline JSX elements should start in a new line',
+    range,
+  );
+}
+
+function expectPreventError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'prevent',
+    'JSX element should not start in a new line',
+    range,
+  );
+}
+
+new RuleTester(fixtureConfig).run('jsx-newline', {
   valid: [
     // Upstream valid 1
     {
@@ -67,7 +89,6 @@ new RuleTester().run('jsx-newline', {} as never, {
           <span>Should be in new line</span>
         </>
       `,
-      features: ['fragment'],
     },
     // Upstream valid 4
     {
@@ -83,7 +104,6 @@ new RuleTester().run('jsx-newline', {} as never, {
           prevent: true,
         },
       ],
-      features: ['fragment'],
     },
     // Upstream valid 5
     {
@@ -134,7 +154,6 @@ new RuleTester().run('jsx-newline', {} as never, {
           <OneLineComponent />
         </>
       `,
-      features: ['fragment'],
     },
     // Upstream valid 10
     {
@@ -157,7 +176,6 @@ new RuleTester().run('jsx-newline', {} as never, {
           allowMultilines: true,
         },
       ],
-      features: ['fragment'],
     },
     // Upstream valid 11
     {
@@ -301,16 +319,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <List />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 4,
-          column: 11,
-          endLine: 4,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectRequireError([4, 11, 4, 19])],
     },
     // Upstream invalid 2
     {
@@ -327,16 +336,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           {showSomething === true && <Something />}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 4,
-          column: 11,
-          endLine: 4,
-          endColumn: 52,
-        },
-      ],
+      errors: [expectRequireError([4, 11, 4, 52])],
     },
     // Upstream invalid 3
     {
@@ -353,16 +353,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <Button>{data.label}</Button>
         </div>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 4,
-          column: 11,
-          endLine: 4,
-          endColumn: 40,
-        },
-      ],
+      errors: [expectRequireError([4, 11, 4, 40])],
     },
     // Upstream invalid 4
     {
@@ -387,16 +378,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           )}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 4,
-          column: 11,
-          endLine: 8,
-          endColumn: 13,
-        },
-      ],
+      errors: [expectRequireError([4, 11, 8, 13])],
     },
     // Upstream invalid 5
     {
@@ -421,16 +403,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <OneLineComponent />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 7,
-          column: 11,
-          endLine: 7,
-          endColumn: 67,
-        },
-      ],
+      errors: [expectRequireError([7, 11, 7, 67])],
     },
     // Upstream invalid 6
     {
@@ -469,16 +442,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           </Button>
         </div>
       `,
-      errors: [
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 7,
-          column: 11,
-          endLine: 7,
-          endColumn: 41,
-        },
-      ],
+      errors: [expectAllowMultilinesError([7, 11, 7, 41])],
     },
     // Upstream invalid 7
     {
@@ -521,16 +485,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           </Button>
         </div>
       `,
-      errors: [
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 7,
-          column: 11,
-          endLine: 7,
-          endColumn: 28,
-        },
-      ],
+      errors: [expectAllowMultilinesError([7, 11, 7, 28])],
     },
     // Upstream invalid 8
     {
@@ -562,30 +517,9 @@ new RuleTester().run('jsx-newline', {} as never, {
         </div>
       `,
       errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 5,
-          column: 13,
-          endLine: 5,
-          endColumn: 30,
-        },
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 7,
-          column: 11,
-          endLine: 10,
-          endColumn: 17,
-        },
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 9,
-          column: 13,
-          endLine: 9,
-          endColumn: 26,
-        },
+        expectRequireError([5, 13, 5, 30]),
+        expectRequireError([7, 11, 10, 17]),
+        expectRequireError([9, 13, 9, 26]),
       ],
     },
     // Upstream invalid 9
@@ -608,16 +542,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <List />
         </div>
       `,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 5,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPreventError([5, 11, 5, 19])],
     },
     // Upstream invalid 10
     {
@@ -639,16 +564,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           {showSomething === true && <Something />}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 5,
-          endColumn: 52,
-        },
-      ],
+      errors: [expectPreventError([5, 11, 5, 52])],
     },
     // Upstream invalid 11
     {
@@ -670,16 +586,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <Button>{data.label}</Button>
         </div>
       `,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 5,
-          endColumn: 40,
-        },
-      ],
+      errors: [expectPreventError([5, 11, 5, 40])],
     },
     // Upstream invalid 12
     {
@@ -709,16 +616,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           )}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 9,
-          endColumn: 13,
-        },
-      ],
+      errors: [expectPreventError([5, 11, 9, 13])],
     },
     // Upstream invalid 13
     {
@@ -755,30 +653,9 @@ new RuleTester().run('jsx-newline', {} as never, {
         </div>
       `,
       errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 6,
-          column: 13,
-          endLine: 6,
-          endColumn: 30,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 9,
-          column: 11,
-          endLine: 13,
-          endColumn: 17,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 12,
-          column: 13,
-          endLine: 12,
-          endColumn: 26,
-        },
+        expectPreventError([6, 13, 6, 30]),
+        expectPreventError([9, 11, 13, 17]),
+        expectPreventError([12, 13, 12, 26]),
       ],
     },
     // Upstream invalid 14
@@ -790,7 +667,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <span>Should be in new line</span>
         </>
       `,
-      features: ['fragment'],
+
       output: `
         <>
           <Button>{data.label}</Button>
@@ -799,16 +676,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <span>Should be in new line</span>
         </>
       `,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 5,
-          endColumn: 45,
-        },
-      ],
+      errors: [expectRequireError([5, 11, 5, 45])],
     },
     // Upstream invalid 15
     {
@@ -825,7 +693,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           prevent: true,
         },
       ],
-      features: ['fragment'],
+
       output: `
         <>
           <Button>{data.label}</Button>
@@ -833,16 +701,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           <span>Should be in new line</span>
         </>
       `,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 6,
-          column: 11,
-          endLine: 6,
-          endColumn: 45,
-        },
-      ],
+      errors: [expectPreventError([6, 11, 6, 45])],
     },
     // Upstream invalid 16
     {
@@ -863,7 +722,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           allowMultilines: true,
         },
       ],
-      features: ['fragment'],
+
       output: `
         <>
           <OneLineComponent />
@@ -878,22 +737,8 @@ new RuleTester().run('jsx-newline', {} as never, {
         </>
       `,
       errors: [
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 5,
-          column: 11,
-          endLine: 8,
-          endColumn: 13,
-        },
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 9,
-          column: 11,
-          endLine: 9,
-          endColumn: 31,
-        },
+        expectAllowMultilinesError([5, 11, 8, 13]),
+        expectAllowMultilinesError([9, 11, 9, 31]),
       ],
     },
     // Upstream invalid 17
@@ -925,16 +770,7 @@ new RuleTester().run('jsx-newline', {} as never, {
           )}
         </div>
       `,
-      errors: [
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 4,
-          column: 11,
-          endLine: 8,
-          endColumn: 13,
-        },
-      ],
+      errors: [expectAllowMultilinesError([4, 11, 8, 13])],
     },
     // Upstream invalid 18
     {
@@ -972,30 +808,9 @@ new RuleTester().run('jsx-newline', {} as never, {
         </div>
       `,
       errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 6,
-          column: 13,
-          endLine: 6,
-          endColumn: 30,
-        },
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 8,
-          column: 11,
-          endLine: 12,
-          endColumn: 17,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 11,
-          column: 13,
-          endLine: 11,
-          endColumn: 26,
-        },
+        expectPreventError([6, 13, 6, 30]),
+        expectAllowMultilinesError([8, 11, 12, 17]),
+        expectPreventError([11, 13, 11, 26]),
       ],
     },
     // Upstream invalid 19
@@ -1007,26 +822,12 @@ new RuleTester().run('jsx-newline', {} as never, {
           allowMultilines: true,
         },
       ],
-      features: ['types'],
+
       output:
         '\n        const frag: DocumentFragment = (\n          <Fragment>\n            <sni-sequence-editor-tool\n              name="forward"\n              direction="forward"\n              type="control"\n              onClick={ () => this.onClickNavigate(\'forward\') }\n            />\n\n            <sni-sequence-editor-tool\n              name="rotate"\n              direction="left"\n              type="control"\n              onClick={ () => this.onClickNavigate(\'left\') }\n            />\n    \n            <sni-sequence-editor-tool\n              name="rotate"\n              direction="right"\n              type="control"\n              onClick={ (): void => this.onClickNavigate(\'right\') }\n            />\n    \n            <div className="sni-sequence-editor-control-panel__delete" data-name="delete" onClick={ this.onDeleteCommand } />\n    \n            {\n              ...Array.from(this.children)\n            }\n          </Fragment>\n        )\n      ',
       errors: [
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 10,
-          column: 13,
-          endLine: 15,
-          endColumn: 15,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 26,
-          column: 13,
-          endLine: 28,
-          endColumn: 14,
-        },
+        expectAllowMultilinesError([10, 13, 15, 15]),
+        expectPreventError([26, 13, 28, 14]),
       ],
     },
     // Upstream documentation example 1
@@ -1045,16 +846,7 @@ new RuleTester().run('jsx-newline', {} as never, {
 
   <List />
 </div>`,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 3,
-          column: 3,
-          endLine: 3,
-          endColumn: 11,
-        },
-      ],
+      errors: [expectRequireError([3, 3, 3, 11])],
     },
     // Upstream documentation example 2
     {
@@ -1072,16 +864,7 @@ new RuleTester().run('jsx-newline', {} as never, {
 
   {showSomething === true && <Something />}
 </div>`,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 3,
-          column: 3,
-          endLine: 3,
-          endColumn: 44,
-        },
-      ],
+      errors: [expectRequireError([3, 3, 3, 44])],
     },
     // Upstream documentation example 3
     {
@@ -1107,16 +890,7 @@ new RuleTester().run('jsx-newline', {} as never, {
     <ErrorMessage />
   )}
 </div>`,
-      errors: [
-        {
-          messageId: 'require',
-          message: 'JSX element should start in a new line',
-          line: 3,
-          column: 3,
-          endLine: 7,
-          endColumn: 5,
-        },
-      ],
+      errors: [expectRequireError([3, 3, 7, 5])],
     },
     // Upstream documentation example 5
     {
@@ -1164,54 +938,12 @@ new RuleTester().run('jsx-newline', {} as never, {
   )}
 </div>`,
       errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 4,
-          column: 3,
-          endLine: 4,
-          endColumn: 11,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 6,
-          column: 3,
-          endLine: 11,
-          endColumn: 12,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 10,
-          column: 5,
-          endLine: 10,
-          endColumn: 18,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 13,
-          column: 3,
-          endLine: 13,
-          endColumn: 44,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 15,
-          column: 3,
-          endLine: 15,
-          endColumn: 28,
-        },
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 17,
-          column: 3,
-          endLine: 21,
-          endColumn: 5,
-        },
+        expectPreventError([4, 3, 4, 11]),
+        expectPreventError([6, 3, 11, 12]),
+        expectPreventError([10, 5, 10, 18]),
+        expectPreventError([13, 3, 13, 44]),
+        expectPreventError([15, 3, 15, 28]),
+        expectPreventError([17, 3, 21, 5]),
       ],
     },
     // Upstream documentation example 9
@@ -1243,22 +975,8 @@ new RuleTester().run('jsx-newline', {} as never, {
   )}
 </div>`,
       errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 4,
-          column: 3,
-          endLine: 4,
-          endColumn: 28,
-        },
-        {
-          messageId: 'allowMultilines',
-          message: 'Multiline JSX elements should start in a new line',
-          line: 5,
-          column: 3,
-          endLine: 9,
-          endColumn: 5,
-        },
+        expectPreventError([4, 3, 4, 28]),
+        expectAllowMultilinesError([5, 3, 9, 5]),
       ],
     },
     // Upstream documentation example 10 (labeled correct; v7.37.5 reports prevent).
@@ -1290,16 +1008,7 @@ new RuleTester().run('jsx-newline', {} as never, {
     <ErrorMessage />
   )}
 </div>`,
-      errors: [
-        {
-          messageId: 'prevent',
-          message: 'JSX element should not start in a new line',
-          line: 4,
-          column: 3,
-          endLine: 4,
-          endColumn: 28,
-        },
-      ],
+      errors: [expectPreventError([4, 3, 4, 28])],
     },
   ],
 });

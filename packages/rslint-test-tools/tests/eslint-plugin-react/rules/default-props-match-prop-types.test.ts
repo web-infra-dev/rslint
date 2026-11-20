@@ -1,23 +1,52 @@
 // Ported from eslint-plugin-react v7.37.5, tests/lib/rules/default-props-match-prop-types.js.
-import {
-  RuleTester,
-  type ValidTestCase,
-  type InvalidTestCase,
-} from '../rule-tester';
-const ruleTester = new RuleTester();
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig, upstreamModuleOptions } from '../config';
+import { diagnostic } from '../expectations';
+function expectDefaultHasNoTypeError1(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'defaultHasNoType',
+    'defaultProp "baz" has no corresponding propTypes declaration.',
+    range,
+  );
+}
+
+function expectRequiredHasDefaultError2(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'requiredHasDefault',
+    'defaultProp "bar" defined for isRequired propType.',
+    range,
+  );
+}
+
+function expectRequiredHasDefaultError3(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'requiredHasDefault',
+    'defaultProp "foo" defined for isRequired propType.',
+    range,
+  );
+}
+
+function expectDefaultHasNoTypeError4(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'defaultHasNoType',
+    'defaultProp "frob" has no corresponding propTypes declaration.',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 const parserOptions = {
   ecmaVersion: 2018,
   sourceType: 'module',
   ecmaFeatures: { jsx: true },
 };
-const parsers = {
-  all<T extends ValidTestCase | InvalidTestCase>(cases: T[]): T[] {
-    // Flow-only cases are retained here and explicitly skipped in Go upstream tests.
-    return cases.filter((c) => !c.features?.includes('flow'));
-  },
-};
-ruleTester.run('default-props-match-prop-types', undefined as never, {
-  valid: parsers.all([
+
+ruleTester.run('default-props-match-prop-types', {
+  valid: [
     // stateless components
     {
       code: `
@@ -388,7 +417,9 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>{foo}{bar}</div>;
         }
       `,
-      parserOptions: Object.assign({ sourceType: 'module' }, parserOptions),
+      languageOptions: {
+        parserOptions: Object.assign({ sourceType: 'module' }, parserOptions),
+      },
     },
     {
       code: `
@@ -403,7 +434,9 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>{foo}{bar}</div>;
         }
       `,
-      parserOptions: Object.assign({ sourceType: 'module' }, parserOptions),
+      languageOptions: {
+        parserOptions: Object.assign({ sourceType: 'module' }, parserOptions),
+      },
     },
     // using spread operator
     {
@@ -491,7 +524,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -512,7 +544,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           bar: "bar"
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -531,7 +562,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           bar: "bar"
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -545,7 +575,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -555,7 +584,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
 
         Hello.defaultProps = { foo: "foo" };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -563,7 +591,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>Hello {foo}</div>;
         }
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -573,7 +600,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
 
         Hello.defaultProps = { foo: "foo" };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -581,7 +607,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>Hello {foo}</div>;
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -591,7 +616,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
 
         Hello.defaultProps = { foo: "foo" };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -599,7 +623,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>Hello {foo}</div>;
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -622,7 +645,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           baz: "baz"
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -641,7 +663,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -653,7 +674,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -663,7 +683,6 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>Hello {foo}</div>;
         };
       `,
-      features: ['types'],
     },
     {
       code: `
@@ -673,9 +692,65 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           return <div>Hello {props.name.firstname}</div>;
         }
       `,
-      features: ['types'],
+    },
+
+    // don't error when variable is not in scope
+    {
+      code: `
+        import type { ImportedType } from "fake";
+        type Props = ImportedType;
+        function Hello(props: Props) {
+          return <div>Hello {props.name.firstname}</div>;
+        }
+      `,
+    },
+    // make sure error is not thrown with multiple assignments
+    {
+      code: `
+        import type ImportedProps from "fake";
+        type NestedProps = ImportedProps;
+        type Props = NestedProps;
+        function Hello(props: Props) {
+          return <div>Hello {props.name.firstname}</div>;
+        }
+      `,
+    },
+    // don't error when variable is not in scope with intersection
+    {
+      code: `
+        import type ImportedProps from "fake";
+        type Props = ImportedProps & {
+          foo: string
+        };
+        function Hello(props: Props) {
+          return <div>Hello {props.name.firstname}</div>;
+        }
+      `,
     },
     {
+      code: `
+        import type { FieldProps } from 'redux-form';
+
+        type Props = FieldProps & {
+          name: string,
+          type: string,
+          label?: string,
+          placeholder?: string,
+          disabled?: boolean,
+        };
+
+        TextField.defaultProps = {
+          label: '',
+          placeholder: '',
+          disabled: false,
+        };
+      `,
+    },
+
+    // Additional input/configuration combinations from pinned upstream.
+    {
+      name: 'Upstream valid 47 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
       code: `
         type DefaultProps1 = {|
           bar1?: string
@@ -698,9 +773,11 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           bar2: "bar2",
         };
       `,
-      features: ['flow'],
+      languageOptions: upstreamModuleOptions,
     },
     {
+      name: 'Upstream valid 48 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
       code: `
         type DefaultProps1 = {|
           bar1?: string
@@ -725,67 +802,11 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           bar2: "bar2",
         };
       `,
-      features: ['flow'],
+      languageOptions: upstreamModuleOptions,
     },
-    // don't error when variable is not in scope
-    {
-      code: `
-        import type { ImportedType } from "fake";
-        type Props = ImportedType;
-        function Hello(props: Props) {
-          return <div>Hello {props.name.firstname}</div>;
-        }
-      `,
-      features: ['types'],
-    },
-    // make sure error is not thrown with multiple assignments
-    {
-      code: `
-        import type ImportedProps from "fake";
-        type NestedProps = ImportedProps;
-        type Props = NestedProps;
-        function Hello(props: Props) {
-          return <div>Hello {props.name.firstname}</div>;
-        }
-      `,
-      features: ['types'],
-    },
-    // don't error when variable is not in scope with intersection
-    {
-      code: `
-        import type ImportedProps from "fake";
-        type Props = ImportedProps & {
-          foo: string
-        };
-        function Hello(props: Props) {
-          return <div>Hello {props.name.firstname}</div>;
-        }
-      `,
-      features: ['types'],
-    },
-    {
-      code: `
-        import type { FieldProps } from 'redux-form';
+  ],
 
-        type Props = FieldProps & {
-          name: string,
-          type: string,
-          label?: string,
-          placeholder?: string,
-          disabled?: boolean,
-        };
-
-        TextField.defaultProps = {
-          label: '',
-          placeholder: '',
-          disabled: false,
-        };
-      `,
-      features: ['types'],
-    },
-  ]),
-
-  invalid: parsers.all([
+  invalid: [
     // stateless components
     {
       code: `
@@ -800,14 +821,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           baz: "baz"
         };
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 10,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([10, 11, 10, 21])],
     },
     {
       code: `
@@ -825,14 +839,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
       settings: {
         propWrapperFunctions: ['forbidExtraProps'],
       },
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 10,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([10, 11, 10, 21])],
     },
     {
       code: `
@@ -851,14 +858,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
       settings: {
         propWrapperFunctions: ['forbidExtraProps'],
       },
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 11,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([11, 11, 11, 21])],
     },
     {
       code: `
@@ -873,14 +873,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           baz: "baz"
         };
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 10,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([10, 11, 10, 21])],
       options: [{ allowRequiredDefaults: true }],
     },
     {
@@ -898,18 +891,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         MyStatelessComponent.defaultProps.baz = "baz";
       `,
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 10,
-          column: 11,
-        },
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 12,
-          column: 9,
-        },
+        expectRequiredHasDefaultError2([10, 11, 10, 21]),
+        expectDefaultHasNoTypeError1([12, 9, 12, 54]),
       ],
     },
     {
@@ -927,14 +910,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           bar: "bar"
         };
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 12,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError2([12, 11, 12, 21])],
     },
     {
       code: `
@@ -951,14 +927,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         };
         MyStatelessComponent.defaultProps = defaults;
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 3,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([3, 11, 3, 21])],
     },
     {
       code: `
@@ -976,14 +945,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         MyStatelessComponent.propTypes = types;
         MyStatelessComponent.defaultProps = defaults;
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 3,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([3, 11, 3, 21])],
     },
 
     // createReactClass components
@@ -1004,14 +966,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         });
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 12,
-          column: 15,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([12, 15, 12, 25])],
     },
     {
       code: `
@@ -1030,14 +985,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         });
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 12,
-          column: 15,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([12, 15, 12, 25])],
     },
 
     // ES6 class component
@@ -1058,14 +1006,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           baz: "baz"
         };
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 14,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([14, 11, 14, 21])],
     },
     {
       code: `
@@ -1084,14 +1025,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         };
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 14,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([14, 11, 14, 21])],
     },
     {
       code: `
@@ -1109,14 +1043,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         Greeting.defaultProps = {};
         Greeting.defaultProps.foo = "foo";
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 14,
-          column: 9,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([14, 9, 14, 42])],
     },
     {
       code: `
@@ -1134,14 +1061,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         Greeting.defaultProps = {};
         Greeting.defaultProps.baz = "baz";
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 14,
-          column: 9,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([14, 9, 14, 42])],
     },
     {
       code: `
@@ -1157,14 +1077,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         Greeting.defaultProps = {};
         Greeting.defaultProps.foo = "foo";
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 12,
-          column: 9,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([12, 9, 12, 42])],
     },
     {
       code: `
@@ -1185,14 +1098,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         };
         Greeting.defaultProps = defaults;
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 15,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError2([15, 11, 15, 21])],
     },
     {
       code: `
@@ -1213,14 +1119,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         Greeting.propTypes = props;
         Greeting.defaultProps = defaults;
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 14,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([14, 11, 14, 21])],
     },
 
     // ES6 classes with static getter methods
@@ -1243,12 +1142,11 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         }
       `,
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'name' },
-          line: 10,
-          column: 15,
-        },
+        diagnostic(
+          'requiredHasDefault',
+          'defaultProp "name" defined for isRequired propType.',
+          [10, 15, 10, 27],
+        ),
       ],
     },
     {
@@ -1270,14 +1168,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 11,
-          column: 15,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([11, 15, 11, 27])],
     },
     {
       code: `
@@ -1300,14 +1191,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 6,
-          column: 11,
-        },
-      ],
+      errors: [expectDefaultHasNoTypeError1([6, 11, 6, 21])],
     },
     {
       code: `
@@ -1330,14 +1214,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 3,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError2([3, 11, 3, 23])],
     },
 
     // ES6 classes with property initializers
@@ -1358,15 +1235,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           };
         }
       `,
-      features: ['class fields'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 13,
-          column: 13,
-        },
-      ],
+
+      errors: [expectRequiredHasDefaultError2([13, 13, 13, 23])],
     },
     {
       code: `
@@ -1385,15 +1255,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           };
         }
       `,
-      features: ['class fields'],
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 13,
-          column: 13,
-        },
-      ],
+
+      errors: [expectDefaultHasNoTypeError1([13, 13, 13, 23])],
     },
     {
       code: `
@@ -1414,15 +1277,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           static defaultProps = defaults;
         }
       `,
-      features: ['class fields'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'bar' },
-          line: 7,
-          column: 11,
-        },
-      ],
+
+      errors: [expectRequiredHasDefaultError2([7, 11, 7, 21])],
     },
     {
       code: `
@@ -1443,15 +1299,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           static defaultProps = defaults;
         }
       `,
-      features: ['class fields'],
-      errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'baz' },
-          line: 7,
-          column: 11,
-        },
-      ],
+
+      errors: [expectDefaultHasNoTypeError1([7, 11, 7, 21])],
     },
 
     // edge cases
@@ -1470,14 +1319,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         };
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 12,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([12, 11, 12, 21])],
     },
     {
       code: `
@@ -1491,14 +1333,7 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         };
       `,
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 9,
-          column: 11,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([9, 11, 9, 21])],
     },
 
     // with Flow annotations
@@ -1519,15 +1354,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         };
       `,
-      features: ['types'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 14,
-          column: 11,
-        },
-      ],
+
+      errors: [expectRequiredHasDefaultError3([14, 11, 14, 21])],
     },
     {
       code: `
@@ -1538,15 +1366,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         }
       `,
-      features: ['types'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 6,
-          column: 11,
-        },
-      ],
+
+      errors: [expectRequiredHasDefaultError3([6, 11, 6, 21])],
     },
     {
       code: `
@@ -1561,15 +1382,8 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           foo: "foo"
         }
       `,
-      features: ['types'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 10,
-          column: 11,
-        },
-      ],
+
+      errors: [expectRequiredHasDefaultError3([10, 11, 10, 21])],
     },
     {
       code: `
@@ -1578,49 +1392,10 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         };
         Hello.defaultProps = { foo: "foo", bar: "bar" };
       `,
-      features: ['types'],
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 5,
-          column: 32,
-        },
-      ],
-    },
-    {
-      code: `
-        type Props = {
-          foo: string,
-          bar?: string
-        };
 
-        type Props2 = {
-          foo: string,
-          baz?: string
-        }
-
-        function Hello(props: Props | Props2) {
-          return <div>Hello {props.foo}</div>;
-        }
-        Hello.defaultProps = { foo: "foo", frob: "frob" };
-      `,
-      features: ['flow'], // TODO: FIXME: change to "types" and fix failures
-      errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 15,
-          column: 32,
-        },
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'frob' },
-          line: 15,
-          column: 44,
-        },
-      ],
+      errors: [expectRequiredHasDefaultError3([5, 32, 5, 42])],
     },
+
     {
       code: `
         type PropsA = { foo: string };
@@ -1639,16 +1414,14 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
           }
         }
       `,
-      features: ['types'],
+
       errors: [
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'fooBar' },
-        },
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-        },
+        diagnostic(
+          'defaultHasNoType',
+          'defaultProp "fooBar" has no corresponding propTypes declaration.',
+          [9, 13, 9, 29],
+        ),
+        expectRequiredHasDefaultError3([10, 13, 10, 23]),
       ],
     },
     {
@@ -1667,13 +1440,43 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         };
       `,
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'firstProperty' },
-        },
+        diagnostic(
+          'requiredHasDefault',
+          'defaultProp "firstProperty" defined for isRequired propType.',
+          [12, 11, 12, 43],
+        ),
       ],
     },
+
+    // Additional input/configuration combinations from pinned upstream.
     {
+      name: 'Upstream invalid 31 (7.37.5)',
+      skip: 'Upstream checks Flow prop annotations for default-props-match-prop-types; the native TypeScript annotation path reports 0 diagnostics instead of 2.',
+      code: `
+        type Props = {
+          foo: string,
+          bar?: string
+        };
+
+        type Props2 = {
+          foo: string,
+          baz?: string
+        }
+
+        function Hello(props: Props | Props2) {
+          return <div>Hello {props.foo}</div>;
+        }
+        Hello.defaultProps = { foo: "foo", frob: "frob" };
+      `,
+      errors: [
+        expectRequiredHasDefaultError3([15, 32, 15, 42]),
+        expectDefaultHasNoTypeError4([15, 44, 15, 56]),
+      ],
+      languageOptions: upstreamModuleOptions,
+    },
+    {
+      name: 'Upstream invalid 34 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
       code: `
         type DefaultProps = {
           baz?: string,
@@ -1690,23 +1493,15 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         }
         Hello.defaultProps = { foo: "foo", frob: "frob", baz: "bar" };
       `,
-      features: ['flow'],
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 15,
-          column: 32,
-        },
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'frob' },
-          line: 15,
-          column: 44,
-        },
+        expectRequiredHasDefaultError3([15, 32, 15, 42]),
+        expectDefaultHasNoTypeError4([15, 44, 15, 56]),
       ],
+      languageOptions: upstreamModuleOptions,
     },
     {
+      name: 'Upstream invalid 35 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
       code: `
         type DefaultProps = {
           baz?: string,
@@ -1725,23 +1520,15 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
         }
         Hello.defaultProps = { foo: "foo", frob: "frob", baz: "bar" };
       `,
-      features: ['flow'],
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: { name: 'foo' },
-          line: 17,
-          column: 32,
-        },
-        {
-          messageId: 'defaultHasNoType',
-          data: { name: 'frob' },
-          line: 17,
-          column: 44,
-        },
+        expectRequiredHasDefaultError3([17, 32, 17, 42]),
+        expectDefaultHasNoTypeError4([17, 44, 17, 56]),
       ],
+      languageOptions: upstreamModuleOptions,
     },
     {
+      name: 'Upstream invalid 36 (7.37.5)',
+      skip: 'The native TypeScript parser cannot parse this upstream flow syntax (Property or signature expected.).',
       code: `
         export type SharedProps = {|
             disabled: boolean,
@@ -1758,15 +1545,14 @@ ruleTester.run('default-props-match-prop-types', undefined as never, {
             };
         };
       `,
-      features: ['flow'],
       errors: [
-        {
-          messageId: 'requiredHasDefault',
-          data: {
-            name: 'disabled',
-          },
-        },
+        diagnostic(
+          'requiredHasDefault',
+          'defaultProp "disabled" defined for isRequired propType.',
+          [13, 15, 13, 30],
+        ),
       ],
+      languageOptions: upstreamModuleOptions,
     },
-  ]),
+  ],
 });

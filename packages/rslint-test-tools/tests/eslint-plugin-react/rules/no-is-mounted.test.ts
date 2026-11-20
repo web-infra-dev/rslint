@@ -1,8 +1,14 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoIsMountedError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic('noIsMounted', 'Do not use isMounted', range);
+}
 
-ruleTester.run('no-is-mounted', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-is-mounted', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -73,7 +79,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 18, 4, 32])],
     },
     {
       code: `
@@ -88,7 +94,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 18, 4, 32])],
     },
     {
       code: `
@@ -103,7 +109,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 18, 4, 32])],
     },
     // ---- Edge: class getter / setter / constructor / object shorthand method ----
     {
@@ -114,7 +120,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 20, 4, 34])],
     },
     {
       code: `
@@ -124,7 +130,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 13, 4, 27])],
     },
     {
       code: `
@@ -135,7 +141,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([5, 13, 5, 27])],
     },
     {
       code: `
@@ -145,7 +151,7 @@ ruleTester.run('no-is-mounted', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noIsMounted' }],
+      errors: [expectNoIsMountedError([4, 13, 4, 27])],
     },
   ],
 });

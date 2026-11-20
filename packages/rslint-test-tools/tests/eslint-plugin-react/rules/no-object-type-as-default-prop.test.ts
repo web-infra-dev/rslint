@@ -1,92 +1,112 @@
 // Upstream: https://github.com/jsx-eslint/eslint-plugin-react/blob/v7.37.5/tests/lib/rules/no-object-type-as-default-prop.js
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectForbiddenTypeDefaultParamError1(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError2(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError3(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError4(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'd has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError5(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError6(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError7(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError8(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.',
+    range,
+  );
+}
+
+function expectForbiddenTypeDefaultParamError9(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'forbiddenTypeDefaultParam',
+    'i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
 const expectedViolations = [
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.',
-    line: 3,
-    column: 11,
-    endLine: 3,
-    endColumn: 17,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.',
-    line: 4,
-    column: 11,
-    endLine: 4,
-    endColumn: 29,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.',
-    line: 5,
-    column: 11,
-    endLine: 5,
-    endColumn: 23,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'd has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.',
-    line: 6,
-    column: 11,
-    endLine: 6,
-    endColumn: 23,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.',
-    line: 7,
-    column: 11,
-    endLine: 7,
-    endColumn: 28,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.',
-    line: 8,
-    column: 11,
-    endLine: 8,
-    endColumn: 23,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.',
-    line: 9,
-    column: 11,
-    endLine: 9,
-    endColumn: 26,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.',
-    line: 10,
-    column: 11,
-    endLine: 10,
-    endColumn: 24,
-  },
-  {
-    messageId: 'forbiddenTypeDefaultParam',
-    message:
-      'i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.',
-    line: 11,
-    column: 11,
-    endLine: 11,
-    endColumn: 28,
-  },
+  expectForbiddenTypeDefaultParamError1([3, 11, 3, 17]),
+  expectForbiddenTypeDefaultParamError2([4, 11, 4, 29]),
+  expectForbiddenTypeDefaultParamError3([5, 11, 5, 23]),
+  expectForbiddenTypeDefaultParamError4([6, 11, 6, 23]),
+  expectForbiddenTypeDefaultParamError5([7, 11, 7, 28]),
+  expectForbiddenTypeDefaultParamError6([8, 11, 8, 23]),
+  expectForbiddenTypeDefaultParamError7([9, 11, 9, 26]),
+  expectForbiddenTypeDefaultParamError8([10, 11, 10, 24]),
+  expectForbiddenTypeDefaultParamError9([11, 11, 11, 28]),
 ];
 
-ruleTester.run('no-object-type-as-default-prop', {} as never, {
+ruleTester.run('no-object-type-as-default-prop', {
   valid: [
     {
       code: `
@@ -230,7 +250,17 @@ function Component({
           return null;
         }
       `,
-      errors: expectedViolations,
+      errors: [
+        expectForbiddenTypeDefaultParamError1([3, 11, 3, 17]),
+        expectForbiddenTypeDefaultParamError2([4, 11, 4, 29]),
+        expectForbiddenTypeDefaultParamError3([5, 11, 5, 23]),
+        expectForbiddenTypeDefaultParamError4([6, 11, 6, 23]),
+        expectForbiddenTypeDefaultParamError5([7, 11, 7, 28]),
+        expectForbiddenTypeDefaultParamError6([8, 11, 8, 23]),
+        expectForbiddenTypeDefaultParamError7([9, 11, 9, 26]),
+        expectForbiddenTypeDefaultParamError8([10, 11, 10, 24]),
+        expectForbiddenTypeDefaultParamError9([11, 11, 11, 28]),
+      ],
     },
     {
       code: `
@@ -248,7 +278,17 @@ function Component({
           return null;
         }
       `,
-      errors: expectedViolations,
+      errors: [
+        expectForbiddenTypeDefaultParamError1([3, 11, 3, 17]),
+        expectForbiddenTypeDefaultParamError2([4, 11, 4, 29]),
+        expectForbiddenTypeDefaultParamError3([5, 11, 5, 23]),
+        expectForbiddenTypeDefaultParamError4([6, 11, 6, 23]),
+        expectForbiddenTypeDefaultParamError5([7, 11, 7, 28]),
+        expectForbiddenTypeDefaultParamError6([8, 11, 8, 23]),
+        expectForbiddenTypeDefaultParamError7([9, 11, 9, 26]),
+        expectForbiddenTypeDefaultParamError8([10, 11, 10, 24]),
+        expectForbiddenTypeDefaultParamError9([11, 11, 11, 28]),
+      ],
     },
     {
       code: `
@@ -266,7 +306,17 @@ function Component({
           return null;
         }
       `,
-      errors: expectedViolations,
+      errors: [
+        expectForbiddenTypeDefaultParamError1([3, 11, 3, 17]),
+        expectForbiddenTypeDefaultParamError2([4, 11, 4, 29]),
+        expectForbiddenTypeDefaultParamError3([5, 11, 5, 23]),
+        expectForbiddenTypeDefaultParamError4([6, 11, 6, 23]),
+        expectForbiddenTypeDefaultParamError5([7, 11, 7, 28]),
+        expectForbiddenTypeDefaultParamError6([8, 11, 8, 23]),
+        expectForbiddenTypeDefaultParamError7([9, 11, 9, 26]),
+        expectForbiddenTypeDefaultParamError8([10, 11, 10, 24]),
+        expectForbiddenTypeDefaultParamError9([11, 11, 11, 28]),
+      ],
     },
   ],
 });

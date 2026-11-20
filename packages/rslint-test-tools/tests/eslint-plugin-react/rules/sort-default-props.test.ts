@@ -1,8 +1,18 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
 // Migrated from eslint-plugin-react v7.37.5.
-const ruleTester = new RuleTester();
-ruleTester.run('sort-default-props', {} as never, {
+function expectPropsNotSortedError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic(
+    'propsNotSorted',
+    'Default prop types declarations should be sorted alphabetically',
+    range,
+  );
+}
+
+const ruleTester = new RuleTester(fixtureConfig);
+ruleTester.run('sort-default-props', {
   valid: [
     {
       code: '\n        var First = createReactClass({\n          render: function() {\n            return <div />;\n          }\n        });\n      ',
@@ -74,39 +84,13 @@ ruleTester.run('sort-default-props', {} as never, {
   invalid: [
     {
       code: '\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            a: "a",\n            c: "c",\n            b: "b"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 11,
-          column: 13,
-          endLine: 11,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([11, 13, 11, 19])],
     },
     {
       code: '\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            b: PropTypes.any,\n            c: PropTypes.any\n          };\n          static defaultProps = {\n            c: "c",\n            b: "b",\n            a: "a"\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ',
       errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 10,
-          column: 13,
-          endLine: 10,
-          endColumn: 19,
-        },
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 11,
-          column: 13,
-          endLine: 11,
-          endColumn: 19,
-        },
+        expectPropsNotSortedError([10, 13, 10, 19]),
+        expectPropsNotSortedError([11, 13, 11, 19]),
       ],
     },
     {
@@ -116,82 +100,26 @@ ruleTester.run('sort-default-props', {} as never, {
           ignoreCase: true,
         },
       ],
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 9,
-          column: 13,
-          endLine: 9,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([9, 13, 9, 19])],
     },
     {
       code: '\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.any,\n            z: PropTypes.any\n          };\n          static defaultProps = {\n            a: "a",\n            Z: "Z",\n          };\n          render() {\n            return <div />;\n          }\n        }\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 9,
-          column: 13,
-          endLine: 9,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([9, 13, 9, 19])],
     },
     {
       code: '\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          "a": PropTypes.string,\n          "b": PropTypes.string\n        };\n        Hello.defaultProps = {\n          "b": "b",\n          "a": "a"\n        };\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 13,
-          column: 11,
-          endLine: 13,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([13, 11, 13, 19])],
     },
     {
       code: '\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          "a": PropTypes.string,\n          "b": PropTypes.string,\n          "c": PropTypes.string\n        };\n        Hello.defaultProps = {\n          "c": "c",\n          "b": "b",\n          "a": "a"\n        };\n      ',
       errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 14,
-          column: 11,
-          endLine: 14,
-          endColumn: 19,
-        },
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 15,
-          column: 11,
-          endLine: 15,
-          endColumn: 19,
-        },
+        expectPropsNotSortedError([14, 11, 14, 19]),
+        expectPropsNotSortedError([15, 11, 15, 19]),
       ],
     },
     {
       code: '\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          "a": PropTypes.string,\n          "B": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          "a": "a",\n          "B": "B",\n        };\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 13,
-          column: 11,
-          endLine: 13,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([13, 11, 13, 19])],
     },
     {
       code: '\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello</div>;\n          }\n        }\n        Hello.propTypes = {\n          "a": PropTypes.string,\n          "B": PropTypes.string,\n        };\n        Hello.defaultProps = {\n          "B": "B",\n          "a": "a",\n        };\n      ',
@@ -200,104 +128,32 @@ ruleTester.run('sort-default-props', {} as never, {
           ignoreCase: true,
         },
       ],
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 13,
-          column: 11,
-          endLine: 13,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([13, 11, 13, 19])],
     },
     {
       code: '\n        const First = (props) => <div />;\n        const propTypes = {\n          z: PropTypes.string,\n          a: PropTypes.any,\n        };\n        const defaultProps = {\n          z: "z",\n          a: "a",\n        };\n        First.propTypes = propTypes;\n        First.defaultProps = defaultProps;\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 9,
-          column: 11,
-          endLine: 9,
-          endColumn: 17,
-        },
-      ],
+      errors: [expectPropsNotSortedError([9, 11, 9, 17])],
     },
     {
       code: '\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            b: PropTypes.string,\n            ...c.propTypes,\n            a: PropTypes.string\n          }\n          static defaultProps = {\n            b: "b",\n            a: "a",\n            ...c.defaultProps\n          }\n        }\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 10,
-          column: 13,
-          endLine: 10,
-          endColumn: 19,
-        },
-      ],
+      errors: [expectPropsNotSortedError([10, 13, 10, 19])],
     },
     {
       code: '\n        export default class ClassWithSpreadInPropTypes extends BaseClass {\n          static propTypes = {\n            a: PropTypes.string,\n            b: PropTypes.string,\n            c: PropTypes.string,\n            d: PropTypes.string,\n            e: PropTypes.string,\n            f: PropTypes.string\n          }\n          static defaultProps = {\n            b: "b",\n            a: "a",\n            ...c.defaultProps,\n            f: "f",\n            e: "e",\n            ...d.defaultProps\n          }\n        }\n      ',
       errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 13,
-          column: 13,
-          endLine: 13,
-          endColumn: 19,
-        },
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 16,
-          column: 13,
-          endLine: 16,
-          endColumn: 19,
-        },
+        expectPropsNotSortedError([13, 13, 13, 19]),
+        expectPropsNotSortedError([16, 13, 16, 19]),
       ],
     },
     {
       code: '\n        const defaults = {\n          b: "b"\n        };\n        const types = {\n          a: PropTypes.string,\n          b: PropTypes.string,\n          c: PropTypes.string\n        };\n        function StatelessComponentWithSpreadInPropTypes({ a, b, c }) {\n          return <div>{a}{b}{c}</div>;\n        }\n        StatelessComponentWithSpreadInPropTypes.propTypes = types;\n        StatelessComponentWithSpreadInPropTypes.defaultProps = {\n          c: "c",\n          a: "a",\n          ...defaults,\n        };\n      ',
-      errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 16,
-          column: 11,
-          endLine: 16,
-          endColumn: 17,
-        },
-      ],
+      errors: [expectPropsNotSortedError([16, 11, 16, 17])],
     },
     {
       code: '\n        class First extends React.Component {\n          render() {\n            return <div />;\n          }\n        }\n\n        First.defaultProps = {\n            a: PropTypes.any,\n            z: PropTypes.string,\n            onFoo: PropTypes.func,\n            onBar: PropTypes.func,\n        };\n      ',
       errors: [
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 11,
-          column: 13,
-          endLine: 11,
-          endColumn: 34,
-        },
-        {
-          messageId: 'propsNotSorted',
-          message:
-            'Default prop types declarations should be sorted alphabetically',
-          line: 12,
-          column: 13,
-          endLine: 12,
-          endColumn: 34,
-        },
+        expectPropsNotSortedError([11, 13, 11, 34]),
+        expectPropsNotSortedError([12, 13, 12, 34]),
       ],
     },
   ],

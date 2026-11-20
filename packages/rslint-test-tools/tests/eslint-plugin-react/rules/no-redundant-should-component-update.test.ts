@@ -1,8 +1,20 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoShouldCompUpdateError(
+  range: Parameters<typeof diagnostic>[2],
+) {
+  return diagnostic(
+    'noShouldCompUpdate',
+    'Foo does not need shouldComponentUpdate when extending React.PureComponent.',
+    range,
+  );
+}
 
-ruleTester.run('no-redundant-should-component-update', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-redundant-should-component-update', {
   valid: [
     // ---- Upstream valid: shouldComponentUpdate on plain React.Component ----
     {
@@ -75,7 +87,7 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [expectNoShouldCompUpdateError([2, 9, 6, 10])],
     },
     // ---- Upstream invalid: bare PureComponent ----
     {
@@ -86,7 +98,7 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [expectNoShouldCompUpdateError([2, 9, 6, 10])],
     },
     // ---- Upstream invalid: class field arrow shouldComponentUpdate ----
     {
@@ -97,7 +109,7 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [expectNoShouldCompUpdateError([2, 9, 6, 10])],
     },
     // ---- Upstream invalid: nested ClassExpression with own name (Bar) ----
     {
@@ -110,7 +122,13 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           };
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [
+        diagnostic(
+          'noShouldCompUpdate',
+          'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
+          [3, 18, 7, 12],
+        ),
+      ],
     },
     // ---- Upstream invalid: nested ClassExpression bare PureComponent ----
     {
@@ -123,7 +141,13 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           };
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [
+        diagnostic(
+          'noShouldCompUpdate',
+          'Bar does not need shouldComponentUpdate when extending React.PureComponent.',
+          [3, 18, 7, 12],
+        ),
+      ],
     },
     // ---- Upstream invalid: anonymous ClassExpression assigned to var (name from binding) ----
     {
@@ -134,7 +158,7 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [expectNoShouldCompUpdateError([2, 19, 6, 10])],
     },
     // ---- Edge: parens around extends expression — paren-transparent matching ESTree ----
     {
@@ -143,7 +167,7 @@ ruleTester.run('no-redundant-should-component-update', {} as never, {
           shouldComponentUpdate() { return true; }
         }
       `,
-      errors: [{ messageId: 'noShouldCompUpdate' }],
+      errors: [expectNoShouldCompUpdateError([2, 9, 4, 10])],
     },
   ],
 });

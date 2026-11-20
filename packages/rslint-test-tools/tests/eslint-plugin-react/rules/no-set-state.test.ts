@@ -1,8 +1,14 @@
-import { RuleTester } from '../rule-tester';
+import { RuleTester } from '@rslint/rule-tester';
+import { fixtureConfig } from '../config';
+import { diagnostic } from '../expectations';
 
-const ruleTester = new RuleTester();
+function expectNoSetStateError(range: Parameters<typeof diagnostic>[2]) {
+  return diagnostic('noSetState', 'Do not use setState', range);
+}
 
-ruleTester.run('no-set-state', {} as never, {
+const ruleTester = new RuleTester(fixtureConfig);
+
+ruleTester.run('no-set-state', {
   valid: [
     // ---- Upstream valid cases ----
     {
@@ -170,7 +176,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     {
       code: `
@@ -185,7 +191,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         });
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     {
       code: `
@@ -200,7 +206,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     {
       code: `
@@ -215,7 +221,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     {
       code: `
@@ -225,7 +231,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         };
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 45, 4, 58])],
     },
     // ---- Edge: parenthesized receiver `(this).setState` ----
     {
@@ -237,7 +243,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 28])],
     },
     // ---- Edge: optional-chain receiver `this?.setState` ----
     {
@@ -249,7 +255,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 27])],
     },
     // ---- Edge: setState inside setTimeout callback ----
     {
@@ -262,7 +268,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([5, 15, 5, 28])],
     },
     // ---- Edge: setState inside constructor ----
     {
@@ -274,7 +280,7 @@ ruleTester.run('no-set-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([5, 13, 5, 26])],
     },
     // ---- Edge: extends PureComponent ----
     {
@@ -286,7 +292,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Edge: bare extends Component ----
     {
@@ -298,7 +304,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Edge: stateless functional component ----
     {
@@ -308,7 +314,7 @@ ruleTester.run('no-set-state', {} as never, {
           return <div/>;
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([3, 11, 3, 24])],
     },
     // ---- Edge: stateless arrow component ----
     {
@@ -318,7 +324,7 @@ ruleTester.run('no-set-state', {} as never, {
           return <div/>;
         };
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([3, 11, 3, 24])],
     },
     // ---- Edge: multiple setState calls in same component ----
     {
@@ -331,7 +337,10 @@ ruleTester.run('no-set-state', {} as never, {
           }
         }
       `,
-      errors: [{ messageId: 'noSetState' }, { messageId: 'noSetState' }],
+      errors: [
+        expectNoSetStateError([4, 13, 4, 26]),
+        expectNoSetStateError([5, 22, 5, 35]),
+      ],
     },
     // ---- Edge: bare PureComponent ----
     {
@@ -343,7 +352,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Edge: custom pragma — Preact.Component IS a component ----
     {
@@ -356,7 +365,7 @@ ruleTester.run('no-set-state', {} as never, {
         }
       `,
       settings: { react: { pragma: 'Preact' } },
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Edge: custom createClass — myCreate IS a component ----
     {
@@ -369,7 +378,7 @@ ruleTester.run('no-set-state', {} as never, {
         });
       `,
       settings: { react: { createClass: 'myCreate' } },
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Real-world: React.memo wrapping class ----
     {
@@ -381,7 +390,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         });
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Real-world: redux connect(...)(class) ----
     {
@@ -393,7 +402,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         });
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([4, 13, 4, 26])],
     },
     // ---- Real-world: addEventListener callback ----
     {
@@ -407,7 +416,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([5, 15, 5, 28])],
     },
     // ---- Multi-component file: only React component reports ----
     {
@@ -424,7 +433,7 @@ ruleTester.run('no-set-state', {} as never, {
           render() { return <div/>; }
         }
       `,
-      errors: [{ messageId: 'noSetState' }],
+      errors: [expectNoSetStateError([9, 13, 9, 26])],
     },
   ],
 });
