@@ -250,6 +250,42 @@ func TestUpdatePreservesOtherWriter(t *testing.T) {
 	})
 }
 
+func TestUpdateRechecksTargetAliases(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options Options
+		changed string
+	}{
+		{"prune", Options{Mode: Prune}, "app.js"},
+		{"record no rules", Options{Mode: Record, Rules: []string{}}, "entry.js"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			baseline, err := Open(test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected := baseline.cwd + "app.js"
+			baseline.NoteTargetAlias(selected, baseline.cwd+"entry.js")
+			if err := baseline.CheckTargetAliases(); err != nil {
+				t.Fatal(err)
+			}
+
+			// Another writer records a count after target selection.
+			latest := fmt.Sprintf(`{ %q: { "x": { "count": 1 } } }`, test.changed)
+			if err := os.WriteFile(DefaultFilename, []byte(latest), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := baseline.Apply(t.Context(), []FileResult{{Path: selected}}, nil); err == nil {
+				t.Fatal("updated a baseline with counts for aliased targets")
+			}
+			if got, err := os.ReadFile(DefaultFilename); err != nil || string(got) != latest {
+				t.Fatalf("baseline after rejected update = %q, error %v, want %q", got, err, latest)
+			}
+		})
+	}
+}
+
 func TestDirectoryHash(t *testing.T) {
 	// These values come from ESLint's imurmurhash, including a signed UTF-16 tail.
 	for cwd, want := range map[string]string{

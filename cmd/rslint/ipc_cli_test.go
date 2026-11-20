@@ -68,6 +68,47 @@ func TestClassifyPaths(t *testing.T) {
 	}
 }
 
+func TestCLIDoubleSlashPaths(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		const unc = "//server/share/file.ts"
+		if got := normalizeCLIRoot(unc); got != unc {
+			t.Fatalf("UNC path = %q, want %q", got, unc)
+		}
+		return
+	}
+
+	root := osvfs.FS().Realpath(txtarfs.MustParseFile(t, "testdata/cli_globs.txtar").Materialize(t, ""))
+	t.Chdir(root)
+	t.Setenv("PWD", "/"+root)
+	if cwd, err := cliWorkingDirectory(); err != nil || cwd != root {
+		t.Fatalf("working directory = %q, %v; want %q", cwd, err, root)
+	}
+	const backslashName = `/src/literal\name.ts`
+	if got := normalizeCLIRoot("/" + backslashName); got != backslashName {
+		t.Fatalf("POSIX filename = %q, want %q", got, backslashName)
+	}
+	file := tspath.ResolvePath(root, "src/a.ts")
+	dir := tspath.ResolvePath(root, "other")
+	for _, exact := range []bool{false, true} {
+		args := lintArgs{FS: osvfs.FS()}
+		wantFiles := []string{file}
+		inputs := []string{"/" + file, "//" + dir}
+		var exactPaths []string
+		if exact {
+			exactPaths = inputs
+		} else {
+			args.Positional = append(inputs, "/"+root+`/src/\[ab\].ts`)
+			wantFiles = append(wantFiles, tspath.ResolvePath(root, "src/[ab].ts"))
+		}
+		if err := prepareCLIInputs(t.Context(), &args, exactPaths); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(args.AllowFiles, wantFiles) || !slices.Equal(args.AllowDirs, []string{dir}) {
+			t.Fatalf("exact=%v: files %q, dirs %q; want %q, [%q]", exact, args.AllowFiles, args.AllowDirs, wantFiles, dir)
+		}
+	}
+}
+
 func TestRunCLIQuotedGlobs(t *testing.T) {
 	root := txtarfs.MustParseFile(t, "testdata/cli_globs.txtar").Materialize(t, "")
 	if err := os.Mkdir(filepath.Join(root, "src/git-ignored/.git"), 0o755); err != nil {

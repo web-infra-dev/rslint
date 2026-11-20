@@ -288,7 +288,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 		return 1
 	}
-	abortRun := func(reason, legacyMessage string) int {
+	abortRun := func(code int, reason, legacyMessage string) int {
 		// The IPC owner reports the signal or disconnect that canceled the run.
 		if ctx.Err() != nil {
 			return 1
@@ -300,7 +300,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		} else {
 			fmt.Fprintln(os.Stderr, legacyMessage)
 		}
-		return 1
+		return code
 	}
 
 	// Project declarations and target discovery use the pre-override config.
@@ -361,7 +361,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			// authorize recursive lint-target walking.
 			targetDirectories = rslintconfig.ResolveDirectoryIdentities(args.AllowDirs, fs)
 		}
-		targetPlan, err = target.Resolve(target.Request{
+		request := target.Request{
 			ConfigMap:       targetConfigMap,
 			Config:          targetRslintConfig,
 			ConfigDirectory: currentDirectory,
@@ -374,9 +374,18 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			GitPolicy:       configCatalog.GitPolicy,
 			PathSpaces:      pathSpaces,
 			SingleThreaded:  singleThreaded,
-		})
+		}
+		if baseline != nil {
+			request.OnFileAlias = baseline.NoteTargetAlias
+		}
+		targetPlan, err = target.Resolve(request)
 		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
+		}
+		if baseline != nil && (fix || args.Suppressions.Mode != suppressions.Check) {
+			if err := baseline.CheckTargetAliases(); err != nil {
+				return abortRun(2, err.Error(), err.Error())
+			}
 		}
 		configResolver = configLint.NewResolver(configLint.ResolverOptions{
 			ConfigsByOwner:       configMap,
@@ -390,7 +399,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		})
 		projectPolicies, err = configResolver.ProjectPolicies(targetPlan.Files, singleThreaded)
 		if err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		pathSpaces = targetPlan.PathSpaces()
 	}
@@ -400,7 +409,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	// lexical, while every generation reads the same planned physical inputs.
 	sourceFS, err := loader.WithFrozenIO(fs, pathSpaces, targetPlan.Files)
 	if err != nil {
-		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	programSession := loader.NewSession(sourceFS)
 	hasEslintPlugins := !typeCheckOnly && len(eslintPlugins) > 0
@@ -575,7 +584,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	pipelineResult, err := linter.RunPipeline(ctx, pipelineRequest)
 	var loadError *linter.GenerationLoadError
 	if _, fixing := pipelineResult.AppliedFixes(); !fixing && errors.As(err, &loadError) {
-		return abortRun(loadError.Error(), fmt.Sprintf("error: %v", loadError))
+		return abortRun(1, loadError.Error(), fmt.Sprintf("error: %v", loadError))
 	}
 
 	pluginRecords := pipelineResult.PluginOutcomes()
@@ -592,12 +601,12 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 			operation = "applying fixes"
 			reason = operation + ": " + reason
 		}
-		return abortRun(reason, fmt.Sprintf("error %s: %v", operation, err))
+		return abortRun(1, reason, fmt.Sprintf("error %s: %v", operation, err))
 	}
 	allDiags, complete := pipelineResult.Observation.CompleteDiagnostics()
 	if !complete {
 		const reason = "CLI lint returned an incomplete observation"
-		return abortRun(reason, "error running linter: "+reason)
+		return abortRun(1, reason, "error running linter: "+reason)
 	}
 	lintResult := pipelineResult.Observation.Native.Lint
 	initialObservation := pipelineResult.Observation
@@ -626,7 +635,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	var suppressionError string
 	if baseline != nil {
 		if err := ctx.Err(); err != nil {
-			return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+			return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 		}
 		allDiags, suppressionError = applyLintSuppressions(ctx, baseline, pipelineResult.Observation, allDiags, pluginRecords, args)
 	}
@@ -661,7 +670,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 		}
 	}
 	if err := ctx.Err(); err != nil {
-		return abortRun(err.Error(), fmt.Sprintf("error: %v", err))
+		return abortRun(1, err.Error(), fmt.Sprintf("error: %v", err))
 	}
 	report, err := assembleLintReport(lintReportInput{
 		Mode:             mode,
@@ -673,6 +682,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	})
 	if err != nil {
 		return abortRun(
+			1,
 			"assembling lint report: "+err.Error(),
 			fmt.Sprintf("error assembling lint report: %v", err),
 		)
@@ -681,6 +691,7 @@ func handleLintCommand(args lintArgs, ctx context.Context, dispatch linter.Eslin
 	outputOptions.ComparePaths = comparePathOptions
 	if err := renderLintReport(ctx, os.Stdout, report, outputOptions); err != nil {
 		return abortRun(
+			1,
 			"writing lint report: "+err.Error(),
 			fmt.Sprintf("error writing lint report: %v", err),
 		)

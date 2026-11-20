@@ -36,9 +36,11 @@ This baseline records two `no-debugger` errors in `src/app.js`.
 
 If a third `no-debugger` error appears in that file, Rslint reports all three. Moving the two original errors to different lines leaves the count at two. Each file and rule has its own count.
 
-Rslint records the filename it checked, relative to the working directory's physical path, using `/` as the separator. Entering the same directory through a symlink keeps the base for relative paths stable. This also applies when you pass `--config`. On Windows, a file on another drive or network share uses its absolute path.
+Rslint records the filename it checked, relative to the working directory's physical path, using `/` as the separator. Entering the same directory through a symlink keeps this base stable. Relative CLI arguments such as `../app.js` still follow the working directory used for file selection. The same conventions apply with `--config`. On Windows, a file on another drive or network share uses its absolute path.
 
-For example, if `linked.js` points to `src/app.js`, the two names can match different rule settings. Checking them in separate runs gives each name its own count. Pruning `linked.js` leaves the entry for `src/app.js` intact. When Rslint selects one target from multiple arguments, it uses the entry for the name it checked.
+For example, if `linked.js` points to `src/app.js`, the two names can match different rules. Checking them in separate runs gives each name its own count. Pruning `linked.js` leaves the entry for `src/app.js` intact.
+
+When a project scan or explicit arguments select both names, Rslint checks the physical file once. If you ask to record counts for both names, or either name already has a count, Rslint exits with code `2` and identifies both paths. Run Rslint on each path separately, or exclude one name in your config so project scans select the intended entry. Repeating the same filename as `app.js` and `./app.js` works normally.
 
 To reuse an ESLint baseline, run `rslint --suppressions-location eslint-suppressions.json` from the directory where it was recorded. Entries apply when the file path and rule ID match.
 

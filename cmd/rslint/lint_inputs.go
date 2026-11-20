@@ -7,31 +7,27 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/config/target"
-	"golang.org/x/text/unicode/norm"
 )
 
-// Go honors the shell's PWD. On macOS this can differ from the on-disk cwd
-// in case or Unicode spelling. Keep deliberate symlinks visible to rules.
 func cliWorkingDirectory() (string, error) {
-	cwd, err := os.Getwd()
+	cwd, err := getCLIWorkingDirectory()
 	if err != nil {
 		return "", err
 	}
-	if runtime.GOOS == "darwin" {
-		clean := filepath.Clean(cwd)
-		native, err := syscall.Getwd()
-		if err == nil && native != clean && strings.EqualFold(norm.NFC.String(native), norm.NFC.String(clean)) {
-			if resolved, err := filepath.EvalSymlinks(cwd); err == nil && resolved == clean {
-				cwd = native
-			}
-		}
+	return tspath.NormalizePath(normalizeCLIRoot(cwd)), nil
+}
+
+// The native POSIX CLI treats repeated leading slashes as one root. Keep
+// glob escapes and Windows UNC roots intact before entering tsgo's path space.
+func normalizeCLIRoot(path string) string {
+	if runtime.GOOS != "windows" && strings.HasPrefix(path, "//") {
+		return "/" + strings.TrimLeft(path, "/")
 	}
-	return tspath.NormalizePath(cwd), nil
+	return path
 }
 
 // IPC-supplied files are exact names. Only raw CLI arguments expand as globs.
@@ -47,6 +43,9 @@ func prepareCLIInputs(ctx context.Context, args *lintArgs, exactPaths []string) 
 		args.AllowFiles, args.AllowDirs = classifyPaths(cwd, exactPaths)
 		args.Positional = nil
 		return nil
+	}
+	for i, input := range args.Positional {
+		args.Positional[i] = normalizeCLIRoot(input)
 	}
 	selection, err := target.SelectInputs(ctx, args.FS, cwd, args.Positional)
 	if err != nil {

@@ -59,7 +59,7 @@ func applyLintSuppressions(
 	}
 	visible, unused, err := baseline.Apply(ctx, checked, diagnostics)
 	if err != nil {
-		return diagnostics, err.Error()
+		return visible, err.Error()
 	}
 	if unused && !args.PassOnUnpruned {
 		if len(args.ConfigCatalog.Failures) > 0 {
