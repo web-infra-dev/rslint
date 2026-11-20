@@ -1821,142 +1821,6 @@ queries observe the public arrays. These views retain no transport capability
 or original frame buffer. Token value/range/location construction remains in
 languages/js, while caching and ESLint query behavior belong to SourceCode.
 
-The independent `internal/typeservice` foundation accepts an already bound
-Program and explicitly eligible sources. `BindTarget` authorizes one canonical
-source identity and session generation; dependency declarations remain valid
-semantic operands. The first semantic query acquires the anchored checker that
-supplies stable type, symbol and signature handles. Queries resolve source
-indices before acquiring the checker, copy typed facts during a short exclusive
-lease, then resolve declaration indices and encode packets after releasing it.
-The session retains its Program directly until close, outside the Program's
-weak derived cache.
-
-A syntax-only session admits exact source files and exposes both parser-service
-node maps. The JS parser services return `program: null` and leave compiler
-option flags undefined. A map lookup projects the existing compiler tree.
-The session rejects semantic requests even if its Program also has a checker.
-
-Rules with a project can inspect Program diagnostics, source roots, references,
-module resolution, and compiler statistics. Program-wide queries acquire their
-own checker leases. The JS checker also exposes intrinsic and literal types,
-symbol lookup and formatting, type predicates, and inspection of generated
-declaration nodes. Statistics and the checker's mutable result slots are read
-on demand. Declared interface members remain absent until the checker resolves
-them. The worker then retains the declared properties, signatures and index
-information separately from inherited members. Source views expose the project
-script target and applicable module format. Compiler output through `Program.emit()` and source replacement
-through `SourceFile.update()` are unsupported and throw. Conditional-type
-instantiation keys are opaque to rules and scoped to the native checker.
-
-The ESTree builder's `ProjectOrigins` maps an existing compact frame to its
-original compiler nodes and records their preferred reverse aliases. It reuses
-the frame's node numbering without scanning tokens or encoding another frame.
-Flattened comma prefixes and
-detached optional chain prefixes retain compact aliases referencing original
-frame node IDs. The file client creates ordinary writable aliases only on
-reverse lookup. Their original membership survives earlier listener mutations.
-Native compiler nodes and proxies resolve on map lookup through the pinned
-binary syntax reader.
-
-`TypeServiceClient` belongs to one worker and Program generation. Each
-`file(binding)` handle is closed in `finally`; file completion releases ESTree
-maps while preserving generation-scoped native, type, symbol and signature
-identities while a plugin can observe them. Weak interning releases unreachable
-wrappers and their keys. Closing the owner invalidates compiler queries and
-releases its transports and caches. Inspecting a retained type can still
-display its local ID and plugin metadata.
-
-An injected synchronous transport uses a finite request/fact protocol and
-offset-addressed binary records. Property/name arguments and packet strings
-preserve UTF-16 code units. Scalar answers include shallow facts for their
-direct handles and symbols, without recursively exporting member or type graphs.
-Reference targets, type parameters, alias arguments and operands of derived
-types are handles on those facts. Index signatures and type predicates come from
-the checker on demand.
-Scope and export lists carry symbol names and handles so name searches can
-defer declaration facts. JSDoc queries return display parts with link targets
-and UTF-16 text spans. Suggestion diagnostics preserve the source file, UTF-16
-ranges, message chains and related locations. The worker reads generated type
-nodes from the compiler's detached binary syntax tree and translates their
-kinds for JS rules. Generated nodes have no source-node handle.
-Symbol member tables materialize on demand. Reads of transient symbol links
-and mapped-type fields observe the checker's current values without triggering
-resolution. Type methods and the `typeArguments` accessor are inherited.
-Field presence follows the TypeScript type kind and its current state. A mapped
-type exposes the slots the checker has already filled in one read. Compiler
-fields are read-only and non-configurable, and their member lists are
-read-only. Preventing extensions preserves existing property descriptors.
-A type with only fixed, read-only properties then satisfies `Object.isFrozen`.
-Checking a field's presence or listing
-keys reads its metadata and leaves member objects lazy. Plugins can add their
-own properties with ordinary JavaScript descriptors. Transparent proxies
-preserve the original handle. Objects derived from a type have no checker
-handle of their own. For plugin getters that use the type as a `WeakMap`
-key, use `util.inspect(type, { getters: true })` or pass `customInspect: true`
-to `console.dir`. With custom inspection disabled, Node unwraps proxies
-before invoking getters. A getter that uses its receiver as a key can then
-display a different value. Editing an unwrapped debugger target is unsupported.
-Explicit signature queries pass the apparent
-argument count and candidate output through normal overload resolution. They
-can change the checker's cached answers for every client. Node-dependent
-semantic reads therefore go directly to the checker. A variable declaration's
-own identifier has a fixed symbol type, and an enum member declaration has a
-fixed constant value. The worker can reuse these reads when it already has the
-syntax tree. Type and signature
-formatting use the checker printer with the writer layout used by each
-TypeScript method. Syntax navigation uses the reader's synthesized tokens and
-lists. Their identities survive decoded source eviction, and semantic queries
-continue to use encoded compiler nodes.
-Workers and brokers retain each supplemental fact under its canonical key,
-rather than duplicating it under every node query. Fields decode on demand;
-wrappers retain requested immutable values and translated flags, never packet
-readers. A byte-bounded packet LRU is checked before shared storage and the
-bridge. Query keys use canonical source filenames while retaining every semantic
-argument. `QueryBatch` resolves node identities before one short checker lease
-and encodes its answers afterward.
-
-A caller can explicitly request immutable facts in batches of at most 256
-queries. Rule execution loads semantic facts as the rule requests them so
-overload resolution follows the rule's call order.
-
-Compiler node proxies hold canonical file/index identities. Source metadata and
-`getSourceFile()` need no syntax transfer; a finite `nodeRecord` supplies
-requested declaration ancestors and names, with a separate byte-bounded summary
-cache. Relative and case aliases use metadata-only canonicalization through the
-Program; they do not request source syntax. Other structural properties load the
-exact immutable source through a separate callback outside checker leases.
-Copied source buffers have their own byte-bounded generation LRU. Full syntax
-and compact summaries use the same proxies and enum/heritage adapters, preserving
-identity through hydration. File origin maps continue to reference the exact
-compiler nodes and preferred reverse aliases.
-Node-local values written by TypeScript helpers stay on the JavaScript proxy,
-so helper caches remain observable without modifying the compiler tree.
-
-A broker may publish immutable packets into `SharedTypeCacheOwner`, a portable
-JavaScript-owned SharedArrayBuffer with explicit byte and entry budgets. When an
-entry count is omitted, the index uses at most one quarter of the byte budget;
-it has no separate half-capacity insertion cutoff. Bounded probe walks preserve
-existing hits at capacity and fall back to binary replies when insertion cannot
-proceed. A header-only cache preserves shared generation state when the packet
-budget is exhausted. Independent workers decode their own requested values. Live wrappers
-and their requested arrays have generation validity, rather than a claimed global heap
-bound. Plugins retaining syntax methods or decoded values can retain their
-independently owned graphs after close; semantic access rejects. Shared storage
-is reclaimed when its owner/readers/descriptors are unreachable. This cache
-retains no native attachment lease or research Go-mapped V8 store.
-
-The optional parser-services factory is available to the direct rule runner;
-production CLI, API, LSP and WorkerPool requests do not supply it yet. Entrypoint
-admission, scheduling, generation transfer and editor integration remain follow-up
-work. Meta-property keywords are scalar compiler fields, so their synthetic
-ESTree identifiers have no compiler node origin and reject semantic queries.
-The `@rslint/api` workspace package owns the binary syntax reader, decoder and
-enums from the same pinned compiler source as Go. Rslib selects its
-`@typescript/source` entry for runtime bundling. Core's workspace type check
-covers the worker with the same strict settings as the rest of core and
-resolves the public declarations from the API's own build. Public plugin
-declarations are bundled from the public entries.
-
 The listener dispatcher preserves one specificity-sorted order for simple and
 complex selectors. Only complex ESQuery matches prepare an ancestor array,
 shared within the current enter or exit phase. Simple listeners do not copy
@@ -2370,6 +2234,17 @@ Plugin execution has two paths:
 - third-party ESLint plugin objects are loaded from JS/TS config on the Node side; Go derives catalog placeholders for their rules and sends per-file batches back to the Node plugin worker over reverse IPC
 
 String plugin declarations select bundled Go plugin namespaces. Live third-party plugin objects require a JS/TS module config. The repository currently ships Go implementations for TypeScript ESLint, Import, Jest, JSX accessibility, Node.js (`node`), Promise, React, React Hooks, Rstest, and Unicorn rule namespaces.
+
+Only direct callers of the ESLint rule runner (`lintFile`) can supply a factory
+for `sourceCode.parserServices`. Syntax-only sessions map between ESTree and
+TypeScript nodes and expose `program: null`. Typed sessions also expose a
+read-only `Program` and type checker. `Program.emit()` and `SourceFile.update()`
+are unsupported.
+
+`internal/typeservice` runs queries against the existing Go `Program`. Each
+worker's `TypeServiceClient` requests compiler data on demand over a synchronous
+transport. Node maps belong to one file. Within a worker, types, symbols and
+signatures keep their identity across files in the same Program generation.
 
 ### Rule Extension Points
 
