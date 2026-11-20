@@ -42,7 +42,7 @@ Rslint also excludes a containing group when looking for a previous occurrence o
 
 Separate `unique symbol` declarations retain their distinct identities, even when their syntax is identical. Repeated references to the same declared symbol or branded type can still be duplicates.
 
-Comments around a singleton group's member are preserved when its wrapping tokens are removed. Rslint reports a duplicate without an autofix if deletion would remove a lint directive, detach `@ts-expect-error` or `@ts-ignore` from its target, or change which code a line-based lint directive covers. This includes `global`, `globals`, and `exported` directives separated from their names by tabs or newlines. These checks preserve TypeScript diagnostics and other rules' behavior after fixing.
+Comments around a singleton group's member are preserved when its wrapping tokens are removed. Rslint reports a duplicate without an autofix if deletion would remove a lint directive, detach `@ts-expect-error` or `@ts-ignore` from its target, or change which code a line-based lint directive covers. This includes `global`, `globals`, and `exported` directives separated from their names by tabs or newlines. TypeScript targets follow TypeScript 6.0.3's ECMAScript whitespace and line-comment rules. A retained inline directive that controls a later statement does not prevent a safe fix on the current line. These checks preserve TypeScript diagnostics and other rules' behavior after fixing.
 
 ## Original Documentation
 

@@ -16,11 +16,17 @@ import (
 // A comment's text is only part of its meaning: line directives also depend on
 // the code they cover. This guard runs before reserving any member for removal.
 type fixDirectiveGuard struct {
-	source   *ast.SourceFile
-	comments func() []*ast.CommentRange
+	source    *ast.SourceFile
+	comments  func() []*ast.CommentRange
+	tsTargets []typeScriptDirectiveTarget
 }
 
-func (g fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixes []rule.RuleFix) bool {
+type typeScriptDirectiveTarget struct {
+	directive core.TextRange
+	target    core.TextRange
+}
+
+func (g *fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixes []rule.RuleFix) bool {
 	text := g.source.Text()
 	start, end := bodyRange.Pos(), bodyRange.End()
 	removesLines := false
@@ -33,7 +39,7 @@ func (g fixDirectiveGuard) safe(bodyRange core.TextRange, triviaStart int, fixes
 	}
 	// Parser-owned metadata handles @ts-ignore/@ts-expect-error without
 	// mistaking directive-like strings for comments or scanning unrelated ASTs.
-	if g.affectsTypeScriptDirective(start, end, triviaStart) {
+	if g.affectsTypeScriptDirective(fixes) {
 		return false
 	}
 	inspectStart := min(start, triviaStart)
@@ -122,30 +128,74 @@ func fixLineDirective(value string) bool {
 	return false
 }
 
-func (g fixDirectiveGuard) affectsTypeScriptDirective(start, end, triviaStart int) bool {
+// Targets follow TypeScript 6.0.3: directives are keyed by their ending
+// line, and diagnostics look back through trimmed blank or // comment lines.
+// A shared advancing cursor visits each intervening line only once per file.
+func (g *fixDirectiveGuard) typeScriptTargets() []typeScriptDirectiveTarget {
 	directives := g.source.CommentDirectives
-	last := sort.Search(len(directives), func(i int) bool { return directives[i].Loc.Pos() >= end })
-	if last == 0 {
-		return false
+	if len(directives) == 0 {
+		return nil
 	}
-	directive := directives[last-1]
-	if directive.Loc.End() > min(start, triviaStart) {
-		return true // directive in the member or surrounding wrapper/trivia
+	if g.tsTargets != nil {
+		return g.tsTargets
 	}
-	// TypeScript searches preceding blank/comment-only lines for a suppression.
-	// Keep a directive above the affected line bound to its original target.
+	text := g.source.Text()
 	lineStarts := scanner.GetECMALineStarts(g.source)
-	startLine := scanner.GetECMALineOfPosition(g.source, start)
-	directiveLine := scanner.GetECMALineOfPosition(g.source, directive.Loc.Pos())
-	if directiveLine >= startLine {
+	g.tsTargets = make([]typeScriptDirectiveTarget, 0, len(directives))
+	nextLine := 0
+	for _, directive := range directives {
+		directiveLine := scanner.GetECMALineOfPosition(g.source, directive.Loc.End())
+		nextLine = max(nextLine, directiveLine+1)
+		for nextLine < len(lineStarts) {
+			lineEnd := len(text)
+			if nextLine+1 < len(lineStarts) {
+				lineEnd = int(lineStarts[nextLine+1])
+			}
+			lineText := ecmascript.StringTrim(text[int(lineStarts[nextLine]):lineEnd])
+			if lineText != "" && !strings.HasPrefix(lineText, "//") {
+				break
+			}
+			nextLine++
+		}
+		targetStart, targetEnd := len(text), len(text)
+		if nextLine < len(lineStarts) {
+			targetStart = int(lineStarts[nextLine])
+			if nextLine+1 < len(lineStarts) {
+				targetEnd = int(lineStarts[nextLine+1])
+			}
+		}
+		g.tsTargets = append(g.tsTargets, typeScriptDirectiveTarget{directive: directive.Loc, target: core.NewTextRange(targetStart, targetEnd)})
+	}
+	return g.tsTargets
+}
+
+func (g *fixDirectiveGuard) affectsTypeScriptDirective(fixes []rule.RuleFix) bool {
+	targets := g.typeScriptTargets()
+	if len(targets) == 0 {
 		return false
 	}
-	for line := directiveLine + 1; line < startLine; line++ {
-		lineText := g.source.Text()[int(lineStarts[line]):int(lineStarts[line+1])]
-		lineText = strings.TrimLeft(lineText, " \t")
-		if !strings.HasPrefix(lineText, "//") && !strings.HasPrefix(lineText, "\r") && !strings.HasPrefix(lineText, "\n") {
-			return false
+	text := g.source.Text()
+	for _, fix := range fixes {
+		start, end := fix.Range.Pos(), fix.Range.End()
+		// Both sequences are monotonic: each target follows its directive.
+		// Skip directives whose target ended before this edit, and those whose
+		// comments start after it. Retained comments in gaps between separate
+		// token edits are not treated as removed.
+		first := sort.Search(len(targets), func(i int) bool { return targets[i].target.End() > start })
+		last := sort.Search(len(targets), func(i int) bool { return targets[i].directive.Pos() >= end })
+		for i := first; i < last; i++ {
+			item := targets[i]
+			if start < item.directive.End() && item.directive.Pos() < end {
+				return true
+			}
+			if start < item.target.End() && item.target.Pos() < end {
+				return true
+			}
+			gapStart, gapEnd := max(start, item.directive.End()), min(end, item.target.Pos())
+			if gapStart < gapEnd && strings.ContainsAny(text[gapStart:gapEnd], ecmascript.LineTerminators) {
+				return true
+			}
 		}
 	}
-	return true
+	return false
 }
