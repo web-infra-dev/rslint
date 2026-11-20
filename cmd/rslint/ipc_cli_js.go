@@ -23,10 +23,6 @@ func runCLI(args []string) int {
 		fmt.Fprint(os.Stderr, usage)
 		return 0
 	}
-	preflight, code := prepareLintCommand(parsed)
-	if code != 0 {
-		return code
-	}
 	// js/wasm has no Node IPC host, so no eslint-plugin dispatch (nil).
-	return handleLintCommand(parsed, preflight, context.Background(), nil)
+	return handleLintCommand(parsed, context.Background(), nil)
 }

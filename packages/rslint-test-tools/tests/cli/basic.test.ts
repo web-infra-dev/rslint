@@ -1,7 +1,6 @@
 import { describe, test, expect } from 'rstack/test';
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { runCliProcess, type CliProcessResult } from './spawn-cli.js';
 const RSLINT_BIN = require.resolve('@rslint/core/bin');
@@ -112,7 +111,7 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
-  test('reads and prunes the selected ESLint path when two spellings have different counts', async () => {
+  test('uses one suppression entry for paths to the same file', async () => {
     const temp = await createTempDir({
       'rslint.config.mjs':
         "export default [{files:['**/*.js'],rules:{'no-debugger':'error'}}];",
@@ -125,144 +124,50 @@ describe('CLI Configuration Tests', () => {
       const link = path.join(parent, 'link');
       await fs.symlink(repo, link, 'junction');
       const cwd = path.join(link, 'a');
-      const windows = process.platform === 'win32';
-      const alternate = path.join(windows ? repo : link, 'b', 'file.js');
-      const physical = path.join(repo, 'b', 'file.js');
       const relative = '../b/file.js';
-      const otherKey = path
-        .relative(windows ? cwd : path.join(repo, 'a'), alternate)
-        .split(path.sep)
-        .join('/');
-      const baseline = path.join(cwd, 'eslint-suppressions.json');
-      const one = { 'no-debugger': { count: 1 } };
-      await fs.writeFile(
-        baseline,
-        JSON.stringify({
-          [relative]: one,
-          [otherKey]: { 'no-debugger': { count: 3 } },
-        }),
-      );
+      const logical = path.join(link, 'b', 'file.js');
+      const physical = path.join(repo, 'b', 'file.js');
+      const paths = [relative, logical, physical];
+      const reversed = [...paths].reverse();
+      const baseline = path.join(cwd, 'rslint-suppressions.json');
       const check = (...args: string[]) =>
         runCliProcess(
           process.execPath,
-          [
-            RSLINT_BIN,
-            '--suppressions-location',
-            baseline,
-            '--format',
-            'jsonline',
-            ...args,
-          ],
+          [RSLINT_BIN, '--format', 'jsonline', ...args],
           { cwd, env: { ...process.env, PWD: cwd } },
         );
 
-      const exceeded = await check(relative);
-      expect(exceeded.exitCode).toBe(1);
-      expect(exceeded.stdout.trim().split('\n')).toHaveLength(2);
-      expect((await check('../b/*.js')).exitCode).toBe(1);
-      expect((await check(path.dirname(alternate))).exitCode).toBe(2);
-      const unused = await check(alternate);
-      expect(unused.exitCode).toBe(2);
-      expect(unused.stdout.trim()).toBe('');
-      expect(unused.stderr).toContain('Unused suppressions');
-
       const two = { 'no-debugger': { count: 2 } };
-      if (!windows) {
-        // A logical PWD lets both operands select the same caller-visible filename.
-        await fs.writeFile(
-          baseline,
-          JSON.stringify({ [relative]: one, [otherKey]: two }),
-        );
-        for (const args of [
-          [relative, alternate],
-          [alternate, relative],
-          [relative, physical],
-          [physical, relative],
-        ]) {
-          const result = await check(...args);
-          expect(result.exitCode).toBe(1);
-          expect(
-            result.stdout
-              .trim()
-              .split('\n')
-              .map((line) => JSON.parse(line).ruleName),
-          ).toEqual(['no-debugger', 'no-debugger']);
-        }
-      }
-      await fs.writeFile(alternate, '');
-      const pruned = await check('--prune-suppressions', alternate);
-      expect(pruned.exitCode, pruned.stderr).toBe(0);
-      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-        [relative]: one,
+      const alias = { '../../link/b/file.js': two };
+      const seeded = JSON.stringify({
+        [relative]: { 'no-debugger': { count: 1 } },
+        ...alias,
       });
-      if (!windows) {
-        await fs.writeFile(alternate, 'debugger; debugger;');
+      await fs.writeFile(baseline, seeded);
+      for (const args of [[logical], [relative, logical], paths, reversed]) {
+        const result = await check(...args);
+        expect(result.exitCode, result.stderr).toBe(1);
         expect(
-          (await check('--suppress-all', alternate, relative)).exitCode,
-        ).toBe(0);
-        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-          [relative]: two,
-          [otherKey]: two,
-        });
-        await fs.writeFile(alternate, '');
-        expect(
-          (await check('--prune-suppressions', relative, alternate)).exitCode,
-        ).toBe(0);
-        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
-
-        // Both arguments select the same baseline key from the native cwd.
-        await fs.writeFile(physical, 'debugger; debugger;');
-        const recorded = await check('--suppress-all', relative, physical);
-        expect(recorded.exitCode, recorded.stderr).toBe(0);
-        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-          [relative]: two,
-        });
-        expect((await check(relative)).exitCode).toBe(0);
-        await fs.writeFile(
-          baseline,
-          JSON.stringify({ [relative]: one, [otherKey]: two }),
-        );
-        await fs.writeFile(physical, '');
-        expect(
-          (await check('--prune-suppressions', physical, relative)).exitCode,
-        ).toBe(0);
-        expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
-          [otherKey]: two,
-        });
-
-        const upperDir = path.join(parent, 'LINK', 'b');
-        if (existsSync(upperDir)) {
-          // Discovery can coalesce two spellings of the same scan root.
-          const upperKey = path.relative(
-            path.join(repo, 'a'),
-            path.join(upperDir, 'file.js'),
-          );
-          await fs.writeFile(
-            baseline,
-            JSON.stringify({ [relative]: one, [upperKey]: two }),
-          );
-          await fs.writeFile(physical, 'debugger; debugger;');
-          for (const args of [
-            ['../b/*.js', upperDir],
-            [
-              '--config',
-              path.join(parent, 'rslint.config.mjs'),
-              '../b',
-              path.join(upperDir, '*.js'),
-            ],
-          ]) {
-            const mixed = await check(...args);
-            expect(mixed.exitCode, mixed.stderr).toBe(1);
-            expect(mixed.stdout.trim().split('\n')).toHaveLength(2);
-          }
-          await fs.writeFile(physical, '');
-          expect(
-            (await check('--prune-suppressions', upperDir, '../b/*.js'))
-              .exitCode,
-          ).toBe(0);
-          expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({});
-        }
+          result.stdout
+            .trim()
+            .split('\n')
+            .map((line) => JSON.parse(line).ruleName),
+        ).toEqual(['no-debugger', 'no-debugger']);
       }
+      expect(await fs.readFile(baseline, 'utf8')).toBe(seeded);
+
+      await fs.rm(baseline);
+      const recorded = await check('--suppress-all', ...paths);
+      expect(recorded.exitCode, recorded.stderr).toBe(0);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual({
+        [relative]: two,
+      });
+
+      await fs.writeFile(baseline, seeded);
+      await fs.writeFile(physical, '');
+      const pruned = await check('--prune-suppressions', ...reversed);
+      expect(pruned.exitCode, pruned.stderr).toBe(0);
+      expect(JSON.parse(await fs.readFile(baseline, 'utf8'))).toEqual(alias);
     } finally {
       await cleanupTempDir(temp);
     }

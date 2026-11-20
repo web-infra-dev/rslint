@@ -259,7 +259,7 @@ func TestDiscoverCLISingleThreadedConfigPreparesPlugins(t *testing.T) {
 	peer.Start()
 	args := lintArgs{FS: osvfs.FS(), SingleThreaded: true}
 	payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
-	if err := discoverCLIConfigCatalog(context.Background(), tspath.NormalizePath(dir), &args, &payload, cli); err != nil {
+	if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Equal(kinds, []ipc.MessageKind{kindLoadConfigs, kindPrepareConfigs}) {

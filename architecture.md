@@ -1489,26 +1489,16 @@ in `internal/config/lint`, Program construction in `internal/program/loader`,
 the complete lint/fix lifecycle in `internal/linter`, and report rendering in
 `internal/output`.
 
-Before expanding file operands and discovering configurations, the file CLI
-reads its optional bulk suppressions file in the calling working directory.
-Only an active baseline needs operand spellings from a symlinked working
-directory. After the final lint or fix observation, the CLI passes diagnostics
-and selected files to `internal/suppressions`. It marks files with syntax errors
-as unchecked.
-The lint plan identifies rules skipped for lack of type information. The plugin
-dispatcher identifies the files and error-level rules affected by incomplete
-worker results. The CLI passes these exclusions to the package, which compares
-completed rule counts and owns baseline persistence. For a symlinked working
-directory, discovery retains the operands that reached each file or scan
-root. The target plan identifies the filename kept when it coalesces aliases.
-The CLI uses both facts to associate input spellings with completed lint
-results. Each distinct key for a result must cover that rule's error count.
-Repeating an operand that resolves to the same key preserves the single-input
-lookup. A separately requested filename that was skipped can retain its own
-entry. Rules can inspect the filename, so each completed lint result owns
-its keys. A portable fallback is used only when no other result claims it. The CLI
-blocks baseline writes after configuration or plugin failures and supplies
-visible diagnostics and any baseline failure to report assembly.
+The file CLI opens the optional suppressions file after config evaluation and
+before lint or autofix. After the final observation, it passes completed
+files, skipped rules and diagnostics to `internal/suppressions`. The reported
+filename identifies its diagnostics. The canonical path frozen during target
+selection identifies its baseline entry. Recording, checking and pruning use
+that same key relative to the physical working directory.
+
+Files with syntax errors and rules skipped for lack of type information keep
+their entries. The plugin dispatcher identifies incomplete rule results.
+Configuration and plugin failures block baseline writes.
 
 The Go API mode similarly prepares one request in
 `internal/api/server/lint.go` and calls `RunPipeline` once. Its generation provider

@@ -208,7 +208,7 @@ func TestDiscoverCLIExplicitConfigProjectsMixedTargetsOnly(t *testing.T) {
 			}
 			payload := initPayload{ConfigDiscovery: &configDiscoveryPayload{ExplicitConfigPath: configPath}}
 
-			if err := discoverCLIConfigCatalog(context.Background(), root, &args, &payload, cli); err != nil {
+			if err := discoverCLIConfigCatalog(context.Background(), &args, &payload, cli); err != nil {
 				t.Fatalf("discoverCLIConfigCatalog: %v", err)
 			}
 			if args.ConfigCatalog == nil || !args.ConfigCatalog.Explicit {

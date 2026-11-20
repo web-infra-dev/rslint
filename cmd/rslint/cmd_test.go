@@ -92,6 +92,7 @@ func runLintCommandWithDispatcherForTest(
 	t.Helper()
 
 	t.Chdir(cwd)
+	prepareCommandCatalogForTest(cwd, &args)
 
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
@@ -107,16 +108,7 @@ func runLintCommandWithDispatcherForTest(
 	originalStdout, originalStderr := os.Stdout, os.Stderr
 	os.Stdout, os.Stderr = stdoutW, stderrW
 
-	preflight, code := prepareLintCommand(args)
-	if code == 0 {
-		if err := prepareCLIInputs(t.Context(), &args, preflight); err != nil {
-			t.Errorf("prepare CLI inputs: %v", err)
-			code = 1
-		} else {
-			prepareCommandCatalogForTest(cwd, &args)
-			code = handleLintCommand(args, preflight, context.Background(), dispatch)
-		}
-	}
+	code := handleLintCommand(args, context.Background(), dispatch)
 
 	os.Stdout, os.Stderr = originalStdout, originalStderr
 	if err := stdoutW.Close(); err != nil {
