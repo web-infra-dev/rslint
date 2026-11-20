@@ -2241,10 +2241,10 @@ TypeScript nodes and expose `program: null`. Typed sessions also expose a
 read-only `Program` and type checker. `Program.emit()` and `SourceFile.update()`
 are unsupported.
 
-`internal/typeservice` runs queries against the existing Go `Program`. Each
-worker's `TypeServiceClient` requests compiler data on demand over a synchronous
-transport. Node maps belong to one file. Within a worker, types, symbols and
-signatures keep their identity across files in the same Program generation.
+`internal/typeservice` runs queries against the existing Go `Program`. In the
+worker, a `TypeServiceClient` requests compiler data on demand over a synchronous
+transport. Node maps belong to one file. The client preserves type, symbol and
+signature identities across files in its Program generation.
 
 ### Rule Extension Points
 
