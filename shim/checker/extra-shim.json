@@ -39,22 +39,88 @@
       "getTypeParameterFromMappedType",
       "getConstraintTypeFromMappedType",
       "getNameTypeFromMappedType",
-      "getTemplateTypeFromMappedType"
+      "getTemplateTypeFromMappedType",
+      "sortSymbols",
+      "getNamedMembers",
+      "getNodeBuilder",
+      "getAugmentedPropertiesOfType",
+      "getStringLiteralType",
+      "getNumberLiteralType",
+      "getBigIntLiteralType",
+      "getNullableType",
+      "getIndexInfosOfIndexSymbol",
+      "getPrivateIdentifierPropertyOfType",
+      "lookupSymbolForPrivateIdentifierDeclaration",
+      "getTypeOfAssignmentPattern",
+      "isOptionalParameter",
+      "getSignaturesOfSymbol",
+      "getSymbolOfDeclaration",
+      "getSymbolOfNode",
+      "instantiateTypes",
+      "newTypePredicate",
+      "typePredicateToStringEx"
     ]
   },
   "ExtraFields": {
     "Type": ["alias", "flags", "symbol", "objectFlags"],
-    "ConditionalType": ["root"],
-    "ConditionalRoot": ["node"],
-    "TupleType": ["combinedFlags"],
+    "ConditionalType": ["root", "resolvedTrueType", "resolvedFalseType"],
+    "ConditionalRoot": [
+      "node",
+      "checkType",
+      "extendsType",
+      "isDistributive",
+      "instantiations",
+      "inferTypeParameters",
+      "outerTypeParameters",
+      "alias"
+    ],
+    "TupleType": ["combinedFlags", "minLength"],
     "LiteralType": ["freshType", "regularType"],
-    "Signature": ["parameters", "declaration"],
+    "UnionType": ["regularType"],
+    "Relation": ["results"],
+    "IndexInfo": ["components"],
+    "TypeReference": ["node"],
+    "EvolvingArrayType": ["elementType", "finalArrayType"],
+    "TypeParameter": ["constraint"],
+    "Signature": ["parameters", "declaration", "mapper"],
     "Checker": [
+      "assignableRelation",
+      "identityRelation",
+      "subtypeRelation",
+      "strictSubtypeRelation",
+      "patternForType",
+      "cachedTypes",
+      "unresolvedType",
+      "regularTrueType",
+      "regularFalseType",
       "numberType",
       "booleanType",
       "globalRegExpType",
       "couldContainTypeVariables"
     ],
-    "InterfaceType": ["thisType"]
+    "InterfaceType": [
+      "thisType",
+      "declaredMembersResolved",
+      "declaredMembers",
+      "declaredCallSignatures",
+      "declaredConstructSignatures",
+      "declaredIndexInfos"
+    ],
+    "MappedType": [
+      "typeParameter",
+      "constraintType",
+      "templateType",
+      "modifiersType"
+    ],
+    "ValueSymbolLinks": ["resolvedType"]
+  },
+  "ExtraFieldPointers": {
+    "Checker": [
+      "apparentArgumentCount",
+      "serializationLevel",
+      "valueSymbolLinks.store"
+    ],
+    "CachedTypeKey": ["kind", "typeId"],
+    "IndexInfo": ["keyType", "valueType", "isReadonly", "declaration"]
   }
 }

@@ -58,6 +58,7 @@ type sourceBackend interface {
 // backend kind exposed to callers: the public facade simply cannot provide a
 // checker or program-wide type diagnostics for that source generation.
 type typeBackend interface {
+	CompilerQueries
 	typeCheckerForFile(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func())
 	typeCheckerForFileExclusive(ctx context.Context, file *ast.SourceFile) (*checker.Checker, func())
 	noEmitDiagnostics(ctx context.Context) []*ast.Diagnostic

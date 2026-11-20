@@ -203,6 +203,7 @@ function readFrame(req: LintFileRequest): ReturnType<typeof decodeFrame> {
 export function lintFile(
   req: LintFileRequest,
   loadedPlugins: LoadedPlugins,
+  services?: (frame: ReturnType<typeof decodeFrame>) => Record<string, unknown>,
 ): LintFileResult {
   const result: LintFileResult = {
     filePath: req.filePath,
@@ -230,7 +231,10 @@ export function lintFile(
   // of `languageOptions`. No legacy positions are accepted.
   // Lazy SourceCode resources may outlive lintFile. Keep their language
   // metadata, rather than capturing the request and its transport frame.
-  const languageOptions = req.languageOptions;
+  const languageOptions =
+    services && !req.languageOptions?.parserOptions
+      ? { ...req.languageOptions, parserOptions: {} }
+      : req.languageOptions;
   const globals = languageOptions?.globals;
   const ecmaFeatures = languageOptions?.parserOptions?.ecmaFeatures;
   const createScopeManager = makeScopeManagerFactory(ast, {
@@ -288,6 +292,7 @@ export function lintFile(
       ends: parsed.tokenEnds,
     },
   });
+  if (services) sharedSourceCode.parserServices = services(parsed);
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
   // to the AST root directly. the frame decoder doesn't, so plugin rules that

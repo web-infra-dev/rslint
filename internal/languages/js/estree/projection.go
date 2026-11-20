@@ -64,6 +64,8 @@ type estreeProjector struct {
 	triviaStarts     map[int]int
 	frameBytes       uint64
 	scan             scanner.Scanner
+	origin           *ast.Node
+	mapping          *originProjection
 }
 
 // Options are syntax metadata already resolved by the linter.
@@ -71,6 +73,9 @@ type Options struct {
 	SourceType string
 	HasBOM     bool
 }
+
+// Keep the first reverse mapping reserved after its frame ID is reclaimed.
+const detachedChainReverse = ^uint32(0)
 
 // Builder reuses scratch for sequential projections. Build returns
 // independently owned bytes and clears every source-backed reference on return.
@@ -137,6 +142,10 @@ func (b *Builder) Build(ctx context.Context, file *ast.SourceFile, options Optio
 // storage must remain immutable until every consumer has finished; it never
 // aliases the Builder's scratch. allocate is called synchronously at most once.
 func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte) (data []byte, err error) {
+	return b.build(ctx, file, options, allocate, nil)
+}
+
+func (b *Builder) build(ctx context.Context, file *ast.SourceFile, options Options, allocate func(int) []byte, mapping *originProjection) (data []byte, err error) {
 	if options.SourceType != "module" && options.SourceType != "script" && options.SourceType != "commonjs" {
 		return nil, fmt.Errorf("invalid ESTree sourceType %q", options.SourceType)
 	}
@@ -157,6 +166,7 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	p.file = file
 	p.text = file.Text()
 	p.sourceType = options.SourceType
+	p.mapping = mapping
 	if options.SourceType == "commonjs" {
 		p.sourceType = "script"
 	}
@@ -180,6 +190,11 @@ func (b *Builder) BuildInto(ctx context.Context, file *ast.SourceFile, options O
 	}
 	p.tokenCovers = p.tokenCovers[:0]
 	root := p.convert(file.AsNode(), false)
+	if mapping != nil {
+		mapping.finish()
+		p.check()
+		return nil, nil
+	}
 	initialTokenBytes := maxInitialFrameBytes - int(min(p.frameBytes, maxInitialFrameBytes))
 	b.tokens = slices.Grow(b.tokens[:0], min(max(16, file.NodeCount*2), initialTokenBytes/9))
 	b.tokens, b.comments = scanTokensAndCommentsInto(ctx, &p.scan, file, p.offsets, p.tokenCovers, b.tokens[:0], b.comments[:0], maxWireFrameSize-int(p.frameBytes))
@@ -193,6 +208,8 @@ func (p *estreeProjector) check() {
 }
 
 func (p *estreeProjector) clearSource() {
+	p.origin = nil
+	p.mapping = nil
 	p.file = nil
 	p.text = ""
 	p.sourceType = ""
@@ -382,6 +399,13 @@ func (p *estreeProjector) add(typeName string, start, end uint32, values ...uint
 		end:        end,
 		valueStart: uint32(len(p.values)),
 	})
+	if p.mapping != nil {
+		origin := p.origin
+		if typeName == "TSTypeAnnotation" || typeName == "TSTypeParameterDeclaration" {
+			origin = nil
+		}
+		p.mapping.nodes = append(p.mapping.nodes, origin)
+	}
 	p.values = append(p.values, values...)
 	return id
 }
@@ -424,7 +448,11 @@ func (p *estreeProjector) rangeOf(node *ast.Node) (uint32, uint32) {
 
 func (p *estreeProjector) addNode(typeName string, node *ast.Node, values ...uint32) uint32 {
 	start, end := p.rangeOf(node)
-	return p.add(typeName, start, end, values...)
+	id := p.add(typeName, start, end, values...)
+	if p.mapping != nil {
+		p.mapping.nodes[id-1] = node
+	}
+	return id
 }
 
 func (p *estreeProjector) hasModifier(node *ast.Node, flag ast.ModifierFlags) bool {
