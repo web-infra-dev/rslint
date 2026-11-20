@@ -1912,8 +1912,16 @@ export class TypeServiceClient {
               continue;
             const desc = own(name, false)!;
             if (desc.get) {
-              if (name === Symbol.toStringTag) continue;
-              desc.get = desc.get.bind(self);
+              const getter = desc.get;
+              desc.get = () => {
+                try {
+                  return Reflect.apply(getter, self, []) as unknown;
+                } catch (error) {
+                  // Node 22 reads the display tag outside its getter formatter.
+                  if (name === Symbol.toStringTag) return undefined;
+                  throw error;
+                }
+              };
             }
             Object.defineProperty(display, name, desc);
           }
